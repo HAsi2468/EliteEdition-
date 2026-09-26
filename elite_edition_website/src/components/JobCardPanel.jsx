@@ -1971,7 +1971,7 @@ const rowStyle = {
 };
 
 // ─── MAIN PANEL ──────────────────────────────────────────────────────────────
-export default function JobCardPanel({ activeSubTab = 'jobcards', department }) {
+export default function JobCardPanel({ activeSubTab = 'jobcards', department, currentUser }) {
   const [cards, setCards] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalMtr, setTotalMtr] = useState(0);
@@ -2397,8 +2397,12 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <GarmentJobCardDashboard />
       ) : department === 'stitching' && (effectiveSubTab === 'challan' || effectiveSubTab === 'fabric_challan' || effectiveSubTab === 'stitching_challan') ? (
         <StitchingChallanPanel onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
-      ) : effectiveSubTab === 'catalogue' || effectiveSubTab === 'master' ? (
-        <DesignCatalogue department={department} initialSubTab={effectiveSubTab === 'master' ? 'master' : 'catalogue'} />
+      ) : effectiveSubTab === 'catalogue' || effectiveSubTab === 'master' || effectiveSubTab === 'sample' || effectiveSubTab === 'sample_design' ? (
+        <DesignCatalogue 
+          department={department} 
+          currentUser={currentUser}
+          initialSubTab={effectiveSubTab === 'master' ? 'master' : (effectiveSubTab === 'sample' || effectiveSubTab === 'sample_design') ? 'sample' : 'catalogue'} 
+        />
       ) : effectiveSubTab === 'fabric' ? (
         <FabricInventoryPanel department={department} onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
       ) : effectiveSubTab === 'billing' || effectiveSubTab === 'billing_digital' || effectiveSubTab === 'billing_elite' || effectiveSubTab === 'costing' || effectiveSubTab === 'costing_pl' ? (

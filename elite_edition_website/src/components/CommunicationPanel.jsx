@@ -20,6 +20,9 @@ import {
   ChevronRight,
   ChevronLeft,
   MoreVertical,
+  Phone,
+  Video,
+  MoreHorizontal,
   UserCheck,
   Building2,
   Zap,
@@ -109,7 +112,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setInputMessage(roomDrafts[activeGroup._id] || '');
   }, [activeGroup?._id]);
   const [msgFilter, setMsgFilter] = useState('all'); // 'all' | 'human' | 'system_activity' | 'urgent' | 'media'
-  const [rosterTab, setRosterTab] = useState('groups'); // 'groups' | 'direct'
+  const [rosterTab, setRosterTab] = useState('all'); // 'all' | 'groups' | 'direct'
+  const [phoenixFilter, setPhoenixFilter] = useState('all'); // 'all' | 'read' | 'unread'
   const [isUrgent, setIsUrgent] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [zoomImg, setZoomImg] = useState(null);
@@ -1815,62 +1819,68 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const filteredGroups = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
+    const myId = String(currentUser?._id || currentUser?.id || '');
 
+    const activeDmRooms = groups.filter((g) => g.type === 'direct');
+    const existingDmUserIds = new Set();
+    activeDmRooms.forEach((room) => {
+      const colleague = getDMColleague(room);
+      if (colleague) {
+        const cId = String(colleague._id || colleague.id || '');
+        if (cId) existingDmUserIds.add(cId);
+      }
+    });
+
+    const contactUsers = (allUsers || []).filter((u) => {
+      const uId = String(u._id || u.id || '');
+      return uId && uId !== myId && !existingDmUserIds.has(uId);
+    }).map((u) => ({
+      _id: `contact_${u._id || u.id}`,
+      isVirtualContact: true,
+      user: u,
+      name: u.name || u.username || u.email || 'Colleague',
+      type: 'direct',
+      department: u.department || 'General',
+      unreadCount: 0
+    }));
+
+    let baseItems = [];
     if (rosterTab === 'groups') {
-      return groups.filter((g) => {
-        if (g.type === 'direct') return false;
-        if (!term) return true;
-        return (
-          (g.name || '').toLowerCase().includes(term) ||
-          (g.department || '').toLowerCase().includes(term) ||
-          (g.permissionScope || '').toLowerCase().includes(term)
-        );
-      });
+      baseItems = groups.filter((g) => g.type !== 'direct');
+    } else if (rosterTab === 'direct') {
+      baseItems = [...activeDmRooms, ...contactUsers];
+    } else {
+      // 'all': combined groups, active DMs, and colleagues
+      baseItems = [...groups.filter((g) => g.type !== 'direct'), ...activeDmRooms, ...contactUsers];
     }
 
-    if (rosterTab === 'direct') {
-      const myId = String(currentUser?._id || currentUser?.id || '');
-      const activeDmRooms = groups.filter((g) => g.type === 'direct');
+    // Filter by Phoenix Segmented Tabs: All | Read | Unread
+    if (phoenixFilter === 'read') {
+      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) === 0);
+    } else if (phoenixFilter === 'unread') {
+      baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) > 0);
+    }
 
-      const existingDmUserIds = new Set();
-      activeDmRooms.forEach((room) => {
-        const colleague = getDMColleague(room);
-        if (colleague) {
-          const cId = String(colleague._id || colleague.id || '');
-          if (cId) existingDmUserIds.add(cId);
-        }
-      });
+    if (!term) return baseItems;
 
-      const contactUsers = (allUsers || []).filter((u) => {
-        const uId = String(u._id || u.id || '');
-        return uId && uId !== myId && !existingDmUserIds.has(uId);
-      }).map((u) => ({
-        _id: `contact_${u._id || u.id}`,
-        isVirtualContact: true,
-        user: u,
-        name: u.name || u.username || u.email || 'Colleague',
-        type: 'direct',
-        department: u.department || 'General'
-      }));
-
-      const combined = [...activeDmRooms, ...contactUsers];
-
-      if (!term) return combined;
-
-      return combined.filter((item) => {
-        if (item.isVirtualContact) {
-          return (item.name || '').toLowerCase().includes(term) ||
-                 (item.user?.department || '').toLowerCase().includes(term) ||
-                 (item.user?.role || '').toLowerCase().includes(term);
-        }
+    return baseItems.filter((item) => {
+      if (item.isVirtualContact) {
+        return (item.name || '').toLowerCase().includes(term) ||
+               (item.user?.department || '').toLowerCase().includes(term) ||
+               (item.user?.role || '').toLowerCase().includes(term);
+      }
+      if (item.type === 'direct') {
         const colleague = getDMColleague(item);
         const cName = colleague ? (colleague.name || colleague.username || '').toLowerCase() : (item.name || '').toLowerCase();
         return cName.includes(term);
-      });
-    }
-
-    return groups;
-  }, [groups, allUsers, rosterTab, searchQuery, currentUser]);
+      }
+      return (
+        (item.name || '').toLowerCase().includes(term) ||
+        (item.department || '').toLowerCase().includes(term) ||
+        (item.permissionScope || '').toLowerCase().includes(term)
+      );
+    });
+  }, [groups, allUsers, rosterTab, phoenixFilter, searchQuery, currentUser]);
 
   const getDeptColor = (dept) => {
     switch ((dept || '').toLowerCase()) {
@@ -2049,323 +2059,157 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       style={{
         display: 'flex',
         flexDirection: 'column',
-        position: isMobileScreen && activeGroup ? 'fixed' : 'relative',
-        top: isMobileScreen && activeGroup ? 0 : 'auto',
-        left: isMobileScreen && activeGroup ? 0 : 'auto',
-        right: isMobileScreen && activeGroup ? 0 : 'auto',
-        bottom: isMobileScreen && activeGroup ? 0 : 'auto',
-        width: isMobileScreen && activeGroup ? '100vw' : 'auto',
+        width: '100%',
         height: isMobileScreen && activeGroup
           ? (viewportHeight ? `${viewportHeight}px` : '100dvh')
-          : (isMobileScreen ? 'calc(100dvh - 70px)' : 'calc(100vh - 70px)'),
-        maxHeight: isMobileScreen && activeGroup
-          ? (viewportHeight ? `${viewportHeight}px` : '100dvh')
-          : undefined,
-        zIndex: isMobileScreen && activeGroup ? 9999 : 'auto',
-        padding: isMobileScreen ? (activeGroup ? '0' : '0.4rem') : '0.75rem',
-        gap: isMobileScreen ? (activeGroup ? '0' : '0.35rem') : '0.75rem',
-        background: 'var(--bg-main)',
+          : '100%',
+        padding: isMobileScreen ? 0 : '0.85rem',
         boxSizing: 'border-box',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        background: isMobileScreen ? 'var(--bg-card, #ffffff)' : 'var(--bg-main, #f5f7fa)'
       }}
     >
-      
-      {/* ── TOP HEADER / ACTION BAR WITH PRIMARY TAB SWITCHER (Hidden on mobile when inside active chat) ── */}
-      {(!isMobileScreen || !activeGroup) && (
-        <div className="glass-panel" style={{
-          padding: isMobileScreen ? '0.5rem 0.75rem' : '0.75rem 1.1rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderRadius: isMobileScreen ? '10px' : '14px',
-          background: 'var(--bg-card)',
-          flexWrap: isMobileScreen ? 'nowrap' : 'wrap',
-          gap: '0.5rem',
-          border: '1px solid var(--border-light, #e2e8f0)',
-          boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)',
-          flexShrink: 0
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-            <div style={{ width: isMobileScreen ? 32 : 40, height: isMobileScreen ? 32 : 40, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 14px rgba(37,99,235,0.3)', flexShrink: 0 }}>
-              {mainTab === 'chat' ? <MessageSquare size={isMobileScreen ? 17 : 21} /> : <CheckSquare size={isMobileScreen ? 17 : 21} />}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <h2 style={{ margin: 0, fontSize: isMobileScreen ? '0.92rem' : '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {isMobileScreen ? 'Inter-Dept Chat' : 'Inter-Department Communication & Activity Stream'}
-                </h2>
-                {!isMobileScreen && (
-                  <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    LIVE SYNC
-                  </span>
-                )}
-              </div>
-              {!isMobileScreen && (
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                  {mainTab === 'chat'
-                    ? 'Group Channels, Direct Messages & Real-Time Activity Stream'
-                    : 'Task Management, Department Assignments & Progress Tracking'}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* 🌟 PRIMARY TAB SWITCHER: Chat | Tasks 🌟 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input, #f1f5f9)', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-light, #cbd5e1)', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => { setMainTab('chat'); setRosterTab('groups'); }}
-              style={{
-                padding: isMobileScreen ? '0.35rem 0.75rem' : '0.5rem 1.25rem',
-                fontSize: isMobileScreen ? '0.75rem' : '0.84rem',
-                fontWeight: 800,
-                borderRadius: '7px',
-                border: 'none',
-                background: mainTab === 'chat' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
-                color: mainTab === 'chat' ? '#ffffff' : 'var(--text-muted, #475569)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                boxShadow: mainTab === 'chat' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
-                transition: 'all 0.18s ease',
-                position: 'relative'
-              }}
-            >
-              <MessageSquare size={14} />
-              <span>Chat</span>
-              {totalChatUnreadCount > 0 && (
-                <span style={{
-                  background: '#ef4444',
-                  color: '#ffffff',
-                  fontSize: '0.62rem',
-                  fontWeight: 900,
-                  padding: '1px 5px',
-                  borderRadius: '10px',
-                  lineHeight: '1.2',
-                  boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
-                }}>
-                  {totalChatUnreadCount > 99 ? '99+' : totalChatUnreadCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setMainTab('task'); }}
-              style={{
-                padding: isMobileScreen ? '0.35rem 0.75rem' : '0.5rem 1.25rem',
-                fontSize: isMobileScreen ? '0.75rem' : '0.84rem',
-                fontWeight: 800,
-                borderRadius: '7px',
-                border: 'none',
-                background: mainTab === 'task' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
-                color: mainTab === 'task' ? '#ffffff' : 'var(--text-muted, #475569)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                boxShadow: mainTab === 'task' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
-                transition: 'all 0.18s ease'
-              }}
-            >
-              <CheckSquare size={14} />
-              <span>Tasks</span>
-            </button>
-          </div>
-
-          {!isMobileScreen && (
-            <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center' }}>
-              {mainTab === 'chat' && currentUser?.role === 'admin' && (
-                <button
-                  onClick={handleOpenCreateGroupModal}
-                  className="btn-primary"
-                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', fontWeight: 700 }}
-                  title="Create a new custom communication group with members"
-                >
-                  <PlusCircle size={14} />
-                  <span>+ Create Group</span>
-                </button>
-              )}
-
-              <button
-                onClick={async () => {
-                  if (!window.confirm('Are you sure you want to force a hard reload for ALL connected users across the company? Connected browsers will clear caches and reload immediately.')) return;
-                  try {
-                    await api.forceReloadAllUsers();
-                    alert('⚡ Hard reload signal sent to all connected users!');
-                  } catch (err) {
-                    alert('Failed to send reload signal: ' + err.message);
-                  }
-                }}
-                className="btn-secondary"
-                style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', color: '#d97706', borderColor: '#f59e0b40', fontWeight: 700 }}
-                title="Force clear cache & hard reload all connected users instantly"
-              >
-                <Zap size={13} color="#d97706" />
-                <span>Hard Refresh All</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── MAIN CONTENT VIEW (IF TASK MODE SELECTED: FULL TASK PANEL | IF CHAT MODE: SPLIT ROSTER & STREAM) ── */}
+      {/* ── MAIN CONTENT VIEW (IF TASK MODE: FULL TASK PANEL | IF CHAT MODE: PHOENIX CHAT LAYOUT) ── */}
       {mainTab === 'task' ? (
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 1rem', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-light)', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setMainTab('chat')}
+              className="phoenix-action-btn-neutral"
+              style={{ gap: '6px', width: 'auto', padding: '0 12px', fontSize: '0.82rem', fontWeight: 700 }}
+            >
+              <ChevronLeft size={16} />
+              <span>Back to Chats</span>
+            </button>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Task Management Board</h3>
+            <div />
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+          </div>
         </div>
       ) : (
-      <div style={{ display: isMobileScreen ? 'flex' : 'grid', flexDirection: isMobileScreen ? 'column' : 'initial', gridTemplateColumns: isMobileScreen ? '1fr' : '290px 1fr', gap: '0.75rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="phoenix-chat-layout" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         
-        {/* ════ LEFT COLUMN: GROUPS & DM ROSTER ════ */}
-        <div className="glass-panel" style={{ display: (isMobileScreen && activeGroup && rosterTab !== 'tasks') ? 'none' : 'flex', flexDirection: 'column', height: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+        {/* ════ LEFT COLUMN: PHOENIX CONVERSATIONS SIDEBAR ════ */}
+        <div className="phoenix-chat-sidebar" style={{ display: (isMobileScreen && activeGroup) ? 'none' : 'flex' }}>
           
-          {/* Dual Roster Mode Switcher Pills (Groups vs Personal DMs) */}
-          <div style={{ padding: '0.5rem 0.65rem', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-th)', display: 'flex', gap: '4px', flexShrink: 0 }}>
-            <button
-              onClick={() => handleRosterTabChange('groups')}
-              style={{
-                flex: 1,
-                padding: '0.35rem 0.45rem',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                borderRadius: '6px',
-                border: rosterTab === 'groups' ? '1px solid #2563eb' : '1px solid transparent',
-                background: rosterTab === 'groups' ? '#2563eb' : 'transparent',
-                color: rosterTab === 'groups' ? '#ffffff' : 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Building2 size={13} />
-              <span>Groups</span>
-              {groupUnreadCount > 0 && (
-                <span style={{
-                  background: rosterTab === 'groups' ? '#ffffff' : '#ef4444',
-                  color: rosterTab === 'groups' ? '#2563eb' : '#ffffff',
-                  fontSize: '0.62rem',
-                  fontWeight: 900,
-                  padding: '1px 5px',
-                  borderRadius: '10px',
-                  lineHeight: '1.2',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
-                }}>
-                  {groupUnreadCount > 99 ? '99+' : groupUnreadCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => handleRosterTabChange('direct')}
-              style={{
-                flex: 1,
-                padding: '0.35rem 0.45rem',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                borderRadius: '6px',
-                border: rosterTab === 'direct' ? '1px solid #2563eb' : '1px solid transparent',
-                background: rosterTab === 'direct' ? '#2563eb' : 'transparent',
-                color: rosterTab === 'direct' ? '#ffffff' : 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <User size={13} />
-              <span>Personal DMs</span>
-              {dmUnreadCount > 0 && (
-                <span style={{
-                  background: rosterTab === 'direct' ? '#ffffff' : '#ef4444',
-                  color: rosterTab === 'direct' ? '#2563eb' : '#ffffff',
-                  fontSize: '0.62rem',
-                  fontWeight: 900,
-                  padding: '1px 5px',
-                  borderRadius: '10px',
-                  lineHeight: '1.2',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
-                }}>
-                  {dmUnreadCount > 99 ? '99+' : dmUnreadCount}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Search Bar & New DM / Group Button */}
-          <div style={{ padding: '0.55rem 0.65rem', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
-            <div style={{ position: 'relative', flex: 1 }}>
-              <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                placeholder={rosterTab === 'groups' ? 'Search groups...' : 'Search contacts...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ width: '100%', paddingLeft: '28px', fontSize: '0.75rem', height: '30px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
-              />
+          {/* Phoenix Sidebar Top Bar: Chats title + Presence + Task toggle + Add Chat button */}
+          <div style={{ padding: '0.85rem 1rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '1px solid var(--border-light, #e3e6ed)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: 'var(--text-primary, #141824)', letterSpacing: '-0.02em' }}>
+                Chats
+              </h2>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#25b865', display: 'inline-block' }} title="Live Presence Active" />
             </div>
 
-            {rosterTab === 'direct' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* Task Toggle Pill */}
               <button
-                onClick={handleOpenNewDmModal}
-                className="btn-primary"
-                style={{ padding: '0.35rem 0.6rem', height: '30px', fontSize: '0.72rem', borderRadius: '6px', gap: '3px' }}
-                title="Start 1-on-1 private chat with a colleague"
+                type="button"
+                onClick={() => setMainTab('task')}
+                className="phoenix-action-btn-neutral"
+                style={{ width: 'auto', padding: '0 10px', height: '32px', fontSize: '0.76rem', fontWeight: 700, gap: '4px' }}
+                title="Switch to Kanban Tasks"
               >
-                <Plus size={13} />
-                <span>New</span>
+                <CheckSquare size={13} color="#3874ff" />
+                <span>Tasks</span>
               </button>
-            ) : currentUser?.role === 'admin' ? (
+
+              {/* + Button for New Chat / Group */}
               <button
-                onClick={handleOpenCreateGroupModal}
-                className="btn-primary"
-                style={{ padding: '0.35rem 0.6rem', height: '30px', fontSize: '0.72rem', borderRadius: '6px', gap: '3px' }}
-                title="Create a new communication group with staff members"
+                type="button"
+                onClick={currentUser?.role === 'admin' ? handleOpenCreateGroupModal : handleOpenNewDmModal}
+                className="phoenix-action-btn-blue"
+                style={{ width: '32px', height: '32px', borderRadius: '8px' }}
+                title={currentUser?.role === 'admin' ? "Create Group Channel" : "New Direct Message"}
               >
-                <Plus size={13} />
-                <span>Group</span>
+                <Plus size={16} />
               </button>
-            ) : null}
+            </div>
           </div>
 
-          {/* Roster Channels List */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0.4rem' }}>
+          {/* Phoenix Search Box */}
+          <div style={{ padding: '0.75rem 0.85rem 0.45rem', flexShrink: 0 }}>
+            <div className="phoenix-search-box">
+              <User size={15} color="var(--text-muted, #9aa5b8)" style={{ flexShrink: 0 }} />
+              <input
+                type="text"
+                className="phoenix-search-input"
+                placeholder="People, Groups and Messages"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Phoenix Filter Segmented Tabs (All | Read | Unread) */}
+          <div style={{ padding: '0 0.85rem 0.65rem', flexShrink: 0 }}>
+            <div className="phoenix-tab-segmented">
+              <button
+                type="button"
+                className={`phoenix-tab-pill ${phoenixFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setPhoenixFilter('all')}
+              >
+                <span>All</span>
+              </button>
+              <button
+                type="button"
+                className={`phoenix-tab-pill ${phoenixFilter === 'read' ? 'active' : ''}`}
+                onClick={() => setPhoenixFilter('read')}
+              >
+                <span>Read</span>
+              </button>
+              <button
+                type="button"
+                className={`phoenix-tab-pill ${phoenixFilter === 'unread' ? 'active' : ''}`}
+                onClick={() => setPhoenixFilter('unread')}
+              >
+                <span>Unread</span>
+                {totalChatUnreadCount > 0 && (
+                  <span style={{
+                    background: phoenixFilter === 'unread' ? '#3874ff' : '#ef4444',
+                    color: '#ffffff',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    marginLeft: '2px'
+                  }}>
+                    {totalChatUnreadCount > 99 ? '99+' : totalChatUnreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Phoenix Conversation Items List */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0.2rem 0.75rem 0.75rem' }}>
             {loadingGroups ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                <RefreshCw size={18} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
+              <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <RefreshCw size={20} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
                 <div>Loading conversations...</div>
               </div>
             ) : filteredGroups.length === 0 ? (
-              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                {rosterTab === 'groups' ? (
-                  <div>
-                    <div>No active groups found.</div>
-                    {currentUser?.role === 'admin' && (
-                      <button
-                        onClick={handleOpenCreateGroupModal}
-                        style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                      >
-                        + Create New Group
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <div>No direct messages yet.</div>
-                    <button
-                      onClick={handleOpenNewDmModal}
-                      style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                    >
-                      + Start Private Chat
-                    </button>
-                  </div>
-                )}
+              <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                <div>No conversations found in {phoenixFilter}.</div>
+                <button
+                  type="button"
+                  onClick={handleOpenNewDmModal}
+                  style={{ marginTop: '0.75rem', background: 'none', border: 'none', color: '#3874ff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  + Start a new direct conversation
+                </button>
               </div>
             ) : (
               filteredGroups.map((group) => {
@@ -2375,11 +2219,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 const colleague = isDirect ? (isVirtual ? group.user : getDMColleague(group)) : null;
                 const colleagueName = colleague ? (typeof colleague === 'object' ? (colleague.name || colleague.username || colleague.email) : group.name) : group.name;
                 const displayName = isDirect ? (colleagueName || group.name || 'Private DM') : group.name;
-                const deptCol = isDirect ? '#2563eb' : getDeptColor(group.department);
+                const deptCol = isDirect ? '#3874ff' : getDeptColor(group.department);
 
                 return (
                   <div
                     key={group._id}
+                    className={`phoenix-chat-item ${isActive ? 'active' : ''}`}
                     onClick={() => {
                       if (isVirtual && group.user) {
                         handleStartDirectChat(group.user);
@@ -2387,79 +2232,68 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         handleSelectGroup(group);
                       }
                     }}
-                    style={{
-                      padding: '0.55rem 0.65rem',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      marginBottom: '0.3rem',
-                      background: isActive ? 'var(--nav-active-bg, rgba(37,99,235,0.08))' : 'transparent',
-                      borderLeft: isActive ? `3.5px solid ${deptCol}` : '3.5px solid transparent',
-                      border: isActive ? `1px solid var(--border-light)` : '1px solid transparent',
-                      borderLeftColor: deptCol,
-                      transition: 'all 0.15s ease'
-                    }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        {isDirect ? (
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', color: '#fff', fontSize: '0.65rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {(displayName || 'D').charAt(0).toUpperCase()}
-                          </div>
-                        ) : (
-                          <Building2 size={13} color={deptCol} />
-                        )}
-                        <span style={{ fontSize: '0.8rem', fontWeight: isActive ? 800 : 700, color: 'var(--text-primary)', lineHeight: 1.25 }}>
+                    {/* Left: Avatar with green active presence dot */}
+                    <div
+                      className="phoenix-avatar-wrap"
+                      style={{
+                        background: isDirect
+                          ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
+                          : `${deptCol}18`,
+                        color: isDirect ? '#ffffff' : deptCol,
+                        border: isDirect ? 'none' : `1.5px solid ${deptCol}35`
+                      }}
+                    >
+                      {isDirect ? (
+                        (displayName || 'D').charAt(0).toUpperCase()
+                      ) : (
+                        <Building2 size={18} color={deptCol} />
+                      )}
+                      <span className="phoenix-online-dot" title="Active now" />
+                    </div>
+
+                    {/* Center & Right: Name, preview snippet, time, unread badge */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                        <span style={{
+                          fontSize: '0.86rem',
+                          fontWeight: isActive ? 800 : 700,
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
                           {displayName}
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {group.lastMessage ? formatTime(group.lastMessage.createdAt) : ''}
                         </span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {group.unreadCount > 0 && (
-                          <span style={{
-                            background: '#ef4444',
-                            color: '#ffffff',
-                            fontSize: '0.64rem',
-                            fontWeight: 900,
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            minWidth: '18px',
-                            height: '18px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
-                            border: '1px solid rgba(255, 255, 255, 0.4)'
-                          }}>
-                            {group.unreadCount > 99 ? '99+' : group.unreadCount}
-                          </span>
-                        )}
-                        {currentUser?.role === 'admin' && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group); }}
-                            style={{ background: 'none', border: 'none', color: '#dc2626', opacity: 0.6, cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                            title="Delete this group"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginTop: '3px' }}>
+                        <p style={{
+                          margin: 0,
+                          fontSize: '0.74rem',
+                          color: 'var(--text-muted)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          fontWeight: group.unreadCount > 0 ? 600 : 400
+                        }}>
+                          {group.lastMessage
+                            ? (group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged' : group.lastMessage.content)
+                            : (isDirect ? 'Say Hi to your new friend now' : (group.description || 'Channel conversation'))}
+                        </p>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                          {group.unreadCount > 0 && (
+                            <span className="phoenix-unread-pill">
+                              {group.unreadCount > 99 ? '99+' : `${group.unreadCount}+`}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px' }}>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: deptCol, background: `${deptCol}15`, padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        {isDirect ? 'DIRECT MESSAGE' : (group.department || 'GENERAL')}
-                      </span>
-                      <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                        {group.lastMessage ? formatTime(group.lastMessage.createdAt) : ''}
-                      </span>
-                    </div>
-
-                    {group.lastMessage && (
-                      <p style={{ margin: '3px 0 0', fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 400 }}>
-                        {group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged' : group.lastMessage.content}
-                      </p>
-                    )}
                   </div>
                 );
               })
@@ -2467,8 +2301,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           </div>
         </div>
 
-        {/* ════ RIGHT COLUMN: CHAT STREAM / TASK MANAGER / ACTIVITY FEED ════ */}
-        <div className="glass-panel" style={{ display: (isMobileScreen && !activeGroup && rosterTab !== 'tasks') ? 'none' : 'flex', flexDirection: 'column', height: '100%', borderRadius: isMobileScreen && activeGroup ? '0' : '12px', border: isMobileScreen && activeGroup ? 'none' : undefined, overflow: 'hidden' }}>
+        {/* ════ RIGHT COLUMN: PHOENIX ACTIVE CHAT STREAM ════ */}
+        <div className="phoenix-chat-main" style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex' }}>
           
           {rosterTab === 'tasks' ? (
             <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
@@ -2480,180 +2314,258 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 const colleague = isDirect ? getDMColleague(activeGroup) : null;
                 const colleagueName = colleague ? (typeof colleague === 'object' ? (colleague.name || colleague.username || colleague.email) : activeGroup.name) : activeGroup.name;
                 const displayName = isDirect ? (colleagueName || activeGroup.name || 'Private DM') : activeGroup.name;
+                const deptCol = isDirect ? '#3874ff' : getDeptColor(activeGroup.department);
 
                 return (
                   <>
                     <div style={{
-                      padding: isMobileScreen ? '0.45rem 0.65rem' : '0.65rem 1rem',
-                      borderBottom: '1px solid var(--border-light)',
+                      padding: isMobileScreen ? '0.65rem 0.85rem' : '0.85rem 1.25rem',
+                      borderBottom: '1px solid var(--border-light, #e2e8f0)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      background: 'var(--bg-th, #f8fafc)',
+                      background: 'var(--bg-card)',
                       flexShrink: 0,
                       position: 'relative',
-                      gap: '0.5rem'
+                      gap: '0.75rem'
                     }}>
-                      {/* Left: Back Button (Mobile) + Avatar + Display Name */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '0.45rem' : '0.65rem', minWidth: 0, flex: 1 }}>
+                      {/* Left: Back Button (Mobile) + Avatar + Display Name with Chevron Dropdown + Active now indicator */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '0.5rem' : '0.75rem', minWidth: 0 }}>
                         {isMobileScreen && activeGroup && (
                           <button
+                            type="button"
                             onClick={() => { setActiveGroup(null); setShowMobileActionMenu(false); setShowMobileHeaderMenu(false); }}
-                            className="chat-icon-circle-btn"
+                            className="phoenix-action-btn-neutral"
                             style={{
-                              background: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              color: '#2563eb',
-                              padding: 0,
                               width: '32px',
                               height: '32px',
-                              minWidth: '32px',
-                              minHeight: '32px',
-                              boxSizing: 'border-box',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
+                              padding: 0,
                               marginRight: '2px',
                               flexShrink: 0
                             }}
                             title="Back to conversation list"
                           >
-                            <ChevronLeft size={20} color="#2563eb" />
+                            <ChevronLeft size={18} color="var(--text-primary)" />
                           </button>
                         )}
-                        {isDirect ? (
-                          <div style={{ width: isMobileScreen ? 32 : 34, height: isMobileScreen ? 32 : 34, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.85rem', fontWeight: 800, flexShrink: 0, boxShadow: '0 3px 10px rgba(37,99,235,0.3)' }}>
-                            {(displayName || 'D').charAt(0).toUpperCase()}
-                          </div>
-                        ) : (
-                          <div style={{ width: isMobileScreen ? 32 : 34, height: isMobileScreen ? 32 : 34, borderRadius: '8px', background: `${getDeptColor(activeGroup.department)}15`, border: `1.5px solid ${getDeptColor(activeGroup.department)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: getDeptColor(activeGroup.department), flexShrink: 0 }}>
-                            <Building2 size={16} />
-                          </div>
-                        )}
 
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <h3 style={{ margin: 0, fontSize: isMobileScreen ? '0.88rem' : '0.95rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {/* Avatar with Online Dot */}
+                        <div
+                          className="phoenix-avatar-wrap"
+                          style={{
+                            width: isMobileScreen ? 36 : 40,
+                            height: isMobileScreen ? 36 : 40,
+                            background: isDirect
+                              ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
+                              : `${deptCol}18`,
+                            color: isDirect ? '#ffffff' : deptCol,
+                            border: isDirect ? 'none' : `1.5px solid ${deptCol}35`
+                          }}
+                        >
+                          {isDirect ? (
+                            (displayName || 'D').charAt(0).toUpperCase()
+                          ) : (
+                            <Building2 size={18} color={deptCol} />
+                          )}
+                          <span className="phoenix-online-dot" title="Active now" />
+                        </div>
+
+                        {/* Name + Dropdown Chevron + Active Now Status */}
+                        <div style={{ minWidth: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowDesktopHeaderMenu(!showDesktopHeaderMenu)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              textAlign: 'left'
+                            }}
+                            title="Click for conversation options"
+                          >
+                            <h3 style={{
+                              margin: 0,
+                              fontSize: isMobileScreen ? '0.92rem' : '1.05rem',
+                              fontWeight: 800,
+                              color: 'var(--text-primary)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
                               {displayName}
                             </h3>
-                            {!isMobileScreen && (
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isDirect ? '#2563eb' : getDeptColor(activeGroup.department), background: isDirect ? '#eff6ff' : `${getDeptColor(activeGroup.department)}18`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                                {isDirect ? '1-on-1 PRIVATE DM' : activeGroup.department}
-                              </span>
-                            )}
+                            <ChevronDown size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                          </button>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                            <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
+                              Active now
+                            </span>
                           </div>
-                          <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {isDirect ? (
-                              <span>{colleague?.role ? `${colleague.role} · ` : ''}Private Chat</span>
-                            ) : (
-                              <span>{activeGroup.companyEntity || activeGroup.department || 'Group Channel'}</span>
-                            )}
-                          </p>
                         </div>
                       </div>
 
-                      {/* Right: Actions */}
-                      {isMobileScreen ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                          {/* Search */}
+                      {/* Right: Phone, Video, and More Options Buttons (Phoenix 1:1) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '4px' : '8px', flexShrink: 0 }}>
+                        {/* Phone Call Button */}
+                        <button
+                          type="button"
+                          className="phoenix-action-btn-blue"
+                          style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
+                          onClick={() => alert(`📞 Voice call initiated with ${displayName}...`)}
+                          title="Start Voice Call"
+                        >
+                          <Phone size={isMobileScreen ? 14 : 16} />
+                        </button>
+
+                        {/* Video Call Button */}
+                        <button
+                          type="button"
+                          className="phoenix-action-btn-blue"
+                          style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
+                          onClick={() => alert(`📹 Video call initiated with ${displayName}...`)}
+                          title="Start Video Call"
+                        >
+                          <Video size={isMobileScreen ? 14 : 16} />
+                        </button>
+
+                        {/* Three Dots More Options Menu */}
+                        <div style={{ position: 'relative' }}>
                           <button
                             type="button"
-                            onClick={() => setShowInRoomSearch(!showInRoomSearch)}
-                            style={{
-                              background: showInRoomSearch ? '#eff6ff' : 'transparent',
-                              border: showInRoomSearch ? '1px solid #bfdbfe' : 'none',
-                              color: showInRoomSearch ? '#2563eb' : 'var(--text-muted)',
-                              padding: '6px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            title="Search keywords"
+                            className="phoenix-action-btn-neutral"
+                            style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
+                            onClick={() => setShowDesktopHeaderMenu(!showDesktopHeaderMenu)}
+                            title="More Conversation Options"
                           >
-                            <Search size={17} />
+                            <MoreVertical size={isMobileScreen ? 14 : 16} />
                           </button>
 
-                          {/* Gallery */}
-                          <button
-                            type="button"
-                            onClick={() => setShowGalleryModal(true)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title="View Gallery"
-                          >
-                            <Folder size={17} />
-                          </button>
-
-                          {/* More Options Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => setShowMobileHeaderMenu(!showMobileHeaderMenu)}
-                            style={{
-                              background: showMobileHeaderMenu ? '#f1f5f9' : 'none',
-                              border: 'none',
-                              color: 'var(--text-muted)',
-                              padding: '6px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            title="More actions"
-                          >
-                            <MoreVertical size={18} />
-                          </button>
-
-                          {/* Mobile Header Dropdown Popup */}
-                          {showMobileHeaderMenu && (
+                          {/* Dropdown Menu */}
+                          {showDesktopHeaderMenu && (
                             <>
                               <div
-                                onClick={() => setShowMobileHeaderMenu(false)}
+                                onClick={() => setShowDesktopHeaderMenu(false)}
                                 style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
                               />
                               <div style={{
                                 position: 'absolute',
-                                top: '100%',
-                                right: '6px',
-                                marginTop: '4px',
+                                top: 'calc(100% + 6px)',
+                                right: 0,
                                 background: 'var(--bg-card, #ffffff)',
                                 border: '1px solid var(--border-light, #e2e8f0)',
                                 borderRadius: '12px',
-                                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                                boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
                                 zIndex: 9999,
                                 padding: '6px',
-                                minWidth: '180px',
+                                minWidth: '200px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '2px'
                               }}>
+                                {/* In-room Search */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowInRoomSearch(!showInRoomSearch); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Search size={14} color="#3874ff" />
+                                  <span>Search in Chat</span>
+                                </button>
+
+                                {/* Gallery */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowGalleryModal(true); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Folder size={14} color="#2563eb" />
+                                  <span>Shared Gallery</span>
+                                </button>
+
+                                {/* Create Task from chat */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); handleOpenTaskModalFromChat(); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <CheckSquare size={14} color="#10b981" />
+                                  <span>Create Task</span>
+                                </button>
+
+                                {/* Create Poll */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); setShowPollModal(true); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <BarChart2 size={14} color="#059669" />
+                                  <span>Create Poll</span>
+                                </button>
+
+                                {/* Share Record */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); handleOpenShareModal('jobcard'); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Share2 size={14} color="#9333ea" />
+                                  <span>Share Record Card</span>
+                                </button>
+
+                                {/* Members (if group) */}
                                 {!isDirect && (
                                   <button
                                     type="button"
-                                    onClick={() => { setShowMobileHeaderMenu(false); handleOpenMembers(); }}
+                                    onClick={() => { setShowDesktopHeaderMenu(false); handleOpenMembers(); }}
                                     style={{
                                       display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                      background: 'none', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
                                       fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
                                     }}
                                   >
-                                    <Users size={14} color="#2563eb" />
+                                    <Users size={14} color="#0ea5e9" />
                                     <span>Members ({activeGroup.members?.length || 0})</span>
                                   </button>
                                 )}
 
+                                {/* Sound Toggle */}
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setShowMobileHeaderMenu(false);
+                                    setShowDesktopHeaderMenu(false);
                                     const next = !chatSoundMuted;
                                     setChatSoundMuted(next);
                                     if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
                                   }}
                                   style={{
                                     display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'none', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
                                     fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
                                   }}
                                 >
@@ -2661,12 +2573,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   <span>{chatSoundMuted ? 'Unmute Sound' : 'Mute Sound'}</span>
                                 </button>
 
+                                {/* Export Chat Log */}
                                 <button
                                   type="button"
-                                  onClick={() => { setShowMobileHeaderMenu(false); handleExportChatLog(); }}
+                                  onClick={() => { setShowDesktopHeaderMenu(false); handleExportChatLog(); }}
                                   style={{
                                     display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'none', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
                                     fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
                                   }}
                                 >
@@ -2674,258 +2587,31 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   <span>Export Chat Log</span>
                                 </button>
 
+                                {/* Admin Delete */}
                                 {currentUser?.role === 'admin' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setShowMobileHeaderMenu(false); handleDeleteGroup(activeGroup); }}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                      background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                      fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700
-                                    }}
-                                  >
-                                    <Trash2 size={14} color="#dc2626" />
-                                    <span>Delete Group</span>
-                                  </button>
+                                  <>
+                                    <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '4px 0' }} />
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); handleDeleteGroup(activeGroup); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700
+                                      }}
+                                    >
+                                      <Trash2 size={14} color="#dc2626" />
+                                      <span>Delete Group</span>
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </>
                           )}
                         </div>
-                      ) : (
-                        /* Desktop full toolbar */
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ display: 'flex', background: 'var(--bg-main)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                            {[
-                              { id: 'all', label: 'All' },
-                              { id: 'human', label: '💬 Chat' },
-                              { id: 'system_activity', label: '🤖 Activity' },
-                              { id: 'urgent', label: '🚨 SOS' },
-                              { id: 'media', label: '📎 Media' },
-                            ].map((f) => (
-                              <button
-                                key={f.id}
-                                onClick={() => setMsgFilter(f.id)}
-                                style={{
-                                  background: msgFilter === f.id ? 'var(--primary)' : 'transparent',
-                                  color: msgFilter === f.id ? '#fff' : 'var(--text-muted)',
-                                  border: 'none',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  padding: '0.25rem 0.5rem',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s'
-                                }}
-                              >
-                                {f.label}
-                              </button>
-                            ))}
-                          </div>
-
-                          <button
-                            onClick={() => setShowInRoomSearch(!showInRoomSearch)}
-                            className="btn-secondary"
-                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px', background: showInRoomSearch ? 'rgba(56,189,248,0.15)' : undefined, borderColor: showInRoomSearch ? 'var(--primary)' : undefined }}
-                            title="Search keywords inside this message stream"
-                          >
-                            <Search size={13} color={showInRoomSearch ? 'var(--primary)' : 'currentColor'} />
-                            <span>Search</span>
-                          </button>
-
-                          {/* More Options Dropdown */}
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              type="button"
-                              onClick={() => setShowDesktopHeaderMenu(!showDesktopHeaderMenu)}
-                              className="btn-secondary"
-                              style={{
-                                fontSize: '0.75rem',
-                                padding: '0.35rem 0.65rem',
-                                gap: '0.35rem',
-                                borderRadius: '6px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                background: showDesktopHeaderMenu ? '#eff6ff' : undefined,
-                                borderColor: showDesktopHeaderMenu ? '#3b82f6' : undefined,
-                                color: showDesktopHeaderMenu ? '#1d4ed8' : 'currentColor',
-                                fontWeight: 600,
-                                cursor: 'pointer'
-                              }}
-                              title="More options"
-                            >
-                              <MoreVertical size={14} />
-                              <span>More</span>
-                            </button>
-
-                            {showDesktopHeaderMenu && (
-                              <>
-                                <div
-                                  onClick={() => setShowDesktopHeaderMenu(false)}
-                                  style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
-                                />
-                                <div style={{
-                                  position: 'absolute',
-                                  top: 'calc(100% + 6px)',
-                                  right: 0,
-                                  background: 'var(--bg-card, #ffffff)',
-                                  border: '1px solid var(--border-light, #e2e8f0)',
-                                  borderRadius: '10px',
-                                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
-                                  zIndex: 9999,
-                                  padding: '5px',
-                                  minWidth: '190px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '2px'
-                                }}>
-                                  {/* Gallery */}
-                                  <button
-                                    type="button"
-                                    onClick={() => { setShowDesktopHeaderMenu(false); setShowGalleryModal(true); }}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                      fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
-                                      transition: 'background 0.12s'
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                  >
-                                    <Folder size={14} color="#2563eb" />
-                                    <span>Gallery</span>
-                                  </button>
-
-                                  {/* Sound Toggle */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setShowDesktopHeaderMenu(false);
-                                      const next = !chatSoundMuted;
-                                      setChatSoundMuted(next);
-                                      if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
-                                    }}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                      fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
-                                      transition: 'background 0.12s'
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                  >
-                                    {chatSoundMuted ? <Volume2 size={14} color="#10b981" /> : <VolumeX size={14} color="#ef4444" />}
-                                    <span>{chatSoundMuted ? 'Unmute Sound' : 'Mute Sound'}</span>
-                                  </button>
-
-                                  {/* Export Chat Log */}
-                                  <button
-                                    type="button"
-                                    onClick={() => { setShowDesktopHeaderMenu(false); handleExportChatLog(); }}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                      fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
-                                      transition: 'background 0.12s'
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                  >
-                                    <FileText size={14} color="#8b5cf6" />
-                                    <span>Export Chat</span>
-                                  </button>
-
-                                  {/* Members (if not direct chat) */}
-                                  {!isDirect && (
-                                    <button
-                                      type="button"
-                                      onClick={() => { setShowDesktopHeaderMenu(false); handleOpenMembers(); }}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                        fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
-                                        transition: 'background 0.12s'
-                                      }}
-                                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
-                                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                    >
-                                      <Users size={14} color="#0ea5e9" />
-                                      <span>Members ({activeGroup.members?.length || 0})</span>
-                                    </button>
-                                  )}
-
-                                  {/* Delete Group (Admin only) */}
-                                  {currentUser?.role === 'admin' && (
-                                    <>
-                                      <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '3px 0' }} />
-                                      <button
-                                        type="button"
-                                        onClick={() => { setShowDesktopHeaderMenu(false); handleDeleteGroup(activeGroup); }}
-                                        style={{
-                                          display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                          background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                          fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700,
-                                          transition: 'background 0.12s'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#fecaca'}
-                                        onMouseLeave={e => e.currentTarget.style.background = '#fee2e2'}
-                                      >
-                                        <Trash2 size={14} color="#dc2626" />
-                                        <span>Delete Group</span>
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
                     </div>
+                  </div>
 
-                    {/* Horizontal Filter Pills for Mobile */}
-                    {isMobileScreen && (
-                      <div style={{
-                        display: 'flex',
-                        gap: '6px',
-                        padding: '6px 10px',
-                        borderBottom: '1px solid var(--border-light)',
-                        background: 'var(--bg-main, #f8fafc)',
-                        overflowX: 'auto',
-                        scrollbarWidth: 'none',
-                        WebkitOverflowScrolling: 'touch',
-                        flexShrink: 0
-                      }}>
-                        {[
-                          { id: 'all', label: 'All' },
-                          { id: 'human', label: '💬 Chat' },
-                          { id: 'system_activity', label: '🤖 Activity' },
-                          { id: 'urgent', label: '🚨 SOS' },
-                          { id: 'media', label: '📎 Media' },
-                        ].map((f) => (
-                          <button
-                            key={f.id}
-                            onClick={() => setMsgFilter(f.id)}
-                            style={{
-                              background: msgFilter === f.id ? 'var(--primary, #2563eb)' : 'var(--bg-card, #ffffff)',
-                              color: msgFilter === f.id ? '#ffffff' : 'var(--text-muted, #64748b)',
-                              border: msgFilter === f.id ? '1px solid var(--primary, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              padding: '4px 10px',
-                              borderRadius: '16px',
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                              flexShrink: 0,
-                              boxShadow: msgFilter === f.id ? '0 2px 6px rgba(37,99,235,0.25)' : 'none',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {f.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </>
                 );
               })()}
@@ -2974,7 +2660,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 ref={chatScrollRef}
                 onScroll={handleChatScroll}
                 onClick={() => setActiveMsgMenuId(null)}
-                className="wa-chat-container"
+                className="phoenix-chat-stream"
                 style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px' }}
               >
                 {loadingMoreMessages && (
@@ -3038,7 +2724,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         <React.Fragment key={msg._id}>
                           {showDateHeader && (
                             <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0', position: 'sticky', top: 0, zIndex: 10 }}>
-                              <span style={{ padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(15,23,42,0.75)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+                              <span className="phoenix-date-badge">
                                 {msgDateHeader}
                               </span>
                             </div>
@@ -3116,46 +2802,77 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <React.Fragment key={msg._id}>
                         {showDateHeader && (
                           <div style={{ display: 'flex', justifyContent: 'center', margin: '0.6rem 0', position: 'sticky', top: 4, zIndex: 10 }}>
-                            <span style={{ padding: '4px 12px', borderRadius: '7.5px', fontSize: '0.72rem', fontWeight: 600, background: '#ffffff', color: '#54656f', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)' }}>
+                            <span className="phoenix-date-badge">
                               {msgDateHeader}
                             </span>
                           </div>
                         )}
 
                         <div
-                          className={activeMsgMenuId === msg._id ? 'wa-msg-row menu-open' : 'wa-msg-row'}
                           style={{
-                            alignSelf: isMe ? 'flex-end' : 'flex-start',
-                            maxWidth: isMobileScreen ? '85%' : '72%',
-                            position: 'relative',
                             display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: isMe ? 'flex-end' : 'flex-start',
-                            marginBottom: '3px'
+                            alignItems: 'flex-end',
+                            gap: '8px',
+                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                            maxWidth: isMobileScreen ? '88%' : '75%',
+                            marginBottom: '6px',
+                            position: 'relative'
                           }}
                         >
+                          {!isMe && (
+                            <div
+                              className="phoenix-avatar-wrap"
+                              style={{
+                                width: 34,
+                                height: 34,
+                                fontSize: '0.75rem',
+                                flexShrink: 0,
+                                marginBottom: '2px',
+                                background: 'linear-gradient(135deg, #93c5fd 0%, #3b82f6 100%)',
+                                color: '#ffffff',
+                                border: 'none'
+                              }}
+                              title={msg.senderId?.name || msg.senderName || 'Staff Member'}
+                            >
+                              {(msg.senderId?.name || msg.senderName || 'S').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+
                           <div
-                            className="wa-msg-bubble"
+                            className={activeMsgMenuId === msg._id ? 'wa-msg-row menu-open' : 'wa-msg-row'}
                             style={{
-                              background: msg.priority === 'urgent'
-                                ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
-                                : (isMe ? '#2563eb' : '#ffffff'),
-                              color: msg.priority === 'urgent'
-                                ? (isMe ? '#ffffff' : '#991b1b')
-                                : (isMe ? '#ffffff' : '#0f172a'),
-                              padding: '6px 10px 6px 10px',
-                              borderRadius: isMe ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
-                              border: msg.priority === 'urgent'
-                                ? (isMe ? '1.5px solid #fca5a5' : '1.5px solid #ef4444')
-                                : (isMe ? 'none' : '1px solid #e2e8f0'),
-                              boxShadow: msg.priority === 'urgent' ? '0 3px 12px rgba(239,68,68,0.25)' : (isMe ? '0 1px 3px rgba(37,99,235,0.2)' : '0 1px 2px rgba(0,0,0,0.06)'),
-                              fontSize: '0.88rem',
-                              lineHeight: 1.42,
-                              wordBreak: 'break-word',
                               position: 'relative',
-                              minWidth: '75px'
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: isMe ? 'flex-end' : 'flex-start',
+                              minWidth: 0,
+                              flex: 1
                             }}
                           >
+                            <div
+                              className={isMe ? 'phoenix-bubble-sent' : 'phoenix-bubble-received'}
+                              style={{
+                                background: msg.priority === 'urgent'
+                                  ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
+                                  : (isMe ? '#3874ff' : 'var(--bg-card, #ffffff)'),
+                                color: msg.priority === 'urgent'
+                                  ? (isMe ? '#ffffff' : '#991b1b')
+                                  : (isMe ? '#ffffff' : 'var(--text-primary, #141824)'),
+                                padding: '12px 16px',
+                                borderRadius: '8px',
+                                border: msg.priority === 'urgent'
+                                  ? (isMe ? '1.5px solid #fca5a5' : '1.5px solid #ef4444')
+                                  : (isMe ? 'none' : '1px solid var(--border-light, #e3e6ed)'),
+                                boxShadow: msg.priority === 'urgent'
+                                  ? '0 3px 12px rgba(239,68,68,0.25)'
+                                  : (isMe ? '0 2px 8px rgba(56, 116, 255, 0.2)' : '0 1px 2px rgba(0,0,0,0.03)'),
+                                fontSize: '0.88rem',
+                                lineHeight: 1.5,
+                                wordBreak: 'break-word',
+                                position: 'relative',
+                                minWidth: '75px'
+                              }}
+                            >
                             {/* WhatsApp Down-Chevron Trigger */}
                             <button
                               type="button"
@@ -3526,60 +3243,54 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             {/* Text Content + Inline Timestamp & Read Ticks */}
                             <div style={{ fontSize: '0.88rem', lineHeight: '1.42', color: 'inherit' }}>
                               {!isPollMsg && renderContentWithMentions(msg.content)}
-
-                              <span
-                                style={{
-                                  float: 'right',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  fontSize: '0.66rem',
-                                  color: isMe ? 'rgba(255,255,255,0.85)' : '#64748b',
-                                  marginLeft: '8px',
-                                  marginTop: '3px',
-                                  userSelect: 'none',
-                                  verticalAlign: 'bottom',
-                                  position: 'relative',
-                                  top: '2px'
-                                }}
-                              >
-                                {msg.isPinned && <Pin size={10} color={isMe ? '#fef08a' : '#d97706'} style={{ transform: 'rotate(45deg)' }} />}
-                                <span>{formatTime(msg.createdAt)}</span>
-                                {isMe && (() => {
-                                  const myIdStr = String(currentUser?._id || currentUser?.id || '');
-                                  const isRead = Boolean(
-                                    msg.readBy &&
-                                    msg.readBy.some((u) => {
-                                      const uId = String(typeof u === 'object' ? (u._id || u.id) : u);
-                                      return uId && uId !== myIdStr;
-                                    })
-                                  );
-
-                                  return isRead ? (
-                                    <CheckCheck
-                                      size={14}
-                                      color="#38bdf8"
-                                      style={{
-                                        strokeWidth: 2.6,
-                                        filter: 'drop-shadow(0 0 2.5px rgba(56, 189, 248, 0.8))',
-                                        marginLeft: '1px'
-                                      }}
-                                      title="Read by recipient"
-                                    />
-                                  ) : (
-                                    <Check
-                                      size={13}
-                                      color="rgba(255, 255, 255, 0.55)"
-                                      style={{
-                                        strokeWidth: 2.2,
-                                        marginLeft: '1px'
-                                      }}
-                                      title="Sent"
-                                    />
-                                  );
-                                })()}
-                              </span>
                             </div>
+                          </div>
+
+                          {/* Phoenix Timestamp & Status below bubble */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: isMe ? 'flex-end' : 'flex-start',
+                              gap: '4px',
+                              marginTop: '3px',
+                              fontSize: '0.72rem',
+                              color: 'var(--text-muted, #9aa5b8)',
+                              fontWeight: 600,
+                              userSelect: 'none',
+                              width: '100%',
+                              paddingLeft: isMe ? 0 : '4px',
+                              paddingRight: isMe ? '4px' : 0
+                            }}
+                          >
+                            {msg.isPinned && <Pin size={10} color="#d97706" style={{ transform: 'rotate(45deg)' }} />}
+                            <span>{formatTime(msg.createdAt)}</span>
+                            {isMe && (() => {
+                              const myIdStr = String(currentUser?._id || currentUser?.id || '');
+                              const isRead = Boolean(
+                                msg.readBy &&
+                                msg.readBy.some((u) => {
+                                  const uId = String(typeof u === 'object' ? (u._id || u.id) : u);
+                                  return uId && uId !== myIdStr;
+                                })
+                              );
+
+                              return isRead ? (
+                                <CheckCheck
+                                  size={13}
+                                  color="#3874ff"
+                                  style={{ strokeWidth: 2.4, marginLeft: '2px' }}
+                                  title="Read by recipient"
+                                />
+                              ) : (
+                                <Check
+                                  size={12}
+                                  color="#9aa5b8"
+                                  style={{ strokeWidth: 2, marginLeft: '2px' }}
+                                  title="Sent"
+                                />
+                              );
+                            })()}
                           </div>
 
                           {/* Existing Reaction Badges (WhatsApp Style Overlapping Pill) */}
@@ -3671,6 +3382,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               </button>
                             </div>
                           )}
+                          </div>
                         </div>
                       </React.Fragment>
                     );
@@ -3708,33 +3420,30 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               )}
 
-              {/* Hidden File Input */}
-              <input type="file" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx,audio/*" />
-
-              {/* Chat Input Form */}
+              {/* Hidden File Input *              {/* Chat Input Form (Phoenix 1:1 Unified Desktop & Mobile) */}
               <form
                 onSubmit={handleSendMessage}
                 style={{
-                  padding: isMobileScreen ? '0.45rem 0.6rem' : '0.65rem 0.9rem',
-                  background: 'var(--bg-card)',
-                  borderTop: '1px solid var(--border-light)',
+                  padding: isMobileScreen ? '0.65rem 0.85rem' : '0.75rem 1.15rem',
+                  background: 'var(--bg-card, #ffffff)',
+                  borderTop: '1px solid var(--border-light, #e3e6ed)',
                   display: 'flex',
-                  gap: isMobileScreen ? '0.4rem' : '0.45rem',
-                  alignItems: 'center',
+                  flexDirection: 'column',
+                  gap: '8px',
                   flexShrink: 0,
                   position: 'relative'
                 }}
               >
                 {isRecordingAudio ? (
                   <div style={{
-                    flex: 1,
+                    width: '100%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     background: slideCancelActive ? '#fef2f2' : '#fee2e2',
                     border: slideCancelActive ? '1.5px dashed #ef4444' : '1px solid #fca5a5',
-                    padding: '0.4rem 0.8rem',
-                    borderRadius: '12px',
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: '8px',
                     color: '#b91c1c',
                     fontWeight: 800,
                     fontSize: '0.82rem',
@@ -3750,11 +3459,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         type="button"
                         onClick={() => stopAudioRecording(true)}
                         style={{
-                          background: '#2563eb',
+                          background: '#3874ff',
                           color: '#ffffff',
                           border: 'none',
                           padding: '0.3rem 0.75rem',
-                          borderRadius: '8px',
+                          borderRadius: '6px',
                           fontWeight: 800,
                           cursor: 'pointer',
                           fontSize: '0.78rem',
@@ -3768,367 +3477,221 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       </button>
                     </div>
                   </div>
-                ) : isMobileScreen ? (
+                ) : (
                   <>
-                    {/* Mobile Action Sheet Overlay & Menu */}
-                    {showMobileActionMenu && (
-                      <>
-                        <div
-                          onClick={() => setShowMobileActionMenu(false)}
-                          style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
-                        />
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '100%',
-                          left: '8px',
-                          marginBottom: '8px',
-                          background: 'var(--bg-card, #ffffff)',
-                          border: '1px solid var(--border-light, #e2e8f0)',
-                          borderRadius: '16px',
-                          boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
-                          zIndex: 9999,
-                          padding: '10px',
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(2, 1fr)',
-                          gap: '8px',
-                          width: '260px'
-                        }}>
-                          {/* File Attachment */}
-                          <button
-                            type="button"
-                            onClick={() => { setShowMobileActionMenu(false); fileInputRef.current && fileInputRef.current.click(); }}
-                            style={{
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
-                              background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', color: '#2563eb',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
-                            }}
-                          >
-                            <Paperclip size={20} color="#2563eb" />
-                            <span>Attach File</span>
-                          </button>
-
-                          {/* Voice Note */}
-                          <button
-                            type="button"
-                            onClick={() => { setShowMobileActionMenu(false); startAudioRecording(); }}
-                            style={{
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
-                              background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', color: '#16a34a',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
-                            }}
-                          >
-                            <Mic size={20} color="#16a34a" />
-                            <span>Voice Note</span>
-                          </button>
-
-                          {/* Department Poll */}
-                          <button
-                            type="button"
-                            onClick={() => { setShowMobileActionMenu(false); setShowPollModal(true); }}
-                            style={{
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
-                              background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', color: '#059669',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
-                            }}
-                          >
-                            <BarChart2 size={20} color="#059669" />
-                            <span>Create Poll</span>
-                          </button>
-
-                          {/* Share Record Card */}
-                          <button
-                            type="button"
-                            onClick={() => { setShowMobileActionMenu(false); handleOpenShareModal('jobcard'); }}
-                            style={{
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
-                              background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '10px', color: '#9333ea',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
-                            }}
-                          >
-                            <Share2 size={20} color="#9333ea" />
-                            <span>Share Record</span>
-                          </button>
-
-                          {/* Urgent SOS Alert Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => { setShowMobileActionMenu(false); setIsUrgent(!isUrgent); }}
-                            style={{
-                              gridColumn: 'span 2',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px',
-                              background: isUrgent ? '#ef4444' : '#fff1f2', border: '1px solid #fecdd3', borderRadius: '10px',
-                              color: isUrgent ? '#ffffff' : '#e11d48', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 800,
-                              minHeight: 'unset', boxSizing: 'border-box'
-                            }}
-                          >
-                            <AlertTriangle size={16} color={isUrgent ? '#ffffff' : '#e11d48'} />
-                            <span>{isUrgent ? '🚨 Urgent SOS Alert ACTIVE' : '🚨 Send as Urgent SOS Alert'}</span>
-                          </button>
-                        </div>
-                      </>
-                    )}
-
-                    {/* '+' Toggle button for tools on Mobile */}
-                    <button
-                      type="button"
-                      className="chat-icon-circle-btn"
-                      onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
-                      style={{
-                        background: showMobileActionMenu ? '#2563eb' : '#eff6ff',
-                        color: showMobileActionMenu ? '#ffffff' : '#2563eb',
-                        border: '1.5px solid #93c5fd',
-                        borderRadius: '50%',
-                        width: '36px',
-                        height: '36px',
-                        minWidth: '36px',
-                        minHeight: '36px',
-                        padding: 0,
-                        margin: 0,
-                        boxSizing: 'border-box',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                        transition: 'all 0.15s ease'
-                      }}
-                      title="Attachments & Tools"
-                    >
-                      <Plus size={20} strokeWidth={2.5} color={showMobileActionMenu ? '#ffffff' : '#2563eb'} style={{ width: 20, height: 20, stroke: showMobileActionMenu ? '#ffffff' : '#2563eb', transform: showMobileActionMenu ? 'rotate(45deg)' : 'none', transition: 'transform 0.15s ease', flexShrink: 0, display: 'block' }} />
-                    </button>
-
-                    {/* 1-tap File Attachment */}
-                    <button
-                      type="button"
-                      className="chat-icon-circle-btn"
-                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#64748b',
-                        padding: 0,
-                        width: '32px',
-                        height: '32px',
-                        minWidth: '32px',
-                        minHeight: '32px',
-                        boxSizing: 'border-box',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}
-                      title="Attach File"
-                    >
-                      <Paperclip size={19} strokeWidth={2.3} color="#64748b" style={{ width: 19, height: 19, stroke: '#64748b', flexShrink: 0, display: 'block' }} />
-                    </button>
-
-                    {/* SOS Tag if active */}
-                    {isUrgent && (
-                      <div style={{ background: '#ef4444', color: '#ffffff', fontSize: '0.66rem', fontWeight: 900, padding: '3px 7px', borderRadius: '12px', flexShrink: 0 }}>
-                        SOS
-                      </div>
-                    )}
-
-                    {/* Main input */}
-                    <input
-                      type="text"
-                      placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Message..."}
-                      value={inputMessage}
-                      onPaste={handlePasteClipboard}
-                      onFocus={() => {
-                        setTimeout(() => {
-                          chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-                        }, 250);
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setInputMessage(val);
-                        if (activeGroup?._id) {
-                          setRoomDrafts((prev) => ({ ...prev, [activeGroup._id]: val }));
-                        }
-                      }}
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        padding: '0.55rem 0.85rem',
-                        fontSize: isMobileScreen ? '16px' : '0.88rem',
-                        background: 'var(--bg-input, #f1f5f9)',
-                        border: isUrgent ? '1.5px solid #ef4444' : '1px solid var(--border-light, #cbd5e1)',
-                        borderRadius: '20px',
-                        color: 'var(--text-primary, #0f172a)',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-
-                    {/* Send / Mic Button */}
-                    {(inputMessage.trim() || attachedFile) ? (
-                      <button
-                        type="submit"
-                        className="chat-icon-circle-btn"
-                        style={{
-                          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: '36px',
-                          height: '36px',
-                          minWidth: '36px',
-                          minHeight: '36px',
-                          padding: 0,
-                          margin: 0,
-                          boxSizing: 'border-box',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          boxShadow: '0 3px 10px rgba(37,99,235,0.35)'
+                    {/* Top Row: Clean input / textarea matching Phoenix */}
+                    <div style={{ width: '100%' }}>
+                      <textarea
+                        rows={isMobileScreen ? 1 : 2}
+                        placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Type your message..."}
+                        value={inputMessage}
+                        onPaste={handlePasteClipboard}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage(e);
+                          }
                         }}
-                      >
-                        <Send size={16} strokeWidth={2.5} color="#ffffff" style={{ width: 16, height: 16, stroke: '#ffffff', flexShrink: 0, display: 'block', marginLeft: '1px' }} />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="chat-icon-circle-btn"
-                        onMouseDown={handlePushToTalkStart}
-                        onMouseUp={handlePushToTalkEnd}
-                        onTouchStart={handlePushToTalkStart}
-                        onTouchMove={handlePushToTalkMove}
-                        onTouchEnd={handlePushToTalkEnd}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (!isRecordingAudio && !isPushToTalkRef.current) {
-                            startAudioRecording();
+                        onFocus={() => {
+                          setTimeout(() => {
+                            chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+                          }, 250);
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setInputMessage(val);
+                          if (activeGroup?._id) {
+                            setRoomDrafts((prev) => ({ ...prev, [activeGroup._id]: val }));
                           }
                         }}
                         style={{
-                          background: '#eff6ff',
-                          color: '#2563eb',
-                          border: '1.5px solid #93c5fd',
-                          borderRadius: '50%',
-                          width: '36px',
-                          height: '36px',
-                          minWidth: '36px',
-                          minHeight: '36px',
-                          padding: 0,
-                          margin: 0,
+                          width: '100%',
+                          background: 'transparent',
+                          border: 'none',
+                          outline: 'none',
+                          resize: 'none',
+                          fontSize: isMobileScreen ? '16px' : '0.875rem',
+                          color: 'var(--text-primary, #141824)',
+                          padding: '2px 0',
                           boxSizing: 'border-box',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          userSelect: 'none',
-                          WebkitUserSelect: 'none',
-                          touchAction: 'none'
+                          fontFamily: 'inherit',
+                          lineHeight: 1.45,
+                          maxHeight: '120px'
                         }}
-                        title="Hold to send voice note / Tap to record"
+                      />
+                    </div>
+
+                    {/* Bottom Row: Tool icons on left, Phoenix Send button on right */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '6px' : '10px' }}>
+                        {/* Smile / Emoji */}
+                        <button
+                          type="button"
+                          className="phoenix-toolbar-icon"
+                          title="Emoji"
+                          onClick={() => setInputMessage((prev) => prev + ' 😊')}
+                        >
+                          <Smile size={18} />
+                        </button>
+
+                        {/* Image upload */}
+                        <button
+                          type="button"
+                          className="phoenix-toolbar-icon"
+                          onClick={() => {
+                            if (fileInputRef.current) {
+                              fileInputRef.current.accept = 'image/*';
+                              fileInputRef.current.click();
+                            }
+                          }}
+                          title="Upload Image"
+                        >
+                          <ImageIcon size={18} />
+                        </button>
+
+                        {/* Attachment / Paperclip */}
+                        <button
+                          type="button"
+                          className="phoenix-toolbar-icon"
+                          onClick={() => {
+                            if (fileInputRef.current) {
+                              fileInputRef.current.accept = 'image/*,.pdf,.doc,.docx,audio/*';
+                              fileInputRef.current.click();
+                            }
+                          }}
+                          title="Attach Document"
+                        >
+                          <Paperclip size={18} />
+                        </button>
+
+                        {/* Mic Voice Note */}
+                        <button
+                          type="button"
+                          className="phoenix-toolbar-icon"
+                          onMouseDown={handlePushToTalkStart}
+                          onMouseUp={handlePushToTalkEnd}
+                          onTouchStart={handlePushToTalkStart}
+                          onTouchEnd={handlePushToTalkEnd}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (!isRecordingAudio && !isPushToTalkRef.current) {
+                              startAudioRecording();
+                            }
+                          }}
+                          title="Voice Note"
+                        >
+                          <Mic size={18} />
+                        </button>
+
+                        {/* More tools popover (Polls, Tasks, Job Cards, SOS) */}
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            className="phoenix-toolbar-icon"
+                            onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
+                            style={{
+                              background: showMobileActionMenu ? 'var(--nav-active-bg, #edf2f9)' : 'transparent',
+                              color: showMobileActionMenu ? '#3874ff' : 'var(--text-muted, #748194)'
+                            }}
+                            title="More Tools"
+                          >
+                            <MoreHorizontal size={18} />
+                          </button>
+
+                          {showMobileActionMenu && (
+                            <>
+                              <div
+                                onClick={() => setShowMobileActionMenu(false)}
+                                style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                bottom: 'calc(100% + 8px)',
+                                left: 0,
+                                background: 'var(--bg-card, #ffffff)',
+                                border: '1px solid var(--border-light, #e2e8f0)',
+                                borderRadius: '12px',
+                                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                                zIndex: 9999,
+                                padding: '6px',
+                                minWidth: '210px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px'
+                              }}>
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowMobileActionMenu(false); setIsUrgent(!isUrgent); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: isUrgent ? '#fee2e2' : 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: isUrgent ? '#dc2626' : 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <AlertTriangle size={14} color="#dc2626" />
+                                  <span>{isUrgent ? 'Disable Urgent Alert' : 'Mark as Urgent (SOS)'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowMobileActionMenu(false); handleOpenShareModal('jobcard'); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Share2 size={14} color="#8b5cf6" />
+                                  <span>Quick Share Record</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowMobileActionMenu(false); setShowPollModal(true); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <BarChart2 size={14} color="#059669" />
+                                  <span>Create Poll</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowMobileActionMenu(false); handleOpenTaskModalFromChat(); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <CheckSquare size={14} color="#10b981" />
+                                  <span>Create Task</span>
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {isUrgent && (
+                          <span style={{ fontSize: '0.65rem', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>
+                            SOS ACTIVE
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Phoenix Send Button */}
+                      <button
+                        type="submit"
+                        disabled={!inputMessage.trim() && !attachedFile}
+                        className="phoenix-send-btn"
                       >
-                        <Mic size={19} strokeWidth={2.3} color="#2563eb" style={{ width: 19, height: 19, stroke: '#2563eb', flexShrink: 0, display: 'block', pointerEvents: 'none' }} />
+                        <span>Send</span>
+                        <Send size={13} style={{ transform: 'rotate(0deg)' }} />
                       </button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {/* Audio Record Button */}
-                    <button
-                      type="button"
-                      onMouseDown={handlePushToTalkStart}
-                      onMouseUp={handlePushToTalkEnd}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (!isRecordingAudio && !isPushToTalkRef.current) {
-                          startAudioRecording();
-                        }
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
-                      title="Hold to send voice note / Click to record"
-                    >
-                      <Mic size={18} />
-                    </button>
-
-                    {/* Interactive Poll Button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowPollModal(true)}
-                      style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
-                      title="Create Department Poll & Vote"
-                    >
-                      <BarChart2 size={18} />
-                    </button>
-
-                    {/* Quick Share Record Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenShareModal('jobcard')}
-                      style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
-                      title="Share Job Card, Design, Invoice or Complaint Card"
-                    >
-                      <Share2 size={18} />
-                    </button>
-
-                    {/* Paperclip Button */}
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
-                      title="Attach photo or document (up to 100MB Cloudflare R2)"
-                    >
-                      <Paperclip size={18} />
-                    </button>
-
-                    {/* Urgent SOS Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => setIsUrgent(!isUrgent)}
-                      style={{
-                        background: isUrgent ? '#ef4444' : 'transparent',
-                        color: isUrgent ? '#ffffff' : '#dc2626',
-                        border: '1px solid #fca5a5',
-                        borderRadius: '6px',
-                        padding: '0.3rem 0.6rem',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: isUrgent ? '0 0 10px rgba(239,68,68,0.4)' : 'none',
-                        transition: 'all 0.15s ease'
-                      }}
-                      title="Toggle Urgent SOS High Priority Alert"
-                    >
-                      <AlertTriangle size={13} />
-                      <span>{isUrgent ? 'SOS ON' : 'SOS'}</span>
-                    </button>
-
-                    <input
-                      type="text"
-                      placeholder={`Message channel or paste screenshot (Cmd+V)...`}
-                      value={inputMessage}
-                      onPaste={handlePasteClipboard}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setInputMessage(val);
-                        if (activeGroup?._id) {
-                          setRoomDrafts((prev) => ({ ...prev, [activeGroup._id]: val }));
-                        }
-                      }}
-                      style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={!inputMessage.trim() && !attachedFile}
-                      className="btn-primary"
-                      style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', height: '36px', gap: '0.35rem', borderRadius: '8px', opacity: (!inputMessage.trim() && !attachedFile) ? 0.6 : 1 }}
-                    >
-                      <Send size={14} />
-                      <span>Send</span>
-                    </button>
+                    </div>
                   </>
                 )}
               </form>

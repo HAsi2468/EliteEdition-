@@ -39,8 +39,18 @@ const MyntraHub = lazy(() => import('./components/MyntraHub'));
 const ReturnsManager = lazy(() => import('./components/ReturnsManager'));
 import DesignerModule from './components/DesignerModule';
 import DesignerScreen from './components/DesignerScreen';
-import { 
-  LogOut, 
+import CalendarModule from './components/CalendarModule';
+import FileManager from './components/FileManager';
+import InboxModule from './components/InboxModule';
+import ActivityFeed from './components/ActivityFeed';
+import GanttChart from './components/GanttChart';
+import GeographicMap from './components/GeographicMap';
+import AdvancedDashboard from './components/AdvancedDashboard';
+import Gallery from './components/Gallery';
+import ThemeCustomizer from './components/ThemeCustomizer';
+import {
+  LogOut,
+  LayoutGrid, 
   LayoutDashboard, 
   Database, 
   RefreshCw, 
@@ -78,7 +88,15 @@ import {
   Clock,
   Sparkles,
   Sliders,
-  Bot
+  Bot,
+  Sun,
+  Moon,
+  Search as SearchIcon,
+  Folder,
+  Mail,
+  Calendar as CalendarIcon,
+  Globe,
+  Image as ImageIcon
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -164,6 +182,82 @@ export default function App() {
   // Notification Toasts state
   const [toasts, setToasts] = useState([]);
 
+  // Dark mode state and effect
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_dark_mode');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (isDarkMode) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      localStorage.setItem('elite_dark_mode', String(isDarkMode));
+    } catch (e) {}
+  }, [isDarkMode]);
+
+  // Global search state
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSearchResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Notification inline dropdown state
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideNotif = (e) => {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target)) {
+        setShowNotifDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideNotif);
+    return () => document.removeEventListener('mousedown', handleOutsideNotif);
+  }, []);
+
+  // Theme customizer drawer state
+  const [showThemeCustomizer, setShowThemeCustomizer] = useState(false);
+
+  const SEARCHABLE_MODULES = [
+    { label: 'Dashboard Overview', tab: 'dashboard', category: 'General' },
+    { label: 'Calendar Schedule & Events', tab: 'calendar', category: 'Apps' },
+    { label: 'Email & Inbox Messages', tab: 'inbox', category: 'Apps' },
+    { label: 'File Manager & Documents', tab: 'file_manager', category: 'Apps' },
+    { label: 'Activity & Team Feed', tab: 'activity_feed', category: 'Apps' },
+    { label: 'Production Gantt Timeline', tab: 'gantt', category: 'Production' },
+    { label: 'Territory Revenue Map', tab: 'geo_map', category: 'Analytics' },
+    { label: 'Advanced Analytics & Projections', tab: 'advanced_dashboard', category: 'Analytics' },
+    { label: 'Design & Media Gallery', tab: 'gallery', category: 'Design' },
+    { label: 'Job Cards & Production', tab: 'jobcards', category: 'Production' },
+    { label: 'Printing Department Log', tab: 'jobcards_printing_log', category: 'Production' },
+    { label: 'Fusing & Heat Press', tab: 'jobcards_fusing_log', category: 'Production' },
+    { label: 'Fabric Inventory Management', tab: 'jobcards_fabric', category: 'Inventory' },
+    { label: 'Elite Billing & Finance', tab: 'jobcards_billing', category: 'Finance' },
+    { label: 'Designer Screen & Tasks', tab: 'designer_screen', category: 'Design' },
+    { label: 'Sample Design Screen', tab: 'jobcards_sample', category: 'Design' },
+    { label: 'Stitching Job Cards', tab: 'jobcards_list', category: 'Stitching' },
+    { label: 'Team Communication & Chat', tab: 'communication', category: 'Collaboration' },
+    { label: 'Task Management Kanban', tab: 'task_management', category: 'Tasks' },
+    { label: 'Admin Security Panel', tab: 'admin', category: 'Admin' }
+  ];
+
   // Chat unread count tracking for notification badges
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
@@ -192,7 +286,8 @@ export default function App() {
   const [activeDepartment, setActiveDepartment] = useState(initialNav.dept);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCompanyQuickSheet, setShowCompanyQuickSheet] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 850);
 
   const longPressTimerRef = useRef(null);
   const isLongPressRef = useRef(false);
@@ -251,7 +346,7 @@ export default function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(window.innerWidth <= 850);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -278,11 +373,21 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_sample_design', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
   ];
+
+  const isMasterAdmin = Boolean(
+    currentUser?.isMainAdmin ||
+    (currentUser?.role || '').toLowerCase() === 'admin' ||
+    (currentUser?.role || '').toLowerCase() === 'master_admin' ||
+    (currentUser?.username || '').toLowerCase() === 'admin' ||
+    (currentUser?.username || '').toLowerCase() === 'master' ||
+    (currentUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com' ||
+    (currentUser?.email || '').toLowerCase() === 'admin@elite.com'
+  );
 
   const isCompanyAllowed = (companyName) => {
     if (!currentUser) return false;
@@ -303,7 +408,7 @@ export default function App() {
 
   const getFirstJobCardsTab = () => {
     if (!currentUser || currentUser.role === 'admin') return 'jobcards';
-    const subTabs = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
+    const subTabs = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
     const allowed = subTabs.filter(t => currentUser.permissions?.includes(t));
     return allowed[0] || 'jobcards';
   };
@@ -426,7 +531,8 @@ export default function App() {
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
       'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent',
-      'jobcards_business_connection', 'business_connection', 'complaint_dashboard', 'complaint_create'
+      'jobcards_business_connection', 'business_connection', 'complaint_dashboard', 'complaint_create',
+      'calendar', 'file_manager', 'inbox', 'activity_feed', 'gantt', 'geo_map', 'advanced_dashboard', 'gallery'
     ];
 
     if (currentUser.role === 'admin') {
@@ -438,6 +544,7 @@ export default function App() {
       // For non-admin users, check if activeTab or any parent category is allowed
       const isAllowed = currentUser.permissions.some(p => {
         if (p === activeTab) return true;
+        if (['calendar', 'file_manager', 'inbox', 'activity_feed', 'gantt', 'geo_map', 'advanced_dashboard', 'gallery'].includes(activeTab)) return isMasterAdmin;
         if (activeTab.startsWith('ee_') || activeTab.startsWith('ef_') || activeTab.startsWith('es_') || activeTab.startsWith('eo_')) return true;
         if (activeTab === 'catalog' && p === 'inventory') return true;
         if (activeTab === 'jobcards_list' && (p === 'stitching_jobcards' || p === 'jobcards_list' || p === 'jobcards')) return true;
@@ -452,7 +559,7 @@ export default function App() {
         return false;
       });
 
-      if (!isAllowed && !['workspace', 'dashboard'].includes(activeTab)) {
+      if (!isAllowed && !(isMasterAdmin && ['calendar', 'file_manager', 'inbox', 'activity_feed', 'gantt', 'geo_map', 'advanced_dashboard', 'gallery'].includes(activeTab)) && !['workspace', 'dashboard'].includes(activeTab)) {
         if (hasStitchingAccess && activeDepartment === 'stitching') {
           setActiveTab(getFirstStitchingTab());
         } else if (hasDigitalPrintAccess && activeDepartment === 'digital_print') {
@@ -1153,223 +1260,346 @@ export default function App() {
       )}
 
       {/* Top Navbar */}
-      <header className="glass-panel app-header" style={styles.header}>
-        <div style={styles.headerLeft} className="header-left-wrap">
+      <header className="phoenix-navbar-top">
+        <div className="phoenix-nav-left">
           <button
-            onClick={handleMenuButtonClick}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-            onMouseDown={handleTouchStart}
-            onMouseUp={handleTouchEnd}
-            className="mobile-menu-toggle"
-            aria-label="Toggle Mobile Menu (Hold for Quick Company Switcher)"
-            title="Tap for Menu | Hold for Quick Company Switcher"
+            type="button"
+            onClick={isMobile ? handleMenuButtonClick : toggleSidebarCollapse}
+            onTouchStart={isMobile ? handleTouchStart : undefined}
+            onTouchEnd={isMobile ? handleTouchEnd : undefined}
+            onMouseDown={isMobile ? handleTouchStart : undefined}
+            onMouseUp={isMobile ? handleTouchEnd : undefined}
+            className="phoenix-navbar-toggle-btn"
+            aria-label="Toggle Navigation"
+            title={isMobile ? "Toggle Mobile Menu" : "Toggle Sidebar (Collapse/Expand)"}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted, #525b75)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '6px',
+              marginRight: '6px',
+              transition: 'all 0.15s ease'
+            }}
           >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            {isMobile ? (mobileMenuOpen ? <X size={20} /> : <Menu size={20} />) : <Menu size={20} />}
           </button>
+
+          {/* Elite Edition Brand Logo */}
+          <div 
+            className="phoenix-brand-logo" 
+            onClick={() => setActiveTab('jobcards')}
+            title="Elite Edition Enterprise ERP"
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <img 
+              src={activeDepartment === 'digital_print' ? '/DigitalLogo.png' : '/Logo.png'} 
+              alt="Elite Edition" 
+              style={{ 
+                height: '24px', 
+                maxWidth: '150px', 
+                objectFit: 'contain', 
+                display: 'inline-block',
+                filter: isDarkMode ? 'brightness(0) invert(1)' : 'none'
+              }} 
+            />
+          </div>
 
           {/* Interactive Company Switcher Pill */}
           {(() => {
             const activeComp = getCompanyById(activeDepartment);
             const ActiveIcon = activeComp?.iconName === 'Store' ? Store : activeComp?.iconName === 'Printer' ? Printer : activeComp?.iconName === 'Scissors' ? Scissors : Building;
-            const brandColor = activeComp?.iconColor || '#6366f1';
+            const brandColor = activeComp?.iconColor || 'var(--primary)';
 
             return (
               <div 
                 onClick={() => setShowCompanyQuickSheet(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  padding: '0.3rem 0.65rem 0.3rem 0.4rem',
-                  borderRadius: '10px',
-                  border: `1px solid ${brandColor}40`,
-                  background: `${brandColor}12`,
-                  transition: 'all 0.15s ease'
-                }}
-                title="Tap to switch active company entity workspace"
+                className="phoenix-dept-pill"
+                title="Click to switch company workspace"
               >
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '7px',
-                  background: activeComp?.gradient || 'linear-gradient(135deg, #6366f1, #0891b2)',
-                  color: '#fff',
-                  fontWeight: 800,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  boxShadow: `0 2px 6px ${brandColor}40`
-                }}>
-                  <ActiveIcon size={15} color="#ffffff" />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                    {activeTab === 'workspace' ? 'Workspace' : (activeComp?.name || 'Elite Online')}
-                  </span>
-                  <span style={{
-                    fontSize: '0.65rem',
-                    fontWeight: 800,
-                    padding: '1px 5px',
-                    borderRadius: '4px',
-                    background: `${brandColor}25`,
-                    color: brandColor,
-                    lineHeight: 1.2
-                  }}>
-                    {activeComp?.code || 'EO'}
-                  </span>
-                </div>
-                <ChevronDown size={14} color={brandColor} style={{ flexShrink: 0 }} />
+                <ActiveIcon size={14} color={brandColor} />
+                <span>{activeTab === 'workspace' ? 'Workspace' : (activeComp?.name || 'Elite Online')}</span>
+                <ChevronDown size={13} color="var(--text-muted)" />
               </div>
             );
           })()}
-
-          {/* Master Company Switcher Buttons */}
-          <div className="dept-switcher-header">
-            {COMPANIES.map(company => {
-              // Permission check
-              if (!isCompanyAllowed(company.name)) return null;
-              if (company.id === 'elite_online' && !hasEliteEditionAccess) return null;
-              if (company.id === 'digital_print' && !hasDigitalPrintAccess) return null;
-              if (company.id === 'stitching' && !hasStitchingAccess) return null;
-
-              const IconComponent = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : Building;
-              const isActive = activeDepartment === company.id && activeTab !== 'workspace';
-
-              return (
-                <button
-                  key={company.id}
-                  onClick={() => handleSwitchDepartment(company.id)}
-                  className={`dept-switch-btn ${isActive ? 'active' : ''}`}
-                  style={isActive ? { background: company.gradient, boxShadow: `0 2px 10px ${company.iconColor}40` } : {}}
-                  title={`Switch to ${company.name} Workspace (${company.type})`}
-                >
-                  <IconComponent size={15} color={isActive ? '#ffffff' : (company.iconColor || 'currentColor')} />
-                  <span>{company.name}</span>
-                </button>
-              );
-            })}
-
-            {hasWorkspaceAccess && (
-              <button
-                onClick={() => { setActiveTab('communication'); setMobileMenuOpen(false); }}
-                className={`dept-switch-btn ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
-                title="Open Department Communication & Activity Stream"
-                style={{ position: 'relative' }}
-              >
-                <MessageSquare size={15} />
-                <span>Inter-Dept Communication</span>
-                {chatUnreadCount > 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-5px',
-                    right: '-5px',
-                    background: '#ef4444',
-                    color: '#ffffff',
-                    borderRadius: '10px',
-                    minWidth: '18px',
-                    height: '18px',
-                    fontSize: '0.62rem',
-                    fontWeight: 900,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0 4px',
-                    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.6)',
-                    border: '1.5px solid #ffffff'
-                  }}>
-                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
         </div>
 
-        <div style={styles.headerRight} className="header-right-wrap">
-          <button
-            onClick={() => setShowNotificationDrawer(true)}
-            className="btn-icon"
-            title="Notification History & Push Alerts"
-            style={{ position: 'relative' }}
-          >
-            <Bell size={15} color={unreadNotifCount > 0 ? 'var(--primary)' : typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'var(--success)' : 'var(--text-muted)'} />
-            {unreadNotifCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '-3px',
-                right: '-3px',
-                background: 'var(--primary)',
-                color: '#fff',
-                fontSize: '0.6rem',
-                fontWeight: 800,
-                borderRadius: '10px',
-                padding: '1px 4px',
-                minWidth: '14px',
-                textAlign: 'center',
-                lineHeight: 1,
-                boxShadow: '0 0 8px rgba(56,189,248,0.6)'
-              }}>
-                {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
-              </span>
-            )}
-          </button>
-
-          <button onClick={() => setShowPermissionsModal(true)} className="btn-icon" title="Device Hardware & Web API Permissions Hub">
-            <Sliders size={15} color="var(--primary)" />
-          </button>
-
-          <button
-            onClick={() => {
-              fetchData();
-              if (typeof window !== 'undefined' && window.showToast) {
-                window.showToast('🔄 Live data refreshed across all departments', 'info');
-              }
-            }}
-            className={`btn-icon master-refresh-btn ${loading ? 'is-refreshing' : ''}`}
-            title="Master Refresh — Re-sync all live socket data"
-          >
-            <RefreshCw size={16} className={loading ? 'spin-loader' : ''} />
-          </button>
-
-          <div style={styles.divider}></div>
-          {!isMobile && currentUser && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              backgroundColor: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid var(--border-light)',
-              borderRadius: '24px',
-              padding: '4px 6px 4px 14px'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{currentUser.name}</span>
-                <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{currentUser.role || 'user'}</span>
-              </div>
-              <button
-                onClick={handleLogout}
-                title="Sign Out"
+        {/* Global Search Bar (Phoenix Style) */}
+        {!isMobile && (
+          <div className="phoenix-nav-search" ref={searchRef}>
+            <SearchIcon size={14} className="phoenix-search-icon" />
+            <input
+              type="text"
+              className="phoenix-search-input"
+              placeholder="Search..."
+              value={globalSearch}
+              onChange={(e) => {
+                setGlobalSearch(e.target.value);
+                setShowSearchResults(e.target.value.trim().length > 0);
+              }}
+              onFocus={() => {
+                if (globalSearch.trim()) setShowSearchResults(true);
+              }}
+            />
+            {showSearchResults && (
+              <div
+                className="global-search-results"
                 style={{
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                  color: '#ef4444',
+                  position: 'absolute',
+                  top: '115%',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--bg-modal)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: 10,
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.18)',
+                  zIndex: 9999,
+                  maxHeight: 280,
+                  overflowY: 'auto',
+                  padding: '4px'
+                }}
+              >
+                {SEARCHABLE_MODULES.filter(m => 
+                  m.label.toLowerCase().includes(globalSearch.toLowerCase()) || 
+                  m.category.toLowerCase().includes(globalSearch.toLowerCase())
+                ).map((m, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setActiveTab(m.tab);
+                      setShowSearchResults(false);
+                      setGlobalSearch('');
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      transition: 'background 0.15s ease'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--nav-active-bg)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span>{m.label}</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: 'var(--bg-input)', color: 'var(--text-muted)' }}>
+                      {m.category}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Right Nav Controls (Phoenix Style) */}
+        <div className="phoenix-nav-right">
+          {/* Dark Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsDarkMode(prev => !prev)}
+            className="phoenix-circle-btn"
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle dark mode"
+          >
+            {isDarkMode ? <Sun size={17} color="#f59e0b" /> : <Moon size={17} />}
+          </button>
+
+          {/* Notification Bell Dropdown */}
+          <div style={{ position: 'relative' }} ref={notifDropdownRef}>
+            <button
+              onClick={() => setShowNotifDropdown(prev => !prev)}
+              className="phoenix-circle-btn"
+              title="Notifications"
+            >
+              <Bell size={17} color={unreadNotifCount > 0 ? 'var(--primary)' : 'currentColor'} />
+              {unreadNotifCount > 0 && <span className="phoenix-notif-dot" />}
+            </button>
+
+            {/* Inline Dropdown Menu */}
+            {showNotifDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '120%',
+                right: 0,
+                width: 340,
+                maxWidth: '90vw',
+                background: 'var(--bg-modal)',
+                border: '1px solid var(--border-light)',
+                borderRadius: 12,
+                boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+                zIndex: 9999,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  borderBottom: '1px solid var(--border-light)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'var(--bg-card)'
+                }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Notifications</div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700 }}>
+                    {unreadNotifCount} new
+                  </span>
+                </div>
+
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  {(() => {
+                    const list = typeof getNotificationHistory === 'function' ? getNotificationHistory() : [];
+                    if (!list || list.length === 0) {
+                      return (
+                        <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                          No recent notifications
+                        </div>
+                      );
+                    }
+                    return list.slice(0, 5).map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        style={{
+                          padding: '0.65rem 1rem',
+                          borderBottom: '1px solid var(--border-light)',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                          background: item.read ? 'transparent' : 'rgba(56,116,255,0.04)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--nav-active-bg)'}
+                        onMouseLeave={e => e.currentTarget.style.background = item.read ? 'transparent' : 'rgba(56,116,255,0.04)'}
+                      >
+                        <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{item.title}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.message}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'Just now'}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+
+                <div style={{
+                  padding: '0.5rem 1rem',
+                  borderTop: '1px solid var(--border-light)',
+                  background: 'var(--bg-card)',
+                  textAlign: 'center'
+                }}>
+                  <button
+                    onClick={() => {
+                      setShowNotifDropdown(false);
+                      setShowNotificationDrawer(true);
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--primary)',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    View All Activity History →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 9-Dots Quick App & Workspace Switcher Launcher */}
+          <button
+            type="button"
+            onClick={() => setShowCompanyQuickSheet(prev => !prev)}
+            className="phoenix-circle-btn"
+            title="Apps & Workspaces Launcher"
+          >
+            <LayoutGrid size={17} />
+          </button>
+
+          {/* User Profile Avatar with User Initial Badge */}
+          {!isMobile && currentUser && (
+            <div style={{ position: 'relative', marginLeft: '6px' }}>
+              <div 
+                className="phoenix-user-avatar"
+                style={{
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  padding: 0,
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 2px 6px rgba(239,68,68,0.2)'
+                  background: 'linear-gradient(135deg, #3874ff 0%, #1e40af 100%)',
+                  color: '#ffffff',
+                  fontSize: '0.92rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.02em',
+                  boxShadow: '0 2px 6px rgba(56, 116, 255, 0.28)',
+                  userSelect: 'none',
+                  border: '2px solid rgba(255,255,255,0.85)'
                 }}
+                title={`${currentUser.name || currentUser.username} (${currentUser.role || 'user'})`}
+                onClick={() => setShowUserDropdown(prev => !prev)}
               >
-                <LogOut size={15} color="#ef4444" />
-              </button>
+                {(currentUser.name || currentUser.username || currentUser.email || 'A').trim().charAt(0).toUpperCase()}
+              </div>
+
+              {/* Profile Dropdown */}
+              {showUserDropdown && (
+                <div className="phoenix-user-dropdown" onClick={() => setShowUserDropdown(false)}>
+                  <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{currentUser.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{currentUser.email || currentUser.role || 'Administrator'}</div>
+                  </div>
+
+                  <button
+                    className="phoenix-dropdown-item"
+                    onClick={() => {
+                      fetchData();
+                      if (typeof window !== 'undefined' && window.showToast) {
+                        window.showToast('🔄 Live data refreshed across all departments', 'info');
+                      }
+                    }}
+                  >
+                    <RefreshCw size={15} color="var(--primary)" className={loading ? 'spin-loader' : ''} />
+                    <span>Master Refresh</span>
+                  </button>
+
+                  <button
+                    className="phoenix-dropdown-item"
+                    onClick={() => setShowPermissionsModal(true)}
+                  >
+                    <ShieldAlert size={15} color="#10b981" />
+                    <span>Settings & Permissions</span>
+                  </button>
+
+                  <div style={{ height: '1px', background: 'var(--border-light)', margin: '0.25rem 0' }} />
+
+                  <button
+                    className="phoenix-dropdown-item"
+                    style={{ color: '#fa3b1d' }}
+                    onClick={handleLogout}
+                  >
+                    <LogOut size={15} />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1719,6 +1949,40 @@ export default function App() {
                 </>
               )}
 
+              {/* Apps & Analytics - Strictly Master Admin Only */}
+              {isMasterAdmin && (
+                <>
+                  <div style={{ ...styles.sidebarSectionHeader, marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-light)' }}>
+                    <Sparkles size={14} color="var(--primary)" />
+                    <span>Apps & Analytics (Master Admin)</span>
+                  </div>
+                  <button onClick={() => { setActiveTab('calendar'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'calendar' ? styles.navItemActive : {}) }}>
+                    <CalendarIcon size={18} color="#0284c7" /><span>Calendar Schedule</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('inbox'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'inbox' ? styles.navItemActive : {}) }}>
+                    <Mail size={18} color="#8b5cf6" /><span>Email & Inbox</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('file_manager'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'file_manager' ? styles.navItemActive : {}) }}>
+                    <Folder size={18} color="#f59e0b" /><span>File Manager</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('activity_feed'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'activity_feed' ? styles.navItemActive : {}) }}>
+                    <Users size={18} color="#10b981" /><span>Activity Feed</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('gantt'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'gantt' ? styles.navItemActive : {}) }}>
+                    <Layers size={18} color="#38bdf8" /><span>Gantt Timeline</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('geo_map'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'geo_map' ? styles.navItemActive : {}) }}>
+                    <Globe size={18} color="#6366f1" /><span>Territory Map</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('advanced_dashboard'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'advanced_dashboard' ? styles.navItemActive : {}) }}>
+                    <BarChart3 size={18} color="#ec4899" /><span>Advanced Analytics</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('gallery'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'gallery' ? styles.navItemActive : {}) }}>
+                    <ImageIcon size={18} color="#f43f5e" /><span>Design Gallery</span>
+                  </button>
+                </>
+              )}
+
               {currentUser && currentUser.role === 'admin' && (
                 <button onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'admin' ? styles.navItemActive : {}) }}>
                   <ShieldAlert size={18} color="var(--primary)" /><span>Admin Panel</span>
@@ -1756,62 +2020,11 @@ export default function App() {
       )}
 
       {/* Main Layout */}
-      <main style={styles.mainLayout} className="main-layout-container">
+      <div className="phoenix-main-wrapper">
         
         {/* Left Navigation Sidebar */}
-        <aside
-          style={{
-            width: isSidebarCollapsed ? '82px' : '260px',
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-            position: 'sticky',
-            top: '62px',
-            alignSelf: 'flex-start',
-            maxHeight: 'calc(100vh - 74px)',
-            overflowY: 'auto',
-            transition: 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
-            zIndex: 90
-          }}
-          className="sidebar-wrap"
-        >
-          <div className="glass-panel" style={{ padding: isSidebarCollapsed ? '0.4rem 0.25rem' : '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {/* Collapse / Expand Toggle Button Header */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-              padding: '0.4rem 0.5rem',
-              borderBottom: '1px solid var(--border-light)',
-              marginBottom: '0.35rem'
-            }}>
-              {!isSidebarCollapsed && (
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-                  Navigation
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={toggleSidebarCollapse}
-                title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-                style={{
-                  background: isSidebarCollapsed ? 'rgba(99,102,241,0.12)' : 'transparent',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '0.35rem',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {isSidebarCollapsed ? <PanelLeftOpen size={18} color="var(--primary)" /> : <PanelLeftClose size={18} />}
-              </button>
-            </div>
-
+        <aside className={`phoenix-navbar-vertical ${isSidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+          <div className="phoenix-vertical-content">
             {(() => {
               const renderNavItem = (tabKey, label, IconComponent, customColor, shortLabel) => {
                 const isActive = activeTab === tabKey || (tabKey === 'jobcards_stitching_challan' && activeTab === 'jobcards_fabric');
@@ -1826,43 +2039,43 @@ export default function App() {
                       onClick={() => handleNavClick(tabKey)}
                       title={label}
                       style={{
-                        background: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                        background: isActive ? 'rgba(56, 116, 255, 0.1)' : 'transparent',
                         border: 'none',
                         width: '100%',
-                        padding: '0.55rem 0.2rem',
+                        padding: '0.45rem 0.2rem',
+                        marginBottom: '2px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '3px',
-                        borderRadius: '10px',
-                        color: isActive ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
+                        gap: '2px',
+                        borderRadius: '6px',
+                        color: isActive ? 'var(--primary, #3874ff)' : 'var(--text-muted, #6e7891)',
                         cursor: 'pointer',
                         textAlign: 'center',
                         transition: 'all 0.15s ease',
-                        borderLeft: isActive ? '3.5px solid var(--primary, #6366f1)' : '3.5px solid transparent',
                         position: 'relative'
                       }}
                       onMouseEnter={e => {
-                        if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                        if (!isActive) e.currentTarget.style.background = 'rgba(56, 116, 255, 0.05)';
                       }}
                       onMouseLeave={e => {
                         if (!isActive) e.currentTarget.style.background = 'transparent';
                       }}
                     >
                       <NavIcon
-                        size={22}
-                        color={customColor || (isActive ? 'var(--primary)' : undefined)}
+                        size={18}
+                        color={isActive ? 'var(--primary, #3874ff)' : (customColor || 'var(--text-muted, #8a94ad)')}
                         style={{ flexShrink: 0 }}
                       />
                       <span
                         style={{
-                          fontSize: '0.67rem',
-                          fontWeight: isActive ? 800 : 600,
+                          fontSize: '0.64rem',
+                          fontWeight: isActive ? 700 : 500,
                           lineHeight: 1.15,
-                          color: isActive ? 'var(--primary, #6366f1)' : 'var(--text-muted, #94a3b8)',
+                          color: isActive ? 'var(--primary, #3874ff)' : 'var(--text-muted, #6e7891)',
                           wordBreak: 'break-word',
-                          maxWidth: '72px',
+                          maxWidth: '60px',
                           textAlign: 'center'
                         }}
                       >
@@ -1879,59 +2092,72 @@ export default function App() {
                     onClick={() => handleNavClick(tabKey)}
                     title={label}
                     style={{
-                      background: isActive ? 'var(--nav-active-bg, rgba(99,102,241,0.12))' : 'none',
+                      background: isActive ? 'rgba(56, 116, 255, 0.09)' : 'transparent',
                       border: 'none',
                       width: '100%',
-                      padding: '0.75rem 0.9rem',
+                      padding: '0.38rem 0.75rem',
+                      marginBottom: '2px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'flex-start',
-                      gap: '0.75rem',
-                      borderRadius: 'var(--radius-sm, 8px)',
-                      color: isActive ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
-                      fontSize: '0.88rem',
-                      fontWeight: isActive ? '700' : '500',
+                      gap: '0.55rem',
+                      borderRadius: '6px',
+                      color: isActive ? 'var(--primary, #3874ff)' : 'var(--text-secondary, #525b75)',
+                      fontSize: '0.8rem',
+                      fontWeight: isActive ? 700 : 600,
                       cursor: 'pointer',
                       textAlign: 'left',
                       transition: 'all 0.15s ease',
-                      borderLeft: isActive ? '3px solid var(--nav-active-border, #6366f1)' : '3px solid transparent',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden'
                     }}
+                    onMouseEnter={e => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(56, 116, 255, 0.04)';
+                        e.currentTarget.style.color = 'var(--text-primary, #141824)';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-secondary, #525b75)';
+                      }
+                    }}
                   >
-                    <NavIcon size={18} color={customColor || (isActive ? 'var(--primary)' : undefined)} style={{ flexShrink: 0 }} />
+                    <NavIcon 
+                      size={16} 
+                      color={isActive ? 'var(--primary, #3874ff)' : (customColor || 'var(--text-muted, #8a94ad)')} 
+                      style={{ flexShrink: 0 }} 
+                    />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
                   </button>
                 );
               };
 
-              const renderSectionHeader = (label, IconComponent) => {
-                const HeaderIcon = IconComponent || MessageSquare;
+              const renderSectionHeader = (label, IconComponent, isFirst = false) => {
                 return (
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
-                      gap: '0.45rem',
-                      fontSize: '0.72rem',
+                      fontSize: '0.64rem',
                       fontWeight: '700',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
-                      color: 'var(--text-muted)',
-                      padding: isSidebarCollapsed ? '0.35rem 0' : '0.4rem 0.75rem',
-                      borderBottom: '1px solid var(--border-light)',
-                      marginBottom: '0.35rem'
+                      color: 'var(--text-muted, #8a94ad)',
+                      padding: '0 0.75rem',
+                      margin: isFirst ? '0.35rem 0 0.35rem 0' : '1.15rem 0 0.35rem 0'
                     }}
                     title={label}
                   >
-                    <HeaderIcon size={15} color="var(--primary)" style={{ flexShrink: 0 }} />
                     {!isSidebarCollapsed && <span>{label}</span>}
                   </div>
                 );
               };
 
-              if (activeTab === 'workspace') {
+              const renderDepartmentModules = () => {
+                if (activeTab === 'workspace') {
                 return (
                   <div style={{ padding: isSidebarCollapsed ? '0.4rem 0.2rem' : '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                     {renderSectionHeader('Workspace', MessageSquare)}
@@ -1995,7 +2221,7 @@ export default function App() {
                   <>
                     {renderSectionHeader('Digital Print Modules', Printer)}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) &&
-                      renderNavItem('jobcards', 'Prints Dashboard & Reports', BarChart3, null, 'Dashboard')
+                      renderNavItem('jobcards', 'Operations Dashboard', BarChart3, null, 'Dashboard')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) &&
                       renderNavItem('jobcards_printing_log', 'Printing Department', Printer, null, 'Printing')
@@ -2007,38 +2233,38 @@ export default function App() {
                       renderNavItem('jobcards_fabric', 'Fabric Management', Database, null, 'Fabric')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
-                      renderNavItem('jobcards_billing', 'Finance', Receipt, null, 'Finance')
+                      renderNavItem('jobcards_billing', 'Billing & Invoices', Receipt, null, 'Billing')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) &&
-                      renderNavItem('jobcards_costing', 'Costing', TrendingUp, null, 'Costing')
+                      renderNavItem('jobcards_costing', 'Job Costing & Profit', TrendingUp, null, 'Costing')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) &&
-                      renderNavItem('jobcards_crm', 'CRM Department', Users, null, 'CRM')
+                      renderNavItem('jobcards_crm', 'CRM & Clients', Users, null, 'CRM')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_business_connection') || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) &&
-                      renderNavItem('jobcards_business_connection', 'Business Connection', Users, null, 'Connections')
+                      renderNavItem('jobcards_business_connection', 'Business Connections', Users, null, 'Connections')
                     }
 
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
-                      renderNavItem('jobcards_list', 'Job Card', FileText, null, 'Job Card')
+                      renderNavItem('jobcards_list', 'Job Cards Register', FileText, null, 'Job Cards')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) &&
                       renderNavItem('jobcards_catalogue', 'Design Catalog', BookOpen, null, 'Catalog')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_screen') || currentUser.permissions?.includes('designer_module')) &&
-                      renderNavItem('designer_screen', 'Designer Screen', Palette, null, 'Designer')
+                      renderNavItem('designer_screen', 'Designer Studio', Palette, null, 'Designer')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) &&
-                      renderNavItem('jobcards_settings', 'Print Settings', Settings, null, 'Settings')
+                      renderNavItem('jobcards_settings', 'Machine & Print Settings', Settings, null, 'Settings')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) &&
-                      renderNavItem('jobcards_raw_materials', 'Raw Materials', ShoppingBag, null, 'Materials')
+                      renderNavItem('jobcards_raw_materials', 'Inks & Paper Stock', ShoppingBag, null, 'Stock')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints') || currentUser.permissions?.includes('complaint_dashboard') || currentUser.permissions?.includes('complaint_create')) &&
-                      renderNavItem('jobcards_complain', 'Complain Module', AlertTriangle, null, 'Complain')
+                      renderNavItem('jobcards_complain', 'Customer Complaints', AlertTriangle, null, 'Complaints')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_qa') || currentUser.permissions?.includes('qa') || currentUser.permissions?.includes('jobcards')) &&
-                      renderNavItem('jobcards_qa', 'QA & Quality Checking', ShieldCheck, null, 'QA Check')
+                      renderNavItem('jobcards_qa', 'QA & Quality Inspection', ShieldCheck, null, 'QA Check')
                     }
                   </>
                 );
@@ -2071,80 +2297,52 @@ export default function App() {
                   }
                 </>
               );
-            })()}
+            };
 
-            {currentUser && currentUser.role === 'admin' && (
-              isSidebarCollapsed ? (
-                <button
-                  type="button"
-                  onClick={() => handleNavClick('admin')}
-                  title="Admin Panel"
-                  style={{
-                    background: activeTab === 'admin' ? 'rgba(99,102,241,0.15)' : 'transparent',
-                    border: 'none',
-                    width: '100%',
-                    padding: '0.55rem 0.2rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '3px',
-                    borderRadius: '10px',
-                    color: activeTab === 'admin' ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'all 0.15s ease',
-                    borderLeft: activeTab === 'admin' ? '3.5px solid var(--primary, #6366f1)' : '3.5px solid transparent',
-                    borderTop: '1px solid var(--border-light)',
-                    marginTop: '0.5rem',
-                    paddingTop: '0.65rem'
-                  }}
-                >
-                  <ShieldAlert size={22} color="var(--primary)" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.67rem', fontWeight: activeTab === 'admin' ? 800 : 600, color: activeTab === 'admin' ? 'var(--primary)' : 'var(--text-muted)' }}>
-                    Admin
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleNavClick('admin')}
-                  title="Admin Panel"
-                  style={{
-                    background: activeTab === 'admin' ? 'var(--nav-active-bg, rgba(99,102,241,0.12))' : 'none',
-                    border: 'none',
-                    width: '100%',
-                    padding: '0.75rem 0.9rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    gap: '0.75rem',
-                    borderRadius: 'var(--radius-sm, 8px)',
-                    color: activeTab === 'admin' ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
-                    fontSize: '0.88rem',
-                    fontWeight: activeTab === 'admin' ? '700' : '500',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.15s ease',
-                    borderLeft: activeTab === 'admin' ? '3px solid var(--nav-active-border, #6366f1)' : '3px solid transparent',
-                    borderTop: '1px solid var(--border-light)',
-                    marginTop: '0.5rem',
-                    paddingTop: '0.75rem',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <ShieldAlert size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
-                  <span>Admin Panel</span>
-                </button>
-              )
-            )}
+            return (
+              <>
+                {renderDepartmentModules()}
 
+                {/* Apps & Tools Section - Strictly Master Admin Only */}
+                {isMasterAdmin && (
+                  <>
+                    {renderSectionHeader('Apps & Tools', Sparkles)}
+                    {[
+                      { tabKey: 'calendar', label: 'Calendar Schedule', icon: CalendarIcon, color: '#0284c7', short: 'Calendar' },
+                      { tabKey: 'inbox', label: 'Email & Inbox', icon: Mail, color: '#8b5cf6', short: 'Inbox' },
+                      { tabKey: 'file_manager', label: 'File Manager', icon: Folder, color: '#f59e0b', short: 'Files' },
+                      { tabKey: 'activity_feed', label: 'Activity Feed', icon: Users, color: '#10b981', short: 'Social' },
+                      { tabKey: 'gantt', label: 'Gantt Timeline', icon: Layers, color: '#38bdf8', short: 'Gantt' },
+                      { tabKey: 'geo_map', label: 'Territory Map', icon: Globe, color: '#6366f1', short: 'Geo Map' },
+                      { tabKey: 'advanced_dashboard', label: 'Advanced Analytics', icon: BarChart3, color: '#ec4899', short: 'Analytics' },
+                      { tabKey: 'gallery', label: 'Design Gallery', icon: ImageIcon, color: '#f43f5e', short: 'Gallery' }
+                    ].map(app => renderNavItem(app.tabKey, app.label, app.icon, app.color, app.short))}
+                  </>
+                )}
+
+                {currentUser && currentUser.role === 'admin' && (
+                  <>
+                    {renderSectionHeader('Administration', ShieldAlert)}
+                    {renderNavItem('admin', 'Admin Panel', ShieldAlert, 'var(--primary)', 'Admin')}
+                  </>
+                )}
+              </>
+            );
+          })()}
+
+          </div>
+          <div 
+            className="phoenix-vertical-footer"
+            onClick={toggleSidebarCollapse}
+            title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            {!isSidebarCollapsed && <span>Collapsed View</span>}
           </div>
         </aside>
 
         {/* Right Content Panel */}
-        <section style={styles.contentArea}>
+        <main className={`phoenix-main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
           {error && <div style={styles.globalError}>{error}</div>}
 
           <Suspense fallback={
@@ -2249,6 +2447,22 @@ export default function App() {
             <DesignerScreen currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} onNavigate={(t) => setActiveTab(t)} />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
+          ) : activeTab === 'calendar' ? (
+            isMasterAdmin ? <CalendarModule currentUser={currentUser} /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
+          ) : activeTab === 'file_manager' ? (
+            isMasterAdmin ? <FileManager currentUser={currentUser} /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
+          ) : activeTab === 'inbox' ? (
+            isMasterAdmin ? <InboxModule currentUser={currentUser} /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
+          ) : activeTab === 'activity_feed' ? (
+            isMasterAdmin ? <ActivityFeed currentUser={currentUser} /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
+          ) : activeTab === 'gantt' ? (
+            isMasterAdmin ? <GanttChart currentUser={currentUser} /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
+          ) : activeTab === 'geo_map' ? (
+            isMasterAdmin ? <GeographicMap /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
+          ) : activeTab === 'advanced_dashboard' ? (
+            isMasterAdmin ? <AdvancedDashboard /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
+          ) : activeTab === 'gallery' ? (
+            isMasterAdmin ? <Gallery /> : <div style={styles.noAccessContainer}><ShieldAlert size={48} color="#ef4444" /><h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Master Admin Only</h3><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', textAlign: 'center' }}>This tool is restricted to Master Admin accounts only.</p></div>
           ) : ['communication', 'workspace', 'task_management'].includes(activeTab) ? null : (
             <div style={styles.noAccessContainer}>
               <ShieldAlert size={48} color="var(--primary)" />
@@ -2269,8 +2483,26 @@ export default function App() {
               onUnreadChange={(count) => setChatUnreadCount(count)}
             />
           </div>
-        </section>
-      </main>
+        </main>
+      </div>
+
+      {/* Floating Phoenix Chat Demo Button */}
+      <button 
+        type="button"
+        className="phoenix-floating-chat-btn"
+        onClick={() => setActiveTab('communication')}
+        title="Open Phoenix Chat Demo & Activity Stream"
+      >
+        <MessageSquare size={16} color="var(--primary)" />
+        <span>Chat demo</span>
+        <span className="phoenix-status-dot-green"></span>
+        {chatUnreadCount > 0 && (
+          <span className="badge badge-danger" style={{ padding: '1px 5px', fontSize: '0.65rem' }}>
+            {chatUnreadCount}
+          </span>
+        )}
+      </button>
+
 
       {/* Global Push / Toast Notifications Container */}
       <NotificationToastContainer toasts={toasts} setToasts={setToasts} />
@@ -2575,6 +2807,14 @@ export default function App() {
         onClose={() => setShowPermissionsModal(false)}
         currentUser={currentUser}
       />
+
+      {/* Phoenix Theme & Style Customizer Slide-out */}
+      <ThemeCustomizer
+        isOpen={showThemeCustomizer}
+        onClose={() => setShowThemeCustomizer(false)}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+      />
     </div>
   );
 }
@@ -2592,13 +2832,14 @@ const styles = {
     minHeight: '400px'
   },
   appContainer: {
-    maxWidth: '1280px',
+    maxWidth: '100%',
     margin: '0 auto',
-    padding: '1.5rem',
+    padding: '0.75rem 1rem',
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.5rem',
+    gap: '1rem',
     minHeight: '100vh',
+    boxSizing: 'border-box'
   },
   header: {
     position: 'sticky',
@@ -2607,15 +2848,13 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '0.4rem 1rem',
+    padding: '0.45rem 1rem',
     flexWrap: 'wrap',
     gap: '0.75rem',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
     borderBottom: '1px solid var(--border-light)',
     backgroundColor: 'var(--bg-card, #ffffff)',
     minHeight: '52px',
-    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)'
+    boxShadow: '0 1px 3px rgba(36, 40, 46, 0.05)'
   },
   headerLeft: {
     display: 'flex',
@@ -2623,16 +2862,17 @@ const styles = {
     gap: '0.75rem',
   },
   logoBadge: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '10px',
-    background: 'linear-gradient(135deg, var(--primary), #0891b2)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '8px',
+    background: 'var(--primary, #3874ff)',
     color: '#fff',
     fontWeight: '700',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '1.1rem',
+    fontSize: '1rem',
+    boxShadow: '0 2px 6px rgba(56, 116, 255, 0.3)'
   },
   brandTitle: {
     fontSize: '1.2rem',
@@ -2695,11 +2935,11 @@ const styles = {
     transition: 'all var(--transition-fast)',
   },
   navItemActive: {
-    background: 'var(--nav-active-bg)',
-    color: 'var(--text-primary)',
-    fontWeight: '600',
-    borderLeft: '3px solid var(--nav-active-border)',
-    borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+    background: 'var(--nav-active-bg, #e5edff)',
+    color: 'var(--primary, #3874ff)',
+    fontWeight: '700',
+    borderLeft: '3px solid var(--primary, #3874ff)',
+    borderRadius: '0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0',
     paddingLeft: 'calc(1rem - 3px)',
   },
   navSubItem: {

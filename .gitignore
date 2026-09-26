@@ -124,3 +124,6 @@ elite_edition_website/.git/
 backups/
 *.json.gz
 
+# Uploads directory
+uploads/
+

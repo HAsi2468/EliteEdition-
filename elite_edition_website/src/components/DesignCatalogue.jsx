@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
-  PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image,
+  PlusCircle, Plus, Search, RefreshCw, Edit2, Trash2, X, Save, Image,
   Eye, FileText, ChevronLeft, ChevronRight, CheckCircle, AlertCircle,
-  Layers, BookOpen, ChevronDown, Check
+  Layers, BookOpen, ChevronDown, Check, Sparkles, ShieldAlert
 } from 'lucide-react';
 import { COLOR_NAMES, getColorHex, detectDominantColors } from '../utils/colors';
 import imageCompression from 'browser-image-compression';
@@ -14,6 +14,7 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
+import DesignerScreen from './DesignerScreen';
 import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
 import DesignImage from './DesignImage';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
@@ -638,13 +639,26 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
   );
 }
 
-export default function DesignCatalogue({ department, initialSubTab = 'catalogue' }) {
+export default function DesignCatalogue({ department, initialSubTab = 'catalogue', currentUser }) {
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
+  const designerScreenRef = useRef(null);
   const [designs, setDesigns] = useState([]);
   const [failedImages, setFailedImages] = useState(new Set());
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const effectiveUser = currentUser || api.getCurrentUser() || {};
+  const isMasterAdmin = Boolean(
+    effectiveUser?.isMainAdmin ||
+    (effectiveUser?.role || '').toLowerCase() === 'admin' ||
+    (effectiveUser?.role || '').toLowerCase() === 'master_admin' ||
+    (effectiveUser?.role || '').toLowerCase() === 'master' ||
+    (effectiveUser?.username || '').toLowerCase() === 'admin' ||
+    (effectiveUser?.username || '').toLowerCase() === 'master' ||
+    (effectiveUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com' ||
+    (effectiveUser?.email || '').toLowerCase() === 'admin@elite.com'
+  );
 
   useEffect(() => {
     if (initialSubTab) {
@@ -1095,88 +1109,96 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             </div>
             <div>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
-                {department === 'stitching' ? 'Elite Stitching — Design Room' : 'Design Catalog'}
+                {activeSubTab === 'sample' || activeSubTab === 'sample_design'
+                  ? (department === 'stitching' ? 'Elite Stitching — Sample Design Screen' : 'Sample Design Screen')
+                  : (department === 'stitching' ? 'Elite Stitching — Design Room' : 'Design Catalog')}
               </h2>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0', fontWeight: 500 }}>
-                {department === 'stitching' ? 'Store & display master designs for Stitching department' : 'Store & display master designs'} — <strong>{total}</strong> total designs
+                {activeSubTab === 'sample' || activeSubTab === 'sample_design'
+                  ? 'Live sample designs reference proofs, assigned designers, colour matching & fabric specifications'
+                  : (department === 'stitching' ? 'Store & display master designs for Stitching department' : 'Store & display master designs') + ` — ${total} total designs`}
               </p>
             </div>
           </div>
 
           {/* Right Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={handleBulkAutoDetectColors}
-              disabled={bulkDetecting}
-              style={{
-                padding: '0.5rem 1rem',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                color: '#ffffff',
-                cursor: bulkDetecting ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                boxShadow: '0 3px 10px rgba(124, 58, 237, 0.25)',
-                transition: 'all 0.15s ease',
-                opacity: bulkDetecting ? 0.6 : 1
-              }}
-            >
-              {bulkDetecting ? (
-                <><RefreshCw size={14} className="spin-loader" /> Processing...</>
-              ) : (
-                <><span style={{ fontSize: '0.9rem' }}>🎨</span> Auto-set All Colours</>
-              )}
-            </button>
+            {activeSubTab === 'sample' || activeSubTab === 'sample_design' ? null : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBulkAutoDetectColors}
+                  disabled={bulkDetecting}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    color: '#ffffff',
+                    cursor: bulkDetecting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    boxShadow: '0 3px 10px rgba(124, 58, 237, 0.25)',
+                    transition: 'all 0.15s ease',
+                    opacity: bulkDetecting ? 0.6 : 1
+                  }}
+                >
+                  {bulkDetecting ? (
+                    <><RefreshCw size={14} className="spin-loader" /> Processing...</>
+                  ) : (
+                    <><span style={{ fontSize: '0.9rem' }}>🎨</span> Auto-set All Colours</>
+                  )}
+                </button>
 
-            {department === 'stitching' && (
-              <button
-                type="button"
-                onClick={() => setShowPKDImportModal(true)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 800,
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  boxShadow: '0 3px 10px rgba(16, 185, 129, 0.25)'
-                }}
-              >
-                📥 Import PKD Orders
-              </button>
+                {department === 'stitching' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPKDImportModal(true)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 800,
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: '#ffffff',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      boxShadow: '0 3px 10px rgba(16, 185, 129, 0.25)'
+                    }}
+                  >
+                    📥 Import PKD Orders
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={openNew}
+                  style={{
+                    padding: '0.5rem 1.15rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    boxShadow: '0 3px 12px rgba(37, 99, 235, 0.3)'
+                  }}
+                >
+                  <PlusCircle size={15} />
+                  <span>New Design</span>
+                </button>
+              </>
             )}
-
-            <button
-              type="button"
-              onClick={openNew}
-              style={{
-                padding: '0.5rem 1.15rem',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                color: '#ffffff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                boxShadow: '0 3px 12px rgba(37, 99, 235, 0.3)'
-              }}
-            >
-              <PlusCircle size={15} />
-              <span>New Design</span>
-            </button>
           </div>
         </div>
 
@@ -1207,6 +1229,28 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
               <BookOpen size={15} />
               <span>Design Catalog</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('sample')}
+              style={{
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                borderRadius: '8px',
+                border: (activeSubTab === 'sample' || activeSubTab === 'sample_design') ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                background: (activeSubTab === 'sample' || activeSubTab === 'sample_design') ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
+                color: (activeSubTab === 'sample' || activeSubTab === 'sample_design') ? '#1d4ed8' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Sparkles size={15} />
+              <span>Sample Design</span>
+            </button>
             
             <button
               type="button"
@@ -1235,6 +1279,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
       {activeSubTab === 'master' ? (
         <DesignMaster department={department} />
+      ) : (activeSubTab === 'sample' || activeSubTab === 'sample_design') ? (
+        <DesignerScreen
+          ref={designerScreenRef}
+          currentUser={currentUser}
+          isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
+          embedded={true}
+        />
       ) : (
         <>
           {showPKDImportModal && (
@@ -1353,9 +1404,15 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
       {/* Grid catalogue */}
       {loading && designs.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-          <RefreshCw size={32} className="spin-loader" color="var(--primary)" />
-          <p style={{ marginTop: '1rem' }}>Loading designs catalogue...</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4rem 1.5rem', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '1rem 0' }}>
+          <div style={{ position: 'relative', width: '64px', height: '64px', marginBottom: '1.25rem' }}>
+            <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid transparent', borderTopColor: '#2563eb', borderRightColor: '#8b5cf6', animation: 'spin 1.1s linear infinite' }} />
+            <div style={{ position: 'absolute', inset: '4px', borderRadius: '50%', background: 'linear-gradient(135deg, #1d4ed8, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', boxShadow: '0 0 20px rgba(37, 99, 235, 0.45)', animation: 'pulseGlow 2s infinite' }}>
+              <BookOpen size={24} />
+            </div>
+          </div>
+          <h4 style={{ margin: '0 0 0.35rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Loading Design Catalogue</h4>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>Retrieving master catalog specifications & preview artwork...</p>
         </div>
       ) : designs.length === 0 ? (
         <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
@@ -1624,9 +1681,47 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       {/* Form Modal */}
       {showForm && (
         <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '2rem' }}>
-          <div style={{ background: 'var(--bg-modal,#161b26)', border: '1px solid var(--border-light)',
+          <div style={{
+            position: 'relative',
+            background: 'var(--bg-modal,#161b26)', border: '1px solid var(--border-light)',
             borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 700,
             boxShadow: 'var(--shadow-lg)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+
+            {/* Modal Saving Loading Screen */}
+            {saving && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(15, 23, 42, 0.82)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 100,
+                  padding: '2rem',
+                  animation: 'fadeIn 0.2s ease',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ position: 'relative', width: '76px', height: '76px', marginBottom: '1.25rem' }}>
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid transparent', borderTopColor: '#38bdf8', borderRightColor: '#818cf8', animation: 'spin 1.1s linear infinite' }} />
+                  <div style={{ position: 'absolute', inset: '4px', borderRadius: '50%', background: 'linear-gradient(135deg, #1d4ed8, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', boxShadow: '0 0 25px rgba(37,99,235,0.6)', animation: 'pulseGlow 2s infinite' }}>
+                    <Save size={28} />
+                  </div>
+                </div>
+                <h3 style={{ margin: '0 0 0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
+                  {formDesign ? 'Updating Design Catalogue' : 'Saving New Master Design'}
+                </h3>
+                <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#cbd5e1', maxWidth: '340px' }}>
+                  Syncing parameters, color tags, and publishing records to ERP database...
+                </p>
+                <div style={{ width: '100%', maxWidth: '280px', height: '5px', background: 'rgba(255,255,255,0.15)', borderRadius: '999px', overflow: 'hidden' }}>
+                  <div style={{ width: '60%', height: '100%', background: 'linear-gradient(90deg, #38bdf8, #818cf8)', borderRadius: '999px', animation: 'shimmer 1.5s infinite linear' }} />
+                </div>
+              </div>
+            )}
 
             {/* Header */}
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-light)',

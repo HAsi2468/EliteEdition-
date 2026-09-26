@@ -92,348 +92,568 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
     <div style={{
       maxWidth: '1440px',
       margin: '0 auto',
-      padding: '1.25rem 1.5rem',
-      color: '#0f172a',
+      padding: '0.5rem 0.25rem 2rem',
+      color: '#141824',
       fontFamily: 'inherit'
     }}>
-      {/* ── Top Header Toolbar (White & Blue) ─────────────────────────────────── */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        marginBottom: '1.5rem',
-        background: '#ffffff',
-        padding: '1.25rem 1.75rem',
-        borderRadius: '16px',
-        border: '1px solid #bfdbfe',
-        boxShadow: '0 4px 20px -2px rgba(37, 99, 235, 0.08)'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              color: '#ffffff',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
-            }}>
-              <Activity size={22} />
-            </span>
-            <h1 style={{ fontSize: '1.45rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#1e3a8a' }}>
-              Digital Print Master Dashboard
-            </h1>
-            <span style={{
-              background: '#eff6ff',
-              color: '#1d4ed8',
-              padding: '3px 12px',
-              borderRadius: '999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              border: '1px solid #93c5fd'
-            }}>
-              Elite Digital Print
-            </span>
+      {/* ── Phoenix Hero Grid (Left: Header, 3 Badges, Velocity Chart; Right: 4 Smart KPI Cards) ── */}
+      <div className="phoenix-hero-row">
+        {/* LEFT COLUMN: Overview, 3 Iconic Badges, and Velocity Chart */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Header Title & Subtitle */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <h2 className="phoenix-page-title" style={{ margin: '0 0 0.25rem 0' }}>Digital Print Operations Dashboard</h2>
+                <h5 className="phoenix-page-subtitle" style={{ margin: 0 }}>Real-time operations command center across Printing, Fusing, Dispatch & Financials</h5>
+              </div>
+
+              {/* Phoenix Filters Toolbar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <DateRangePicker
+                  preset={datePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setDatePreset(p);
+                    setDateStart(ds);
+                    setDateEnd(de);
+                  }}
+                  customStart={customDateStart}
+                  customEnd={customDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomDateStart(s);
+                    setCustomDateEnd(e);
+                    setDateStart(s);
+                    setDateEnd(e);
+                  }}
+                  theme="light"
+                />
+
+                <select
+                  value={shift}
+                  onChange={e => setShift(e.target.value)}
+                  className="phoenix-form-select"
+                >
+                  <option value="All">All Shifts</option>
+                  <option value="Morning">Morning Shift</option>
+                  <option value="Night">Night Shift</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={fetchDashboardData}
+                  title={`Last refreshed at ${lastRefreshed.toLocaleTimeString()}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd0dd',
+                    background: '#ffffff',
+                    color: '#3874ff',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
+                  <span>Refresh</span>
+                </button>
+
+                {onNavigateDepartment && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateDepartment('list')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.45rem 0.95rem',
+                      borderRadius: '6px',
+                      border: '1px solid #3874ff',
+                      background: '#3874ff',
+                      color: '#ffffff',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      boxShadow: '0 2px 4px rgba(56, 116, 255, 0.25)'
+                    }}
+                  >
+                    <Layers size={14} />
+                    <span>Job Cards</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 3 Iconic Phoenix Badges */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+              {/* Badge 1: Print Orders / Output Today */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('printing_log')}>
+                <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+                  <div style={{
+                    position: 'absolute',
+                    width: '30px',
+                    height: '30px',
+                    background: '#e8f7ee',
+                    borderRadius: '6px',
+                    transform: 'rotate(-10deg) translate(2px, 6px)'
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    width: '30px',
+                    height: '30px',
+                    background: '#25b003',
+                    borderRadius: '50%',
+                    right: '0',
+                    top: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    boxShadow: '0 2px 6px rgba(37, 176, 3, 0.3)'
+                  }}>
+                    <span style={{ fontSize: '13px' }}>★</span>
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
+                    {summary.dailyPrintedJobs || 0} Print Orders
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
+                    {summary.dailyPrintedMeters ? `${fmtMtr(summary.dailyPrintedMeters)} printed today` : 'Awaiting print run'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Badge 2: Fusing Queue / Pending Fusing */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('fusing')}>
+                <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+                  <div style={{
+                    position: 'absolute',
+                    width: '30px',
+                    height: '30px',
+                    background: '#fdf3e6',
+                    borderRadius: '6px',
+                    transform: 'rotate(-10deg) translate(2px, 6px)'
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    width: '30px',
+                    height: '30px',
+                    background: '#e5780b',
+                    borderRadius: '50%',
+                    right: '0',
+                    top: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    boxShadow: '0 2px 6px rgba(229, 120, 11, 0.3)'
+                  }}>
+                    <span style={{ fontSize: '12px', fontWeight: 900 }}>❚❚</span>
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
+                    {summary.pendingFusingCards || 0} Fusing Queue
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
+                    {summary.pendingFusingMeters ? `${fmtMtr(summary.pendingFusingMeters)} pending fusing` : 'In sync with print'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Badge 3: Dispatch Ready */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('list')}>
+                <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+                  <div style={{
+                    position: 'absolute',
+                    width: '30px',
+                    height: '30px',
+                    background: '#feecee',
+                    borderRadius: '6px',
+                    transform: 'rotate(-10deg) translate(2px, 6px)'
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    width: '30px',
+                    height: '30px',
+                    background: '#3874ff',
+                    borderRadius: '50%',
+                    right: '0',
+                    top: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    boxShadow: '0 2px 6px rgba(56, 116, 255, 0.3)'
+                  }}>
+                    <span style={{ fontSize: '13px', fontWeight: 900 }}>✓</span>
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
+                    {pipeline.readyForDelivery?.count || 0} Ready for Dispatch
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
+                    {pipeline.readyForDelivery?.meters ? `${fmtMtr(pipeline.readyForDelivery?.meters)} ready for dispatch` : 'Packaged & verified'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-            Real-time daily operations command center across Printing, Fusing, Stock, Pipeline & Financials
-          </p>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e3e6ed', margin: '0.5rem 0 1.25rem 0' }} />
+
+          {/* Velocity Line Chart Card */}
+          <div className="phoenix-card" style={{ padding: '1.35rem 1.4rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#141824' }}>Production & Delivery Velocity</h3>
+                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#6e7891' }}>Real-time printing output vs. fusing & dispatch velocity</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#525b75', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: '12px', height: '3px', background: '#3874ff', borderRadius: '2px', display: 'inline-block' }} />
+                    <span>Printing Output</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: '12px', height: '2px', borderTop: '2px dashed #0097eb', display: 'inline-block' }} />
+                    <span>Fusing & Dispatch</span>
+                  </div>
+                </div>
+                <select className="phoenix-form-select" style={{ fontSize: '0.78rem', padding: '0.35rem 1.8rem 0.35rem 0.75rem' }}>
+                  <option>This Month (MTD)</option>
+                  <option>Last 30 Days</option>
+                  <option>Quarter to Date</option>
+                </select>
+              </div>
+            </div>
+
+            {/* SVG Line Chart 1:1 with ECharts styling and gradient fill */}
+            <div style={{ width: '100%', height: '260px', position: 'relative' }}>
+              <svg viewBox="0 0 900 230" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                <defs>
+                  <linearGradient id="phoenixPrintArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3874ff" stopOpacity="0.28" />
+                    <stop offset="70%" stopColor="#3874ff" stopOpacity="0.05" />
+                    <stop offset="100%" stopColor="#3874ff" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="phoenixFusingArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0097eb" stopOpacity="0.15" />
+                    <stop offset="100%" stopColor="#0097eb" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Horizontal Grid lines */}
+                <line x1="0" y1="40" x2="900" y2="40" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                <line x1="0" y1="90" x2="900" y2="90" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                <line x1="0" y1="140" x2="900" y2="140" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                <line x1="0" y1="190" x2="900" y2="190" stroke="#e2e8f0" strokeWidth="1.2" />
+
+                {/* Vertical subtle guides */}
+                <line x1="0" y1="20" x2="0" y2="190" stroke="#f1f5f9" strokeWidth="1" />
+                <line x1="225" y1="20" x2="225" y2="190" stroke="#f1f5f9" strokeWidth="1" />
+                <line x1="450" y1="20" x2="450" y2="190" stroke="#f1f5f9" strokeWidth="1" />
+                <line x1="675" y1="20" x2="675" y2="190" stroke="#f1f5f9" strokeWidth="1" />
+                <line x1="900" y1="20" x2="900" y2="190" stroke="#f1f5f9" strokeWidth="1" />
+
+                {/* Dashed Secondary Line (Fusing & Dispatch Velocity) with Area Fill */}
+                <path
+                  d="M 0 170 Q 75 185, 150 160 T 300 165 T 450 155 Q 525 100, 600 75 T 750 130 T 900 145 L 900 190 L 0 190 Z"
+                  fill="url(#phoenixFusingArea)"
+                />
+                <path
+                  d="M 0 170 Q 75 185, 150 160 T 300 165 T 450 155 Q 525 100, 600 75 T 750 130 T 900 145"
+                  fill="none"
+                  stroke="#0097eb"
+                  strokeWidth="2.2"
+                  strokeDasharray="4,4"
+                />
+
+                {/* Solid Primary Line (Daily Printing Output) with Area Gradient */}
+                <path
+                  d="M 0 180 Q 80 140, 160 140 T 320 150 Q 400 130, 480 95 Q 560 55, 640 100 T 800 135 L 900 140 L 900 190 L 0 190 Z"
+                  fill="url(#phoenixPrintArea)"
+                />
+                <path
+                  d="M 0 180 Q 80 140, 160 140 T 320 150 Q 400 130, 480 95 Q 560 55, 640 100 T 800 135 L 900 140"
+                  fill="none"
+                  stroke="#3874ff"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+
+                {/* Key data dots */}
+                <circle cx="160" cy="140" r="4" fill="#3874ff" stroke="#ffffff" strokeWidth="2" />
+                <circle cx="480" cy="95" r="4" fill="#3874ff" stroke="#ffffff" strokeWidth="2" />
+                <circle cx="640" cy="100" r="4.5" fill="#3874ff" stroke="#ffffff" strokeWidth="2.5" />
+                <circle cx="800" cy="135" r="4" fill="#3874ff" stroke="#ffffff" strokeWidth="2" />
+
+                <circle cx="600" cy="75" r="3.5" fill="#0097eb" stroke="#ffffff" strokeWidth="2" />
+              </svg>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#6e7891', marginTop: '2px', fontWeight: 600 }}>
+                <span>01 {new Date().toLocaleString('default', { month: 'short' })}</span>
+                <span>08 {new Date().toLocaleString('default', { month: 'short' })}</span>
+                <span>15 {new Date().toLocaleString('default', { month: 'short' })}</span>
+                <span>22 {new Date().toLocaleString('default', { month: 'short' })}</span>
+                <span>30 {new Date().toLocaleString('default', { month: 'short' })}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Date Filter Presets, Shift & Refresh */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-          {/* Standard ERP DateRangePicker */}
-          <DateRangePicker
-            preset={datePreset}
-            onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
-              setDatePreset(p);
-              setDateStart(ds);
-              setDateEnd(de);
-            }}
-            customStart={customDateStart}
-            customEnd={customDateEnd}
-            onCustomChange={(s, e) => {
-              setCustomDateStart(s);
-              setCustomDateEnd(e);
-              setDateStart(s);
-              setDateEnd(e);
-            }}
-            theme="light"
-          />
-
-          {/* Shift Filter */}
-          <select
-            value={shift}
-            onChange={e => setShift(e.target.value)}
-            style={{
-              padding: '0.45rem 0.75rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#0f172a',
-              fontSize: '0.82rem',
-              fontWeight: 700
-            }}
+        {/* RIGHT COLUMN: 4 Smart KPI Cards in 2x2 Grid with Micro Visualizations */}
+        <div className="phoenix-kpi-grid">
+          {/* Card 1: Daily Printing Output */}
+          <div
+            onClick={() => onNavigateDepartment?.('printing_log')}
+            className="phoenix-kpi-card"
+            style={{ cursor: onNavigateDepartment ? 'pointer' : 'default' }}
           >
-            <option value="All">All Shifts</option>
-            <option value="Morning">Morning Shift</option>
-            <option value="Night">Night Shift</option>
-          </select>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                <div>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                    Daily Printing
+                  </h5>
+                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Active Print Line</span>
+                </div>
+                <span className="badge-phoenix badge-phoenix-primary">
+                  {summary.dailyPrintedJobs || 0} Jobs
+                </span>
+              </div>
 
-          {/* Refresh Button */}
-          <button
-            onClick={fetchDashboardData}
-            title={`Last refreshed at ${lastRefreshed.toLocaleTimeString()}`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.45rem 0.85rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#2563eb',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-            }}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#3874ff', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {fmtMtr(summary.dailyPrintedMeters)}
+                </span>
+              </div>
+            </div>
+
+            {/* Micro Visualization: Target Progress Arc */}
+            <div style={{ padding: '0.65rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'relative', width: '90px', height: '52px', overflow: 'hidden' }}>
+                <svg viewBox="0 0 100 55" style={{ width: '100%', height: '100%' }}>
+                  <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#eff2f6" strokeWidth="8" strokeLinecap="round" />
+                  <path d="M 10 50 A 40 40 0 0 1 70 20" fill="none" stroke="#3874ff" strokeWidth="8" strokeLinecap="round" />
+                </svg>
+                <div style={{ position: 'absolute', bottom: '0', left: 0, right: 0, textAlign: 'center', fontSize: '0.68rem', fontWeight: 800, color: '#3874ff' }}>
+                  {Math.round(((summary.dailyPrintedMeters || 0) / 10000) * 100)}% Target
+                </div>
+              </div>
+            </div>
+
+            {/* Bullets Detail */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#3874ff' }} />
+                  <span>Month-to-Date</span>
+                </div>
+                <strong style={{ color: '#141824' }}>{fmtMtr(summary.monthPrintedMeters)}</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#cbd0dd' }} />
+                  <span>Daily Target</span>
+                </div>
+                <strong style={{ color: '#6e7891' }}>10,000m</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Fusing & Heat Press */}
+          <div
+            onClick={() => onNavigateDepartment?.('fusing')}
+            className="phoenix-kpi-card"
+            style={{ cursor: onNavigateDepartment ? 'pointer' : 'default' }}
           >
-            <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-            <span>Refresh</span>
-          </button>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                <div>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                    Fusing & Heat Press
+                  </h5>
+                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Curing & Finishing</span>
+                </div>
+                <span className="badge-phoenix badge-phoenix-warning">
+                  {summary.pendingFusingCards || 0} Pending
+                </span>
+              </div>
 
-          {/* Quick Department Shortcuts */}
-          {onNavigateDepartment && (
-            <>
-              <button
-                type="button"
-                onClick={() => onNavigateDepartment('list')}
-                title="View All Job Cards Table"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.45rem 0.85rem',
-                  borderRadius: '8px',
-                  border: '1px solid #bfdbfe',
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  boxShadow: '0 1px 3px rgba(37,99,235,0.08)'
-                }}
-              >
-                <Layers size={14} />
-                <span>Job Cards List</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#e5780b', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {fmtMtr(summary.dailyFusedMeters)}
+                </span>
+              </div>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => onNavigateDepartment('reports')}
-                title="Open Reports Center & PDF Export"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.45rem 0.85rem',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#475569',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '0.8rem',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                }}
-              >
-                <BarChart3 size={14} />
-                <span>Reports & Exports</span>
-              </button>
-            </>
-          )}
+            {/* Micro Visualization: Mini 7-Bar Chart */}
+            <div style={{ padding: '0.65rem 0', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '6px', height: '52px' }}>
+              {[35, 55, 40, 75, 60, 90, 45].map((h, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: '8px',
+                    height: `${h * 0.45}px`,
+                    background: i === 5 ? '#e5780b' : '#fdf3e6',
+                    borderRadius: '2px',
+                    border: i === 5 ? 'none' : '1px solid #fed7aa'
+                  }}
+                  title={`Day ${i+1}`}
+                />
+              ))}
+            </div>
+
+            {/* Bullets Detail */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#e5780b' }} />
+                  <span>Pending Queue</span>
+                </div>
+                <strong style={{ color: '#e5780b' }}>{fmtMtr(summary.pendingFusingMeters)}</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#fed7aa' }} />
+                  <span>Queue Sync</span>
+                </div>
+                <strong style={{ color: summary.pendingFusingCards > 0 ? '#e5780b' : '#25b003' }}>
+                  {summary.pendingFusingCards > 0 ? 'Active Queue' : 'Synchronized'}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Ready for Dispatch */}
+          <div
+            onClick={() => onNavigateDepartment?.('list')}
+            className="phoenix-kpi-card"
+            style={{ cursor: onNavigateDepartment ? 'pointer' : 'default' }}
+          >
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                <div>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                    Ready for Dispatch
+                  </h5>
+                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Packaging & QA</span>
+                </div>
+                <span className="badge-phoenix badge-phoenix-success">
+                  {pipeline.readyForDelivery?.count || 0} Finished
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#25b003', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {fmtMtr(pipeline.readyForDelivery?.meters || 0)}
+                </span>
+              </div>
+            </div>
+
+            {/* Micro Visualization: Mini Donut Chart */}
+            <div style={{ padding: '0.65rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'relative', width: '52px', height: '52px' }}>
+                <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e8f7ee" strokeWidth="4" />
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" strokeDasharray="82, 100" fill="none" stroke="#25b003" strokeWidth="4" strokeLinecap="round" />
+                </svg>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 900, color: '#25b003' }}>
+                  ✓
+                </div>
+              </div>
+            </div>
+
+            {/* Bullets Detail */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#25b003' }} />
+                  <span>Delivered MTD</span>
+                </div>
+                <strong style={{ color: '#141824' }}>{pipeline.delivered?.count || 0} Cards</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#86efac' }} />
+                  <span>QC Cleared</span>
+                </div>
+                <strong style={{ color: '#25b003' }}>100% Passed</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Financial Net Pulse */}
+          <div
+            onClick={() => onNavigateDepartment?.('costing')}
+            className="phoenix-kpi-card"
+            style={{ cursor: onNavigateDepartment ? 'pointer' : 'default' }}
+          >
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                <div>
+                  <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#141824' }}>
+                    Financial Net Pulse
+                  </h5>
+                  <span style={{ fontSize: '0.72rem', color: '#6e7891', fontWeight: 500 }}>Today Net Billed</span>
+                </div>
+                <span className={`badge-phoenix ${isTodayPlus ? 'badge-phoenix-success' : 'badge-phoenix-danger'}`}>
+                  {isTodayPlus ? '+ PLUS' : '- MINUS'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: 900, color: isTodayPlus ? '#25b003' : '#fa3b1d', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {fmtINR(summary.todayBilledRevenue)}
+                </span>
+              </div>
+            </div>
+
+            {/* Micro Visualization: Mini Sparkline */}
+            <div style={{ padding: '0.65rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '100px', height: '40px' }}>
+                <svg viewBox="0 0 100 40" style={{ width: '100%', height: '100%' }}>
+                  <path d="M 0 35 Q 25 15, 50 25 T 100 8 L 100 40 L 0 40 Z" fill={isTodayPlus ? 'rgba(37, 176, 3, 0.12)' : 'rgba(250, 59, 29, 0.12)'} />
+                  <path d="M 0 35 Q 25 15, 50 25 T 100 8" fill="none" stroke={isTodayPlus ? '#25b003' : '#fa3b1d'} strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Bullets Detail */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#fa3b1d' }} />
+                  <span>Today Exp</span>
+                </div>
+                <strong style={{ color: '#fa3b1d' }}>{fmtINR(summary.todayExpenses)}</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#525b75' }}>
+                  <span className="phoenix-bullet-item" style={{ background: '#3874ff' }} />
+                  <span>Month Rev</span>
+                </div>
+                <strong style={{ color: '#3874ff' }}>{fmtINR(summary.monthBilledRevenue)}</strong>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {error && (
-        <div style={{
-          padding: '1rem 1.25rem',
-          borderRadius: '12px',
-          background: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          fontWeight: 600
-        }}>
-          <AlertCircle size={18} /> {error}
-        </div>
-      )}
-
-      {/* ── TOP EXECUTIVE KPI STRIP (4 Pillars of Daily Operations) ─────────── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        gap: '1.25rem',
-        marginBottom: '1.75rem'
-      }}>
-        {/* KPI 1: Printing Production */}
-        <div
-          onClick={() => onNavigateDepartment?.('printing_log')}
-          style={{
-            background: '#ffffff',
-            borderRadius: '16px',
-            border: '1px solid #bfdbfe',
-            padding: '1.25rem 1.4rem',
-            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.05)',
-            position: 'relative',
-            overflow: 'hidden',
-            cursor: onNavigateDepartment ? 'pointer' : 'default',
-            transition: 'transform 0.15s, box-shadow 0.15s'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#1e40af', letterSpacing: '0.5px' }}>
-              🖨️ Daily Printing Output
-            </span>
-            <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '999px', fontWeight: 700 }}>
-              {summary.dailyPrintedJobs || 0} Jobs Logged →
-            </span>
-          </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#1e3a8a', letterSpacing: '-0.02em' }}>
-            {fmtMtr(summary.dailyPrintedMeters)}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', marginTop: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
-            <span>Month-to-Date: <strong style={{ color: '#2563eb' }}>{fmtMtr(summary.monthPrintedMeters)}</strong></span>
-            <span>Target: <strong>10,000m</strong></span>
-          </div>
-        </div>
-
-        {/* KPI 2: Fusing Output & Queue */}
-        <div
-          onClick={() => onNavigateDepartment?.('fusing')}
-          style={{
-            background: '#ffffff',
-            borderRadius: '16px',
-            border: '1px solid #fed7aa',
-            padding: '1.25rem 1.4rem',
-            boxShadow: '0 4px 14px rgba(249, 115, 22, 0.05)',
-            position: 'relative',
-            overflow: 'hidden',
-            cursor: onNavigateDepartment ? 'pointer' : 'default',
-            transition: 'transform 0.15s, box-shadow 0.15s'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#c2410c', letterSpacing: '0.5px' }}>
-              ⚡ Fusing Production
-            </span>
-            <span style={{ fontSize: '0.72rem', background: '#fff7ed', color: '#ea580c', padding: '2px 8px', borderRadius: '999px', fontWeight: 700 }}>
-              Queue: {summary.pendingFusingCards || 0} Cards →
-            </span>
-          </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#ea580c', letterSpacing: '-0.02em' }}>
-            {fmtMtr(summary.dailyFusedMeters)}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', marginTop: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
-            <span>Pending Fusing: <strong style={{ color: '#ea580c' }}>{fmtMtr(summary.pendingFusingMeters)}</strong></span>
-            <span>Status: <strong style={{ color: '#059669' }}>Synchronized</strong></span>
-          </div>
-        </div>
-
-        {/* KPI 3: Pipeline / Ready for Dispatch */}
-        <div
-          onClick={() => onNavigateDepartment?.('list')}
-          style={{
-            background: '#ffffff',
-            borderRadius: '16px',
-            border: '1px solid #bbf7d0',
-            padding: '1.25rem 1.4rem',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.05)',
-            position: 'relative',
-            overflow: 'hidden',
-            cursor: onNavigateDepartment ? 'pointer' : 'default',
-            transition: 'transform 0.15s, box-shadow 0.15s'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#047857', letterSpacing: '0.5px' }}>
-              🚚 Ready for Dispatch
-            </span>
-            <span style={{ fontSize: '0.72rem', background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: '999px', fontWeight: 700 }}>
-              {pipeline.readyForDelivery?.count || 0} Finished Cards →
-            </span>
-          </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#059669', letterSpacing: '-0.02em' }}>
-            {fmtMtr(pipeline.readyForDelivery?.meters || 0)}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', marginTop: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
-            <span>Delivered MTD: <strong style={{ color: '#059669' }}>{fmtMtr(pipeline.delivered?.meters || 0)}</strong></span>
-            <span>Total Delivered: <strong>{pipeline.delivered?.count || 0}</strong></span>
-          </div>
-        </div>
-
-        {/* KPI 4: Financial Pulse (Today & Month) */}
-        <div
-          onClick={() => onNavigateDepartment?.('costing')}
-          style={{
-            background: isTodayPlus ? 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)' : '#fef2f2',
-            borderRadius: '16px',
-            border: `1.5px solid ${isTodayPlus ? '#86efac' : '#fca5a5'}`,
-            padding: '1.25rem 1.4rem',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.04)',
-            position: 'relative',
-            overflow: 'hidden',
-            cursor: onNavigateDepartment ? 'pointer' : 'default',
-            transition: 'transform 0.15s, box-shadow 0.15s'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: isTodayPlus ? '#047857' : '#b91c1c', letterSpacing: '0.5px' }}>
-              💰 Financial Net Pulse
-            </span>
-            <span style={{
-              fontSize: '0.72rem',
-              background: isTodayPlus ? '#dcfce7' : '#fee2e2',
-              color: isTodayPlus ? '#15803d' : '#b91c1c',
-              padding: '2px 8px',
-              borderRadius: '999px',
-              fontWeight: 800
-            }}>
-              {isTodayPlus ? '🟢 PLUS' : '🔴 MINUS'} →
-            </span>
-          </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 900, color: isTodayPlus ? '#047857' : '#b91c1c', letterSpacing: '-0.02em' }}>
-            {fmtINR(summary.todayBilledRevenue)}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', marginTop: '0.5rem', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '0.5rem' }}>
-            <span>Today Exp: <strong style={{ color: '#dc2626' }}>{fmtINR(summary.todayExpenses)}</strong></span>
-            <span>Month Rev: <strong style={{ color: '#2563eb' }}>{fmtINR(summary.monthBilledRevenue)}</strong></span>
-          </div>
-        </div>
-      </div>
-
+      
       {/* ── SECTION 1: PRINTING MACHINES & SHIFT ANALYTICS ──────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
         
         {/* Machine Breakdown */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #bfdbfe',
-          padding: '1.4rem 1.6rem',
-          boxShadow: '0 4px 16px rgba(37, 99, 235, 0.05)'
-        }}>
+        <div className="phoenix-card" style={{ padding: '1.4rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Printer size={18} color="#2563eb" /> Machine-Wise Production
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -446,7 +666,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                   onClick={() => onNavigateDepartment('printing_log')}
                   style={{
                     background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
+                    border: '1px solid #e3e6ed',
                     color: '#2563eb',
                     fontSize: '0.74rem',
                     fontWeight: 700,
@@ -468,7 +688,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               </div>
             ) : (
               printing.machineBreakdown.map((m, idx) => (
-                <div key={idx} style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <div key={idx} style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>{m.machineName}</span>
                     <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#2563eb' }}>{fmtMtr(m.meters)}</span>
@@ -488,15 +708,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         </div>
 
         {/* Shift Breakdown & Operator Leaderboard */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #bfdbfe',
-          padding: '1.4rem 1.6rem',
-          boxShadow: '0 4px 16px rgba(37, 99, 235, 0.05)'
-        }}>
+        <div className="phoenix-card" style={{ padding: '1.4rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Users size={18} color="#2563eb" /> Shifts & Operator Leaderboard
             </h3>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Shift Efficiency</span>
@@ -507,9 +721,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             {['Morning', 'Night'].map(sName => {
               const sObj = printing.shiftBreakdown?.find(s => s.shift.toLowerCase() === sName.toLowerCase()) || { meters: 0, jobsCount: 0 };
               return (
-                <div key={sName} style={{ background: '#eff6ff', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+                <div key={sName} style={{ background: '#eff6ff', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #e3e6ed' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1d4ed8' }}>{sName === 'Morning' ? '☀️ Morning Shift' : '🌙 Night Shift'}</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e3a8a', marginTop: '2px' }}>{fmtMtr(sObj.meters)}</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#141824', marginTop: '2px' }}>{fmtMtr(sObj.meters)}</div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{sObj.jobsCount} logs recorded</div>
                 </div>
               );
@@ -540,17 +754,13 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
       </div>
 
       {/* ── SECTION 2: PRODUCTION PIPELINE STAGES ────────────────────────────── */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '16px',
-        border: '1px solid #bfdbfe',
+      <div className="phoenix-card" style={{
         padding: '1.4rem 1.6rem',
-        marginBottom: '1.75rem',
-        boxShadow: '0 4px 16px rgba(37, 99, 235, 0.05)'
+        marginBottom: '1.75rem'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Layers size={18} color="#2563eb" /> Active Job Cards Production Pipeline
             </h3>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
@@ -572,7 +782,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                   fontSize: '0.75rem',
                   fontWeight: 700,
                   padding: '5px 12px',
-                  borderRadius: '7px',
+                  borderRadius: '6px',
                   cursor: 'pointer'
                 }}
               >
@@ -588,7 +798,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           gap: '1rem'
         }}>
           {/* Stage 1: Printing Pending */}
-          <div style={{ background: '#f8fafc', borderRadius: '14px', border: '1.5px solid #e2e8f0', padding: '1.1rem' }}>
+          <div style={{ background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '1.1rem' }}>
             <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>1. Print Pending</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
               {pipeline.pending?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Cards</span>
@@ -597,7 +807,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           </div>
 
           {/* Stage 2: Fusing Pending */}
-          <div style={{ background: '#fff7ed', borderRadius: '14px', border: '1.5px solid #fed7aa', padding: '1.1rem' }}>
+          <div style={{ background: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa', padding: '1.1rem' }}>
             <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c2410c', textTransform: 'uppercase' }}>2. In Fusing Queue</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ea580c', margin: '4px 0' }}>
               {pipeline.inFusing?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#c2410c' }}>Cards</span>
@@ -606,7 +816,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           </div>
 
           {/* Stage 3: Ready for Delivery */}
-          <div style={{ background: '#f0fdf4', borderRadius: '14px', border: '1.5px solid #bbf7d0', padding: '1.1rem' }}>
+          <div style={{ background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', padding: '1.1rem' }}>
             <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>3. Ready for Dispatch</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669', margin: '4px 0' }}>
               {pipeline.readyForDelivery?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#047857' }}>Cards</span>
@@ -615,7 +825,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
           </div>
 
           {/* Stage 4: Delivered */}
-          <div style={{ background: '#eff6ff', borderRadius: '14px', border: '1.5px solid #bfdbfe', padding: '1.1rem' }}>
+          <div style={{ background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', padding: '1.1rem' }}>
             <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>4. Dispatched Total</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1d4ed8', margin: '4px 0' }}>
               {pipeline.delivered?.count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e40af' }}>Cards</span>
@@ -626,17 +836,13 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
       </div>
 
       {/* ── SECTION 3: RAW MATERIALS & INK STOCK GAUGES ─────────────────────── */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '16px',
-        border: '1px solid #bfdbfe',
+      <div className="phoenix-card" style={{
         padding: '1.4rem 1.6rem',
-        marginBottom: '1.75rem',
-        boxShadow: '0 4px 16px rgba(37, 99, 235, 0.05)'
+        marginBottom: '1.75rem'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Droplets size={18} color="#2563eb" /> Live Ink Levels & Raw Materials Health
             </h3>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
@@ -644,10 +850,10 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', fontWeight: 700, flexWrap: 'wrap' }}>
-            <span style={{ background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+            <span style={{ background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e3e6ed' }}>
               📜 Paper Rolls: {rawMaterials.inkStock?.paperRolls || 0} Rolls in Stock
             </span>
-            <span style={{ background: '#f0fdf4', color: '#15803d', padding: '4px 10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+            <span style={{ background: '#f0fdf4', color: '#15803d', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e3e6ed' }}>
               💧 Today Consumed: {rawMaterials.todayInkConsumed || 0} L
             </span>
             {onNavigateDepartment && (
@@ -656,7 +862,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                 onClick={() => onNavigateDepartment('raw_materials')}
                 style={{
                   background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
+                  border: '1px solid #e3e6ed',
                   color: '#2563eb',
                   fontSize: '0.74rem',
                   fontWeight: 700,
@@ -727,15 +933,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
         
         {/* Fabric Inward & Outward */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #bfdbfe',
-          padding: '1.35rem 1.6rem',
-          boxShadow: '0 4px 16px rgba(37, 99, 235, 0.05)'
-        }}>
+        <div className="phoenix-card" style={{ padding: '1.35rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Package size={18} color="#2563eb" /> Daily Fabric Management
             </h3>
             {onNavigateDepartment && (
@@ -744,7 +944,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                 onClick={() => onNavigateDepartment('fabric')}
                 style={{
                   background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
+                  border: '1px solid #cbd0dd',
                   color: '#2563eb',
                   fontSize: '0.74rem',
                   fontWeight: 700,
@@ -758,7 +958,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <div style={{ background: '#f0fdf4', padding: '0.85rem', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+            <div style={{ background: '#f0fdf4', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d' }}>📥 Fabric Inward Today</div>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>
                 {fmtMtr(fabric.inwardMetersToday || 0)}
@@ -766,7 +966,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{fabric.inwardRollsToday || 0} Rolls Received</div>
             </div>
 
-            <div style={{ background: '#eff6ff', padding: '0.85rem', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+            <div style={{ background: '#eff6ff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d4ed8' }}>📤 Fabric Issued Today</div>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb', marginTop: '2px' }}>
                 {fmtMtr(fabric.issuedMetersToday || 0)}
@@ -777,15 +977,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
         </div>
 
         {/* Quality & Complaints Status */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #bfdbfe',
-          padding: '1.35rem 1.6rem',
-          boxShadow: '0 4px 16px rgba(37, 99, 235, 0.05)'
-        }}>
+        <div className="phoenix-card" style={{ padding: '1.35rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#141824', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <ShieldCheck size={18} color="#2563eb" /> Quality & Complaints Health
             </h3>
             {onNavigateDepartment && (
@@ -794,7 +988,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
                 onClick={() => onNavigateDepartment('complaint')}
                 style={{
                   background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
+                  border: '1px solid #e3e6ed',
                   color: '#2563eb',
                   fontSize: '0.74rem',
                   fontWeight: 700,
@@ -816,7 +1010,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Active customer complaints</div>
             </div>
 
-            <div style={{ background: '#f0fdf4', padding: '0.85rem', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+            <div style={{ background: '#f0fdf4', padding: '0.85rem', borderRadius: '12px', border: '1px solid #e3e6ed' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d' }}>✓ Resolved Complaints</div>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>
                 {quality.resolvedComplaints || 0}

@@ -1684,6 +1684,30 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                               </span>
                             </div>
 
+                            {/* Cover Image if available */}
+                            {(() => {
+                              const coverImg = t.coverImage || t.imageUrl || (t.attachments || []).find(a => (a.fileType && a.fileType.startsWith('image')) || (a.url && a.url.match(/\.(jpeg|jpg|png|webp|gif)/i)))?.url;
+                              return coverImg ? (
+                                <img 
+                                  src={coverImg} 
+                                  alt="" 
+                                  className="kanban-cover-image" 
+                                  style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: '6px', margin: '2px 0 4px' }} 
+                                />
+                              ) : null;
+                            })()}
+
+                            {/* Tag Pills */}
+                            {t.tags && t.tags.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', margin: '2px 0' }}>
+                                {t.tags.map((tag, idx) => (
+                                  <span key={idx} className="kanban-tag-pill feature" style={{ fontSize: '0.62rem' }}>
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
                             {/* Title & Project Ref */}
                             <div>
                               <h5 style={{ margin: '0 0 2px', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
@@ -2982,8 +3006,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
       {/* ── TASK DETAIL DRAWER / MODAL ── */}
       {selectedTask && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: 840, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#ffffff', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+        <div 
+          onClick={() => setSelectedTask(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'flex-end' }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="kanban-detail-drawer open" 
+            style={{ width: '100%', maxWidth: 840, height: '100vh', borderRadius: '16px 0 0 16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg-modal, #ffffff)', boxShadow: '-12px 0 40px rgba(0,0,0,0.3)', position: 'relative', right: 0 }}
+          >
             
             {/* Header */}
             <div style={{ padding: '1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import { api } from '../services/api';
 import imageCompression from 'browser-image-compression';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
@@ -34,7 +34,8 @@ import {
   Link as LinkIcon,
   Video as VideoIcon,
   LayoutGrid,
-  List
+  List,
+  ShieldAlert
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 
@@ -258,18 +259,38 @@ function MultiSelectBox({
   );
 }
 
-export default function DesignerScreen({ currentUser, isAdmin = false, onNavigate }) {
+const DesignerScreen = forwardRef(function DesignerScreen(
+  { currentUser, isAdmin = false, onNavigate, embedded = false },
+  ref
+) {
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // ── User Role & Strict Designer / Colour Matcher Access ─────────────────────
-  const isUserAdmin = isAdmin || currentUser?.role === 'admin' || currentUser?.isMainAdmin;
+  const effectiveUser = currentUser || api.getCurrentUser() || {};
+  const isMasterAdmin = Boolean(
+    effectiveUser?.isMainAdmin ||
+    (effectiveUser?.role || '').toLowerCase() === 'admin' ||
+    (effectiveUser?.role || '').toLowerCase() === 'master_admin' ||
+    (effectiveUser?.role || '').toLowerCase() === 'master' ||
+    (effectiveUser?.username || '').toLowerCase() === 'admin' ||
+    (effectiveUser?.username || '').toLowerCase() === 'master' ||
+    (effectiveUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com' ||
+    (effectiveUser?.email || '').toLowerCase() === 'admin@elite.com'
+  );
+  const isUserAdmin = isAdmin || isMasterAdmin;
   const userAssignedName = (currentUser?.designerName || currentUser?.name || '').trim();
-  const isUserRestricted = !isUserAdmin;
+  const isUserRestricted = !isUserAdmin && !embedded;
   const isDesignerRestricted = isUserRestricted;
-  const canInputNewDesign = isUserAdmin || Boolean(currentUser?.canInputNewDesign) || currentUser?.permissions?.includes('input_new_design');
+  const canInputNewDesign = isUserAdmin ||
+    embedded ||
+    !currentUser ||
+    Boolean(currentUser?.canInputNewDesign) ||
+    currentUser?.permissions?.includes('input_new_design') ||
+    currentUser?.permissions?.includes('jobcards_catalogue') ||
+    currentUser?.permissions?.includes('jobcards');
 
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [] });
@@ -564,6 +585,11 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     setShowCreateModal(true);
   };
 
+  useImperativeHandle(ref, () => ({
+    openCreateModal: handleOpenCreate,
+    refreshData: () => loadData(false)
+  }));
+
   const handleOpenEdit = (task) => {
     setEditingId(task._id);
     const taskFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
@@ -675,6 +701,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
 
   // Open the Status & Image Modal
   const handleOpenStatusModal = (task, category, statusType, statusValue = '') => {
+    if (embedded) return;
     setActiveModalData({
       task,
       category,
@@ -832,170 +859,279 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
   return (
     <div style={{ padding: '1rem', maxWidth: '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
       {/* ─── Top Header Bar ────────────────────────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          marginBottom: '1.25rem',
-          paddingBottom: '1rem',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 4px 14px rgba(29, 78, 216, 0.3)',
-              flexShrink: 0,
-            }}
-          >
-            <Palette size={22} />
+      {embedded ? (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.65rem',
+            marginBottom: '1rem',
+            paddingBottom: '0.65rem',
+            borderBottom: '1px solid #e2e8f0',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                border: '1px solid #bfdbfe',
+                borderRadius: '12px',
+                padding: '0.15rem 0.6rem',
+              }}
+            >
+              {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
+            </span>
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                Designer Screen
-              </h1>
-              <span
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* View Mode Toggle (Cards / Table) */}
+            <div
+              style={{
+                display: 'inline-flex',
+                background: '#f1f5f9',
+                padding: '3px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
                 style={{
-                  fontSize: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.35rem 0.7rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '0.76rem',
                   fontWeight: 800,
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  border: '1px solid #bfdbfe',
-                  borderRadius: '12px',
-                  padding: '0.15rem 0.6rem',
+                  cursor: 'pointer',
+                  background: viewMode === 'grid' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'grid' ? '#2563eb' : '#64748b',
+                  boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.15s ease',
                 }}
+                title="Cards Grid View"
               >
-                {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
-              </span>
+                <LayoutGrid size={13} /> <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.35rem 0.7rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  background: viewMode === 'table' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'table' ? '#2563eb' : '#64748b',
+                  boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                title="High-Density Table View"
+              >
+                <List size={13} /> <span>Table</span>
+              </button>
             </div>
-            <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
-              Live Design Workflow • Cloudflare R2 Proofs • Drawing & Colour Matching Studio
-            </p>
-          </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {/* View Mode Toggle (Cards / Table) */}
-          <div
-            style={{
-              display: 'inline-flex',
-              background: '#f1f5f9',
-              padding: '3px',
-              borderRadius: '10px',
-              border: '1px solid #cbd5e1',
-            }}
-          >
             <button
-              type="button"
-              onClick={() => setViewMode('grid')}
+              onClick={() => loadData(false)}
+              disabled={loading}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.4rem 0.75rem',
-                borderRadius: '7px',
-                border: 'none',
-                fontSize: '0.78rem',
-                fontWeight: 800,
+                gap: '0.4rem',
+                padding: '0.42rem 0.8rem',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#334155',
                 cursor: 'pointer',
-                background: viewMode === 'grid' ? '#ffffff' : 'transparent',
-                color: viewMode === 'grid' ? '#2563eb' : '#64748b',
-                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s ease',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
               }}
-              title="Cards Grid View"
             >
-              <LayoutGrid size={14} /> <span>Cards</span>
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+              <span>Refresh</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.4rem 0.75rem',
-                borderRadius: '7px',
-                border: 'none',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                background: viewMode === 'table' ? '#ffffff' : 'transparent',
-                color: viewMode === 'table' ? '#2563eb' : '#64748b',
-                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-              title="High-Density Table View"
-            >
-              <List size={14} /> <span>Table</span>
-            </button>
-          </div>
 
-          <button
-            onClick={() => loadData(false)}
-            disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.5rem 0.85rem',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              color: '#334155',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
-          </button>
-
-          {canInputNewDesign && (
             <button
               onClick={handleOpenCreate}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                padding: '0.5rem 1.05rem',
+                padding: '0.42rem 0.95rem',
                 background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '0.82rem',
+                fontSize: '0.8rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
               }}
             >
-              <Plus size={15} /> <span>Input New Design</span>
+              <Plus size={14} /> <span>Input New Design</span>
             </button>
-          )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            marginBottom: '1.25rem',
+            paddingBottom: '1rem',
+            borderBottom: '1px solid #e2e8f0',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 4px 14px rgba(29, 78, 216, 0.3)',
+                flexShrink: 0,
+              }}
+            >
+              <Palette size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  Designer Screen
+                </h1>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '12px',
+                    padding: '0.15rem 0.6rem',
+                  }}
+                >
+                  {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
+                </span>
+              </div>
+              <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
+                Live Design Workflow • Cloudflare R2 Proofs • Drawing & Colour Matching Studio
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* View Mode Toggle (Cards / Table) */}
+            <div
+              style={{
+                display: 'inline-flex',
+                background: '#f1f5f9',
+                padding: '3px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.4rem 0.75rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  background: viewMode === 'grid' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'grid' ? '#2563eb' : '#64748b',
+                  boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Cards Grid View"
+              >
+                <LayoutGrid size={14} /> <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.4rem 0.75rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  background: viewMode === 'table' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'table' ? '#2563eb' : '#64748b',
+                  boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                title="High-Density Table View"
+              >
+                <List size={14} /> <span>Table</span>
+              </button>
+            </div>
+
+            <button
+              onClick={() => loadData(false)}
+              disabled={loading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.5rem 0.85rem',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                color: '#334155',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              }}
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ─── Metric Stats Strip ────────────────────────────────────────── */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '0.85rem',
-          marginBottom: '1.25rem',
+          gap: embedded ? '0.65rem' : '0.85rem',
+          marginBottom: embedded ? '0.85rem' : '1.25rem',
         }}
       >
         {/* Draw Design Metrics Card */}
@@ -1005,28 +1141,28 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             border: '1px solid #dbeafe',
             borderTop: '3px solid #2563eb',
             borderRadius: '12px',
-            padding: '0.9rem',
+            padding: embedded ? '0.65rem 0.8rem' : '0.9rem',
             boxShadow: '0 2px 6px rgba(37, 99, 235, 0.04)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: embedded ? '0.4rem' : '0.6rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Clock size={14} color="#2563eb" /> 1. Drow Design Status
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 1</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ flex: 1, background: '#eff6ff', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#eff6ff', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#1d4ed8' }}>START WORK</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e3a8a' }}>{stats?.drow?.startWorking || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#1e3a8a' }}>{stats?.drow?.startWorking || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#fffbeb', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fffbeb', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>REVIEW</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.drow?.reviewSample || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.drow?.reviewSample || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#eef2ff', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#eef2ff', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4338ca' }}>FINAL</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.drow?.finalSample || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.drow?.finalSample || 0}</div>
             </div>
           </div>
         </div>
@@ -1038,28 +1174,28 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             border: '1px solid #fce7f3',
             borderTop: '3px solid #db2777',
             borderRadius: '12px',
-            padding: '0.9rem',
+            padding: embedded ? '0.65rem 0.8rem' : '0.9rem',
             boxShadow: '0 2px 6px rgba(219, 39, 119, 0.04)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: embedded ? '0.4rem' : '0.6rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9d174d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Palette size={14} color="#db2777" /> 2. Colour Matching Status
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 2</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ flex: 1, background: '#fdf2f8', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fdf2f8', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#be185d' }}>PANTON</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#831843' }}>{stats?.cm?.colourPanton || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#831843' }}>{stats?.cm?.colourPanton || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#fffbeb', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fffbeb', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>REVIEW</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.cm?.reviewSample || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.cm?.reviewSample || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#eef2ff', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#eef2ff', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4338ca' }}>FINAL</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.cm?.finalSample || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.cm?.finalSample || 0}</div>
             </div>
           </div>
         </div>
@@ -1071,28 +1207,28 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             border: '1px solid #dcfce7',
             borderTop: '3px solid #16a34a',
             borderRadius: '12px',
-            padding: '0.9rem',
+            padding: embedded ? '0.65rem 0.8rem' : '0.9rem',
             boxShadow: '0 2px 6px rgba(22, 163, 74, 0.04)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: embedded ? '0.4rem' : '0.6rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <CheckCircle2 size={14} color="#16a34a" /> 3. Final Design Status
             </span>
             <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 3</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.4rem' }}>
-            <div style={{ flex: 1, background: '#f0fdf4', padding: '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#f0fdf4', padding: embedded ? '0.35rem 0.35rem' : '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#15803d' }}>APPROVED</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#14532d' }}>{stats?.final?.approvedSample || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#14532d' }}>{stats?.final?.approvedSample || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#fef2f2', padding: '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fef2f2', padding: embedded ? '0.35rem 0.35rem' : '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#b91c1c' }}>REJ DROW</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#7f1d1d' }}>{stats?.final?.rejectDrow || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#7f1d1d' }}>{stats?.final?.rejectDrow || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#fff7ed', padding: '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fff7ed', padding: embedded ? '0.35rem 0.35rem' : '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#c2410c' }}>REJ C.M.</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#7c2d12' }}>{stats?.final?.rejectCM || 0}</div>
+              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#7c2d12' }}>{stats?.final?.rejectCM || 0}</div>
             </div>
           </div>
         </div>
@@ -1315,9 +1451,137 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
 
       {/* ─── Task Content: Cards Grid vs Table View ───────────────────────── */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <RefreshCw size={28} className="animate-spin" color="#2563eb" style={{ margin: '0 auto 0.75rem' }} />
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>Loading design tasks from server...</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', margin: '0.5rem 0' }}>
+          {/* Executive Pulse Banner */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.25rem 1.5rem',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+              flexWrap: 'wrap',
+              gap: '1rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0 }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '50%',
+                    border: '3px solid transparent',
+                    borderTopColor: '#2563eb',
+                    borderRightColor: '#7c3aed',
+                    borderBottomColor: '#ec4899',
+                    animation: 'spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: '4px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    boxShadow: '0 4px 12px rgba(29, 78, 216, 0.35)',
+                    animation: 'pulseGlow 2s ease-in-out infinite',
+                  }}
+                >
+                  <Sparkles size={20} />
+                </div>
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                  Loading Live Design Pipeline...
+                </h3>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
+                  Synchronizing design tasks, reference proofs & 3-stage workflow progress
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#2563eb',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '20px',
+                  padding: '0.3rem 0.75rem',
+                }}
+              >
+                <RefreshCw size={12} className="spin-loader" /> Cloudflare R2 & DB Connected
+              </span>
+            </div>
+          </div>
+
+          {/* Skeleton Cards Grid matching luxury cards */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+              gap: '1.25rem',
+            }}
+          >
+            {[1, 2, 3].map((idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '18px',
+                  border: '1px solid #e2e8f0',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                {/* Hero skeleton */}
+                <div
+                  style={{
+                    height: '210px',
+                    background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'shimmer 1.8s infinite linear',
+                    position: 'relative',
+                    padding: '0.75rem 0.85rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ width: '80px', height: '22px', borderRadius: '6px', background: 'rgba(255,255,255,0.7)' }} />
+                    <div style={{ width: '90px', height: '22px', borderRadius: '20px', background: 'rgba(255,255,255,0.7)' }} />
+                  </div>
+                </div>
+
+                {/* Body skeleton */}
+                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{ width: '60%', height: '20px', borderRadius: '6px', background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.8s infinite linear' }} />
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <div style={{ width: '70px', height: '22px', borderRadius: '20px', background: '#f1f5f9' }} />
+                    <div style={{ width: '90px', height: '22px', borderRadius: '20px', background: '#f1f5f9' }} />
+                  </div>
+                  <div style={{ height: '70px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ flex: 1, borderRadius: '8px', background: '#ffffff' }} />
+                    <div style={{ flex: 1, borderRadius: '8px', background: '#ffffff' }} />
+                    <div style={{ flex: 1, borderRadius: '8px', background: '#ffffff' }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : filteredTasks.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
@@ -1469,21 +1733,37 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       {/* 1. Drow Status */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <button
-                            onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
-                            style={{
-                              padding: '0.25rem 0.55rem',
-                              borderRadius: '6px',
-                              fontSize: '0.7rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              border: task.drowDesignStatus ? '1px solid #bfdbfe' : '1px dashed #cbd5e1',
-                              background: task.drowDesignStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.drowDesignStatus ? '#eff6ff' : '#f8fafc',
-                              color: task.drowDesignStatus === 'FINAL SAMPLE' ? '#4338ca' : task.drowDesignStatus ? '#1d4ed8' : '#94a3b8',
-                            }}
-                          >
-                            {task.drowDesignStatus || '+ Set Status'}
-                          </button>
+                          {embedded ? (
+                            <span
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                border: task.drowDesignStatus ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+                                background: task.drowDesignStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.drowDesignStatus ? '#eff6ff' : '#f8fafc',
+                                color: task.drowDesignStatus === 'FINAL SAMPLE' ? '#4338ca' : task.drowDesignStatus ? '#1d4ed8' : '#94a3b8',
+                              }}
+                            >
+                              {task.drowDesignStatus || 'Pending'}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                border: task.drowDesignStatus ? '1px solid #bfdbfe' : '1px dashed #cbd5e1',
+                                background: task.drowDesignStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.drowDesignStatus ? '#eff6ff' : '#f8fafc',
+                                color: task.drowDesignStatus === 'FINAL SAMPLE' ? '#4338ca' : task.drowDesignStatus ? '#1d4ed8' : '#94a3b8',
+                              }}
+                            >
+                              {task.drowDesignStatus || '+ Set Status'}
+                            </button>
+                          )}
                           {drowImgs.length > 0 && (
                             <button
                               onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
@@ -1499,21 +1779,37 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       {/* 2. Colour Match */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <button
-                            onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
-                            style={{
-                              padding: '0.25rem 0.55rem',
-                              borderRadius: '6px',
-                              fontSize: '0.7rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              border: task.colourMatchingStatus ? '1px solid #fbcfe8' : '1px dashed #cbd5e1',
-                              background: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.colourMatchingStatus ? '#fdf2f8' : '#f8fafc',
-                              color: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#4338ca' : task.colourMatchingStatus ? '#be185d' : '#94a3b8',
-                            }}
-                          >
-                            {task.colourMatchingStatus || '+ Set Status'}
-                          </button>
+                          {embedded ? (
+                            <span
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                border: task.colourMatchingStatus ? '1px solid #fbcfe8' : '1px solid #e2e8f0',
+                                background: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.colourMatchingStatus ? '#fdf2f8' : '#f8fafc',
+                                color: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#4338ca' : task.colourMatchingStatus ? '#be185d' : '#94a3b8',
+                              }}
+                            >
+                              {task.colourMatchingStatus || 'Pending'}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                border: task.colourMatchingStatus ? '1px solid #fbcfe8' : '1px dashed #cbd5e1',
+                                background: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.colourMatchingStatus ? '#fdf2f8' : '#f8fafc',
+                                color: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#4338ca' : task.colourMatchingStatus ? '#be185d' : '#94a3b8',
+                              }}
+                            >
+                              {task.colourMatchingStatus || '+ Set Status'}
+                            </button>
+                          )}
                           {cmImgs.length > 0 && (
                             <button
                               onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
@@ -1529,35 +1825,65 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       {/* 3. Final Approval */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <button
-                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
-                            style={{
-                              padding: '0.25rem 0.55rem',
-                              borderRadius: '6px',
-                              fontSize: '0.7rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              border: task.finalDesignStatus === 'APPROVED SAMPLE'
-                                ? '1.5px solid #16a34a'
-                                : String(task.finalDesignStatus || '').startsWith('REJECT')
-                                ? '1.5px solid #dc2626'
-                                : '1px dashed #cbd5e1',
-                              background: task.finalDesignStatus === 'APPROVED SAMPLE'
-                                ? '#dcfce7'
-                                : String(task.finalDesignStatus || '').startsWith('REJECT')
-                                ? '#fee2e2'
-                                : '#f8fafc',
-                              color: task.finalDesignStatus === 'APPROVED SAMPLE'
-                                ? '#15803d'
-                                : String(task.finalDesignStatus || '').startsWith('REJECT')
-                                ? '#b91c1c'
-                                : '#94a3b8',
-                            }}
-                          >
-                            {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
-                              ? 'REJECT DRAWING'
-                              : task.finalDesignStatus || '+ Gate Review'}
-                          </button>
+                          {embedded ? (
+                            <span
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                border: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '1.5px solid #16a34a'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '1.5px solid #dc2626'
+                                  : '1px solid #e2e8f0',
+                                background: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '#dcfce7'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '#fee2e2'
+                                  : '#f8fafc',
+                                color: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '#15803d'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '#b91c1c'
+                                  : '#94a3b8',
+                              }}
+                            >
+                              {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
+                                ? 'REJECT DRAWING'
+                                : task.finalDesignStatus || 'Pending Gate'}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                border: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '1.5px solid #16a34a'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '1.5px solid #dc2626'
+                                  : '1px dashed #cbd5e1',
+                                background: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '#dcfce7'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '#fee2e2'
+                                  : '#f8fafc',
+                                color: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '#15803d'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '#b91c1c'
+                                  : '#94a3b8',
+                              }}
+                            >
+                              {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
+                                ? 'REJECT DRAWING'
+                                : task.finalDesignStatus || '+ Gate Review'}
+                            </button>
+                          )}
                           {finalImgs.length > 0 && (
                             <button
                               onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
@@ -1593,7 +1919,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                             <History size={13} />
                             <span>{task.stageHistory?.length || 0}</span>
                           </button>
-                          {isUserAdmin && (
+                          {isUserAdmin && !embedded && (
                             <>
                               <button
                                 onClick={() => handleOpenEdit(task)}
@@ -1660,6 +1986,604 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             const drowImgs = task.drowDesignImages || [];
             const cmImgs = task.colourMatchingImages || [];
             const finalImgs = task.finalDesignImages || [];
+
+            if (embedded) {
+              const heroImg = task.sampleImage || finalImgs[0] || cmImgs[0] || drowImgs[0];
+              const allLightboxImages = [
+                ...(task.sampleImage ? [task.sampleImage] : []),
+                ...drowImgs,
+                ...cmImgs,
+                ...finalImgs,
+              ];
+              const uniqueLightboxImages = Array.from(new Set(allLightboxImages));
+
+              return (
+                <div
+                  key={task._id}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  className="hover:shadow-lg hover:border-blue-200"
+                >
+                  {/* Hero / Sample Image Preview */}
+                  <div
+                    style={{
+                      height: '210px',
+                      position: 'relative',
+                      background: '#0f172a',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {heroImg ? (
+                      <div
+                        onClick={() => handleOpenLightbox(uniqueLightboxImages.length > 0 ? uniqueLightboxImages : [heroImg], 0, `Design: ${task.designName}`)}
+                        style={{ width: '100%', height: '100%', cursor: 'pointer', position: 'relative' }}
+                        title="Click to preview design image in lightbox"
+                      >
+                        <img
+                          src={heroImg}
+                          alt={task.designName}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            transition: 'transform 0.3s ease',
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'rgba(0,0,0,0.35)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            opacity: 0,
+                            transition: 'opacity 0.15s ease',
+                            gap: '0.4rem',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                          }}
+                          className="hover:opacity-100"
+                        >
+                          <Eye size={18} />
+                          <span>Preview Design</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                          color: '#94a3b8',
+                          padding: '1rem',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <Palette size={32} color="#64748b" style={{ marginBottom: '0.4rem' }} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>
+                          No Sample Image Uploaded
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                          {task.designName}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Top Overlays */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        left: '10px',
+                        right: '10px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        pointerEvents: 'none',
+                        zIndex: 2,
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                        <span
+                          style={{
+                            background: 'rgba(15, 23, 42, 0.82)',
+                            backdropFilter: 'blur(8px)',
+                            color: '#ffffff',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            letterSpacing: '0.02em',
+                          }}
+                        >
+                          {task.taskNo}
+                        </span>
+                        <span
+                          style={{
+                            background: priorityConfig.bg,
+                            color: priorityConfig.color,
+                            border: `1px solid ${priorityConfig.border}`,
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '6px',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.2rem',
+                          }}
+                        >
+                          <span>{priorityConfig.badge}</span>
+                          <span>{task.priority || 'Medium'}</span>
+                        </span>
+                      </div>
+
+                      {/* Overall Status Badge */}
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          padding: '0.22rem 0.6rem',
+                          borderRadius: '6px',
+                          backdropFilter: 'blur(8px)',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                          background:
+                            task.finalDesignStatus === 'APPROVED SAMPLE'
+                              ? '#10b981'
+                              : String(task.finalDesignStatus || '').startsWith('REJECT')
+                              ? '#ef4444'
+                              : task.colourMatchingStatus
+                              ? '#ec4899'
+                              : task.drowDesignStatus
+                              ? '#3b82f6'
+                              : 'rgba(15, 23, 42, 0.75)',
+                          color: '#ffffff',
+                          border: '1px solid rgba(255,255,255,0.25)',
+                        }}
+                      >
+                        {task.finalDesignStatus === 'APPROVED SAMPLE'
+                          ? '✓ Approved'
+                          : String(task.finalDesignStatus || '').startsWith('REJECT')
+                          ? '✕ Rejected'
+                          : task.colourMatchingStatus
+                          ? '🎨 Colour Match'
+                          : task.drowDesignStatus
+                          ? '✏️ Drawing'
+                          : '⏳ Pending'}
+                      </span>
+                    </div>
+
+                    {/* Bottom Overlays */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        left: '10px',
+                        right: '10px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        zIndex: 2,
+                      }}
+                    >
+                      <span
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          color: '#e2e8f0',
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '5px',
+                          fontSize: '0.66rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        📅 {task.date}
+                      </span>
+
+                      <button
+                        onClick={() => setHistoryTask(task)}
+                        title="View Complete Stage History"
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          color: '#ffffff',
+                          borderRadius: '6px',
+                          padding: '0.2rem 0.5rem',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        <History size={11} />
+                        <span>{task.stageHistory?.length || 0}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div style={{ padding: '0.95rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', flex: 1 }}>
+                    {/* Design Name */}
+                    <div>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: '1.2rem',
+                          fontWeight: 800,
+                          color: '#0f172a',
+                          letterSpacing: '-0.01em',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {task.designName}
+                      </h3>
+
+                      {/* Reference Link & Notes */}
+                      {task.sampleLink && (
+                        <div style={{ marginTop: '0.35rem' }}>
+                          <a
+                            href={task.sampleLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              fontSize: '0.72rem',
+                              color: '#2563eb',
+                              fontWeight: 700,
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              padding: '0.18rem 0.5rem',
+                              borderRadius: '5px',
+                            }}
+                          >
+                            <ExternalLink size={12} /> Open Sample Link / Video
+                          </a>
+                        </div>
+                      )}
+
+                      {task.notes && (
+                        <p
+                          style={{
+                            margin: '0.35rem 0 0',
+                            fontSize: '0.72rem',
+                            color: '#475569',
+                            fontStyle: 'italic',
+                            background: '#f8fafc',
+                            padding: '0.3rem 0.55rem',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          "{task.notes}"
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Metadata Badges */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                      {allDesigners.map((d, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            color: '#1e40af',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '6px',
+                            padding: '0.15rem 0.45rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                          }}
+                        >
+                          <User size={11} /> {d}
+                        </span>
+                      ))}
+                      {allFabrics.map((f, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            color: '#0369a1',
+                            background: '#f0f9ff',
+                            border: '1px solid #bae6fd',
+                            borderRadius: '6px',
+                            padding: '0.15rem 0.45rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                          }}
+                        >
+                          <Scissors size={11} /> {f}
+                        </span>
+                      ))}
+                      {allColourMatches.map((c, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            color: '#9d174d',
+                            background: '#fdf2f8',
+                            border: '1px solid #fbcfe8',
+                            borderRadius: '6px',
+                            padding: '0.15rem 0.45rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                          }}
+                        >
+                          <Palette size={11} /> {c}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Unified 3-Stage Workflow Status Box */}
+                    <div
+                      style={{
+                        marginTop: 'auto',
+                        background: '#f8fafc',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        padding: '0.7rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Workflow Status
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.66rem', fontWeight: 700 }}>
+                          <span style={{ color: progress.s1 === 'done' ? '#16a34a' : '#2563eb' }}>1.Drow</span>
+                          <span style={{ color: '#cbd5e1' }}>→</span>
+                          <span style={{ color: progress.s2 === 'done' ? '#16a34a' : '#db2777' }}>2.C.M.</span>
+                          <span style={{ color: '#cbd5e1' }}>→</span>
+                          <span style={{ color: progress.s3 === 'approved' ? '#16a34a' : '#15803d' }}>3.Gate</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.45rem' }}>
+                        {/* Stage 1: Drawing */}
+                        <div
+                          style={{
+                            background: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #dbeafe',
+                            padding: '0.5rem 0.35rem',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                            1. Drawing
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '0.64rem',
+                              fontWeight: 800,
+                              padding: '0.15rem 0.35rem',
+                              borderRadius: '5px',
+                              background:
+                                task.drowDesignStatus === 'START WORKING'
+                                  ? '#dbeafe'
+                                  : task.drowDesignStatus === 'REVIEW SAMPLE'
+                                  ? '#fef3c7'
+                                  : task.drowDesignStatus === 'FINAL SAMPLE'
+                                  ? '#e0e7ff'
+                                  : '#f1f5f9',
+                              color:
+                                task.drowDesignStatus === 'START WORKING'
+                                  ? '#1e40af'
+                                  : task.drowDesignStatus === 'REVIEW SAMPLE'
+                                  ? '#92400e'
+                                  : task.drowDesignStatus === 'FINAL SAMPLE'
+                                  ? '#3730a3'
+                                  : '#94a3b8',
+                              border: '1px solid rgba(0,0,0,0.05)',
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {task.drowDesignStatus || 'Pending'}
+                          </span>
+                          {drowImgs.length > 0 && (
+                            <button
+                              onClick={() => handleOpenLightbox(drowImgs, 0, `Drawing Proofs: ${task.designName}`)}
+                              style={{
+                                marginTop: '0.35rem',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '0.64rem',
+                                color: '#2563eb',
+                                fontWeight: 700,
+                                padding: 0,
+                              }}
+                              title="Click to view drawing proofs"
+                            >
+                              🖼️ {drowImgs.length} {drowImgs.length === 1 ? 'proof' : 'proofs'}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Stage 2: Colour Match */}
+                        <div
+                          style={{
+                            background: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #fce7f3',
+                            padding: '0.5rem 0.35rem',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#9d174d', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                            2. Colour
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '0.64rem',
+                              fontWeight: 800,
+                              padding: '0.15rem 0.35rem',
+                              borderRadius: '5px',
+                              background:
+                                task.colourMatchingStatus === 'COLOUR PANTON'
+                                  ? '#fce7f3'
+                                  : task.colourMatchingStatus === 'REVIEW SAMPLE'
+                                  ? '#fef3c7'
+                                  : task.colourMatchingStatus === 'FINAL SAMPLE'
+                                  ? '#e0e7ff'
+                                  : '#f1f5f9',
+                              color:
+                                task.colourMatchingStatus === 'COLOUR PANTON'
+                                  ? '#9d174d'
+                                  : task.colourMatchingStatus === 'REVIEW SAMPLE'
+                                  ? '#92400e'
+                                  : task.colourMatchingStatus === 'FINAL SAMPLE'
+                                  ? '#3730a3'
+                                  : '#94a3b8',
+                              border: '1px solid rgba(0,0,0,0.05)',
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {task.colourMatchingStatus || 'Pending'}
+                          </span>
+                          {cmImgs.length > 0 && (
+                            <button
+                              onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proofs: ${task.designName}`)}
+                              style={{
+                                marginTop: '0.35rem',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '0.64rem',
+                                color: '#db2777',
+                                fontWeight: 700,
+                                padding: 0,
+                              }}
+                              title="Click to view colour proofs"
+                            >
+                              🎨 {cmImgs.length} {cmImgs.length === 1 ? 'proof' : 'proofs'}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Stage 3: Final Gate */}
+                        <div
+                          style={{
+                            background: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #dcfce7',
+                            padding: '0.5rem 0.35rem',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                            3. Gate
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '0.64rem',
+                              fontWeight: 800,
+                              padding: '0.15rem 0.35rem',
+                              borderRadius: '5px',
+                              background:
+                                task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '#dcfce7'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '#fee2e2'
+                                  : task.finalDesignStatus
+                                  ? '#e0e7ff'
+                                  : '#f1f5f9',
+                              color:
+                                task.finalDesignStatus === 'APPROVED SAMPLE'
+                                  ? '#15803d'
+                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  ? '#b91c1c'
+                                  : task.finalDesignStatus
+                                  ? '#3730a3'
+                                  : '#94a3b8',
+                              border: '1px solid rgba(0,0,0,0.05)',
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
+                              ? 'REJ DRAW'
+                              : task.finalDesignStatus || 'Pending'}
+                          </span>
+                          {finalImgs.length > 0 && (
+                            <button
+                              onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proofs: ${task.designName}`)}
+                              style={{
+                                marginTop: '0.35rem',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '0.64rem',
+                                color: '#16a34a',
+                                fontWeight: 700,
+                                padding: 0,
+                              }}
+                              title="Click to view final proofs"
+                            >
+                              ✨ {finalImgs.length} {finalImgs.length === 1 ? 'proof' : 'proofs'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div
@@ -1801,7 +2725,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       <span>{task.stageHistory?.length || 0}</span>
                     </button>
 
-                    {isUserAdmin && (
+                    {isUserAdmin && !embedded && (
                       <>
                         <button
                           onClick={() => handleOpenEdit(task)}
@@ -2027,37 +2951,39 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   </div>
 
                   {/* Quick Status Buttons */}
-                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
-                    {DROW_STATUS_OPTIONS.map((opt) => {
-                      const isActive = task.drowDesignStatus === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', opt.id)}
-                          style={{
-                            flex: '1 1 calc(33.33% - 0.35rem)',
-                            minWidth: '70px',
-                            padding: '0.32rem 0.45rem',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                            background: isActive ? opt.bg : '#ffffff',
-                            color: isActive ? opt.color : '#475569',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.2rem',
-                            boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
-                          }}
-                        >
-                          {isActive && <Check size={11} />}
-                          <span>{opt.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {!embedded && (
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+                      {DROW_STATUS_OPTIONS.map((opt) => {
+                        const isActive = task.drowDesignStatus === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', opt.id)}
+                            style={{
+                              flex: '1 1 calc(33.33% - 0.35rem)',
+                              minWidth: '70px',
+                              padding: '0.32rem 0.45rem',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                              background: isActive ? opt.bg : '#ffffff',
+                              color: isActive ? opt.color : '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.2rem',
+                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
+                            }}
+                          >
+                            {isActive && <Check size={11} />}
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Stored Images Gallery for Drow Design */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem' }}>
@@ -2086,24 +3012,26 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       )}
                     </div>
 
-                    <button
-                      onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
-                      style={{
-                        padding: '0.25rem 0.55rem',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        background: '#ffffff',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '5px',
-                        color: '#1d4ed8',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      <Upload size={11} /> + Proof
-                    </button>
+                    {!embedded && (
+                      <button
+                        onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
+                        style={{
+                          padding: '0.25rem 0.55rem',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: '#ffffff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '5px',
+                          color: '#1d4ed8',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        <Upload size={11} /> + Proof
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2151,37 +3079,39 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   </div>
 
                   {/* Quick Status Buttons */}
-                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
-                    {COLOUR_MATCHING_OPTIONS.map((opt) => {
-                      const isActive = task.colourMatchingStatus === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', opt.id)}
-                          style={{
-                            flex: '1 1 calc(33.33% - 0.35rem)',
-                            minWidth: '70px',
-                            padding: '0.32rem 0.45rem',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                            background: isActive ? opt.bg : '#ffffff',
-                            color: isActive ? opt.color : '#475569',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.2rem',
-                            boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
-                          }}
-                        >
-                          {isActive && <Check size={11} />}
-                          <span>{opt.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {!embedded && (
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+                      {COLOUR_MATCHING_OPTIONS.map((opt) => {
+                        const isActive = task.colourMatchingStatus === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', opt.id)}
+                            style={{
+                              flex: '1 1 calc(33.33% - 0.35rem)',
+                              minWidth: '70px',
+                              padding: '0.32rem 0.45rem',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                              background: isActive ? opt.bg : '#ffffff',
+                              color: isActive ? opt.color : '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.2rem',
+                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
+                            }}
+                          >
+                            {isActive && <Check size={11} />}
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Stored Images Gallery for Colour Matching */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem' }}>
@@ -2210,24 +3140,26 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       )}
                     </div>
 
-                    <button
-                      onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
-                      style={{
-                        padding: '0.25rem 0.55rem',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        background: '#ffffff',
-                        border: '1px solid #fbcfe8',
-                        borderRadius: '5px',
-                        color: '#be185d',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      <Upload size={11} /> + Proof
-                    </button>
+                    {!embedded && (
+                      <button
+                        onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
+                        style={{
+                          padding: '0.25rem 0.55rem',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: '#ffffff',
+                          border: '1px solid #fbcfe8',
+                          borderRadius: '5px',
+                          color: '#be185d',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        <Upload size={11} /> + Proof
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2277,39 +3209,41 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   </div>
 
                   {/* Action Buttons for Final Design */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.35rem', marginBottom: '0.45rem' }}>
-                    {FINAL_DESIGN_OPTIONS.map((opt) => {
-                      const isActive =
-                        task.finalDesignStatus === opt.id ||
-                        (opt.legacyId && task.finalDesignStatus === opt.legacyId) ||
-                        (opt.id.includes('DRAWING') && task.finalDesignStatus?.includes('drowning'));
-                      const IconComp = opt.icon || CheckCircle2;
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', opt.id)}
-                          style={{
-                            padding: '0.35rem 0.45rem',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                            background: isActive ? opt.bg : '#ffffff',
-                            color: isActive ? opt.color : '#475569',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.25rem',
-                            boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
-                          }}
-                        >
-                          <IconComp size={11} color={isActive ? opt.color : '#64748b'} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {!embedded && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.35rem', marginBottom: '0.45rem' }}>
+                      {FINAL_DESIGN_OPTIONS.map((opt) => {
+                        const isActive =
+                          task.finalDesignStatus === opt.id ||
+                          (opt.legacyId && task.finalDesignStatus === opt.legacyId) ||
+                          (opt.id.includes('DRAWING') && task.finalDesignStatus?.includes('drowning'));
+                        const IconComp = opt.icon || CheckCircle2;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', opt.id)}
+                            style={{
+                              padding: '0.35rem 0.45rem',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                              background: isActive ? opt.bg : '#ffffff',
+                              color: isActive ? opt.color : '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.25rem',
+                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
+                            }}
+                          >
+                            <IconComp size={11} color={isActive ? opt.color : '#64748b'} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Stored Images Gallery for Final Design */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem' }}>
@@ -2338,24 +3272,26 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       )}
                     </div>
 
-                    <button
-                      onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
-                      style={{
-                        padding: '0.25rem 0.55rem',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        background: '#ffffff',
-                        border: '1px solid #bbf7d0',
-                        borderRadius: '5px',
-                        color: '#15803d',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      <Upload size={11} /> + Proof
-                    </button>
+                    {!embedded && (
+                      <button
+                        onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
+                        style={{
+                          padding: '0.25rem 0.55rem',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: '#ffffff',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '5px',
+                          color: '#15803d',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        <Upload size={11} /> + Proof
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2365,7 +3301,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
       )}
 
       {/* ─── MODAL: UPDATE STATUS & MULTI-IMAGE UPLOAD TO CLOUDFLARE R2 ─── */}
-      {activeModalData && (
+      {!embedded && activeModalData && (
         <div
           style={{
             position: 'fixed',
@@ -2382,6 +3318,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         >
           <div
             style={{
+              position: 'relative',
               background: '#ffffff',
               borderRadius: '16px',
               maxWidth: '560px',
@@ -2393,6 +3330,79 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Status & Proof Uploading Loading Screen */}
+            {uploading && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(12px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 200,
+                  borderRadius: '16px',
+                  padding: '2.5rem 1.5rem',
+                  animation: 'fadeIn 0.2s ease',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ position: 'relative', width: '76px', height: '76px', marginBottom: '1.25rem' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: '-3px',
+                      borderRadius: '50%',
+                      border: '3px solid transparent',
+                      borderTopColor: '#38bdf8',
+                      borderRightColor: '#6366f1',
+                      borderBottomColor: '#ec4899',
+                      animation: 'spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: '4px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #7c3aed 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      boxShadow: '0 0 25px rgba(59, 130, 246, 0.7)',
+                      animation: 'pulseGlow 2s ease-in-out infinite',
+                    }}
+                  >
+                    <Upload size={30} />
+                  </div>
+                </div>
+
+                <h3 style={{ margin: '0 0 0.4rem', fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
+                  Publishing Proofs & Status Update
+                </h3>
+                <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#cbd5e1', maxWidth: '340px' }}>
+                  Compressing and uploading high-resolution proofs directly to Cloudflare R2 bucket...
+                </p>
+
+                {/* Live Progress Bar with % */}
+                <div style={{ width: '100%', maxWidth: '300px', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.35rem' }}>
+                    <span>Cloudflare R2 Direct Upload</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.15)', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.max(5, uploadProgress)}%`, height: '100%', background: 'linear-gradient(90deg, #38bdf8, #818cf8)', borderRadius: '999px', transition: 'width 0.2s ease' }} />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '1rem', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
+                  Live Workflow Sync • Please do not close
+                </div>
+              </div>
+            )}
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
@@ -2923,6 +3933,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         >
           <div
             style={{
+              position: 'relative',
               background: '#ffffff',
               borderRadius: '16px',
               maxWidth: '680px',
@@ -2934,6 +3945,115 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Create / Update Modal Loading Screen */}
+            {(savingTask || uploadingSampleImage) && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(12px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 200,
+                  borderRadius: '16px',
+                  padding: '2.5rem 1.5rem',
+                  animation: 'fadeIn 0.2s ease',
+                  textAlign: 'center',
+                }}
+              >
+                {/* Glowing Multi-Ring Pulse */}
+                <div style={{ position: 'relative', width: '84px', height: '84px', marginBottom: '1.5rem' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: '-4px',
+                      borderRadius: '50%',
+                      border: '3px solid transparent',
+                      borderTopColor: '#38bdf8',
+                      borderRightColor: '#818cf8',
+                      borderBottomColor: '#ec4899',
+                      animation: 'spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: '4px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #7c3aed 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      boxShadow: '0 0 30px rgba(59, 130, 246, 0.7)',
+                      animation: 'pulseGlow 2s ease-in-out infinite',
+                    }}
+                  >
+                    <Sparkles size={34} />
+                  </div>
+                </div>
+
+                <h3 style={{ margin: '0 0 0.45rem', fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+                  {uploadingSampleImage
+                    ? 'Compressing & Storing Artwork to R2'
+                    : editingId
+                    ? 'Updating Design Task & Workflow'
+                    : 'Publishing New Design to Live Workflow'}
+                </h3>
+                <p style={{ margin: '0 0 1.75rem', fontSize: '0.86rem', color: '#cbd5e1', maxWidth: '380px', lineHeight: 1.5 }}>
+                  {uploadingSampleImage
+                    ? 'Optimizing high-res image and streaming to Cloudflare R2 bucket with secure CDN links...'
+                    : 'Saving design specifications, updating team assignments and synchronizing live ERP pipeline...'}
+                </p>
+
+                {/* Animated Gradient Bar */}
+                <div
+                  style={{
+                    width: '100%',
+                    maxWidth: '340px',
+                    height: '6px',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    marginBottom: '1.5rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      bottom: 0,
+                      width: '60%',
+                      background: 'linear-gradient(90deg, #38bdf8, #818cf8, #ec4899, #38bdf8)',
+                      backgroundSize: '200% 100%',
+                      borderRadius: '999px',
+                      animation: 'shimmer 1.8s infinite linear',
+                    }}
+                  />
+                </div>
+
+                {/* Realtime Pipeline Steps */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', width: '100%', maxWidth: '340px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.8rem', color: '#e2e8f0', background: 'rgba(255, 255, 255, 0.08)', padding: '0.5rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                    <CheckCircle2 size={15} color="#34d399" />
+                    <span>Design specs & designer tags verified</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.8rem', color: '#e2e8f0', background: 'rgba(255, 255, 255, 0.08)', padding: '0.5rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                    <RefreshCw size={14} className="spin-loader" color="#38bdf8" />
+                    <span>{uploadingSampleImage ? 'Transmitting sample media to Cloudflare R2' : 'Synchronizing live database records'}</span>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
+                  🔒 Master Admin Live Sync • Please do not close this window
+                </div>
+              </div>
+            )}
             {/* Modal Header */}
             <div
               style={{
@@ -3241,4 +4361,6 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
       )}
     </div>
   );
-}
+});
+
+export default DesignerScreen;
