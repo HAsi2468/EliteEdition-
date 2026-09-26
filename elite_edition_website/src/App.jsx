@@ -103,6 +103,7 @@ import {
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
 import WebDevicePermissionsModal from './components/WebDevicePermissionsModal';
+import PermissionHelpModal from './components/PermissionHelpModal';
 import { useSocket } from './contexts/SocketContext';
 
 
@@ -601,6 +602,36 @@ export default function App() {
   });
 
   const [notificationPerm, setNotificationPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
+  const [showPermHelpModal, setShowPermHelpModal] = useState(false);
+  const [permSnoozedSession, setPermSnoozedSession] = useState(() => {
+    try {
+      return sessionStorage.getItem('elite_perm_snoozed_session') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // Keep permission state in sync when returning to tab or when permissions change
+  useEffect(() => {
+    const updatePerm = () => {
+      if ('Notification' in window) {
+        const curr = Notification.permission;
+        setNotificationPerm(curr);
+        if (curr === 'granted') {
+          try {
+            sessionStorage.removeItem('elite_perm_snoozed_session');
+          } catch (e) {}
+          setPermSnoozedSession(false);
+        }
+      }
+    };
+    window.addEventListener('focus', updatePerm);
+    window.addEventListener('elite-permission-change', updatePerm);
+    return () => {
+      window.removeEventListener('focus', updatePerm);
+      window.removeEventListener('elite-permission-change', updatePerm);
+    };
+  }, []);
 
   useEffect(() => {
     const handleNotifUpdate = () => {
@@ -610,15 +641,18 @@ export default function App() {
     return () => window.removeEventListener('elite-notification-history-update', handleNotifUpdate);
   }, []);
 
-  // Auto-request push notification permission as soon as user logs in or reloads page
+  // Auto-request push notification permission as soon as user enters app unless already granted
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    if ('Notification' in window && Notification.permission === 'default') {
+    if ('Notification' in window && Notification.permission === 'default' && !permSnoozedSession) {
       const askPerm = async () => {
         try {
           const res = await requestNotificationPermission();
           setNotificationPerm(res);
+          if (res === 'denied') {
+            setShowPermHelpModal(true);
+          }
         } catch (e) {
           console.warn('Deferred notification prompt:', e);
         }
@@ -645,7 +679,7 @@ export default function App() {
         window.removeEventListener('keydown', handleUserInteraction);
       };
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, permSnoozedSession]);
 
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
 
@@ -1262,10 +1296,12 @@ export default function App() {
 
   return (
     <div style={styles.appContainer} className="app-container">
-      {/* ── Auto Push Notification Request Banner ── */}
-      {isAuthenticated && notificationPerm !== 'granted' && notificationPerm !== 'dismissed' && (
+      {/* ── Auto Push Notification & Calling Permissions Request Banner ── */}
+      {isAuthenticated && notificationPerm !== 'granted' && !permSnoozedSession && (
         <div style={{
-          background: 'linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%)',
+          background: notificationPerm === 'denied'
+            ? 'linear-gradient(90deg, #b91c1c 0%, #dc2626 50%, #991b1b 100%)'
+            : 'linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%)',
           color: '#ffffff',
           padding: '0.45rem 1rem',
           display: 'flex',
@@ -1273,39 +1309,123 @@ export default function App() {
           justifyContent: 'space-between',
           fontSize: '0.78rem',
           fontWeight: 700,
-          boxShadow: '0 2px 8px rgba(37,99,235,0.3)',
+          boxShadow: notificationPerm === 'denied'
+            ? '0 2px 10px rgba(220,38,38,0.4)'
+            : '0 2px 8px rgba(37,99,235,0.3)',
           zIndex: 9999,
-          position: 'relative'
+          position: 'relative',
+          gap: '0.75rem',
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <BellRing size={16} color="#ffffff" />
-            <span>Enable Push Notifications to receive real-time Chat, Personal DM, Job Card & Task Alerts instantly!</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '240px' }}>
+            {notificationPerm === 'denied' ? (
+              <AlertTriangle size={18} color="#fef08a" style={{ flexShrink: 0 }} />
+            ) : (
+              <BellRing size={16} color="#ffffff" style={{ flexShrink: 0 }} />
+            )}
+            <span>
+              {notificationPerm === 'denied'
+                ? '⚠️ Incoming Voice/Video Call Rings & Notifications are BLOCKED in your browser! Please unblock to receive incoming calls & team alerts.'
+                : '🔔 Enable Notifications & Call Alerts to receive incoming voice/video call rings, team chats & job card updates instantly!'}
+            </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+            {notificationPerm === 'denied' ? (
+              <>
+                <button
+                  onClick={() => setShowPermHelpModal(true)}
+                  style={{
+                    background: '#ffffff',
+                    color: '#dc2626',
+                    border: 'none',
+                    padding: '0.32rem 0.85rem',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  How to Unblock 🔓
+                </button>
+                <button
+                  onClick={() => {
+                    if ('Notification' in window) {
+                      setNotificationPerm(Notification.permission);
+                      if (Notification.permission === 'granted') {
+                        triggerPushNotification('Permissions Active 🎉', 'Notifications and calling alerts are active!', 'success');
+                      } else {
+                        setShowPermHelpModal(true);
+                      }
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.18)',
+                    color: '#ffffff',
+                    border: '1px solid rgba(255,255,255,0.35)',
+                    padding: '0.32rem 0.65rem',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Check Again 🔄
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={async () => {
+                  const res = await requestNotificationPermission();
+                  setNotificationPerm(res);
+                  if (res === 'denied') {
+                    setShowPermHelpModal(true);
+                  }
+                }}
+                style={{
+                  background: '#ffffff',
+                  color: '#2563eb',
+                  border: 'none',
+                  padding: '0.32rem 0.85rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                }}
+              >
+                Enable Notifications Now 🔔
+              </button>
+            )}
+
             <button
-              onClick={async () => {
-                const res = await requestNotificationPermission();
-                setNotificationPerm(res);
-              }}
+              onClick={() => setShowPermissionsModal(true)}
               style={{
-                background: '#ffffff',
-                color: '#2563eb',
+                background: 'rgba(255,255,255,0.15)',
+                color: '#ffffff',
                 border: 'none',
-                padding: '0.3rem 0.8rem',
+                padding: '0.32rem 0.65rem',
                 borderRadius: '6px',
                 fontSize: '0.75rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                fontWeight: 700,
+                cursor: 'pointer'
               }}
+              title="Open Device Hardware & Web APIs Hub"
             >
-              Enable Notifications Now 🔔
+              Device Hub ⚙️
             </button>
+
             <button
-              onClick={() => setNotificationPerm('dismissed')}
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem('elite_perm_snoozed_session', 'true');
+                } catch (e) {}
+                setPermSnoozedSession(true);
+              }}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+              title="Dismiss for current session only - will ask again when reopening app"
             >
-              Dismiss
+              Dismiss (Ask next time)
             </button>
           </div>
         </div>
@@ -2969,6 +3089,13 @@ export default function App() {
         isOpen={showPermissionsModal}
         onClose={() => setShowPermissionsModal(false)}
         currentUser={currentUser}
+      />
+
+      {/* Browser Permissions Unblock Guide Modal */}
+      <PermissionHelpModal
+        isOpen={showPermHelpModal}
+        onClose={() => setShowPermHelpModal(false)}
+        onOpenDeviceHub={() => setShowPermissionsModal(true)}
       />
 
       {/* Phoenix Theme & Style Customizer Slide-out */}

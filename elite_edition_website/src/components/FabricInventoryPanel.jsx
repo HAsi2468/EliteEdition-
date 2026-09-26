@@ -16,15 +16,11 @@ import {
   AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock, Truck, Calendar
 } from 'lucide-react';
-import SignedDocumentUploadModal from './SignedDocumentUploadModal';
-import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
   const [activeTab, setActiveTab] = useState(onlyChallan ? 'challan' : initialTab);
   const currentUser = api.getCurrentUser();
-  const [signedUploadTarget, setSignedUploadTarget] = useState(null);
-  const [signedPreviewTarget, setSignedPreviewTarget] = useState(null);
 
   const renderJobNoBadge = (jobNoRaw) => {
     if (!jobNoRaw) return '—';
@@ -181,7 +177,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [challans, setChallans] = useState([]);
   const [challanSearch, setChallanSearch] = useState('');
   const [challanStatusFilter, setChallanStatusFilter] = useState('All');
-  const [signedCopyFilter, setSignedCopyFilter] = useState('All');
   // Ref to always hold latest challan filter values — prevents stale closure in setInterval
   const challanFiltersRef = useRef({ search: '', dateStart: defaultThisMonth.dateStart, dateEnd: defaultThisMonth.dateEnd, status: 'All' });
   const [challanDatePreset, setChallanDatePreset] = useState('this_month');
@@ -4084,20 +4079,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <option value="INVOICED">Invoiced</option>
                 </select>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Signed:</span>
-                <select
-                  value={signedCopyFilter}
-                  onChange={e => setSignedCopyFilter(e.target.value)}
-                  style={{ ...inputStyle, width: '150px', padding: '0.35rem 0.5rem', cursor: 'pointer', fontWeight: 700, color: 'var(--text-primary)', background: 'var(--bg-input, rgba(15, 23, 42, 0.6))' }}
-                >
-                  <option value="All">All Signed Status</option>
-                  <option value="NOT_UPLOADED">⚪ Not Uploaded (Gray)</option>
-                  <option value="PENDING">🟡 In Process (Yellow)</option>
-                  <option value="APPROVED">🟢 Approved (Green)</option>
-                  <option value="REJECTED">🔴 Rejected (Red)</option>
-                </select>
-              </div>
               <DateRangePicker
                 preset={challanDatePreset}
                 onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
@@ -4166,24 +4147,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-light)' }}>
             <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
               {(() => {
-                const displayedChallans = challans.filter(ch => {
-                  if (!signedCopyFilter || signedCopyFilter === 'All') return true;
-                  const sc = ch.signedCopy;
-                  const st = sc?.status;
-                  if (signedCopyFilter === 'NOT_UPLOADED') {
-                    return !sc || !st || st === 'NONE' || (!sc.images?.length && !sc.pdfUrl && !sc.fileUrl && st !== 'APPROVED' && st !== 'PENDING' && st !== 'REJECTED');
-                  }
-                  if (signedCopyFilter === 'PENDING') {
-                    return st === 'PENDING' || st === 'IN_PROCESS' || st === 'UPLOADED';
-                  }
-                  if (signedCopyFilter === 'APPROVED') {
-                    return st === 'APPROVED';
-                  }
-                  if (signedCopyFilter === 'REJECTED') {
-                    return st === 'REJECTED';
-                  }
-                  return true;
-                });
+                const displayedChallans = challans;
 
                 return (
                   <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
@@ -4339,82 +4303,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                               <button className="btn-secondary" title="Create Tax Bill" style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
                                 <Receipt size={13} /> Bill
                               </button>
-
-                              {/* 4-Color Signed Challan Action Button */}
-                              {(() => {
-                                const sc = ch.signedCopy;
-                                const status = sc?.status;
-                                const isApproved = status === 'APPROVED';
-                                const isPending = status === 'PENDING' || status === 'IN_PROCESS' || status === 'UPLOADED';
-                                const isRejected = status === 'REJECTED';
-
-                                let iconColor = '#94a3b8'; // Gray (Not uploaded)
-                                let bgColor = 'rgba(148, 163, 184, 0.12)';
-                                let borderColor = 'rgba(148, 163, 184, 0.3)';
-                                let titleText = 'Signed Copy: Not Uploaded (Click to upload)';
-                                let IconComp = FileText;
-
-                                if (isApproved) {
-                                  iconColor = '#10b981'; // Green (Approved by Admin)
-                                  bgColor = 'rgba(16, 185, 129, 0.14)';
-                                  borderColor = 'rgba(16, 185, 129, 0.35)';
-                                  titleText = `Signed Copy: Approved by Admin (${sc?.images?.length || 1} pages). Click to view.`;
-                                  IconComp = CheckCircle;
-                                } else if (isRejected) {
-                                  iconColor = '#ef4444'; // Red (Rejected)
-                                  bgColor = 'rgba(239, 68, 68, 0.14)';
-                                  borderColor = 'rgba(239, 68, 68, 0.35)';
-                                  titleText = `Signed Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
-                                  IconComp = AlertCircle;
-                                } else if (isPending) {
-                                  iconColor = '#f59e0b'; // Yellow (In Process / Pending Review)
-                                  bgColor = 'rgba(245, 158, 11, 0.14)';
-                                  borderColor = 'rgba(245, 158, 11, 0.35)';
-                                  titleText = `Signed Copy: In Process / Pending Admin Review (${sc?.images?.length || 1} pages). Click to view.`;
-                                  IconComp = Clock;
-                                }
-
-                                return (
-                                  <button
-                                    type="button"
-                                    className="btn-icon"
-                                    title={titleText}
-                                    onClick={() => {
-                                      if (isApproved || isPending) {
-                                        setSignedPreviewTarget({
-                                          _id: ch._id,
-                                          docType: 'challan',
-                                          docNumber: `EDP-${ch.challanNo}`,
-                                          partyName: ch.billTo || ch.partyName,
-                                          signedCopy: ch.signedCopy
-                                        });
-                                      } else {
-                                        setSignedUploadTarget({
-                                          id: ch._id,
-                                          docType: 'challan',
-                                          docNumber: `EDP-${ch.challanNo}`,
-                                          partyName: ch.billTo || ch.partyName,
-                                          existingSignedCopy: isRejected ? ch.signedCopy : null
-                                        });
-                                      }
-                                    }}
-                                    style={{
-                                      color: iconColor,
-                                      background: bgColor,
-                                      border: `1px solid ${borderColor}`,
-                                      borderRadius: 6,
-                                      padding: '0.3rem',
-                                      cursor: 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                  >
-                                    <IconComp size={14} />
-                                  </button>
-                                );
-                              })()}
 
                               {ch.status !== 'INVOICED' && (
                                 <>
@@ -6068,29 +5956,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             </div>
           </div>
         </div>
-      )}
-
-      {signedUploadTarget && (
-        <SignedDocumentUploadModal
-          isOpen={!!signedUploadTarget}
-          onClose={() => setSignedUploadTarget(null)}
-          docType="challan"
-          docId={signedUploadTarget.id}
-          docNumber={signedUploadTarget.docNumber}
-          partyName={signedUploadTarget.partyName}
-          existingSignedCopy={signedUploadTarget.existingSignedCopy}
-          onSuccess={() => fetchChallans && fetchChallans()}
-        />
-      )}
-
-      {signedPreviewTarget && (
-        <SignedDocumentPreviewModal
-          isOpen={!!signedPreviewTarget}
-          onClose={() => setSignedPreviewTarget(null)}
-          documentData={signedPreviewTarget}
-          isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
-          onStatusUpdated={() => fetchChallans && fetchChallans()}
-        />
       )}
     </div>
   );

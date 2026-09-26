@@ -713,19 +713,67 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
   const [formError, setFormError] = useState('');
   const [allDesignsList, setAllDesignsList] = useState([]);
 
-  useEffect(() => {
-    if (showForm) {
-      const loadAllDesigns = async () => {
-        try {
-          const res = await api.getDesigns({ limit: 1000 });
-          if (res && res.data) setAllDesignsList(res.data);
-        } catch (e) {
-          console.warn('Failed to load all designs for validation', e);
-        }
-      };
-      loadAllDesigns();
+  const loadAllDesigns = useCallback(async () => {
+    try {
+      const res = await api.getDesigns({ department, limit: 2000 });
+      if (res && res.data) setAllDesignsList(res.data);
+    } catch (e) {
+      console.warn('Failed to load all designs for validation/filters', e);
     }
-  }, [showForm]);
+  }, [department]);
+
+  useEffect(() => {
+    loadAllDesigns();
+  }, [loadAllDesigns]);
+
+  // Dynamically compute filter options strictly from designs data present on this screen
+  const availableCategories = useMemo(() => {
+    const list = allDesignsList.length > 0 ? allDesignsList : designs;
+    const set = new Set();
+    list.forEach(d => {
+      if (d.category && String(d.category).trim()) {
+        set.add(String(d.category).trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allDesignsList, designs]);
+
+  const availableColors = useMemo(() => {
+    const list = allDesignsList.length > 0 ? allDesignsList : designs;
+    const set = new Set();
+    list.forEach(d => {
+      if (d.colors && String(d.colors).trim()) {
+        String(d.colors).split(',').forEach(c => {
+          const clean = c.trim();
+          if (clean) set.add(clean);
+        });
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allDesignsList, designs]);
+
+  const availableParties = useMemo(() => {
+    const list = allDesignsList.length > 0 ? allDesignsList : designs;
+    const set = new Set();
+    list.forEach(d => {
+      const pList = Array.isArray(d.parties) ? d.parties : (d.partyName || d.party ? [d.partyName || d.party] : []);
+      pList.forEach(p => {
+        const clean = String(p || '').trim();
+        if (clean) set.add(clean);
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allDesignsList, designs]);
+
+  // Real-time unique design name check
+  const isDuplicateName = useMemo(() => {
+    const trimmed = String(formVal.designName || '').trim().toLowerCase();
+    if (!trimmed) return false;
+    return allDesignsList.some(d => 
+      String(d.designName || '').trim().toLowerCase() === trimmed && 
+      (!formDesign || d._id !== formDesign._id)
+    );
+  }, [formVal.designName, allDesignsList, formDesign]);
 
   // Auto-detect color state
   const [detectingColor, setDetectingColor] = useState(false);
@@ -766,6 +814,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
     const loadAll = (isSilent = false) => {
       fetchDesigns(isSilent);
+      loadAllDesigns();
       fetchCategories();
       fetchConfig();
     };
@@ -981,6 +1030,10 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     e.preventDefault();
     if (!formVal.designName.trim()) {
       setFormError('Design Name is required.');
+      return;
+    }
+    if (isDuplicateName) {
+      setFormError(`A design with name "${formVal.designName.trim()}" already exists. Design name must be unique.`);
       return;
     }
     setSaving(true);
@@ -1378,7 +1431,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
               style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
             >
               <option value="All">All Categories</option>
-              {categories.map(c => (
+              {availableCategories.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
@@ -1398,7 +1451,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
               style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
             >
               <option value="All">All Colors</option>
-              {COLOR_NAMES.map(c => (
+              {availableColors.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
@@ -1418,7 +1471,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
               style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
             >
               <option value="All">All Parties (Clients)</option>
-              {(printConfig.parties || []).map(p => (
+              {availableParties.map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
@@ -1504,7 +1557,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           const filteredDesigns = designs.filter(d => matchSearchQuery(d, search, ['designNo', 'designName', 'category', 'colors', 'fabric', 'partyName', 'notes']));
           return (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
                 {filteredDesigns.map(d => {
                   return (
                     <div
@@ -1639,7 +1692,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       </div>
                     )}
 
-                    {/* Parameters grid */}
+                    {/* Parameters grid: only show clean design-specific details */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem 0.5rem', fontSize: '0.78rem', borderTop: '1px dashed var(--border-light)', paddingTop: '0.5rem' }}>
                       {(department === 'stitching' ? [
                         ['Fabric', d.fabricName],
@@ -1647,10 +1700,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       ] : [
                         ['Colour Match', d.colourMatching],
                         ['Fabric', d.fabricName],
-                        ['Fusing Temp', d.fusingTemp],
-                        ['Speed', d.speed],
                         ['Colors', d.colors],
-                        ['Panna/Pass', d.panna && d.pass ? `${d.panna}" / ${d.pass}P` : d.panna || d.pass || '—']
+                        ['Category', d.category]
                       ]).map(([k, v]) => (
                         <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{k}</span>
@@ -1845,20 +1896,11 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                 <FormField label="Party SKU ID" name="partySkuId" value={formVal.partySkuId} onChange={handleFormChange} placeholder="e.g. SKU-9042" />
               )}
 
-              {(() => {
-                const nameExists = allDesignsList.some(d => 
-                  d.designName.toLowerCase() === formVal.designName.trim().toLowerCase() && 
-                  (!formDesign || d._id !== formDesign._id)
-                );
-                if (nameExists && formVal.designName.trim()) {
-                  return (
-                    <div style={{ color: '#fbbf24', fontSize: '0.72rem', fontWeight: 600, width: '100%', marginTop: '-0.4rem', paddingLeft: '4px' }}>
-                      ⚠️ Notice: A design named "{formVal.designName}" already exists. Saving will overwrite or fail.
-                    </div>
-                  );
-                }
-                return null;
-              })()}
+              {isDuplicateName && (
+                <div style={{ color: '#ef4444', fontSize: '0.74rem', fontWeight: 700, width: '100%', marginTop: '-0.3rem', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span>⚠️</span> Design name must be unique. A design named "{formVal.designName.trim()}" already exists.
+                </div>
+              )}
 
               {department !== 'stitching' && (
                 <FormField label="Colour Matching Name" name="colourMatching" value={formVal.colourMatching} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Green Matching" />
@@ -2038,7 +2080,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary" style={{ padding: '0.5rem 1.2rem' }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={saving} className="btn-primary" style={{ padding: '0.5rem 1.5rem' }}>
+                <button type="submit" disabled={saving || isDuplicateName} className="btn-primary" style={{ padding: '0.5rem 1.5rem', opacity: isDuplicateName ? 0.6 : 1, cursor: isDuplicateName ? 'not-allowed' : 'pointer' }}>
                   <Save size={14} style={{ marginRight: '0.25rem' }} /> {saving ? 'Saving...' : 'Save Design'}
                 </button>
               </div>

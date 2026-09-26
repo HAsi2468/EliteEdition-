@@ -2,11 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        var h = window.location.hostname;
+        if (h === '3.7.174.180' || /^(\d{1,3}\.){3}\d{1,3}$/.test(h)) {
+          try {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                for (var i = 0; i < regs.length; i++) { regs[i].unregister(); }
+              });
+            }
+            if ('caches' in window) {
+              caches.keys().then(function(keys) {
+                for (var i = 0; i < keys.length; i++) { caches.delete(keys[i]); }
+              });
+            }
+          } catch (e) {}
+          window.location.replace('https://erp.eliteedition.in' + window.location.pathname + window.location.search + window.location.hash);
+        }
+      })();
+    </script>
     <link rel="icon" type="image/png" href="/Logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     
     <!-- Primary SEO Meta Tags -->
     <title>Elite Edition Enterprise ERP - Digital Printing, Stitching & Fabric Management System</title>
+    <!-- Google Fonts: Nunito Sans (Phoenix Theme) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,500;0,6..12,600;0,6..12,700;0,6..12,800;1,6..12,400;1,6..12,600&display=swap" rel="stylesheet">
+
     <meta name="title" content="Elite Edition Enterprise ERP - Digital Printing, Stitching & Fabric Management System" />
     <meta name="description" content="Elite Edition Enterprise ERP System: Advanced Job Card Tracking, Digital Textile Printing, Fabric Inventory Management, GST Invoicing, Garment Stitching & Inter-Department Operations." />
     <meta name="keywords" content="Elite Edition, Elite Digital Print, Elite Stitching, Textile Printing ERP, Job Card System, Fabric Inventory Management, GST Billing Software, Digital Printing ERP, Garment Manufacturing System" />
@@ -56,8 +84,8 @@
 
     <!-- JsBarcode library for client-side barcode sticker printing -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script type="module" crossorigin src="/assets/index-Cu6-iL-t.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-4ILdHM18.css">
+    <script type="module" crossorigin src="/assets/index-z6l3SjsD.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-7ki0a-dS.css">
   </head>
   <body>
     <div id="root"></div>

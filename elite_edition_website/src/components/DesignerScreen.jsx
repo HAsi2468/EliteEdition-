@@ -345,6 +345,67 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [statusFilter, setStatusFilter] = useState('Active');
   const [categories, setCategories] = useState([]);
 
+  // Dynamically compute filter options strictly from tasks present in this screen
+  const availableCategories = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const cat = t.category || (Array.isArray(t.fabrics) && t.fabrics[0]) || (t.fabricName ? t.fabricName.split(',')[0].trim() : '');
+      if (cat && String(cat).trim()) set.add(String(cat).trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const availableColors = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const list = [
+        ...(Array.isArray(t.colourMatches) ? t.colourMatches : (t.colourMatching ? t.colourMatching.split(',') : [])),
+        ...(Array.isArray(t.colors) ? t.colors : (t.colors ? String(t.colors).split(',') : []))
+      ];
+      list.forEach(c => {
+        const clean = String(c || '').trim();
+        if (clean) set.add(clean);
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const availableParties = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : []);
+      pList.forEach(p => {
+        const clean = String(p || '').trim();
+        if (clean) set.add(clean);
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const availableDesigners = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const dList = Array.isArray(t.designers) ? t.designers : (t.designerName ? t.designerName.split(',') : []);
+      dList.forEach(d => {
+        const clean = String(d || '').trim();
+        if (clean) set.add(clean);
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const availableFabrics = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const fList = Array.isArray(t.fabrics) ? t.fabrics : (t.fabricName ? t.fabricName.split(',') : []);
+      fList.forEach(f => {
+        const clean = String(f || '').trim();
+        if (clean) set.add(clean);
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
   // Create / Edit Design Task Modal State
   const initialTaskForm = {
     date: new Date().toISOString().split('T')[0],
@@ -365,6 +426,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [taskFormData, setTaskFormData] = useState(initialTaskForm);
   const [savingTask, setSavingTask] = useState(false);
   const [uploadingSampleImage, setUploadingSampleImage] = useState(false);
+
+  // Real-time unique design name check for tasks
+  const isDuplicateTaskName = useMemo(() => {
+    const trimmed = String(taskFormData.designName || '').trim().toLowerCase();
+    if (!trimmed) return false;
+    return tasks.some(t => 
+      String(t.designName || '').trim().toLowerCase() === trimmed &&
+      (!editingId || t._id !== editingId)
+    );
+  }, [taskFormData.designName, tasks, editingId]);
 
   const activeDateRange = useMemo(
     () => getDatePresetRange(datePreset, customDateStart, customDateEnd),
@@ -773,7 +844,21 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     e.preventDefault();
     const finalDesignName = (taskFormData.designName && taskFormData.designName.trim())
       ? taskFormData.designName.trim()
-      : getNextSampleDesignNumber(tasks);
+      : (editingId ? '' : getNextSampleDesignNumber(tasks));
+
+    if (!finalDesignName) {
+      alert('Design Name is required.');
+      return;
+    }
+
+    const isDuplicate = tasks.some(t => 
+      String(t.designName || '').trim().toLowerCase() === finalDesignName.toLowerCase() &&
+      (!editingId || t._id !== editingId)
+    );
+    if (isDuplicate) {
+      alert(`A design task with name "${finalDesignName}" already exists! Design name must be unique.`);
+      return;
+    }
 
     const fabricsList = taskFormData.fabrics || [];
     const designersList = taskFormData.designers || [];
@@ -1214,7 +1299,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
               >
                 <option value="All">All Categories</option>
-                {Array.from(new Set([...categories, ...printConfig.fabrics])).filter(Boolean).map((c) => (
+                {availableCategories.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -1228,7 +1313,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
               >
                 <option value="All">All Colors</option>
-                {COLOR_NAMES.map((c) => (
+                {availableColors.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -1242,12 +1327,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
               >
                 <option value="All">All Parties</option>
-                {Array.from(new Set([
-                  ...(printConfig.parties || []),
-                  ...tasks.flatMap(t =>
-                    Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : [])
-                  )
-                ])).filter(Boolean).sort().map((p) => (
+                {availableParties.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -1407,7 +1487,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 }}
               >
                 <option value="All">👤 All Designers & Staff</option>
-                {printConfig.designers.map((d, i) => (
+                {availableDesigners.map((d, i) => (
                   <option key={i} value={d}>{d}</option>
                 ))}
               </select>
@@ -1432,7 +1512,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               }}
             >
               <option value="All">🧵 All Fabrics</option>
-              {printConfig.fabrics.map((f, i) => (
+              {availableFabrics.map((f, i) => (
                 <option key={i} value={f}>{f}</option>
               ))}
             </select>
@@ -2133,7 +2213,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               </button>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: embedded ? 'repeat(auto-fill, minmax(280px, 1fr))' : 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: embedded ? '1.2rem' : '1.15rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
           {filteredTasks.map((task) => {
             const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
             const progress = getTaskStageProgress(task);
@@ -2279,7 +2359,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       </div>
                     )}
 
-                    {/* Parameters grid identical to Image 1 */}
+                    {/* Parameters grid: only show required design details */}
                     <div
                       style={{
                         display: 'grid',
@@ -2291,40 +2371,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       }}
                     >
                       {[
+                        ['Designer', allDesigners.join(', ') || '--'],
                         ['Colour Match', allColourMatches.join(', ') || '--'],
                         ['Fabric', allFabrics.join(', ') || '--'],
-                        ['Fusing Temp', task.fusingTemp || '--'],
-                        ['Speed', task.speed || '--'],
-                        ['Colors', task.colors || allColourMatches[0] || '--'],
-                        ['Panna/Pass', task.panna && task.pass ? `${task.panna}" / ${task.pass}P` : (task.panna ? `${task.panna}"` : '--')],
-                        ['Created By', task.createdBy || task.inputBy || allDesigners[0] || '--'],
+                        ['Created By', task.createdByName || task.createdBy || '--'],
                       ].map(([k, v]) => (
                         <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>{k}</span>
-                          {k === 'Colors' && v ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              {getColorHex(v) && (
-                                <span
-                                  style={{
-                                    display: 'inline-block',
-                                    width: '10px',
-                                    height: '10px',
-                                    borderRadius: '2px',
-                                    backgroundColor: getColorHex(v),
-                                    border: '1px solid rgba(0,0,0,0.15)',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              )}
-                              <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {v}
-                              </span>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {v || '--'}
-                            </span>
-                          )}
+                          <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {v || '--'}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -4094,25 +4150,42 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               </div>
 
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
-                  Design Name
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', margin: 0 }}>
+                    Design Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <span style={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                    {editingId ? 'Editable (Must be unique)' : 'Editable (Auto-assigned initial)'}
+                  </span>
+                </div>
                 <input
                   type="text"
-                  placeholder="e.g. SM-05"
+                  name="designName"
                   value={taskFormData.designName}
                   onChange={(e) => setTaskFormData((prev) => ({ ...prev, designName: e.target.value }))}
+                  placeholder="e.g. SM-01, ED-709..."
+                  required
                   style={{
                     width: '100%',
                     padding: '0.52rem 0.75rem',
                     borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.85rem',
-                    color: '#0f172a',
+                    border: `1.5px solid ${isDuplicateTaskName ? '#ef4444' : '#cbd5e1'}`,
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    color: isDuplicateTaskName ? '#dc2626' : '#2563eb',
+                    background: '#ffffff',
                     boxSizing: 'border-box',
+                    letterSpacing: '0.03em',
                     outline: 'none',
+                    boxShadow: isDuplicateTaskName ? '0 0 0 3px rgba(239, 68, 68, 0.12)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 />
+                {isDuplicateTaskName && (
+                  <div style={{ color: '#dc2626', fontSize: '0.74rem', fontWeight: 700, marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span>⚠️</span> A sample design named "{taskFormData.designName.trim()}" already exists. Design name must be unique.
+                  </div>
+                )}
               </div>
 
               {/* Multi-Select: Designers */}
@@ -4276,17 +4349,18 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 </button>
                 <button
                   type="submit"
-                  disabled={savingTask || uploadingSampleImage}
+                  disabled={savingTask || uploadingSampleImage || isDuplicateTaskName}
                   style={{
                     padding: '0.55rem 1.35rem',
-                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                    background: isDuplicateTaskName ? '#94a3b8' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.82rem',
                     fontWeight: 700,
                     color: '#ffffff',
-                    cursor: (savingTask || uploadingSampleImage) ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
+                    cursor: (savingTask || uploadingSampleImage || isDuplicateTaskName) ? 'not-allowed' : 'pointer',
+                    boxShadow: isDuplicateTaskName ? 'none' : '0 2px 6px rgba(37,99,235,0.25)',
+                    opacity: isDuplicateTaskName ? 0.7 : 1,
                   }}
                 >
                   {savingTask ? 'Saving Design Task...' : (editingId ? 'Update Design Task' : 'Create Design Task')}
