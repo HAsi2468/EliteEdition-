@@ -132,6 +132,53 @@ const BLANK = {
   status:'Pending',
 };
 
+// ─── WORKFLOW PIPELINE STAGE BADGE ──────────────────────────────────────────
+function WorkflowStageBadge({ card }) {
+  if (!card) return null;
+  const pStatus = (card.printStatus || '').toLowerCase();
+  const isPrintDone = pStatus.includes('done') || parseFloat(card.printMtr || 0) > 0;
+  
+  const fStatus = (card.fusingStatus || '').toLowerCase();
+  const fusedMtr = parseFloat(card.fusingMtr || card.freshMtr || 0);
+  const isFusingDone = fStatus.includes('done');
+  
+  const deliveredMtr = parseFloat(card.deliveredMtr || 0);
+  const totalMtr = parseFloat(card.totalMtr || card.totalQty || 0);
+  const isDispatched = (card.deliveryStatus || '').toLowerCase().includes('done') || (totalMtr > 0 && deliveredMtr >= totalMtr);
+  const isPartiallyDispatched = deliveredMtr > 0 && !isDispatched;
+
+  if (isDispatched) {
+    return (
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(16, 185, 129, 0.12)', color:'#10b981', border:'1px solid rgba(16, 185, 129, 0.25)', fontSize:'0.7rem', fontWeight:800 }} title={`Dispatched: ${deliveredMtr}m`}>
+        <span>🚚</span> 4. Dispatched
+      </span>
+    );
+  }
+
+  if (isFusingDone || fusedMtr > 0) {
+    const avail = Math.max(0, fusedMtr - deliveredMtr);
+    return (
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(2, 132, 199, 0.12)', color:'#0284c7', border:'1px solid rgba(2, 132, 199, 0.3)', fontSize:'0.7rem', fontWeight:800 }} title={`${fusedMtr}m fused (${avail}m ready for Challan)`}>
+        <span>📦</span> {isPartiallyDispatched ? `Partially Dispatched (${deliveredMtr}m)` : `3. Ready for Challan (${avail}m)`}
+      </span>
+    );
+  }
+
+  if (isPrintDone) {
+    return (
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(245, 158, 11, 0.12)', color:'#d97706', border:'1px solid rgba(245, 158, 11, 0.25)', fontSize:'0.7rem', fontWeight:800 }} title="Printing is done. Next stage: Fusing Department">
+        <span>🔥</span> 2. Fusing Pending
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(99, 102, 241, 0.1)', color:'#6366f1', border:'1px solid rgba(99, 102, 241, 0.2)', fontSize:'0.7rem', fontWeight:800 }} title="Job Card created. Next stage: Printing Log">
+      <span>🖨️</span> 1. Printing Pending
+    </span>
+  );
+}
+
 // ─── STATUS badge ────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cfg = {
@@ -2336,11 +2383,88 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
     }
   };
 
-  const handleSendToBilling = (c) => {
-    const totalM = parseFloat(c.totalMtr) || parseFloat(c.totalQty) || 1;
+  const handleSendToBilling = async (c) => {
+    const user = api.getCurrentUser() || {};
+    const isAdmin = user.role === 'admin' || user.isAdmin === true || user.isMainAdmin === true;
+
+    // ── 1. Check Printing Stage ──
+    const pStatus = (c.printStatus || '').toLowerCase();
+    const pMtr = parseFloat(c.printMtr || 0);
+    const isPrintDone = pStatus.includes('done') || pMtr > 0;
+
+    if (!isPrintDone) {
+      if (!isAdmin) {
+        triggerEliteAlert(
+          'Printing Stage Incomplete',
+          `Cannot create Delivery Challan for Job #${c.jobNo}. This Job Card has not completed the Printing stage yet (Status: ${c.printStatus || 'Printing Pending'}). Printing must be logged first.`,
+          'warning'
+        );
+        return;
+      }
+      const proceed = await triggerEliteConfirm({
+        title: 'Admin Override: Printing Incomplete',
+        message: `Job Card #${c.jobNo} has NOT passed the Printing Stage yet (Status: ${c.printStatus || 'Printing Pending'}). As an Admin, do you want to override and create a Challan anyway?`,
+        confirmText: 'Override & Proceed',
+        cancelText: 'Cancel'
+      });
+      if (!proceed) return;
+    }
+
+    // ── 2. Check Fusing Stage ──
+    const fStatus = (c.fusingStatus || '').toLowerCase();
+    const totalFusedMtr = parseFloat(c.fusingMtr || c.freshMtr || 0);
     const deliveredM = parseFloat(c.deliveredMtr) || 0;
-    const remainingM = totalM > deliveredM ? (totalM - deliveredM) : totalM;
-    const billQty = Math.round(remainingM * 100) / 100;
+    const isFusingDone = fStatus.includes('done');
+    const remainingFusedMtr = Math.max(0, totalFusedMtr - deliveredM);
+
+    if (!isFusingDone && totalFusedMtr <= 0) {
+      if (!isAdmin) {
+        triggerEliteAlert(
+          'Fusing Stage Incomplete',
+          `Cannot create Delivery Challan for Job #${c.jobNo}. This Job Card has not completed the Fusing stage yet (0m fused). Fusing must be logged before dispatch.`,
+          'warning'
+        );
+        return;
+      }
+      const proceed = await triggerEliteConfirm({
+        title: 'Admin Override: Fusing Incomplete',
+        message: `Job Card #${c.jobNo} has NOT passed Fusing (0m fused). As an Admin, do you want to override and create a Challan anyway?`,
+        confirmText: 'Override & Proceed',
+        cancelText: 'Cancel'
+      });
+      if (!proceed) return;
+    }
+
+    // ── 3. Quantities with Partial Quantities Support ──
+    const totalJobMtr = parseFloat(c.totalMtr) || parseFloat(c.totalQty) || 1;
+    let billQty;
+
+    if (totalFusedMtr > 0) {
+      // Partial quantities: Use available fused meters that haven't been delivered yet!
+      billQty = remainingFusedMtr > 0 ? Math.round(remainingFusedMtr * 100) / 100 : Math.round(totalFusedMtr * 100) / 100;
+    } else {
+      // Admin override without fusing
+      const remainingTotal = totalJobMtr > deliveredM ? (totalJobMtr - deliveredM) : totalJobMtr;
+      billQty = Math.round(remainingTotal * 100) / 100;
+    }
+
+    if (billQty <= 0 && remainingFusedMtr <= 0 && deliveredM >= totalJobMtr) {
+      triggerEliteAlert(
+        'Already Fully Dispatched',
+        `Job Card #${c.jobNo} has already been fully delivered (${deliveredM}m of ${totalJobMtr}m delivered).`,
+        'info'
+      );
+      return;
+    }
+
+    if (totalFusedMtr > 0 && billQty < totalJobMtr) {
+      triggerPushNotification(
+        '📦 Partial Challan Batch',
+        `Preparing Partial Delivery Challan for ${billQty}m of fused fabric (Total Job: ${totalJobMtr}m, Delivered so far: ${deliveredM}m).`,
+        'info'
+      );
+    }
+
     const rate = parseFloat(c.rate) || 0;
 
     const challanData = {
@@ -2797,7 +2921,12 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}><StatusBadge status={c.status} /></td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                          <WorkflowStageBadge card={c} />
+                          <StatusBadge status={c.status} />
+                        </div>
+                      </td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
                           <button onClick={() => handleSendToBilling(c)} className="btn-icon" title="Create Invoice / Send to Billing" style={{ padding: '0.3rem', color: '#a78bfa' }}><Receipt size={13} /></button>
@@ -2882,7 +3011,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                         </span>
                       )}
                     </div>
-                    <StatusBadge status={c.status}/>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <WorkflowStageBadge card={c} />
+                      <StatusBadge status={c.status}/>
+                    </div>
                   </div>
 
                   {/* Info grid */}
@@ -2906,11 +3038,27 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
                   {/* Actions */}
                   <div style={{ display:'flex', gap:'0.45rem', borderTop:'1px solid var(--border-light)', paddingTop:'0.7rem', flexWrap:'wrap' }}>
-                    <button onClick={()=>handleSendToBilling(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#4f46e5', borderColor: '#c7d2fe', background: '#eff6ff', fontWeight: 700 }}
-                      title="Create Delivery Challan">
-                      <FileText size={13}/> Challan
-                    </button>
+                    {(() => {
+                      const pStatus = (c.printStatus || '').toLowerCase();
+                      const isPrintDone = pStatus.includes('done') || parseFloat(c.printMtr || 0) > 0;
+                      const fStatus = (c.fusingStatus || '').toLowerCase();
+                      const fusedMtr = parseFloat(c.fusingMtr || c.freshMtr || 0);
+                      const isFusingDone = fStatus.includes('done');
+                      const isReadyForChallan = isPrintDone && (isFusingDone || fusedMtr > 0);
+                      return (
+                        <button onClick={()=>handleSendToBilling(c)} className="btn-secondary"
+                          style={{
+                            flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center',
+                            color: isReadyForChallan ? '#4f46e5' : '#64748b',
+                            borderColor: isReadyForChallan ? '#c7d2fe' : '#e2e8f0',
+                            background: isReadyForChallan ? '#eff6ff' : '#f8fafc',
+                            fontWeight: 700
+                          }}
+                          title={isReadyForChallan ? 'Create Delivery Challan' : (!isPrintDone ? 'Printing Pending' : 'Fusing Pending')}>
+                          <FileText size={13}/> Challan {isReadyForChallan ? '✓' : ''}
+                        </button>
+                      );
+                    })()}
                     <button onClick={()=>triggerJobCardPrint(c)} className="btn-secondary"
                       style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5', fontWeight: 700 }}
                       title="Print / Save PDF">

@@ -9,7 +9,7 @@ import {
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
-import { triggerEliteAlert } from './EliteModalDialog';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
 
 function getAutoShift() {
@@ -433,25 +433,56 @@ export default function FusingDepartment() {
       : cards.find(c => String(c._id) === String(cardOrId) || String(c.id) === String(cardOrId) || String(c.jobNo) === String(cardOrId));
 
     if (card) {
-      const pMtr = getCardPrintedMeters(card);
-      const defaultMtr = pMtr || (card.fusingMtr ? String(card.fusingMtr).match(/[\d.]+/)?.[0] : '') || '';
-      const cardPanna = card.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"';
-      const preset = getFabricFusingPreset(card.fabric);
-      const jobDisplay = formatJobCardNo(card.jobNo);
-      setTopForm(prev => ({
-        ...prev,
-        jobCardId: card._id || card.id,
-        jobNo: card.jobNo || '',
-        panna: cardPanna,
-        printedMtr: pMtr,
-        fusingMtr: defaultMtr,
-        fusingTemp: card.fusingTemp || card.temperature || preset.temp,
-        fusingSpeed: card.fusingSpeed || card.speed || preset.speed || '80',
-        fusingMachine: card.fusingMachine || prev.fusingMachine,
-        butterPaperWeightKg: card.butterPaperWeightKg || '',
-        rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Complete' : ((card.fusingStatus === 'Fusing In Progress' || card.fusingStatus === 'Partial Complete') ? 'Partial Complete' : prev.rollCompleted || 'Complete')
-      }));
-      setJobSearchText(`${jobDisplay} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
+      const pStatus = String(card.printStatus || '').toLowerCase();
+      const isPrintDone = pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending')) || parseFloat(card.printMtr || 0) > 0;
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin;
+
+      const applyCard = (c) => {
+        const pMtr = getCardPrintedMeters(c);
+        const defaultMtr = pMtr || (c.fusingMtr ? String(c.fusingMtr).match(/[\d.]+/)?.[0] : '') || '';
+        const cardPanna = c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"';
+        const preset = getFabricFusingPreset(c.fabric);
+        const jobDisplay = formatJobCardNo(c.jobNo);
+        setTopForm(prev => ({
+          ...prev,
+          jobCardId: c._id || c.id,
+          jobNo: c.jobNo || '',
+          panna: cardPanna,
+          printedMtr: pMtr,
+          fusingMtr: defaultMtr,
+          fusingTemp: c.fusingTemp || c.temperature || preset.temp,
+          fusingSpeed: c.fusingSpeed || c.speed || preset.speed || '80',
+          fusingMachine: c.fusingMachine || prev.fusingMachine,
+          butterPaperWeightKg: c.butterPaperWeightKg || '',
+          rollCompleted: c.fusingStatus === 'Fusing Done' ? 'Complete' : ((c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete') ? 'Partial Complete' : prev.rollCompleted || 'Complete')
+        }));
+        setJobSearchText(`${jobDisplay} — ${c.party || ''} | ${c.designName || ''} (${c.fabric || ''} ${cardPanna})`);
+      };
+
+      if (!isPrintDone) {
+        if (!isAdmin) {
+          triggerEliteAlert(
+            'Printing Stage Incomplete',
+            `Cannot process Fusing: Job Card #${card.jobNo} has not completed the Printing stage yet (Status: ${card.printStatus || 'Printing Pending'}). Printing must be completed first.`,
+            'warning'
+          );
+          return;
+        }
+        triggerEliteConfirm({
+          title: 'Admin Override: Printing Incomplete',
+          message: `Job Card #${card.jobNo} has NOT passed the Printing Stage yet (Status: ${card.printStatus || 'Printing Pending'}). As an Admin, do you want to override and proceed with Fusing?`,
+          confirmText: 'Override & Proceed',
+          cancelText: 'Cancel'
+        }).then(proceed => {
+          if (proceed) {
+            applyCard(card);
+          }
+        });
+        return;
+      }
+
+      applyCard(card);
     } else {
       setTopForm(prev => ({
         ...prev,
@@ -488,6 +519,34 @@ export default function FusingDepartment() {
     try {
       // 1. Find or update job card
       const targetId = topForm.jobCardId || cards.find(c => String(c.jobNo).toLowerCase() === String(topForm.jobNo).toLowerCase())?._id;
+      const targetCard = topForm.jobCardId 
+        ? cards.find(c => String(c._id) === String(topForm.jobCardId) || String(c.id) === String(topForm.jobCardId))
+        : cards.find(c => String(c.jobNo).toLowerCase() === String(topForm.jobNo).toLowerCase());
+
+      if (targetCard) {
+        const pStatus = String(targetCard.printStatus || '').toLowerCase();
+        const isPrintDone = pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending')) || parseFloat(targetCard.printMtr || 0) > 0;
+        const currentUser = api.getCurrentUser() || {};
+        const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin;
+
+        if (!isPrintDone) {
+          if (!isAdmin) {
+            triggerEliteAlert('Printing Stage Incomplete', `Cannot submit Fusing log: Job Card #${targetCard.jobNo} has not completed the Printing stage yet.`, 'warning');
+            setSubmitting(false);
+            return;
+          }
+          const proceed = await triggerEliteConfirm({
+            title: 'Admin Override: Printing Incomplete',
+            message: `Job Card #${targetCard.jobNo} has NOT passed the Printing Stage yet. As Admin, do you want to override and save Fusing?`,
+            confirmText: 'Override & Save',
+            cancelText: 'Cancel'
+          });
+          if (!proceed) {
+            setSubmitting(false);
+            return;
+          }
+        }
+      }
 
       if (targetId) {
         const payload = {
@@ -690,6 +749,27 @@ export default function FusingDepartment() {
     const nextStatus = cur === 'Fusing Pending' 
       ? 'Fusing In Progress' 
       : (cur === 'Fusing In Progress' ? 'Fusing Done' : 'Fusing Pending');
+
+    if (nextStatus !== 'Fusing Pending') {
+      const pStatus = String(card.printStatus || '').toLowerCase();
+      const isPrintDone = pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending')) || parseFloat(card.printMtr || 0) > 0;
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin;
+
+      if (!isPrintDone) {
+        if (!isAdmin) {
+          triggerEliteAlert('Printing Stage Incomplete', `Cannot set Fusing to ${nextStatus}: Job Card #${card.jobNo} has not passed the Printing stage yet.`, 'warning');
+          return;
+        }
+        const proceed = await triggerEliteConfirm({
+          title: 'Admin Override: Printing Incomplete',
+          message: `Job Card #${card.jobNo} has NOT completed Printing yet. As Admin, do you want to override and set Fusing status to "${nextStatus}"?`,
+          confirmText: 'Override & Update',
+          cancelText: 'Cancel'
+        });
+        if (!proceed) return;
+      }
+    }
 
     try {
       await api.updateJobCard(card._id || card.id, {

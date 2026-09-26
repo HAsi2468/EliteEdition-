@@ -367,6 +367,70 @@ const createChallan = async (req, res) => {
       parsedMtr = parseFloat(((totalMtr * parsedPct) / 100).toFixed(2));
     }
 
+    // ── Workflow Pipeline Validation: Job Card -> Printing -> Fusing -> Delivery Challan ──
+    const userRole = String(req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
+    const isUserAdmin = userRole === 'admin' || Boolean(req.user?.isAdmin) || Boolean(req.user?.isMainAdmin);
+    const hasAdminOverride = isUserAdmin && req.body.adminOverride === true;
+
+    if (jobNo && !hasAdminOverride) {
+      const rawJobTokens = String(jobNo).split(',').map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')).filter(Boolean);
+      for (const tok of rawJobTokens) {
+        const cleanNo = tok.replace(/\D/g, '');
+        const jCard = await JobCard.findOne({
+          $or: [
+            { jobNo: tok },
+            { jobNo: new RegExp('^' + tok + '$', 'i') },
+            ...(cleanNo ? [{ jobNo: new RegExp(cleanNo + '$', 'i') }] : [])
+          ]
+        });
+
+        if (jCard) {
+          // 1. Must pass Printing Stage
+          const pStatus = (jCard.printStatus || '').toLowerCase();
+          const pMtr = parseFloat(jCard.printMtr || 0);
+          const isPrintDone = pStatus.includes('done') || pMtr > 0;
+          if (!isPrintDone) {
+            return res.status(400).json({
+              success: false,
+              error: `Workflow Validation: Job Card #${jCard.jobNo} has not completed Printing yet (Status: ${jCard.printStatus || 'Printing Pending'}). It must pass the Printing stage before a Delivery Challan can be created.`,
+              stageError: 'PRINTING_INCOMPLETE',
+              canAdminOverride: isUserAdmin,
+              jobNo: jCard.jobNo
+            });
+          }
+
+          // 2. Must pass Fusing Stage (or have partial fused meters)
+          const fStatus = (jCard.fusingStatus || '').toLowerCase();
+          const fusedMtr = parseFloat(jCard.fusingMtr || jCard.freshMtr || 0);
+          const deliveredMtr = parseFloat(jCard.deliveredMtr || 0);
+          const availableFusedMtr = Math.max(0, fusedMtr - deliveredMtr);
+          const isFusingDone = fStatus.includes('done');
+
+          if (!isFusingDone && fusedMtr <= 0) {
+            return res.status(400).json({
+              success: false,
+              error: `Workflow Validation: Job Card #${jCard.jobNo} has not completed Fusing yet (Status: ${jCard.fusingStatus || 'Fusing Pending'}, 0m fused). It must pass the Fusing stage before a Delivery Challan can be created.`,
+              stageError: 'FUSING_INCOMPLETE',
+              canAdminOverride: isUserAdmin,
+              jobNo: jCard.jobNo
+            });
+          }
+
+          // 3. Partial Quantities check: Cannot exceed available fused meters
+          if (fusedMtr > 0 && totalMtr > (availableFusedMtr + 2.0)) {
+            return res.status(400).json({
+              success: false,
+              error: `Workflow Validation: Requested Challan quantity (${totalMtr.toFixed(1)}m) exceeds available fused fabric (${availableFusedMtr.toFixed(1)}m available, ${fusedMtr.toFixed(1)}m fused, ${deliveredMtr.toFixed(1)}m already delivered) for Job #${jCard.jobNo}.`,
+              stageError: 'EXCEEDS_FUSED_MTR',
+              canAdminOverride: isUserAdmin,
+              availableFusedMtr,
+              jobNo: jCard.jobNo
+            });
+          }
+        }
+      }
+    }
+
     const challan = new FabricChallan({
       date: date ? new Date(date) : new Date(),
       partyName: partyName || '',
@@ -465,9 +529,39 @@ const createChallan = async (req, res) => {
           createdTxIds.push(outwardTx._id);
         }
         challan.fabricOutwardIds = createdTxIds;
-        await challan.save();
       } catch (txErr) {
         console.error('Warning: Failed to auto-create fabric outward transactions:', txErr.message);
+      }
+    }
+
+    // ── Sync deliveredMtr & deliveryStatus to linked JobCard(s) ──────────────
+    if (jobNo && totalMtr > 0) {
+      try {
+        const rawJobTokens = String(jobNo).split(',').map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')).filter(Boolean);
+        for (const tok of rawJobTokens) {
+          const cleanNo = tok.replace(/\D/g, '');
+          const jCard = await JobCard.findOne({
+            $or: [
+              { jobNo: tok },
+              { jobNo: new RegExp('^' + tok + '$', 'i') },
+              ...(cleanNo ? [{ jobNo: new RegExp(cleanNo + '$', 'i') }] : [])
+            ]
+          });
+          if (jCard) {
+            const currentDelivered = parseFloat(jCard.deliveredMtr || 0);
+            const newDelivered = Math.round((currentDelivered + totalMtr) * 100) / 100;
+            jCard.deliveredMtr = newDelivered;
+            const targetMtr = parseFloat(jCard.totalMtr || jCard.totalQty || 0);
+            if (targetMtr > 0 && newDelivered >= targetMtr) {
+              jCard.deliveryStatus = 'Delivery Done';
+            } else if (newDelivered > 0) {
+              jCard.deliveryStatus = 'Partial Complete';
+            }
+            await jCard.save();
+          }
+        }
+      } catch (jcErr) {
+        console.warn('Warning: Failed to update JobCard deliveredMtr:', jcErr.message);
       }
     }
 

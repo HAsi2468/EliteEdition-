@@ -1356,17 +1356,64 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       const combinedColors = Array.from(new Set(matchedJobs.map(j => j.colors).filter(Boolean))).join(', ');
       const primaryJob = matchedJobs[0];
 
-      setChallanForm(prev => ({
-        ...prev,
-        jobNo: val.includes(',') ? val : (combinedJobNo || val),
-        designNo: combinedDesigns || prev.designNo,
-        colour: combinedColors || prev.colour,
-        panna: primaryJob.panna || prev.panna,
-        fabricName: primaryJob.fabric || prev.fabricName,
-        partyName: primaryJob.party || prev.partyName,
-        billTo: primaryJob.billTo || prev.billTo || '',
-        shipTo: primaryJob.shipTo || prev.shipTo || '',
-      }));
+      // ── Workflow Pipeline Validation ──
+      const pStatus = (primaryJob.printStatus || '').toLowerCase();
+      const pMtr = parseFloat(primaryJob.printMtr || 0);
+      const isPrintDone = pStatus.includes('done') || pMtr > 0;
+      
+      const fStatus = (primaryJob.fusingStatus || '').toLowerCase();
+      const fusedMtr = parseFloat(primaryJob.fusingMtr || primaryJob.freshMtr || 0);
+      const isFusingDone = fStatus.includes('done');
+      const deliveredMtr = parseFloat(primaryJob.deliveredMtr || 0);
+      const remainingFused = Math.max(0, fusedMtr - deliveredMtr);
+
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin === true;
+
+      if (!isPrintDone && !isAdmin) {
+        triggerEliteAlert(
+          'Printing Stage Incomplete',
+          `Cannot link Job #${primaryJob.jobNo}: This Job Card is still in Printing stage (Status: ${primaryJob.printStatus || 'Printing Pending'}). Please complete Printing first.`,
+          'warning'
+        );
+        return;
+      }
+
+      if (!isFusingDone && fusedMtr <= 0 && !isAdmin) {
+        triggerEliteAlert(
+          'Fusing Stage Incomplete',
+          `Cannot link Job #${primaryJob.jobNo}: This Job Card has not completed Fusing yet (0m fused). Only fused goods can be dispatched via Delivery Challan.`,
+          'warning'
+        );
+        return;
+      }
+
+      // If partial quantities available, auto-set TP meter to remaining fused meters if empty
+      const defaultMtr = remainingFused > 0 ? remainingFused : (parseFloat(primaryJob.totalMtr) || '');
+
+      setChallanForm(prev => {
+        const needsTpUpdate = prev.tpDetails.length <= 1 && (!prev.tpDetails[0]?.tpMeter || prev.tpDetails[0]?.tpMeter === '0' || prev.tpDetails[0]?.tpMeter === '');
+        return {
+          ...prev,
+          jobNo: val.includes(',') ? val : (combinedJobNo || val),
+          designNo: combinedDesigns || prev.designNo,
+          colour: combinedColors || prev.colour,
+          panna: primaryJob.panna || prev.panna,
+          fabricName: primaryJob.fabric || prev.fabricName,
+          partyName: primaryJob.party || prev.partyName,
+          billTo: primaryJob.billTo || prev.billTo || '',
+          shipTo: primaryJob.shipTo || prev.shipTo || '',
+          tpDetails: needsTpUpdate && defaultMtr ? [{ id: 1, tpNo: 1, tpMeter: String(defaultMtr), lotNo: prev.lotNo || '' }] : prev.tpDetails
+        };
+      });
+
+      if (remainingFused > 0) {
+        triggerPushNotification(
+          '📦 Fused Batch Ready',
+          `Job #${primaryJob.jobNo}: ${remainingFused}m available fused fabric ready for Delivery Challan.`,
+          'info'
+        );
+      }
 
       // Fetch lot numbers that have this fabric
       if (primaryJob.fabric) {
@@ -1497,16 +1544,96 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const challanTotalMtr = challanForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0);
   const challanTotalTp = challanForm.tpDetails.filter(r => parseFloat(r.tpMeter) > 0).length;
 
-  const handleChallanSubmit = async (e) => {
-    e.preventDefault();
+  const handleChallanSubmit = async (e, forceAdminOverride = false) => {
+    if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
     const cleanFabric = normalizeFabricName(challanForm.fabricName, challanForm.panna);
     try {
+      // ── Workflow Pipeline Validation ──
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin === true;
+
+      const rawTokens = String(challanForm.jobNo || '')
+        .split(',')
+        .map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, ''))
+        .filter(Boolean);
+
+      const matchedJobs = rawTokens.map(tok => findMatchingJobCard(tok)).filter(Boolean);
+
+      let needsOverride = false;
+      let overrideReasons = [];
+
+      for (const j of matchedJobs) {
+        const pStatus = (j.printStatus || '').toLowerCase();
+        const pMtr = parseFloat(j.printMtr || 0);
+        const isPrintDone = pStatus.includes('done') || pMtr > 0;
+
+        const fStatus = (j.fusingStatus || '').toLowerCase();
+        const fusedMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+        const deliveredMtr = parseFloat(j.deliveredMtr || 0);
+        const availableFused = Math.max(0, fusedMtr - deliveredMtr);
+        const isFusingDone = fStatus.includes('done');
+
+        if (!isPrintDone) {
+          if (!isAdmin) {
+            setLoading(false);
+            await triggerEliteAlert(
+              'Printing Stage Incomplete',
+              `Job Card #${j.jobNo} is still in Printing (${j.printStatus || 'Printing Pending'}). Production flow requires Printing to be done before creating a Delivery Challan.`,
+              'warning'
+            );
+            return;
+          } else {
+            needsOverride = true;
+            overrideReasons.push(`• Job #${j.jobNo}: Printing is not completed (${j.printStatus || 'Pending'}).`);
+          }
+        } else if (!isFusingDone && fusedMtr <= 0) {
+          if (!isAdmin) {
+            setLoading(false);
+            await triggerEliteAlert(
+              'Fusing Stage Incomplete',
+              `Job Card #${j.jobNo} has not completed Fusing (0m fused). Production flow requires Fusing to be done before dispatching a Delivery Challan.`,
+              'warning'
+            );
+            return;
+          } else {
+            needsOverride = true;
+            overrideReasons.push(`• Job #${j.jobNo}: Fusing has not started (0m fused).`);
+          }
+        } else if (fusedMtr > 0 && challanTotalMtr > (availableFused + 2.0)) {
+          if (!isAdmin) {
+            setLoading(false);
+            await triggerEliteAlert(
+              'Exceeds Available Fused Meters',
+              `Requested Challan quantity (${challanTotalMtr.toFixed(1)}m) exceeds available fused fabric (${availableFused.toFixed(1)}m available, ${deliveredMtr.toFixed(1)}m already delivered) for Job #${j.jobNo}.`,
+              'warning'
+            );
+            return;
+          } else {
+            needsOverride = true;
+            overrideReasons.push(`• Job #${j.jobNo}: Requested ${challanTotalMtr.toFixed(1)}m exceeds available fused quantity (${availableFused.toFixed(1)}m).`);
+          }
+        }
+      }
+
+      if (needsOverride && !forceAdminOverride) {
+        setLoading(false);
+        const confirmed = await triggerEliteConfirm({
+          title: '⚠️ Admin Workflow Override',
+          message: `The following Job Card stage requirements were not met:\n\n${overrideReasons.join('\n')}\n\nAs an Administrator, do you want to override the pipeline and generate this Delivery Challan anyway?`,
+          confirmText: 'Yes, Override & Create',
+          cancelText: 'Cancel'
+        });
+        if (!confirmed) return;
+        return handleChallanSubmit(e, true);
+      }
+
       const payload = {
         ...challanForm,
         fabricName: cleanFabric || challanForm.fabricName,
         totalMtr: challanTotalMtr,
         totalTp: challanTotalTp,
+        adminOverride: forceAdminOverride || (isAdmin && needsOverride),
         tpDetails: challanForm.tpDetails
           .filter(r => r.tpMeter !== '' && r.tpMeter != null)
           .map(r => ({
@@ -1527,7 +1654,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       fetchData();
       fetchChallans();
     } catch (err) {
-      alert(err.message);
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin === true;
+      if (isAdmin && !forceAdminOverride && (err.message?.includes('Workflow Validation') || err.message?.includes('stageError') || err.message?.includes('Printing') || err.message?.includes('Fusing'))) {
+        const confirmed = await triggerEliteConfirm({
+          title: '⚠️ Admin Override Required',
+          message: `${err.message}\n\nDo you want to override and create this Challan as Admin?`,
+          confirmText: 'Yes, Override & Create',
+          cancelText: 'Cancel'
+        });
+        if (confirmed) {
+          return handleChallanSubmit(e, true);
+        }
+      } else {
+        triggerEliteAlert('Challan Error', err.message || 'Failed to save Challan.', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -4513,34 +4654,88 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </div>
                   <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="e.g. JOB-2252, JOB-2253..." />
                   <datalist id="challan-jobs">
-                    {inProgressJobCards.map(j => <option key={j._id} value={j.jobNo}>{j.jobNo} — {j.party} ({j.designNo || ''})</option>)}
+                    {inProgressJobCards.map(j => {
+                      const pDone = (j.printStatus || '').toLowerCase().includes('done') || parseFloat(j.printMtr || 0) > 0;
+                      const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                      const dMtr = parseFloat(j.deliveredMtr || 0);
+                      const fDone = (j.fusingStatus || '').toLowerCase().includes('done') || fMtr > 0;
+                      const avail = Math.max(0, fMtr - dMtr);
+                      const tag = !pDone ? '[🖨️ Printing Pend]' : !fDone ? '[🔥 Fusing Pend]' : `[📦 Ready: ${avail.toFixed(0)}m]`;
+                      return (
+                        <option key={j._id} value={j.jobNo}>
+                          {j.jobNo} {tag} — {j.party} ({j.designNo || ''})
+                        </option>
+                      );
+                    })}
                   </datalist>
 
                   {/* Interactive Job Pills */}
-                  <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '75px', overflowY: 'auto' }}>
+                  <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '85px', overflowY: 'auto' }}>
                     {inProgressJobCards
                       .filter(j => !challanForm.partyName || (j.party && j.party.toLowerCase().trim() === challanForm.partyName.toLowerCase().trim()))
-                      .slice(0, 20)
+                      .slice(0, 25)
                       .map(j => {
                         const isSelected = String(challanForm.jobNo || '').toUpperCase().includes(String(j.jobNo).toUpperCase());
+                        const pDone = (j.printStatus || '').toLowerCase().includes('done') || parseFloat(j.printMtr || 0) > 0;
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        const dMtr = parseFloat(j.deliveredMtr || 0);
+                        const fDone = (j.fusingStatus || '').toLowerCase().includes('done') || fMtr > 0;
+                        const avail = Math.max(0, fMtr - dMtr);
+                        const isReady = pDone && fDone && avail > 0;
+
+                        let badgeText = '';
+                        let pillBorder = '#cbd5e1';
+                        let pillBg = '#ffffff';
+                        let pillColor = '#475569';
+
+                        if (isSelected) {
+                          pillBg = '#0284c7';
+                          pillColor = '#ffffff';
+                          pillBorder = '#0284c7';
+                        } else if (isReady) {
+                          pillBorder = '#86efac';
+                          pillBg = '#f0fdf4';
+                          pillColor = '#166534';
+                          badgeText = `📦 ${avail.toFixed(0)}m`;
+                        } else if (!pDone) {
+                          pillBorder = '#fde68a';
+                          pillBg = '#fffbeb';
+                          pillColor = '#92400e';
+                          badgeText = '🖨️';
+                        } else if (!fDone) {
+                          pillBorder = '#fed7aa';
+                          pillBg = '#fff7ed';
+                          pillColor = '#9a3412';
+                          badgeText = '🔥';
+                        }
+
                         return (
                           <button
                             key={j._id}
                             type="button"
                             onClick={() => toggleChallanJobPill(j.jobNo)}
+                            title={isReady ? `Ready for delivery: ${avail.toFixed(1)}m available fused fabric` : !pDone ? 'Printing Pending' : 'Fusing Pending'}
                             style={{
                               padding: '0.18rem 0.5rem',
                               fontSize: '0.7rem',
                               borderRadius: '10px',
-                              border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                              background: isSelected ? '#0284c7' : '#ffffff',
-                              color: isSelected ? '#ffffff' : '#475569',
+                              border: `1px solid ${pillBorder}`,
+                              background: pillBg,
+                              color: pillColor,
                               cursor: 'pointer',
                               fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
                               transition: 'all 0.15s ease'
                             }}
                           >
-                            {isSelected ? '✓ ' : '+ '} {j.jobNo}
+                            <span>{isSelected ? '✓ ' : '+ '} {j.jobNo}</span>
+                            {badgeText && (
+                              <span style={{ fontSize: '0.62rem', opacity: isSelected ? 0.9 : 0.85, fontWeight: 800 }}>
+                                {badgeText}
+                              </span>
+                            )}
                           </button>
                         );
                       })}

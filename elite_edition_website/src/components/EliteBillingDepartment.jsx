@@ -571,6 +571,71 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     return { startD, endD };
   };
 
+  // Helper to extract taxable amount and GST tax breakup for Tally accuracy
+  const extractInvoiceTaxDetails = (inv) => {
+    if (!inv) return { taxable: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0, isIgst: false };
+    
+    let taxable = 0;
+    if (inv.taxableAmount !== undefined && inv.taxableAmount !== null && Number(inv.taxableAmount) > 0) {
+      taxable = Number(inv.taxableAmount);
+    } else if (inv.subtotal !== undefined && inv.subtotal !== null && Number(inv.subtotal) > 0) {
+      taxable = Number(inv.subtotal);
+    } else if (inv.netSubtotal !== undefined && inv.netSubtotal !== null && Number(inv.netSubtotal) > 0) {
+      taxable = Number(inv.netSubtotal);
+    }
+
+    const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+    let totalTax = Number(inv.totalTax || inv.gstAmount || 0);
+    let cgst = Number(inv.cgstAmount || 0);
+    let sgst = Number(inv.sgstAmount || 0);
+    let igst = Number(inv.igstAmount || 0);
+
+    const isIgst = inv.taxType === 'IGST' || (inv.stateCode && inv.stateCode !== '24') || (inv.customer?.stateCode && inv.customer?.stateCode !== '24');
+
+    if (cgst > 0 || sgst > 0 || igst > 0) {
+      totalTax = cgst + sgst + igst;
+    }
+
+    if (taxable === 0) {
+      if (grandTotal > 0 && totalTax > 0) {
+        taxable = Math.max(0, grandTotal - totalTax);
+      } else if (grandTotal > 0) {
+        taxable = parseFloat((grandTotal / 1.05).toFixed(2));
+        totalTax = parseFloat((grandTotal - taxable).toFixed(2));
+        if (isIgst) {
+          igst = totalTax;
+        } else {
+          cgst = parseFloat((totalTax / 2).toFixed(2));
+          sgst = parseFloat((totalTax / 2).toFixed(2));
+        }
+      }
+    } else if (totalTax === 0 && grandTotal > taxable) {
+      totalTax = parseFloat((grandTotal - taxable).toFixed(2));
+      if (isIgst) {
+        igst = totalTax;
+      } else {
+        cgst = parseFloat((totalTax / 2).toFixed(2));
+        sgst = parseFloat((totalTax / 2).toFixed(2));
+      }
+    } else if (totalTax > 0 && cgst === 0 && sgst === 0 && igst === 0) {
+      if (isIgst) {
+        igst = totalTax;
+      } else {
+        cgst = parseFloat((totalTax / 2).toFixed(2));
+        sgst = parseFloat((totalTax / 2).toFixed(2));
+      }
+    }
+
+    return {
+      taxable: parseFloat(taxable.toFixed(2)),
+      cgst: parseFloat(cgst.toFixed(2)),
+      sgst: parseFloat(sgst.toFixed(2)),
+      igst: parseFloat(igst.toFixed(2)),
+      totalTax: parseFloat(totalTax.toFixed(2)),
+      isIgst
+    };
+  };
+
   // Compute Party Ledger Data with robust matching & date parsing
   const computePartyLedger = (partyId, startD, endD) => {
     const parseInvDate = (dateVal) => {
@@ -630,25 +695,60 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
       if (endD && invDate > endD) return;
 
+      const taxDetails = extractInvoiceTaxDetails(inv);
+      const pName = inv.customer?.businessName || inv.customer?.name || inv.customerName || (targetParty?.businessName || targetParty?.name || 'Party');
+      const pGstin = inv.customer?.gstin || inv.customerGst || targetParty?.gstin || '';
+      const pState = inv.customer?.state || targetParty?.state || (taxDetails.isIgst ? 'Inter-State' : 'Gujarat (24)');
+      const pStateCode = inv.customer?.stateCode || targetParty?.stateCode || (taxDetails.isIgst ? '' : '24');
+
       if (grandTotal > 0) {
         periodTx.push({
           date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
+          rawDate: invDate,
+          voucherType: 'Sales',
           voucherNo: inv.invoiceNo || 'INV',
           particulars: `Sales Invoice #${inv.invoiceNo || ''}`,
           department: inv.department || 'Elite Digital Prints',
+          partyName: pName,
+          gstin: pGstin,
+          state: pState,
+          stateCode: pStateCode,
+          opposingLedger: 'Sales - Digital Print',
+          taxableAmount: taxDetails.taxable,
+          cgstAmount: taxDetails.cgst,
+          sgstAmount: taxDetails.sgst,
+          igstAmount: taxDetails.igst,
+          totalTax: taxDetails.totalTax,
           debit: grandTotal,
-          credit: 0
+          credit: 0,
+          narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo || ''}`
         });
       }
 
       if (paidAmount > 0) {
+        const payMode = inv.paymentMode || inv.paymentMethod || 'Bank';
+        const isCash = payMode.toLowerCase().includes('cash');
+        const pDate = inv.paymentDate ? parseInvDate(inv.paymentDate) : invDate;
         periodTx.push({
           date: formatDateDDMMYYYY(inv.paymentDate || inv.invoiceDate || inv.createdAt),
+          rawDate: pDate,
+          voucherType: 'Receipt',
           voucherNo: `REC-${inv.invoiceNo || ''}`,
-          particulars: `Payment Received — Invoice #${inv.invoiceNo || ''}`,
+          particulars: `Payment Received (${payMode}) — Invoice #${inv.invoiceNo || ''}`,
           department: inv.department || 'Elite Digital Prints',
+          partyName: pName,
+          gstin: pGstin,
+          state: pState,
+          stateCode: pStateCode,
+          opposingLedger: isCash ? 'Cash Account' : 'Bank Account',
+          taxableAmount: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          totalTax: 0,
           debit: 0,
-          credit: paidAmount
+          credit: paidAmount,
+          narration: `Payment received against Invoice #${inv.invoiceNo || ''} via ${payMode}`
         });
       }
     });
@@ -762,11 +862,34 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           xml += '              </BILLALLOCATIONS.LIST>\n';
           xml += '            </ALLLEDGERENTRIES.LIST>\n';
 
+          const taxableVal = t.taxableAmount > 0 ? t.taxableAmount : (amt - (t.totalTax || 0));
           xml += '            <ALLLEDGERENTRIES.LIST>\n';
           xml += '              <LEDGERNAME>Sales - Digital Print</LEDGERNAME>\n';
           xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
-          xml += `              <AMOUNT>${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += `              <AMOUNT>${taxableVal.toFixed(2)}</AMOUNT>\n`;
           xml += '            </ALLLEDGERENTRIES.LIST>\n';
+
+          if (t.cgstAmount > 0) {
+            xml += '            <ALLLEDGERENTRIES.LIST>\n';
+            xml += '              <LEDGERNAME>CGST Output Tax</LEDGERNAME>\n';
+            xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+            xml += `              <AMOUNT>${t.cgstAmount.toFixed(2)}</AMOUNT>\n`;
+            xml += '            </ALLLEDGERENTRIES.LIST>\n';
+          }
+          if (t.sgstAmount > 0) {
+            xml += '            <ALLLEDGERENTRIES.LIST>\n';
+            xml += '              <LEDGERNAME>SGST Output Tax</LEDGERNAME>\n';
+            xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+            xml += `              <AMOUNT>${t.sgstAmount.toFixed(2)}</AMOUNT>\n`;
+            xml += '            </ALLLEDGERENTRIES.LIST>\n';
+          }
+          if (t.igstAmount > 0) {
+            xml += '            <ALLLEDGERENTRIES.LIST>\n';
+            xml += '              <LEDGERNAME>IGST Output Tax</LEDGERNAME>\n';
+            xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+            xml += `              <AMOUNT>${t.igstAmount.toFixed(2)}</AMOUNT>\n`;
+            xml += '            </ALLLEDGERENTRIES.LIST>\n';
+          }
         } else {
           xml += '            <ALLLEDGERENTRIES.LIST>\n';
           xml += '              <LEDGERNAME>Bank / Cash Account</LEDGERNAME>\n';
@@ -851,22 +974,42 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
       if (ledgerFormat === 'excel') {
         const wb = XLSX.utils.book_new();
+
+        // ── SHEET 1: PARTY LEDGER STATEMENT (Comprehensive with Tax & Voucher Type) ──
+        const pGst = selectedParty?.gstin || 'N/A';
+        const pPhone = selectedParty?.phone || 'N/A';
+        const pState = selectedParty?.state || (pGst && pGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+
         const rows = [
           ['ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT'],
           ['Party Name:', partyName],
-          ['GSTIN:', selectedParty.gstin || 'N/A', 'Phone:', selectedParty.phone || 'N/A'],
+          ['GSTIN:', pGst, 'State / POS:', pState, 'Phone:', pPhone],
           ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
           ['Opening Balance (₹):', Number(ledger.openingBalance) || 0],
           [],
-          ['Date', 'Voucher No', 'Particulars', 'Department', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
+          ['Date', 'Voucher Type', 'Voucher No', 'Particulars', 'Taxable (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
         ];
 
+        let sumTaxable = 0;
+        let sumCgst = 0;
+        let sumSgst = 0;
+        let sumIgst = 0;
+
         ledger.transactions.forEach(t => {
+          sumTaxable += (t.taxableAmount || 0);
+          sumCgst += (t.cgstAmount || 0);
+          sumSgst += (t.sgstAmount || 0);
+          sumIgst += (t.igstAmount || 0);
+
           rows.push([
             t.date,
+            t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt'),
             t.voucherNo,
             t.particulars,
-            t.department,
+            Number(t.taxableAmount) || 0,
+            Number(t.cgstAmount) || 0,
+            Number(t.sgstAmount) || 0,
+            Number(t.igstAmount) || 0,
             Number(t.debit) || 0,
             Number(t.credit) || 0,
             Number(Math.abs(t.runningBalance)) || 0,
@@ -880,6 +1023,10 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           '',
           '',
           '',
+          parseFloat(sumTaxable.toFixed(2)),
+          parseFloat(sumCgst.toFixed(2)),
+          parseFloat(sumSgst.toFixed(2)),
+          parseFloat(sumIgst.toFixed(2)),
           Number(ledger.totalDebit) || 0,
           Number(ledger.totalCredit) || 0,
           Number(Math.abs(ledger.closingBalance)) || 0,
@@ -887,23 +1034,74 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         ]);
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
-
-        // Column widths for professional formatting
         ws['!cols'] = [
-          { wch: 14 },
-          { wch: 22 },
-          { wch: 45 },
-          { wch: 18 },
-          { wch: 16 },
-          { wch: 16 },
-          { wch: 20 },
-          { wch: 8 },
+          { wch: 13 }, // Date
+          { wch: 14 }, // Voucher Type
+          { wch: 20 }, // Voucher No
+          { wch: 42 }, // Particulars
+          { wch: 15 }, // Taxable
+          { wch: 12 }, // CGST
+          { wch: 12 }, // SGST
+          { wch: 12 }, // IGST
+          { wch: 15 }, // Debit
+          { wch: 15 }, // Credit
+          { wch: 18 }, // Running Bal
+          { wch: 8 },  // Dr/Cr
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Party Statement');
+
+        // ── SHEET 2: TALLY PRIME / ACCOUNTING IMPORT FORMAT ──
+        const tallyRows = [
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Sales / Bank Ledger', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN', 'Narration']
         ];
 
-        XLSX.utils.book_append_sheet(wb, ws, 'Party Ledger');
+        ledger.transactions.forEach(t => {
+          const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
+          const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
+          const totAmt = t.debit > 0 ? t.debit : t.credit;
+
+          tallyRows.push([
+            t.date,
+            vType,
+            t.voucherNo,
+            partyName,
+            oppLedger,
+            Number(t.taxableAmount) || 0,
+            Number(t.cgstAmount) || 0,
+            Number(t.sgstAmount) || 0,
+            Number(t.igstAmount) || 0,
+            Number(totAmt) || 0,
+            Number(t.debit) || 0,
+            Number(t.credit) || 0,
+            t.state || pState,
+            pGst !== 'N/A' ? pGst : '',
+            t.narration || t.particulars || ''
+          ]);
+        });
+
+        const wsTally = XLSX.utils.aoa_to_sheet(tallyRows);
+        wsTally['!cols'] = [
+          { wch: 13 }, // Date
+          { wch: 14 }, // Voucher Type
+          { wch: 20 }, // Voucher No
+          { wch: 32 }, // Party Ledger Name
+          { wch: 26 }, // Sales/Bank Ledger
+          { wch: 16 }, // Taxable Amount
+          { wch: 12 }, // CGST
+          { wch: 12 }, // SGST
+          { wch: 12 }, // IGST
+          { wch: 16 }, // Total Amount
+          { wch: 14 }, // Debit
+          { wch: 14 }, // Credit
+          { wch: 18 }, // POS
+          { wch: 18 }, // GSTIN
+          { wch: 45 }, // Narration
+        ];
+        XLSX.utils.book_append_sheet(wb, wsTally, 'Tally Import Format');
+
         const fileName = `Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(wb, fileName);
-        triggerPushNotification('📊 Excel Export Ready', `Party statement for ${partyName} exported as XLSX.`, 'success');
+        triggerPushNotification('📊 Excel Export Ready', `Party statement & Tally format for ${partyName} exported as XLSX.`, 'success');
         return;
       }
 
@@ -1074,17 +1272,20 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
       if (ledgerFormat === 'excel') {
         const wb = XLSX.utils.book_new();
+
+        // ── SHEET 1: ALL-PARTIES MASTER SUMMARY ──
         const rows = [
           ['ELITE DIGITAL PRINTS — ALL-PARTIES MASTER LEDGER SUMMARY'],
           ['Report Date:', new Date().toLocaleDateString('en-IN')],
           ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
           [],
-          ['Party Code', 'Party Name', 'GSTIN', 'Phone', 'Opening Balance (₹)', 'Total Billed (₹)', 'Total Paid (₹)', 'Closing Balance (₹)', 'Status']
+          ['Party Code', 'Party Name', 'GSTIN', 'State / POS', 'Phone', 'Opening Balance (₹)', 'Total Billed (₹)', 'Total Paid (₹)', 'Closing Balance (₹)', 'Status']
         ];
 
         let grandBilled = 0;
         let grandPaid = 0;
         let grandBal = 0;
+        const allTransactions = [];
 
         customers.forEach(cust => {
           const partyLedger = computePartyLedger(cust._id, startD, endD);
@@ -1092,10 +1293,24 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           grandPaid += partyLedger.totalCredit;
           grandBal += partyLedger.closingBalance;
 
+          const pState = cust.state || (cust.gstin && cust.gstin.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+          const pName = cust.businessName || cust.name || 'Party';
+
+          (partyLedger.transactions || []).forEach(tx => {
+            allTransactions.push({
+              ...tx,
+              partyCode: `CUST-${cust._id.slice(-4).toUpperCase()}`,
+              partyName: pName,
+              partyGstin: cust.gstin || '',
+              partyState: pState
+            });
+          });
+
           rows.push([
             `CUST-${cust._id.slice(-4).toUpperCase()}`,
-            cust.businessName || cust.name,
+            pName,
             cust.gstin || 'N/A',
+            pState,
             cust.phone || 'N/A',
             Number(partyLedger.openingBalance) || 0,
             Number(partyLedger.totalDebit) || 0,
@@ -1112,6 +1327,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           '',
           '',
           '',
+          '',
           Number(grandBilled) || 0,
           Number(grandPaid) || 0,
           Number(grandBal) || 0,
@@ -1119,12 +1335,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         ]);
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
-
-        // Column widths for professional formatting
         ws['!cols'] = [
           { wch: 14 },
           { wch: 35 },
           { wch: 20 },
+          { wch: 18 },
           { wch: 16 },
           { wch: 20 },
           { wch: 20 },
@@ -1132,11 +1347,62 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           { wch: 22 },
           { wch: 12 },
         ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Master Summary');
 
-        XLSX.utils.book_append_sheet(wb, ws, 'Master Ledger');
+        // ── SHEET 2: ALL VOUCHERS FOR TALLY IMPORT ──
+        allTransactions.sort((a, b) => (a.rawDate || 0) - (b.rawDate || 0));
+
+        const tallyRows = [
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Sales / Bank Ledger', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN', 'Narration']
+        ];
+
+        allTransactions.forEach(t => {
+          const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
+          const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
+          const totAmt = t.debit > 0 ? t.debit : t.credit;
+
+          tallyRows.push([
+            t.date,
+            vType,
+            t.voucherNo,
+            t.partyName,
+            oppLedger,
+            Number(t.taxableAmount) || 0,
+            Number(t.cgstAmount) || 0,
+            Number(t.sgstAmount) || 0,
+            Number(t.igstAmount) || 0,
+            Number(totAmt) || 0,
+            Number(t.debit) || 0,
+            Number(t.credit) || 0,
+            t.partyState || 'Gujarat (24)',
+            t.partyGstin || '',
+            t.narration || t.particulars || ''
+          ]);
+        });
+
+        const wsTally = XLSX.utils.aoa_to_sheet(tallyRows);
+        wsTally['!cols'] = [
+          { wch: 13 },
+          { wch: 14 },
+          { wch: 20 },
+          { wch: 32 },
+          { wch: 26 },
+          { wch: 16 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 16 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 18 },
+          { wch: 18 },
+          { wch: 45 },
+        ];
+        XLSX.utils.book_append_sheet(wb, wsTally, 'Tally All Vouchers');
+
         const fileName = `Master_Ledger_Summary_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(wb, fileName);
-        triggerPushNotification('📊 Excel Export Ready', `All-Parties Master Ledger exported as XLSX.`, 'success');
+        triggerPushNotification('📊 Excel Export Ready', `All-Parties Master Ledger & Tally format exported as XLSX.`, 'success');
         return;
       }
 

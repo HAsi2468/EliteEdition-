@@ -38,12 +38,14 @@ const request = async (path, options = {}) => {
     }
     const uId = currUser?.id || currUser?._id || '';
     const uName = currUser?.name || currUser?.fullName || currUser?.username || '';
+    const uRole = currUser?.role || (currUser?.isAdmin || currUser?.isMainAdmin ? 'admin' : '');
 
     const headers = {
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...(uId ? { 'X-User-Id': uId } : {}),
       ...(uName ? { 'X-User-Name': uName } : {}),
+      ...(uRole ? { 'X-User-Role': uRole } : {}),
       ...options.headers,
     };
     
