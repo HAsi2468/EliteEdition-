@@ -654,6 +654,24 @@ const setupSockets = (io) => {
       try {
         if (!data || !data.roomId) return;
         const roomId = String(data.roomId);
+        socket.join(roomId);
+
+        // Check if recipient is specified and whether they are currently connected
+        if (data.recipientId && String(data.recipientId) !== String(data.caller)) {
+          const recipientChannel = `user_${data.recipientId}`;
+          const recipientRoom = io.sockets.adapter.rooms.get(recipientChannel);
+          const isRecipientOnline = recipientRoom && recipientRoom.size > 0;
+          if (!isRecipientOnline) {
+            socket.emit('call-failed', {
+              roomId,
+              recipientId: data.recipientId,
+              reason: 'offline',
+              message: `${data.recipientName || 'User'} is currently offline or not connected to the network`
+            });
+            return;
+          }
+        }
+
         const payload = {
           roomId: roomId,
           callType: data.callType || 'voice',
@@ -690,6 +708,7 @@ const setupSockets = (io) => {
 
     socket.on('accept-call', (data) => {
       if (data && data.roomId) {
+        socket.join(String(data.roomId));
         const payload = {
           roomId: data.roomId,
           accepter: data.accepter,
@@ -726,6 +745,25 @@ const setupSockets = (io) => {
         if (data.recipientId) {
           io.to(`user_${data.recipientId}`).emit('call-ended', payload);
         }
+        if (data.caller) {
+          io.to(`user_${data.caller}`).emit('call-ended', payload);
+        }
+      }
+    });
+
+    socket.on('call-timeout', (data) => {
+      if (data && data.roomId) {
+        const payload = {
+          roomId: data.roomId,
+          caller: data.caller,
+          recipientId: data.recipientId,
+          reason: 'timeout',
+          message: 'Call timed out (No answer)'
+        };
+        socket.to(String(data.roomId)).emit('call-ended', payload);
+        if (data.recipientId) {
+          io.to(`user_${data.recipientId}`).emit('call-ended', payload);
+        }
       }
     });
 
@@ -734,6 +772,9 @@ const setupSockets = (io) => {
         socket.to(String(data.roomId)).emit('webrtc-offer', data);
         if (data.recipientId) {
           io.to(`user_${data.recipientId}`).emit('webrtc-offer', data);
+        }
+        if (data.caller) {
+          io.to(`user_${data.caller}`).emit('webrtc-offer', data);
         }
       }
     });
@@ -744,6 +785,9 @@ const setupSockets = (io) => {
         if (data.caller) {
           io.to(`user_${data.caller}`).emit('webrtc-answer', data);
         }
+        if (data.recipientId) {
+          io.to(`user_${data.recipientId}`).emit('webrtc-answer', data);
+        }
       }
     });
 
@@ -752,6 +796,12 @@ const setupSockets = (io) => {
         socket.to(String(data.roomId)).emit('webrtc-ice-candidate', data);
         if (data.targetUserId) {
           io.to(`user_${data.targetUserId}`).emit('webrtc-ice-candidate', data);
+        }
+        if (data.recipientId) {
+          io.to(`user_${data.recipientId}`).emit('webrtc-ice-candidate', data);
+        }
+        if (data.caller) {
+          io.to(`user_${data.caller}`).emit('webrtc-ice-candidate', data);
         }
       }
     });
