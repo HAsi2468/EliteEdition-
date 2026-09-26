@@ -142,6 +142,8 @@ export default function DesignImage({
       <img
         src={currentSrc}
         alt={alt || designName || 'Design'}
+        width={width || 360}
+        height={width || 360}
         loading="lazy"
         decoding="async"
         onError={handleError}
@@ -149,6 +151,7 @@ export default function DesignImage({
         style={{
           width: '100%',
           height: '100%',
+          aspectRatio: '1 / 1',
           objectFit: 'cover',
           cursor: onZoom ? 'zoom-in' : (onClick ? 'pointer' : 'default'),
           opacity: hasLoaded ? 1 : 0,

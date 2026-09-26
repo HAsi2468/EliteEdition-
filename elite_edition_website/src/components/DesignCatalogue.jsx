@@ -88,7 +88,7 @@ function FormField({ label, name, value, onChange, placeholder, type = 'text', o
   const showColorPreview = name === 'colors' && getColorHex(value);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 calc(50% - 0.5rem)', minWidth: '180px' }}>
-      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <label htmlFor={`field-${name}`} style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
         {label} {required && <span style={{ color: 'var(--danger)' }}>*</span>}
       </label>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
@@ -96,6 +96,7 @@ function FormField({ label, name, value, onChange, placeholder, type = 'text', o
           {options ? (
             <>
               <input 
+                id={`field-${name}`}
                 type={type}
                 name={name} 
                 value={value} 
@@ -103,6 +104,7 @@ function FormField({ label, name, value, onChange, placeholder, type = 'text', o
                 list={`${name}-options`}
                 placeholder={placeholder || 'Select or type...'}
                 required={required}
+                aria-label={label}
                 style={{ padding: '0.5rem 0.7rem', fontSize: '0.85rem', width: '100%' }}
               />
               <datalist id={`${name}-options`}>
@@ -111,12 +113,14 @@ function FormField({ label, name, value, onChange, placeholder, type = 'text', o
             </>
           ) : (
             <input
+              id={`field-${name}`}
               type={type}
               name={name}
               value={value}
               onChange={onChange}
               placeholder={placeholder}
               required={required}
+              aria-label={label}
               style={{ padding: '0.5rem 0.7rem', fontSize: '0.85rem', width: '100%' }}
             />
           )}
@@ -310,6 +314,9 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
           <div style={{ padding: '0.5rem', borderBottom: '1px solid var(--border-light, #334155)', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
             <Search size={14} style={{ color: 'var(--text-muted)' }} />
             <input
+              id="party-multiselect-search"
+              name="partyMultiselectSearch"
+              aria-label="Filter party names"
               type="text"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -354,10 +361,15 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
             ) : (
               filteredOptions.map(party => {
                 const isSelected = selected.includes(party);
+                const partyChkId = `party-chk-${party.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
                 return (
-                  <div
+                  <label
                     key={party}
-                    onClick={() => toggleParty(party)}
+                    htmlFor={partyChkId}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleParty(party);
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -378,6 +390,9 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
                     }}
                   >
                     <input
+                      id={partyChkId}
+                      name={partyChkId}
+                      aria-label={`Select party ${party}`}
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => {}}
@@ -385,7 +400,7 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
                     />
                     <span style={{ flex: 1 }}>{party}</span>
                     {isSelected && <Check size={14} style={{ color: '#60a5fa' }} />}
-                  </div>
+                  </label>
                 );
               })
             )}
@@ -394,6 +409,9 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
           {/* Quick Add Custom Party */}
           <div style={{ padding: '0.4rem 0.6rem', borderTop: '1px solid var(--border-light, #334155)', background: 'rgba(0, 0, 0, 0.2)', display: 'flex', gap: '0.4rem' }}>
             <input
+              id="catalogue-custom-party-input"
+              name="catalogueCustomPartyInput"
+              aria-label="Add custom party name"
               type="text"
               value={customPartyInput}
               onChange={e => setCustomPartyInput(e.target.value)}
@@ -522,6 +540,9 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
           onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-light)'}
         >
           <input
+            id="catalogue-file-upload-input"
+            name="catalogueFileUpload"
+            aria-label="Upload design image"
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
@@ -596,11 +617,13 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           <input
+            id={`url-input-${name}`}
             type="text"
             name={name}
             value={raw}
             onChange={onChange}
             placeholder={placeholder}
+            aria-label={label || 'Direct Image URL'}
             style={{ padding: '0.5rem 0.7rem', fontSize: '0.82rem', borderColor: directUrl ? 'rgba(52,211,153,0.4)' : undefined }}
           />
           {raw.includes('/folders/') && (
@@ -1302,8 +1325,14 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       <div className="glass-panel" style={{ padding: '1rem 1.25rem' }}>
         <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: '1 1 220px' }}>
+            <label htmlFor="catalogue-search-field" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+              Search Design Name, Fabric, Matching, Designer
+            </label>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
+              id="catalogue-search-field"
+              name="catalogueSearch"
+              aria-label="Search Design name, fabric, matching, designer"
               type="text"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
@@ -1314,7 +1343,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
           {/* Categories select filter */}
           <div style={{ minWidth: 150 }}>
+            <label htmlFor="catalogue-category-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+              Filter by Category
+            </label>
             <select
+              id="catalogue-category-filter"
+              name="catalogueCategory"
+              aria-label="Filter by Category"
               value={categoryFilter}
               onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
               style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
@@ -1328,7 +1363,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
           {/* Colors select filter */}
           <div style={{ minWidth: 150 }}>
+            <label htmlFor="catalogue-color-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+              Filter by Color
+            </label>
             <select
+              id="catalogue-color-filter"
+              name="catalogueColor"
+              aria-label="Filter by Color"
               value={colorFilter}
               onChange={e => { setColorFilter(e.target.value); setPage(1); }}
               style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
@@ -1342,7 +1383,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
           {/* Party (Client) select filter */}
           <div style={{ minWidth: 160 }}>
+            <label htmlFor="catalogue-party-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+              Filter by Party
+            </label>
             <select
+              id="catalogue-party-filter"
+              name="catalogueParty"
+              aria-label="Filter by Party (Clients)"
               value={partyFilter}
               onChange={e => { setPartyFilter(e.target.value); setPage(1); }}
               style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
@@ -1374,7 +1421,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
           {/* Sorting */}
           <div style={{ minWidth: 140 }}>
+            <label htmlFor="catalogue-sort-by" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+              Sort Catalogue
+            </label>
             <select
+              id="catalogue-sort-by"
+              name="catalogueSortBy"
+              aria-label="Sort Catalogue"
               value={sortBy}
               onChange={e => { setSortBy(e.target.value); setPage(1); }}
               style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
@@ -1820,6 +1873,9 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                     <span>💰 Size-Wise Sales Rates (₹) — Taken from Stitching Sizes</span>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <select
+                        id="select-size-rate-shortcut"
+                        name="selectSizeRateShortcut"
+                        aria-label="Select size to set rate"
                         onChange={(e) => {
                           if (!e.target.value) return;
                           const sizeKey = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -1852,12 +1908,16 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                   <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(105px, 1fr))', gap: '0.6rem' }}>
                     {(printConfig.sizes?.length ? printConfig.sizes : ['XS (34)', 'S (36)', 'M (38)', 'L (40)', 'XL (42)', '2XL (44)', '3XL (46)', '4XL (48)', '5XL (50)', '6XL (52)', 'FREE SIZE', 'UNSTITCHED']).map(sz => {
                       const key = sz.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                      const fieldId = `size-sales-rate-${key}`;
                       return (
                         <div key={sz} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sz}>
+                          <label htmlFor={fieldId} style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sz}>
                             {sz}
                           </label>
                           <input
+                            id={fieldId}
+                            name={`sizeSalesRate_${key}`}
+                            aria-label={`Sales Rate for ${sz}`}
                             type="number"
                             step="0.01"
                             value={(formVal.sizeSalesRates || {})[key] || ''}
