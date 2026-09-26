@@ -67,6 +67,26 @@ export const PRIORITY_STYLES = {
 };
 
 /**
+ * Generate sequential SM-01, SM-02... sample design number
+ */
+export const getNextSampleDesignNumber = (taskList = []) => {
+  let maxNum = 0;
+  (taskList || []).forEach((t) => {
+    const nameMatch = (t.designName || '').match(/^SM-(\d+)$/i);
+    if (nameMatch) {
+      const num = parseInt(nameMatch[1], 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  });
+  if (maxNum === 0 && (taskList || []).length > 0) {
+    maxNum = taskList.length;
+  }
+  const nextNum = maxNum + 1;
+  return `SM-${String(nextNum).padStart(2, '0')}`;
+};
+
+
+/**
  * Modern multi-select tag picker with dropdown & custom input support
  */
 function MultiSelectBox({
@@ -575,6 +595,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     setTaskFormData({
       ...initialTaskForm,
       date: new Date().toISOString().split('T')[0],
+      designName: getNextSampleDesignNumber(tasks),
       fabrics: [],
       fabricName: '',
       designers: isUserRestricted && userAssignedName ? [userAssignedName] : [],
@@ -663,7 +684,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     e.preventDefault();
     const finalDesignName = (taskFormData.designName && taskFormData.designName.trim())
       ? taskFormData.designName.trim()
-      : `Design-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+      : getNextSampleDesignNumber(tasks);
 
     const fabricsList = taskFormData.fabrics || [];
     const designersList = taskFormData.designers || [];
@@ -984,7 +1005,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
               }}
             >
-              <Plus size={14} /> <span>Input New Design</span>
+              <Plus size={14} /> <span>+ New Sample Design</span>
             </button>
           </div>
         </div>
@@ -1125,114 +1146,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         </div>
       )}
 
-      {/* ─── Metric Stats Strip ────────────────────────────────────────── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: embedded ? '0.65rem' : '0.85rem',
-          marginBottom: embedded ? '0.85rem' : '1.25rem',
-        }}
-      >
-        {/* Draw Design Metrics Card */}
-        <div
-          style={{
-            background: '#ffffff',
-            border: '1px solid #dbeafe',
-            borderTop: '3px solid #2563eb',
-            borderRadius: '12px',
-            padding: embedded ? '0.65rem 0.8rem' : '0.9rem',
-            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.04)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: embedded ? '0.4rem' : '0.6rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Clock size={14} color="#2563eb" /> 1. Drow Design Status
-            </span>
-            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 1</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ flex: 1, background: '#eff6ff', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#1d4ed8' }}>START WORK</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#1e3a8a' }}>{stats?.drow?.startWorking || 0}</div>
-            </div>
-            <div style={{ flex: 1, background: '#fffbeb', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>REVIEW</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.drow?.reviewSample || 0}</div>
-            </div>
-            <div style={{ flex: 1, background: '#eef2ff', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4338ca' }}>FINAL</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.drow?.finalSample || 0}</div>
-            </div>
-          </div>
-        </div>
 
-        {/* Colour Matching Metrics Card */}
-        <div
-          style={{
-            background: '#ffffff',
-            border: '1px solid #fce7f3',
-            borderTop: '3px solid #db2777',
-            borderRadius: '12px',
-            padding: embedded ? '0.65rem 0.8rem' : '0.9rem',
-            boxShadow: '0 2px 6px rgba(219, 39, 119, 0.04)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: embedded ? '0.4rem' : '0.6rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9d174d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Palette size={14} color="#db2777" /> 2. Colour Matching Status
-            </span>
-            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 2</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ flex: 1, background: '#fdf2f8', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#be185d' }}>PANTON</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#831843' }}>{stats?.cm?.colourPanton || 0}</div>
-            </div>
-            <div style={{ flex: 1, background: '#fffbeb', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>REVIEW</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.cm?.reviewSample || 0}</div>
-            </div>
-            <div style={{ flex: 1, background: '#eef2ff', padding: embedded ? '0.35rem 0.4rem' : '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4338ca' }}>FINAL</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.cm?.finalSample || 0}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Final Design Status Metrics Card */}
-        <div
-          style={{
-            background: '#ffffff',
-            border: '1px solid #dcfce7',
-            borderTop: '3px solid #16a34a',
-            borderRadius: '12px',
-            padding: embedded ? '0.65rem 0.8rem' : '0.9rem',
-            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.04)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: embedded ? '0.4rem' : '0.6rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <CheckCircle2 size={14} color="#16a34a" /> 3. Final Design Status
-            </span>
-            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 3</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.4rem' }}>
-            <div style={{ flex: 1, background: '#f0fdf4', padding: embedded ? '0.35rem 0.35rem' : '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#15803d' }}>APPROVED</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#14532d' }}>{stats?.final?.approvedSample || 0}</div>
-            </div>
-            <div style={{ flex: 1, background: '#fef2f2', padding: embedded ? '0.35rem 0.35rem' : '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#b91c1c' }}>REJ DROW</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#7f1d1d' }}>{stats?.final?.rejectDrow || 0}</div>
-            </div>
-            <div style={{ flex: 1, background: '#fff7ed', padding: embedded ? '0.35rem 0.35rem' : '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#c2410c' }}>REJ C.M.</div>
-              <div style={{ fontSize: embedded ? '1.05rem' : '1.2rem', fontWeight: 800, color: '#7c2d12' }}>{stats?.final?.rejectCM || 0}</div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* ─── Operational Stage Navigation Tabs ───────────────────────────── */}
       <div
@@ -1966,7 +1880,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         </div>
       ) : (
         /* ─── CARDS GRID VIEW ─────────────────────────────────────────── */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: '1.15rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: embedded ? 'repeat(auto-fill, minmax(280px, 1fr))' : 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: embedded ? '1.2rem' : '1.15rem' }}>
           {filteredTasks.map((task) => {
             const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
             const progress = getTaskStageProgress(task);
@@ -1997,588 +1911,298 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               ];
               const uniqueLightboxImages = Array.from(new Set(allLightboxImages));
 
+              const isApproved = task.finalDesignStatus === 'APPROVED SAMPLE';
+              const isRejected = String(task.finalDesignStatus || '').startsWith('REJECT');
+
               return (
                 <div
                   key={task._id}
+                  className="glass-panel"
                   style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
+                    padding: '1rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    gap: '0.8rem',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    position: 'relative'
                   }}
-                  className="hover:shadow-lg hover:border-blue-200"
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
                 >
-                  {/* Hero / Sample Image Preview */}
+                  {/* Task No / Category badge (Top Left) */}
+                  <span style={{
+                    position: 'absolute', top: 16, left: 16,
+                    background: 'rgba(139,92,246,0.25)', color: '#a78bfa',
+                    fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px',
+                    textTransform: 'uppercase', letterSpacing: '0.02em', zIndex: 2
+                  }}>
+                    {task.taskNo || 'SAMPLE'}
+                  </span>
+
+                  {/* Status badge (Top Right) */}
+                  <span style={{
+                    position: 'absolute', top: 16, right: 16,
+                    background: isApproved
+                      ? 'rgba(52,211,153,0.15)'
+                      : isRejected
+                      ? 'rgba(239,68,68,0.15)'
+                      : 'rgba(59,130,246,0.15)',
+                    color: isApproved
+                      ? '#34d399'
+                      : isRejected
+                      ? '#f87171'
+                      : '#60a5fa',
+                    fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                    border: isApproved
+                      ? '1px solid rgba(52,211,153,0.3)'
+                      : isRejected
+                      ? '1px solid rgba(239,68,68,0.3)'
+                      : '1px solid rgba(59,130,246,0.3)',
+                    zIndex: 2
+                  }}>
+                    {isApproved
+                      ? 'Approved'
+                      : isRejected
+                      ? 'Rejected'
+                      : task.colourMatchingStatus
+                      ? 'Colour Match'
+                      : task.drowDesignStatus
+                      ? 'Drawing'
+                      : 'Active'}
+                  </span>
+
+                  {/* Main Image View (180px, #04070d, identical to Design Catalog) */}
                   <div
                     style={{
-                      height: '210px',
-                      position: 'relative',
-                      background: '#0f172a',
+                      height: '180px',
+                      background: '#04070d',
+                      borderRadius: 'var(--radius-sm)',
                       overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      border: '1px solid var(--border-light)',
+                      marginTop: '1.25rem'
                     }}
                   >
                     {heroImg ? (
-                      <div
+                      <img
+                        src={heroImg}
+                        alt={task.designName}
                         onClick={() => handleOpenLightbox(uniqueLightboxImages.length > 0 ? uniqueLightboxImages : [heroImg], 0, `Design: ${task.designName}`)}
-                        style={{ width: '100%', height: '100%', cursor: 'pointer', position: 'relative' }}
-                        title="Click to preview design image in lightbox"
-                      >
-                        <img
-                          src={heroImg}
-                          alt={task.designName}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            transition: 'transform 0.3s ease',
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'rgba(0,0,0,0.35)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            opacity: 0,
-                            transition: 'opacity 0.15s ease',
-                            gap: '0.4rem',
-                            fontWeight: 700,
-                            fontSize: '0.8rem',
-                          }}
-                          className="hover:opacity-100"
-                        >
-                          <Eye size={18} />
-                          <span>Preview Design</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
                         style={{
                           width: '100%',
                           height: '100%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                          color: '#94a3b8',
-                          padding: '1rem',
-                          textAlign: 'center',
+                          objectFit: 'contain',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s ease',
                         }}
-                      >
-                        <Palette size={32} color="#64748b" style={{ marginBottom: '0.4rem' }} />
-                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>
-                          No Sample Image Uploaded
-                        </span>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                          {task.designName}
-                        </span>
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                        title="Click to view full image in lightbox"
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--text-muted)' }}>
+                        <Palette size={28} opacity={0.5} />
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>No Image Uploaded</span>
                       </div>
                     )}
 
-                    {/* Top Overlays */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '10px',
-                        left: '10px',
-                        right: '10px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        pointerEvents: 'none',
-                        zIndex: 2,
-                      }}
-                    >
-                      <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                        <span
+                    {/* Secondary proof thumbnail if available */}
+                    {uniqueLightboxImages.length > 1 && uniqueLightboxImages[1] && (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenLightbox(uniqueLightboxImages, 1, `Proof 2: ${task.designName}`);
+                        }}
+                        style={{
+                          position: 'absolute', bottom: 6, right: 6, width: '38px', height: '38px',
+                          border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', overflow: 'hidden',
+                          background: '#000', cursor: 'pointer', zIndex: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                        }}
+                        title="Click to view secondary proof image"
+                      >
+                        <img
+                          src={uniqueLightboxImages[1]}
+                          alt="Proof 2"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Design Info */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                        {task.designName}
+                      </span>
+                      {task.sampleLink && (
+                        <a
+                          href={task.sampleLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           style={{
-                            background: 'rgba(15, 23, 42, 0.82)',
-                            backdropFilter: 'blur(8px)',
-                            color: '#ffffff',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '6px',
                             fontSize: '0.72rem',
-                            fontWeight: 800,
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            letterSpacing: '0.02em',
-                          }}
-                        >
-                          {task.taskNo}
-                        </span>
-                        <span
-                          style={{
-                            background: priorityConfig.bg,
-                            color: priorityConfig.color,
-                            border: `1px solid ${priorityConfig.border}`,
-                            padding: '0.2rem 0.5rem',
-                            borderRadius: '6px',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
+                            color: '#3b82f6',
+                            fontWeight: 700,
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '0.2rem',
+                            gap: '3px',
+                            textDecoration: 'none',
+                            background: 'rgba(59,130,246,0.1)',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(59,130,246,0.2)'
                           }}
+                          title="Open Reference Link"
                         >
-                          <span>{priorityConfig.badge}</span>
-                          <span>{task.priority || 'Medium'}</span>
-                        </span>
-                      </div>
-
-                      {/* Overall Status Badge */}
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '0.22rem 0.6rem',
-                          borderRadius: '6px',
-                          backdropFilter: 'blur(8px)',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                          background:
-                            task.finalDesignStatus === 'APPROVED SAMPLE'
-                              ? '#10b981'
-                              : String(task.finalDesignStatus || '').startsWith('REJECT')
-                              ? '#ef4444'
-                              : task.colourMatchingStatus
-                              ? '#ec4899'
-                              : task.drowDesignStatus
-                              ? '#3b82f6'
-                              : 'rgba(15, 23, 42, 0.75)',
-                          color: '#ffffff',
-                          border: '1px solid rgba(255,255,255,0.25)',
-                        }}
-                      >
-                        {task.finalDesignStatus === 'APPROVED SAMPLE'
-                          ? '✓ Approved'
-                          : String(task.finalDesignStatus || '').startsWith('REJECT')
-                          ? '✕ Rejected'
-                          : task.colourMatchingStatus
-                          ? '🎨 Colour Match'
-                          : task.drowDesignStatus
-                          ? '✏️ Drawing'
-                          : '⏳ Pending'}
-                      </span>
+                          <ExternalLink size={12} /> Ref
+                        </a>
+                      )}
                     </div>
 
-                    {/* Bottom Overlays */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '8px',
-                        left: '10px',
-                        right: '10px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        zIndex: 2,
-                      }}
-                    >
-                      <span
-                        style={{
-                          background: 'rgba(15, 23, 42, 0.75)',
-                          backdropFilter: 'blur(8px)',
-                          color: '#e2e8f0',
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '5px',
-                          fontSize: '0.66rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        📅 {task.date}
-                      </span>
+                    {/* Notes if present */}
+                    {task.notes && (
+                      <div style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--text-muted)',
+                        fontStyle: 'italic',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        "{task.notes}"
+                      </div>
+                    )}
 
-                      <button
-                        onClick={() => setHistoryTask(task)}
-                        title="View Complete Stage History"
-                        style={{
-                          background: 'rgba(15, 23, 42, 0.75)',
-                          backdropFilter: 'blur(8px)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#ffffff',
-                          borderRadius: '6px',
-                          padding: '0.2rem 0.5rem',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}
-                      >
-                        <History size={11} />
-                        <span>{task.stageHistory?.length || 0}</span>
-                      </button>
+                    {/* Parameters grid identical to Design Catalog */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '0.3rem 0.5rem',
+                      fontSize: '0.78rem',
+                      borderTop: '1px dashed var(--border-light)',
+                      paddingTop: '0.5rem'
+                    }}>
+                      {[
+                        ['Fabric', allFabrics.join(', ') || '—'],
+                        ['Designer', allDesigners.join(', ') || '—'],
+                        ['Colour Match', allColourMatches.join(', ') || '—'],
+                        ['Date', task.date || '—'],
+                      ].map(([k, v]) => (
+                        <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{k}</span>
+                          <span style={{
+                            fontSize: '0.76rem',
+                            fontWeight: 700,
+                            color: 'var(--text-primary)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }} title={v}>
+                            {v}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Card Body */}
-                  <div style={{ padding: '0.95rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', flex: 1 }}>
-                    {/* Design Name */}
-                    <div>
-                      <h3
+                  {/* Card Actions & Stage Proofs Strip */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.4rem',
+                    borderTop: '1px solid var(--border-light)',
+                    paddingTop: '0.6rem',
+                    marginTop: 'auto'
+                  }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      {uniqueLightboxImages.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenLightbox(uniqueLightboxImages, 0, `Proofs: ${task.designName}`)}
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            background: 'rgba(59,130,246,0.1)',
+                            color: '#3b82f6',
+                            border: '1px solid rgba(59,130,246,0.25)',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                          title="View proofs in lightbox"
+                        >
+                          <ImageIcon size={11} /> {uniqueLightboxImages.length} Proof{uniqueLightboxImages.length > 1 ? 's' : ''}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setHistoryTask(task)}
                         style={{
-                          margin: 0,
-                          fontSize: '1.2rem',
-                          fontWeight: 800,
-                          color: '#0f172a',
-                          letterSpacing: '-0.01em',
-                          wordBreak: 'break-word',
+                          padding: '3px 8px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: 'rgba(255,255,255,0.05)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px'
                         }}
+                        title="View stage history"
                       >
-                        {task.designName}
-                      </h3>
-
-                      {/* Reference Link & Notes */}
-                      {task.sampleLink && (
-                        <div style={{ marginTop: '0.35rem' }}>
-                          <a
-                            href={task.sampleLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              fontSize: '0.72rem',
-                              color: '#2563eb',
-                              fontWeight: 700,
-                              textDecoration: 'none',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              background: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              padding: '0.18rem 0.5rem',
-                              borderRadius: '5px',
-                            }}
-                          >
-                            <ExternalLink size={12} /> Open Sample Link / Video
-                          </a>
-                        </div>
-                      )}
-
-                      {task.notes && (
-                        <p
-                          style={{
-                            margin: '0.35rem 0 0',
-                            fontSize: '0.72rem',
-                            color: '#475569',
-                            fontStyle: 'italic',
-                            background: '#f8fafc',
-                            padding: '0.3rem 0.55rem',
-                            borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          "{task.notes}"
-                        </p>
-                      )}
+                        <History size={11} /> History
+                      </button>
                     </div>
 
-                    {/* Metadata Badges */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                      {allDesigners.map((d, i) => (
-                        <span
-                          key={i}
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      {canInputNewDesign && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(task)}
                           style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            color: '#1e40af',
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '6px',
-                            padding: '0.15rem 0.45rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
+                            padding: '4px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            borderRadius: '4px'
                           }}
+                          title="Edit Task"
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#3b82f6')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
                         >
-                          <User size={11} /> {d}
-                        </span>
-                      ))}
-                      {allFabrics.map((f, i) => (
-                        <span
-                          key={i}
+                          <Edit2 size={13} />
+                        </button>
+                      )}
+                      {isUserAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTask(task)}
                           style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            color: '#0369a1',
-                            background: '#f0f9ff',
-                            border: '1px solid #bae6fd',
-                            borderRadius: '6px',
-                            padding: '0.15rem 0.45rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
+                            padding: '4px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            borderRadius: '4px'
                           }}
+                          title="Delete Task"
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
                         >
-                          <Scissors size={11} /> {f}
-                        </span>
-                      ))}
-                      {allColourMatches.map((c, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            color: '#9d174d',
-                            background: '#fdf2f8',
-                            border: '1px solid #fbcfe8',
-                            borderRadius: '6px',
-                            padding: '0.15rem 0.45rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                          }}
-                        >
-                          <Palette size={11} /> {c}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Unified 3-Stage Workflow Status Box */}
-                    <div
-                      style={{
-                        marginTop: 'auto',
-                        background: '#f8fafc',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                        padding: '0.7rem',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Workflow Status
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.66rem', fontWeight: 700 }}>
-                          <span style={{ color: progress.s1 === 'done' ? '#16a34a' : '#2563eb' }}>1.Drow</span>
-                          <span style={{ color: '#cbd5e1' }}>→</span>
-                          <span style={{ color: progress.s2 === 'done' ? '#16a34a' : '#db2777' }}>2.C.M.</span>
-                          <span style={{ color: '#cbd5e1' }}>→</span>
-                          <span style={{ color: progress.s3 === 'approved' ? '#16a34a' : '#15803d' }}>3.Gate</span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.45rem' }}>
-                        {/* Stage 1: Drawing */}
-                        <div
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #dbeafe',
-                            padding: '0.5rem 0.35rem',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                            1. Drawing
-                          </div>
-                          <span
-                            style={{
-                              fontSize: '0.64rem',
-                              fontWeight: 800,
-                              padding: '0.15rem 0.35rem',
-                              borderRadius: '5px',
-                              background:
-                                task.drowDesignStatus === 'START WORKING'
-                                  ? '#dbeafe'
-                                  : task.drowDesignStatus === 'REVIEW SAMPLE'
-                                  ? '#fef3c7'
-                                  : task.drowDesignStatus === 'FINAL SAMPLE'
-                                  ? '#e0e7ff'
-                                  : '#f1f5f9',
-                              color:
-                                task.drowDesignStatus === 'START WORKING'
-                                  ? '#1e40af'
-                                  : task.drowDesignStatus === 'REVIEW SAMPLE'
-                                  ? '#92400e'
-                                  : task.drowDesignStatus === 'FINAL SAMPLE'
-                                  ? '#3730a3'
-                                  : '#94a3b8',
-                              border: '1px solid rgba(0,0,0,0.05)',
-                              maxWidth: '100%',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {task.drowDesignStatus || 'Pending'}
-                          </span>
-                          {drowImgs.length > 0 && (
-                            <button
-                              onClick={() => handleOpenLightbox(drowImgs, 0, `Drawing Proofs: ${task.designName}`)}
-                              style={{
-                                marginTop: '0.35rem',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px',
-                                fontSize: '0.64rem',
-                                color: '#2563eb',
-                                fontWeight: 700,
-                                padding: 0,
-                              }}
-                              title="Click to view drawing proofs"
-                            >
-                              🖼️ {drowImgs.length} {drowImgs.length === 1 ? 'proof' : 'proofs'}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Stage 2: Colour Match */}
-                        <div
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #fce7f3',
-                            padding: '0.5rem 0.35rem',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#9d174d', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                            2. Colour
-                          </div>
-                          <span
-                            style={{
-                              fontSize: '0.64rem',
-                              fontWeight: 800,
-                              padding: '0.15rem 0.35rem',
-                              borderRadius: '5px',
-                              background:
-                                task.colourMatchingStatus === 'COLOUR PANTON'
-                                  ? '#fce7f3'
-                                  : task.colourMatchingStatus === 'REVIEW SAMPLE'
-                                  ? '#fef3c7'
-                                  : task.colourMatchingStatus === 'FINAL SAMPLE'
-                                  ? '#e0e7ff'
-                                  : '#f1f5f9',
-                              color:
-                                task.colourMatchingStatus === 'COLOUR PANTON'
-                                  ? '#9d174d'
-                                  : task.colourMatchingStatus === 'REVIEW SAMPLE'
-                                  ? '#92400e'
-                                  : task.colourMatchingStatus === 'FINAL SAMPLE'
-                                  ? '#3730a3'
-                                  : '#94a3b8',
-                              border: '1px solid rgba(0,0,0,0.05)',
-                              maxWidth: '100%',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {task.colourMatchingStatus || 'Pending'}
-                          </span>
-                          {cmImgs.length > 0 && (
-                            <button
-                              onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proofs: ${task.designName}`)}
-                              style={{
-                                marginTop: '0.35rem',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px',
-                                fontSize: '0.64rem',
-                                color: '#db2777',
-                                fontWeight: 700,
-                                padding: 0,
-                              }}
-                              title="Click to view colour proofs"
-                            >
-                              🎨 {cmImgs.length} {cmImgs.length === 1 ? 'proof' : 'proofs'}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Stage 3: Final Gate */}
-                        <div
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #dcfce7',
-                            padding: '0.5rem 0.35rem',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                            3. Gate
-                          </div>
-                          <span
-                            style={{
-                              fontSize: '0.64rem',
-                              fontWeight: 800,
-                              padding: '0.15rem 0.35rem',
-                              borderRadius: '5px',
-                              background:
-                                task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '#dcfce7'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
-                                  ? '#fee2e2'
-                                  : task.finalDesignStatus
-                                  ? '#e0e7ff'
-                                  : '#f1f5f9',
-                              color:
-                                task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '#15803d'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
-                                  ? '#b91c1c'
-                                  : task.finalDesignStatus
-                                  ? '#3730a3'
-                                  : '#94a3b8',
-                              border: '1px solid rgba(0,0,0,0.05)',
-                              maxWidth: '100%',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
-                              ? 'REJ DRAW'
-                              : task.finalDesignStatus || 'Pending'}
-                          </span>
-                          {finalImgs.length > 0 && (
-                            <button
-                              onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proofs: ${task.designName}`)}
-                              style={{
-                                marginTop: '0.35rem',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px',
-                                fontSize: '0.64rem',
-                                color: '#16a34a',
-                                fontWeight: 700,
-                                padding: 0,
-                              }}
-                              title="Click to view final proofs"
-                            >
-                              ✨ {finalImgs.length} {finalImgs.length === 1 ? 'proof' : 'proofs'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -4162,7 +3786,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Spring Floral Pattern 01 (leave empty for auto-generated name)"
+                  placeholder="e.g. SM-05"
                   value={taskFormData.designName}
                   onChange={(e) => setTaskFormData((prev) => ({ ...prev, designName: e.target.value }))}
                   style={{
@@ -4200,7 +3824,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
               {/* Multi-Select: Fabrics */}
               <MultiSelectBox
-                label="Assigned Fabrics"
+                label="Fabric"
                 icon={Scissors}
                 options={printConfig.fabrics || []}
                 selected={taskFormData.fabrics || []}

@@ -1146,7 +1146,30 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
           {/* Right Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-            {activeSubTab === 'sample' || activeSubTab === 'sample_design' ? null : (
+            {activeSubTab === 'sample' || activeSubTab === 'sample_design' ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => designerScreenRef.current?.openCreateModal?.()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.5rem 1.05rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                }}
+              >
+                <Plus size={15} />
+                <span>+ New Sample Design</span>
+              </button>
+            ) : (
               <>
                 <button
                   type="button"

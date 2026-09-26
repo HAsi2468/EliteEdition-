@@ -156,9 +156,19 @@ const createDesignerTask = async (req, res) => {
     const body = { ...req.body };
 
     if (!body.designName && !body.title) {
-      return res.status(400).json({ error: 'Design Name is required.' });
-    }
-    if (!body.designName && body.title) {
+      // Auto-assign sequential SM-XX number
+      const allTasks = await db.DesignerTask.find({}, 'designName').lean();
+      let maxNum = 0;
+      allTasks.forEach(t => {
+        const match = (t.designName || '').match(/^SM-(\d+)$/i);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (!isNaN(n) && n > maxNum) maxNum = n;
+        }
+      });
+      if (maxNum === 0 && allTasks.length > 0) maxNum = allTasks.length;
+      body.designName = `SM-${String(maxNum + 1).padStart(2, '0')}`;
+    } else if (!body.designName && body.title) {
       body.designName = body.title;
     }
 
