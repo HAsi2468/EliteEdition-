@@ -15,14 +15,16 @@ export function extractCleanFilename(raw) {
   let str = raw.trim();
   if (str.startsWith('data:')) return '';
 
-  if (str.includes('/designs/')) {
+  if (str.includes('/design_samples/')) {
+    str = 'design_samples/' + str.split('/design_samples/')[1];
+  } else if (str.includes('/designs/')) {
     str = str.split('/designs/')[1];
   } else if (str.includes('/uploads/')) {
     str = str.split('/uploads/')[1];
   } else if (str.startsWith('http://') || str.startsWith('https://')) {
     try {
       const u = new URL(str);
-      str = u.pathname.split('/').pop() || '';
+      str = u.pathname.replace(/^\/+/, '');
     } catch (e) {
       str = str.split('/').pop() || '';
     }
@@ -93,12 +95,38 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     }
   }
 
+  // 3. Direct absolute HTTP/HTTPS URL (prioritize original uploaded Cloudflare R2 / CDN link)
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    add(raw);
+  }
+
   const rawFilename = extractCleanFilename(raw);
   const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '').trim();
 
-  // 3. For thumbnails, prioritize the same-origin backend endpoint with ?thumb=1&w=360
-  // This delivers an optimized ~30KB JPEG in < 5ms directly from server SSD cache!
-  if (isThumb) {
+  // 4. Direct Cloudflare R2 links (and master fallbacks)
+  if (rawFilename) {
+    if (rawFilename.startsWith('design_samples/') || rawFilename.startsWith('designs/')) {
+      add(`${R2_PUBLIC_BASE}/${rawFilename}`);
+    } else {
+      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(rawFilename)}`);
+      add(`${R2_PUBLIC_BASE}/design_samples/${encodeURIComponent(rawFilename)}`);
+    }
+    add(`/v1/designs/${encodeURIComponent(rawFilename)}`);
+
+    if (!rawFilename.startsWith('image-') && !rawFilename.startsWith('blob-')) {
+      const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
+      if (baseWithoutExt) {
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpeg`);
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.png`);
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.webp`);
+        add(`/v1/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
+      }
+    }
+  }
+
+  // 5. For thumbnails, also include the backend endpoint if not already loaded
+  if (isThumb && !raw.startsWith('http://') && !raw.startsWith('https://')) {
     if (rawFilename) {
       add(`/v1/designs/${encodeURIComponent(rawFilename)}${thumbQuery}`);
       const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
@@ -108,23 +136,6 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     }
     if (cleanDesign) {
       add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg${thumbQuery}`);
-    }
-  }
-
-  // 4. Direct Cloudflare R2 links (and master fallbacks)
-  if (rawFilename) {
-    add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(rawFilename)}`);
-    add(`/v1/designs/${encodeURIComponent(rawFilename)}`);
-
-    if (!rawFilename.startsWith('image-')) {
-      const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
-      if (baseWithoutExt) {
-        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
-        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpeg`);
-        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.png`);
-        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.webp`);
-        add(`/v1/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
-      }
     }
   }
 

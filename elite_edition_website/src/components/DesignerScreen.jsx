@@ -2072,7 +2072,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             const finalImgs = task.finalDesignImages || [];
 
             if (embedded) {
-              const heroImg = task.sampleImage || finalImgs[0] || stage3Imgs[0] || cmImgs[0] || drowImgs[0];
+              const heroImg = task.sampleImage || finalImgs[0] || stage3Imgs[0] || cmImgs[0] || drowImgs[0] || task.outputImage || (task.sampleLink && /\.(jpg|jpeg|png|webp|gif)/i.test(task.sampleLink) ? task.sampleLink : '');
               const isInactive = task.status === 'Inactive' || task.status === 'Cancelled' || String(task.finalDesignStatus || '').toLowerCase().startsWith('reject');
 
               return (

@@ -274,15 +274,28 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
     const axios = require('axios');
     const r2Candidates = [];
 
-    // If filename is already a multer upload key (image-178...)
-    if (cleanName.startsWith('image-')) {
+    // If filename is already a multer upload key (image-178...) or blob-
+    if (cleanName.startsWith('image-') || cleanName.startsWith('blob-')) {
+      r2Candidates.push(`design_samples/${encodeURIComponent(cleanName)}`);
+      r2Candidates.push(`design_samples/${encodeURIComponent(cleanName)}.webp`);
+      r2Candidates.push(`design_samples/${encodeURIComponent(cleanName)}.jpg`);
+      r2Candidates.push(`designs/drow_design/${encodeURIComponent(cleanName)}`);
+      r2Candidates.push(`designs/drow_design/${encodeURIComponent(cleanName)}.webp`);
       r2Candidates.push(`designs/${encodeURIComponent(cleanName)}`);
       r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.jpg`);
+      r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.webp`);
     } else if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename)) {
+      r2Candidates.push(`design_samples/${encodeURIComponent(filename)}`);
+      r2Candidates.push(`designs/drow_design/${encodeURIComponent(filename)}`);
+      r2Candidates.push(`designs/colour_matching/${encodeURIComponent(filename)}`);
+      r2Candidates.push(`designs/stage_3/${encodeURIComponent(filename)}`);
+      r2Candidates.push(`designs/final_design/${encodeURIComponent(filename)}`);
       r2Candidates.push(`designs/${encodeURIComponent(filename)}`);
+      r2Candidates.push(`uploads/${encodeURIComponent(filename)}`);
+      r2Candidates.push(encodeURIComponent(filename));
     }
 
-    // Check MongoDB design or jobcard record if cleanName looks like a design identifier
+    // Check MongoDB design, jobcard, or designer task record if cleanName looks like a design identifier
     try {
       const db = require('./db/models');
       const dDoc = await db.Design.findOne({
@@ -297,10 +310,17 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
         matchedImgUrl = jDoc?.imageUrl1 || jDoc?.imageUrl || jDoc?.imageUrl2 || '';
       }
 
+      if (!matchedImgUrl) {
+        const tDoc = await db.DesignerTask.findOne({
+          $or: [{ designName: cleanName }, { taskNo: cleanName }]
+        }).lean();
+        matchedImgUrl = tDoc?.sampleImage || tDoc?.outputImage || (tDoc?.finalDesignImages && tDoc.finalDesignImages[0]) || (tDoc?.drowDesignImages && tDoc.drowDesignImages[0]) || '';
+      }
+
       if (matchedImgUrl) {
-        const strippedKey = matchedImgUrl.replace(/^https?:\/\/[^\/]+\//, '').replace(/^\/?designs\//, '').replace(/^\/+/, '').split('?')[0];
+        const strippedKey = matchedImgUrl.replace(/^https?:\/\/[^\/]+\//, '').replace(/^\/+/, '').split('?')[0];
         if (strippedKey) {
-          r2Candidates.unshift(`designs/${encodeURIComponent(strippedKey)}`);
+          r2Candidates.unshift(strippedKey);
         }
       }
     } catch (e) {}
@@ -357,6 +377,11 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
         // Continue to next candidate
       }
     }
+  }
+
+  // If a blob or raw upload image was not found, return 404 rather than displaying a misleading placeholder badge
+  if (cleanName.toLowerCase().startsWith('blob-') || cleanName.toLowerCase().startsWith('image-')) {
+    return res.status(404).send('Image not found');
   }
 
   const displayName = cleanName ? cleanName.toUpperCase() : 'DESIGN';
