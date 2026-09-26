@@ -35,7 +35,9 @@ import {
   Video as VideoIcon,
   LayoutGrid,
   List,
-  ShieldAlert
+  ShieldAlert,
+  Play,
+  Pause
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 import DesignImage from './DesignImage';
@@ -1262,41 +1264,39 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
       {/* ─── Search & Filters Toolbar ───────────────────────────────────── */}
       {embedded ? (
-        /* Single clean toolbar exactly matching Image 1 */
-        <div
-          className="glass-panel"
-          style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            padding: '0.75rem 1rem',
-            marginBottom: '1.25rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          }}
-        >
-          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        /* Single clean toolbar exactly matching Design Catalog */
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem' }}>
+          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Search Input */}
-            <div style={{ position: 'relative', flex: '1 1 220px', minWidth: '200px' }}>
+            <div style={{ position: 'relative', flex: '1 1 220px' }}>
               <label htmlFor="sample-search-field" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-                Search Design name, fabric, matching, designer
+                Search Design Name, Fabric, Matching, Designer
               </label>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 id="sample-search-field"
+                name="sampleSearch"
+                aria-label="Search Design name, fabric, matching, designer"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search Design name, fabric, matching, designer..."
-                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem', height: '36px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
               />
             </div>
 
             {/* Categories select filter */}
             <div style={{ minWidth: 150 }}>
+              <label htmlFor="sample-category-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+                Filter by Category
+              </label>
               <select
+                id="sample-category-filter"
+                name="sampleCategory"
+                aria-label="Filter by Category"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
               >
                 <option value="All">All Categories</option>
                 {availableCategories.map((c) => (
@@ -1307,10 +1307,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
             {/* Colors select filter */}
             <div style={{ minWidth: 150 }}>
+              <label htmlFor="sample-color-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+                Filter by Color
+              </label>
               <select
+                id="sample-color-filter"
+                name="sampleColor"
+                aria-label="Filter by Color"
                 value={colorFilter}
                 onChange={(e) => setColorFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
               >
                 <option value="All">All Colors</option>
                 {availableColors.map((c) => (
@@ -1321,48 +1327,52 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
             {/* Party (Client) select filter */}
             <div style={{ minWidth: 160 }}>
+              <label htmlFor="sample-party-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+                Filter by Party
+              </label>
               <select
+                id="sample-party-filter"
+                name="sampleParty"
+                aria-label="Filter by Party (Clients)"
                 value={partyFilter}
                 onChange={(e) => setPartyFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
               >
-                <option value="All">All Parties</option>
+                <option value="All">All Parties (Clients)</option>
                 {availableParties.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>
 
-            {/* Status Buttons: Active | Inactive | All */}
-            {['Active', 'Inactive', 'All'].map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStatusFilter(s)}
-                style={{
-                  padding: '0.45rem 0.9rem',
-                  fontSize: '0.8rem',
-                  borderRadius: 'var(--radius-sm)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: statusFilter === s ? 'var(--primary, #2563eb)' : '#cbd5e1',
-                  background: statusFilter === s ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-                  color: statusFilter === s ? '#1d4ed8' : '#64748b',
-                  transition: 'all 0.15s',
-                  height: '36px',
-                }}
-              >
-                {s}
-              </button>
-            ))}
+            {/* Status Buttons */}
+            <div style={{ display: 'flex', border: '1px solid var(--border-light)', borderRadius: '8px', overflow: 'hidden' }}>
+              {['Active', 'Inactive', 'All'].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    fontSize: '0.82rem',
+                    fontWeight: statusFilter === s ? 700 : 500,
+                    border: 'none',
+                    background: statusFilter === s ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
+                    color: statusFilter === s ? 'var(--primary)' : 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
 
             {/* Sorting */}
             <div style={{ minWidth: 140 }}>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
               >
                 <option value="designName">Sort by Name</option>
                 <option value="createdAt">Sort by Date</option>
@@ -1374,16 +1384,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               type="button"
               onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
               style={{
-                padding: '0.45rem 0.9rem',
-                fontSize: '0.8rem',
-                borderRadius: 'var(--radius-sm)',
-                fontWeight: 600,
-                cursor: 'pointer',
-                border: '1px solid #cbd5e1',
+                padding: '0.45rem 0.65rem',
+                fontSize: '0.85rem',
+                border: '1px solid var(--border-light)',
+                borderRadius: '8px',
                 background: 'transparent',
-                color: '#64748b',
-                transition: 'all 0.15s',
-                height: '36px',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
             >
               {sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}
@@ -1835,41 +1845,45 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {/* 1. Drow Status */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          {embedded ? (
-                            <span
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                border: task.drowDesignStatus ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
-                                background: task.drowDesignStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.drowDesignStatus ? '#eff6ff' : '#f8fafc',
-                                color: task.drowDesignStatus === 'FINAL SAMPLE' ? '#4338ca' : task.drowDesignStatus ? '#1d4ed8' : '#94a3b8',
-                              }}
-                            >
-                              {task.drowDesignStatus || 'Pending'}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                border: task.drowDesignStatus ? '1px solid #bfdbfe' : '1px dashed #cbd5e1',
-                                background: task.drowDesignStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.drowDesignStatus ? '#eff6ff' : '#f8fafc',
-                                color: task.drowDesignStatus === 'FINAL SAMPLE' ? '#4338ca' : task.drowDesignStatus ? '#1d4ed8' : '#94a3b8',
-                              }}
-                            >
-                              {task.drowDesignStatus || '+ Set Status'}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus || 'Start Design')}
+                            style={{
+                              padding: '0.28rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: task.drowDesignStatus === 'FINAL SAMPLE' || task.drowDesignStatus === 'Final Sample'
+                                ? '1.5px solid #4338ca'
+                                : task.drowDesignStatus
+                                ? '1.5px solid #0284c7'
+                                : '1px solid #38bdf8',
+                              background: task.drowDesignStatus === 'FINAL SAMPLE' || task.drowDesignStatus === 'Final Sample'
+                                ? '#eef2ff'
+                                : task.drowDesignStatus
+                                ? '#eff6ff'
+                                : '#e0f2fe',
+                              color: task.drowDesignStatus === 'FINAL SAMPLE' || task.drowDesignStatus === 'Final Sample'
+                                ? '#4338ca'
+                                : task.drowDesignStatus
+                                ? '#0284c7'
+                                : '#0369a1',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            }}
+                            title="Start or update Drow Design status"
+                          >
+                            <Play size={11} fill="currentColor" />
+                            <span>{task.drowDesignStatus || 'Start Design'}</span>
+                          </button>
                           {drowImgs.length > 0 && (
                             <button
+                              type="button"
                               onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
                               title={`${drowImgs.length} proof image(s)`}
                             >
                               🖼️ {drowImgs.length}
@@ -1881,39 +1895,43 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {/* 2. Colour Match */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          {embedded ? (
-                            <span
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                border: task.colourMatchingStatus ? '1px solid #fbcfe8' : '1px solid #e2e8f0',
-                                background: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.colourMatchingStatus ? '#fdf2f8' : '#f8fafc',
-                                color: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#4338ca' : task.colourMatchingStatus ? '#be185d' : '#94a3b8',
-                              }}
-                            >
-                              {task.colourMatchingStatus || 'Pending'}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                border: task.colourMatchingStatus ? '1px solid #fbcfe8' : '1px dashed #cbd5e1',
-                                background: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.colourMatchingStatus ? '#fdf2f8' : '#f8fafc',
-                                color: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#4338ca' : task.colourMatchingStatus ? '#be185d' : '#94a3b8',
-                              }}
-                            >
-                              {task.colourMatchingStatus || '+ Set Status'}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus || 'Start Design')}
+                            style={{
+                              padding: '0.28rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: task.colourMatchingStatus === 'FINAL SAMPLE' || task.colourMatchingStatus === 'Final Sample'
+                                ? '1.5px solid #4338ca'
+                                : task.colourMatchingStatus
+                                ? '1.5px solid #db2777'
+                                : '1px solid #f472b6',
+                              background: task.colourMatchingStatus === 'FINAL SAMPLE' || task.colourMatchingStatus === 'Final Sample'
+                                ? '#eef2ff'
+                                : task.colourMatchingStatus
+                                ? '#fdf2f8'
+                                : '#fce7f3',
+                              color: task.colourMatchingStatus === 'FINAL SAMPLE' || task.colourMatchingStatus === 'Final Sample'
+                                ? '#4338ca'
+                                : task.colourMatchingStatus
+                                ? '#db2777'
+                                : '#be185d',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            }}
+                            title="Start or update Colour Matching status"
+                          >
+                            <Palette size={12} />
+                            <span>{task.colourMatchingStatus || 'Start Design'}</span>
+                          </button>
                           {cmImgs.length > 0 && (
                             <button
+                              type="button"
                               onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#db2777', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
                               title={`${cmImgs.length} proof image(s)`}
@@ -1927,63 +1945,39 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {/* 3. Hold / Continue */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          {embedded ? (
-                            <span
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                border: task.stage3Status === 'Continue'
-                                  ? '1px solid #bfdbfe'
-                                  : task.stage3Status === 'Hold'
-                                  ? '1px solid #fed7aa'
-                                  : '1px solid #e2e8f0',
-                                background: task.stage3Status === 'Continue'
-                                  ? '#eff6ff'
-                                  : task.stage3Status === 'Hold'
-                                  ? '#fff7ed'
-                                  : '#f8fafc',
-                                color: task.stage3Status === 'Continue'
-                                  ? '#0284c7'
-                                  : task.stage3Status === 'Hold'
-                                  ? '#ea580c'
-                                  : '#94a3b8',
-                              }}
-                            >
-                              {task.stage3Status || 'Pending'}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                border: task.stage3Status === 'Continue'
-                                  ? '1px solid #bfdbfe'
-                                  : task.stage3Status === 'Hold'
-                                  ? '1px solid #fed7aa'
-                                  : '1px dashed #cbd5e1',
-                                background: task.stage3Status === 'Continue'
-                                  ? '#eff6ff'
-                                  : task.stage3Status === 'Hold'
-                                  ? '#fff7ed'
-                                  : '#f8fafc',
-                                color: task.stage3Status === 'Continue'
-                                  ? '#0284c7'
-                                  : task.stage3Status === 'Hold'
-                                  ? '#ea580c'
-                                  : '#94a3b8',
-                              }}
-                            >
-                              {task.stage3Status || '+ Set Status'}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status || 'Hold')}
+                            style={{
+                              padding: '0.28rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: task.stage3Status === 'Continue'
+                                ? '1.5px solid #0284c7'
+                                : task.stage3Status === 'Hold'
+                                ? '1.5px solid #ea580c'
+                                : '1px solid #fdba74',
+                              background: task.stage3Status === 'Continue'
+                                ? '#eff6ff'
+                                : '#fff7ed',
+                              color: task.stage3Status === 'Continue'
+                                ? '#0284c7'
+                                : '#ea580c',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            }}
+                            title="Hold or continue task"
+                          >
+                            <Pause size={11} fill="currentColor" />
+                            <span>{task.stage3Status || 'Hold'}</span>
+                          </button>
                           {stage3Imgs.length > 0 && (
                             <button
+                              type="button"
                               onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
                               title={`${stage3Imgs.length} proof image(s)`}
@@ -1996,64 +1990,70 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
                       {/* 4. Final Approval */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          {embedded ? (
-                            <span
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                border: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '1.5px solid #16a34a'
-                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                  ? '1.5px solid #dc2626'
-                                  : '1px solid #e2e8f0',
-                                background: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '#dcfce7'
-                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                  ? '#fee2e2'
-                                  : '#f8fafc',
-                                color: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '#15803d'
-                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                  ? '#b91c1c'
-                                  : '#94a3b8',
-                              }}
-                            >
-                              {task.finalDesignStatus || 'Pending Gate'}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
-                              style={{
-                                padding: '0.25rem 0.55rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                border: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '1.5px solid #16a34a'
-                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                  ? '1.5px solid #dc2626'
-                                  : '1px dashed #cbd5e1',
-                                background: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '#dcfce7'
-                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                  ? '#fee2e2'
-                                  : '#f8fafc',
-                                color: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                                  ? '#15803d'
-                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                  ? '#b91c1c'
-                                  : '#94a3b8',
-                              }}
-                            >
-                              {task.finalDesignStatus || '+ Gate Review'}
-                            </button>
-                          )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'nowrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', 'Approved')}
+                            style={{
+                              padding: '0.28rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              border: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
+                                ? '1.5px solid #15803d'
+                                : '1px solid #86efac',
+                              background: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
+                                ? '#16a34a'
+                                : '#f0fdf4',
+                              color: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
+                                ? '#ffffff'
+                                : '#15803d',
+                              boxShadow: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
+                                ? '0 1px 4px rgba(22, 163, 74, 0.3)'
+                                : 'none',
+                            }}
+                            title="Mark as Approved"
+                          >
+                            <Check size={12} /> Approved
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', 'Reject')}
+                            style={{
+                              padding: '0.28rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              border: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
+                                ? '1.5px solid #b91c1c'
+                                : '1px solid #fca5a5',
+                              background: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
+                                ? '#dc2626'
+                                : '#fef2f2',
+                              color: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
+                                ? '#ffffff'
+                                : '#b91c1c',
+                              boxShadow: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
+                                ? '0 1px 4px rgba(220, 38, 38, 0.3)'
+                                : 'none',
+                            }}
+                            title="Mark as Rejected"
+                          >
+                            <X size={12} /> Reject
+                          </button>
+
                           {finalImgs.length > 0 && (
                             <button
+                              type="button"
                               onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
                               title={`${finalImgs.length} final proof image(s)`}
@@ -2135,84 +2135,84 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       ) : (
         /* ─── CARDS GRID VIEW ─────────────────────────────────────────── */
         <div>
-          {/* Count + Sort Row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', padding: '0 0.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>
-                Total Samples:
-              </span>
-              <span style={{
-                fontSize: '0.82rem',
-                fontWeight: 800,
-                color: '#ffffff',
-                background: '#2563eb',
-                padding: '2px 10px',
-                borderRadius: '20px',
-                minWidth: '28px',
-                textAlign: 'center',
-              }}>
-                {filteredTasks.length}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Sort:</span>
-              <button
-                type="button"
-                onClick={() => setSortBy('designName')}
-                style={{
-                  padding: '0.3rem 0.65rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: sortBy === 'designName' ? '#2563eb' : '#cbd5e1',
-                  background: sortBy === 'designName' ? '#eff6ff' : '#f8fafc',
-                  color: sortBy === 'designName' ? '#1d4ed8' : '#64748b',
-                }}
-              >
-                Name
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortBy('createdAt')}
-                style={{
-                  padding: '0.3rem 0.65rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: sortBy === 'createdAt' ? '#2563eb' : '#cbd5e1',
-                  background: sortBy === 'createdAt' ? '#eff6ff' : '#f8fafc',
-                  color: sortBy === 'createdAt' ? '#1d4ed8' : '#64748b',
-                }}
-              >
-                Date
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-                title={sortOrder === 'asc' ? 'Currently Ascending - click for Descending' : 'Currently Descending - click for Ascending'}
-                style={{
-                  padding: '0.3rem 0.65rem',
+          {/* Total count & Sort bar - only show in standalone view */}
+          {!embedded && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Samples:</span>
+                <span style={{
                   fontSize: '0.82rem',
                   fontWeight: 800,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid #2563eb',
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.2rem',
-                }}
-              >
-                {sortOrder === 'asc' ? 'A' : 'D'}
-                <span style={{ fontSize: '0.7rem' }}>{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
-              </button>
+                  color: '#ffffff',
+                  background: '#2563eb',
+                  padding: '2px 10px',
+                  borderRadius: '20px',
+                  minWidth: '28px',
+                  textAlign: 'center',
+                }}>
+                  {filteredTasks.length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Sort:</span>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('designName')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: sortBy === 'designName' ? '#2563eb' : '#cbd5e1',
+                    background: sortBy === 'designName' ? '#eff6ff' : '#f8fafc',
+                    color: sortBy === 'designName' ? '#1d4ed8' : '#64748b',
+                  }}
+                >
+                  Name
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('createdAt')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: sortBy === 'createdAt' ? '#2563eb' : '#cbd5e1',
+                    background: sortBy === 'createdAt' ? '#eff6ff' : '#f8fafc',
+                    color: sortBy === 'createdAt' ? '#1d4ed8' : '#64748b',
+                  }}
+                >
+                  Date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                  title={sortOrder === 'asc' ? 'Currently Ascending - click for Descending' : 'Currently Descending - click for Ascending'}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: '1px solid #2563eb',
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.2rem',
+                  }}
+                >
+                  {sortOrder === 'asc' ? 'A' : 'D'}
+                  <span style={{ fontSize: '0.7rem' }}>{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
           {filteredTasks.map((task) => {
             const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
@@ -2250,20 +2250,17 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     gap: '0.8rem',
                     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                     position: 'relative',
-                    background: '#ffffff',
-                    borderRadius: '14px',
-                    border: '1px solid #e2e8f0',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = '';
                     e.currentTarget.style.boxShadow = '';
                   }}
                 >
-                  {/* Category badge (Top-Left) */}
+                  {/* Category / Fabric badge (Top-Left) */}
                   <span
                     style={{
                       position: 'absolute',
@@ -2302,7 +2299,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     {isInactive ? 'Inactive' : 'Active'}
                   </span>
 
-                  {/* Main Image View (180px, #04070d, identical to Design Catalog Image 1) */}
+                  {/* Main Image View (180px, #04070d, identical to Design Catalog Image) */}
                   <div
                     style={{
                       height: '180px',
@@ -2331,82 +2328,67 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   {/* Design Info */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary, #2563eb)' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
                         {task.designName}
                       </span>
                     </div>
 
-                    {/* Brand / Assigned Parties badge -- only show if party data exists */}
-                    {(task.partyName || (Array.isArray(task.parties) && task.parties[0])) && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            color: '#10b981',
-                            fontWeight: 700,
-                            background: 'rgba(16, 185, 129, 0.12)',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(16, 185, 129, 0.25)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                          }}
-                          title={`Party (Client): ${task.partyName || (Array.isArray(task.parties) && task.parties[0])}`}
-                        >
-                          <span style={{ fontSize: '0.72rem' }}>🏢</span> {task.partyName || (Array.isArray(task.parties) && task.parties[0])}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Parameters grid: only show required design details */}
+                    {/* Parameters grid: Exactly 3 rows as requested */}
                     <div
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr',
                         gap: '0.3rem 0.5rem',
                         fontSize: '0.78rem',
-                        borderTop: '1px dashed var(--border-light, #cbd5e1)',
+                        borderTop: '1px dashed var(--border-light)',
                         paddingTop: '0.5rem',
                       }}
                     >
-                      {[
-                        ['Designer', allDesigners.join(', ') || '--'],
-                        ['Colour Match', allColourMatches.join(', ') || '--'],
-                        ['Fabric', allFabrics.join(', ') || '--'],
-                        ['Created By', task.createdByName || task.createdBy || '--'],
-                      ].map(([k, v]) => (
-                        <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>{k}</span>
-                          <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {v || '--'}
-                          </span>
-                        </div>
-                      ))}
+                      {/* 1 row: Assign Design , Colour matching */}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assign Design</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={allDesigners.join(', ') || task.designerName || '--'}>
+                          {allDesigners.join(', ') || task.designerName || '--'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Colour Matching</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={allColourMatches.join(', ') || task.colourMatching || '--'}>
+                          {allColourMatches.join(', ') || task.colourMatching || '--'}
+                        </span>
+                      </div>
+
+                      {/* 2 row: Priority , Machine */}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Priority</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {task.priority || 'Medium'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Machine</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.machineName || task.machine || '--'}>
+                          {task.machineName || task.machine || '--'}
+                        </span>
+                      </div>
+
+                      {/* 3 row: created by */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gridColumn: 'span 2' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Created By</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.createdByName || task.createdBy || '--'}>
+                          {task.createdByName || task.createdBy || '--'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Actions identical to Design Catalog */}
-                  <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.7rem', marginTop: 'auto' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.7rem', marginTop: 'auto' }}>
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(task)}
                       className="btn-secondary"
-                      style={{
-                        flex: 1,
-                        padding: '0.4rem',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        justifyContent: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        background: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        color: '#334155',
-                      }}
+                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.78rem', justifyContent: 'center' }}
                     >
                       <Edit2 size={13} /> Edit Design
                     </button>
@@ -2417,7 +2399,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         style={{
                           padding: '0.4rem 0.7rem',
                           fontSize: '0.78rem',
-                          borderRadius: '6px',
+                          borderRadius: 'var(--radius-sm)',
                           background: 'rgba(239,68,68,0.08)',
                           border: '1px solid rgba(239,68,68,0.2)',
                           color: '#f87171',
