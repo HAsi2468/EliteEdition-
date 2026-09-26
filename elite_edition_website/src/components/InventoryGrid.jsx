@@ -1626,58 +1626,58 @@ export default function InventoryGrid({
                 <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
                   <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
                     <thead>
-                      <tr style={{ background: '#0369a1', color: '#ffffff' }}>
-                        <th style={{ width: '45px', padding: '0.65rem 0.4rem', textAlign: 'center', color: '#bae6fd', fontWeight: 800 }}>#</th>
-                        <th onClick={() => handleInwardChallanSort('date')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
+                      <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
+                        <th style={{ width: '45px', padding: '0.65rem 0.4rem', textAlign: 'center', color: 'var(--text-muted, #64748b)', fontWeight: 800 }}>#</th>
+                        <th onClick={() => handleInwardChallanSort('date')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span>DATE & TIME</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'date' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'date' ? '#0284c7' : '#94a3b8' }}>
                               {inwardChallanSortField === 'date' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardChallanSort('challanNo')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Challan No">
+                        <th onClick={() => handleInwardChallanSort('challanNo')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Challan No">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span>CHALLAN NO</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'challanNo' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'challanNo' ? '#0284c7' : '#94a3b8' }}>
                               {inwardChallanSortField === 'challanNo' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardChallanSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Vendor / Supplier">
+                        <th onClick={() => handleInwardChallanSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Vendor / Supplier">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span>VENDOR / SUPPLIER</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'party' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'party' ? '#0284c7' : '#94a3b8' }}>
                               {inwardChallanSortField === 'party' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardChallanSort('totalSkus')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total SKUs">
+                        <th onClick={() => handleInwardChallanSort('totalSkus')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Total SKUs">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
                             <span>TOTAL SKUs</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalSkus' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalSkus' ? '#0284c7' : '#94a3b8' }}>
                               {inwardChallanSortField === 'totalSkus' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardChallanSort('totalQty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Pieces (Qty)">
+                        <th onClick={() => handleInwardChallanSort('totalQty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Total Pieces (Qty)">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
                             <span>TOTAL PIECES (QTY)</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalQty' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalQty' ? '#0284c7' : '#94a3b8' }}>
                               {inwardChallanSortField === 'totalQty' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }}>ITEMS PREVIEW</th>
-                        <th onClick={() => handleInwardChallanSort('totalAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Value">
+                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>ITEMS PREVIEW</th>
+                        <th onClick={() => handleInwardChallanSort('totalAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Total Value">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                             <span>TOTAL VALUE</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalAmount' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalAmount' ? '#0284c7' : '#94a3b8' }}>
                               {inwardChallanSortField === 'totalAmount' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: '#ffffff', whiteSpace: 'nowrap' }}>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>
                           ACTIONS
                         </th>
                       </tr>
@@ -2056,66 +2056,66 @@ export default function InventoryGrid({
                 <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
                   <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
                     <thead>
-                      <tr style={{ background: '#0369a1', color: '#ffffff' }}>
-                        <th onClick={() => handleInwardSort('created_date_time')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
+                      <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
+                        <th onClick={() => handleInwardSort('created_date_time')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span>DATE & TIME</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'created_date_time' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'created_date_time' ? '#0284c7' : '#94a3b8' }}>
                               {inwardSortField === 'created_date_time' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }}>PHOTO</th>
-                        <th onClick={() => handleInwardSort('skuCode')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by SKU Code">
+                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>PHOTO</th>
+                        <th onClick={() => handleInwardSort('skuCode')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by SKU Code">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span>SKU CODE</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'skuCode' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'skuCode' ? '#0284c7' : '#94a3b8' }}>
                               {inwardSortField === 'skuCode' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardSort('itemName')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff' }} title="Sort by Product Name">
+                        <th onClick={() => handleInwardSort('itemName')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)' }} title="Sort by Product Name">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span>PRODUCT NAME</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'itemName' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'itemName' ? '#0284c7' : '#94a3b8' }}>
                               {inwardSortField === 'itemName' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Vendor / Supplier">
+                        <th onClick={() => handleInwardSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Vendor / Supplier">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span>VENDOR</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'party' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'party' ? '#0284c7' : '#94a3b8' }}>
                               {inwardSortField === 'party' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }}>SIZES & QTY</th>
-                        <th onClick={() => handleInwardSort('qty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Quantity Inwarded">
+                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>SIZES & QTY</th>
+                        <th onClick={() => handleInwardSort('qty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Quantity Inwarded">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
                             <span>QTY IN</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'qty' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'qty' ? '#0284c7' : '#94a3b8' }}>
                               {inwardSortField === 'qty' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardSort('purchasePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Buy Price Unit">
+                        <th onClick={() => handleInwardSort('purchasePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Buy Price Unit">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                             <span>BUY PRICE</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'purchasePrice' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'purchasePrice' ? '#0284c7' : '#94a3b8' }}>
                               {inwardSortField === 'purchasePrice' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th onClick={() => handleInwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Purchase Value">
+                        <th onClick={() => handleInwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Total Purchase Value">
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                             <span>TOTAL VALUE</span>
-                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'totalPurchaseAmount' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'totalPurchaseAmount' ? '#0284c7' : '#94a3b8' }}>
                               {inwardSortField === 'totalPurchaseAmount' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
                           </div>
                         </th>
-                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: '#ffffff', whiteSpace: 'nowrap' }}>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>
                           ACTIONS
                         </th>
                       </tr>
@@ -2400,85 +2400,85 @@ export default function InventoryGrid({
               <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
                 <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
                   <thead>
-                    <tr style={{ background: '#7c2d12', color: '#ffffff' }}>
-                      <th onClick={() => handleOutwardSort('created_date_time')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
+                    <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
+                      <th onClick={() => handleOutwardSort('created_date_time')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                           <span>DATE & TIME</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'created_date_time' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'created_date_time' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'created_date_time' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }}>PHOTO</th>
-                      <th onClick={() => handleOutwardSort('skuCode')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by SKU Code">
+                      <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>PHOTO</th>
+                      <th onClick={() => handleOutwardSort('skuCode')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by SKU Code">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                           <span>SKU CODE</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'skuCode' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'skuCode' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'skuCode' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th onClick={() => handleOutwardSort('itemName')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff' }} title="Sort by Product Name">
+                      <th onClick={() => handleOutwardSort('itemName')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)' }} title="Sort by Product Name">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                           <span>PRODUCT NAME</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'itemName' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'itemName' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'itemName' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th onClick={() => handleOutwardSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Vendor / Brand">
+                      <th onClick={() => handleOutwardSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Vendor / Brand">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                           <span>VENDOR</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'party' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'party' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'party' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }}>SIZES & QTY</th>
-                      <th onClick={() => handleOutwardSort('total')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Qty Out">
+                      <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>SIZES & QTY</th>
+                      <th onClick={() => handleOutwardSort('total')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Total Qty Out">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
                           <span>QTY OUT</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'total' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'total' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'total' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th onClick={() => handleOutwardSort('purchasePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Buy Price Unit">
+                      <th onClick={() => handleOutwardSort('purchasePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Buy Price Unit">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                           <span>BUY PRICE</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'purchasePrice' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'purchasePrice' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'purchasePrice' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th onClick={() => handleOutwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Buy Value Total">
+                      <th onClick={() => handleOutwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Buy Value Total">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                           <span>TOTAL BUY</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'totalPurchaseAmount' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'totalPurchaseAmount' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'totalPurchaseAmount' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th onClick={() => handleOutwardSort('salePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Sale Price Unit">
+                      <th onClick={() => handleOutwardSort('salePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Sale Price Unit">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                           <span>SALE PRICE</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'salePrice' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'salePrice' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'salePrice' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th onClick={() => handleOutwardSort('totalSellableAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Sale Revenue">
+                      <th onClick={() => handleOutwardSort('totalSellableAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Sale Revenue">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                           <span>SALE REVENUE</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'totalSellableAmount' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'totalSellableAmount' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'totalSellableAmount' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
                       </th>
-                      <th onClick={() => handleOutwardSort('profit')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Gross Profit">
+                      <th onClick={() => handleOutwardSort('profit')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Gross Profit">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
                           <span>PROFIT</span>
-                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'profit' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                          <span style={{ fontSize: '0.7rem', color: outwardSortField === 'profit' ? '#ea580c' : '#94a3b8' }}>
                             {outwardSortField === 'profit' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                           </span>
                         </div>
@@ -3856,8 +3856,9 @@ const styles = {
     boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
   },
   tableHeaderRow: {
-    background: '#0f172a',
-    color: '#ffffff',
+    background: 'var(--bg-th, #f1f5f9)',
+    color: 'var(--text-primary, #1e293b)',
+    borderBottom: '2px solid var(--border-light, #cbd5e1)',
   },
   emptyState: {
     padding: '4rem 1rem',
@@ -3900,6 +3901,7 @@ const styles = {
     letterSpacing: '0.04em',
     cursor: 'pointer',
     userSelect: 'none',
+    color: 'var(--text-primary, #1e293b)',
   },
   thStatic: {
     padding: '0.9rem 1rem',
@@ -3907,6 +3909,7 @@ const styles = {
     fontSize: '0.75rem',
     fontWeight: 800,
     letterSpacing: '0.04em',
+    color: 'var(--text-primary, #1e293b)',
   },
   itemCell: {
     display: 'flex',

@@ -624,16 +624,16 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
             <thead>
-              <tr style={{ background: '#0f172a', color: '#ffffff', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.03em' }}>
-                <th style={{ padding: '0.65rem 0.85rem' }}>Job Card #</th>
-                <th style={{ padding: '0.65rem 0.85rem' }}>Party / Client Name</th>
-                <th style={{ padding: '0.65rem 0.85rem' }}>Fabric &amp; Design</th>
-                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Job Target Mtr</th>
-                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Printing (PD / PP)</th>
-                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Pending Print Mtr</th>
-                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Fusing (FD / FP)</th>
-                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Delivery (DD / DP)</th>
-                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Action</th>
+              <tr style={{ background: 'var(--bg-th, #f1f5f9)', color: 'var(--text-primary, #1e293b)', borderBottom: '2px solid var(--border-light, #cbd5e1)', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.03em' }}>
+                <th style={{ padding: '0.65rem 0.85rem', color: 'var(--text-primary, #1e293b)' }}>Job Card #</th>
+                <th style={{ padding: '0.65rem 0.85rem', color: 'var(--text-primary, #1e293b)' }}>Party / Client Name</th>
+                <th style={{ padding: '0.65rem 0.85rem', color: 'var(--text-primary, #1e293b)' }}>Fabric &amp; Design</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)' }}>Job Target Mtr</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)' }}>Printing (PD / PP)</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)' }}>Pending Print Mtr</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)' }}>Fusing (FD / FP)</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)' }}>Delivery (DD / DP)</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)' }}>Action</th>
               </tr>
             </thead>
             <tbody>
