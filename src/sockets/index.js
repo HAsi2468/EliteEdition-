@@ -647,6 +647,49 @@ const setupSockets = (io) => {
       }
     });
 
+    // ══════════════════════════════════════════════════
+    // Real-Time Audio / Video Calling Signaling
+    // ══════════════════════════════════════════════════
+    socket.on('call-user', (data) => {
+      if (data && data.roomId) {
+        socket.to(String(data.roomId)).emit('incoming-call', {
+          roomId: data.roomId,
+          callType: data.callType || 'voice',
+          caller: data.caller,
+          callerName: data.callerName || data.name || 'Team Member',
+          socketId: socket.id
+        });
+      }
+    });
+
+    socket.on('accept-call', (data) => {
+      if (data && data.roomId) {
+        socket.to(String(data.roomId)).emit('call-accepted', {
+          roomId: data.roomId,
+          accepter: data.accepter,
+          socketId: socket.id
+        });
+      }
+    });
+
+    socket.on('decline-call', (data) => {
+      if (data && data.roomId) {
+        socket.to(String(data.roomId)).emit('call-declined', {
+          roomId: data.roomId,
+          decliner: data.decliner
+        });
+      }
+    });
+
+    socket.on('end-call', (data) => {
+      if (data && data.roomId) {
+        socket.to(String(data.roomId)).emit('call-ended', {
+          roomId: data.roomId,
+          from: data.from
+        });
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`User disconnected from socket: ${socket.id}`);
       activeUsers.delete(socket.id);

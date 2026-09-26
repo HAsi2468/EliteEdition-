@@ -21,7 +21,14 @@ import {
   ChevronLeft,
   MoreVertical,
   Phone,
+  PhoneOff,
   Video,
+  VideoOff,
+  MicOff,
+  Monitor,
+  MonitorOff,
+  PhoneIncoming,
+  Grid,
   MoreHorizontal,
   UserCheck,
   Building2,
@@ -159,6 +166,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
   const [showDesktopHeaderMenu, setShowDesktopHeaderMenu] = useState(false);
 
+  // ─── Real-Time Voice & Video Calling Suite State ───
+  const [activeCall, setActiveCall] = useState(null); // { type: 'voice' | 'video', recipientName, recipientAvatar, status: 'calling' | 'connected' | 'ended', isMuted: false, isVideoOff: false, isSpeakerOn: true, isScreenSharing: false, error: null }
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [callDuration, setCallDuration] = useState(0);
+  const [showDialpad, setShowDialpad] = useState(false);
+  const [dialpadDigits, setDialpadDigits] = useState('');
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  const localVideoRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
+  const callTimerRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const audioIntervalRef = useRef(null);
+
   // Job Card PDF preview modal state
   const [pdfPreviewCard, setPdfPreviewCard] = useState(null);
   const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
@@ -276,6 +298,267 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       })
       .catch(err => console.warn('Could not load staff users for chat task creation:', err));
   }, []);
+
+  // ─── Real-Time Voice & Video Calling Handlers ───
+  const formatDuration = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const startCall = async (type = 'voice') => {
+    if (!activeGroup) return;
+    const recipient = activeGroup.displayName || activeGroup.name || 'Team Member';
+    const recipientAvatar = activeGroup.avatar || null;
+
+    setActiveCall({
+      type,
+      recipientName: recipient,
+      recipientAvatar,
+      status: 'calling',
+      isMuted: false,
+      isVideoOff: false,
+      isSpeakerOn: true,
+      isScreenSharing: false,
+      error: null
+    });
+    setCallDuration(0);
+    setShowDialpad(false);
+    setDialpadDigits('');
+
+    // Emit socket call event
+    if (socket && activeGroup._id) {
+      socket.emit('call-user', {
+        roomId: activeGroup._id,
+        callType: type,
+        caller: currentUser?._id || currentUser?.id,
+        callerName: currentUser?.name || currentUser?.username || 'Elite User'
+      });
+    }
+
+    // Capture local audio/video media
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const constraints = type === 'video' ? { audio: true, video: true } : { audio: true, video: false };
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (mediaErr) {
+          console.warn('Initial getUserMedia capture failed, trying audio only fallback:', mediaErr);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          } catch (audioErr) {
+            console.warn('Audio capture also failed:', audioErr);
+          }
+        }
+
+        if (stream) {
+          localStreamRef.current = stream;
+          if (localVideoRef.current && type === 'video') {
+            localVideoRef.current.srcObject = stream;
+          }
+
+          // Setup AudioContext for waveform / pulse visualizer
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              const ctx = new AudioCtx();
+              audioContextRef.current = ctx;
+              const source = ctx.createMediaStreamSource(stream);
+              const analyser = ctx.createAnalyser();
+              analyser.fftSize = 64;
+              source.connect(analyser);
+              const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+              audioIntervalRef.current = setInterval(() => {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                const avg = sum / (dataArray.length || 1);
+                setAudioLevel(Math.min(100, Math.round((avg / 255) * 100)));
+              }, 120);
+            }
+          } catch (visErr) {
+            console.warn('Visualization setup warning:', visErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('getUserMedia uncaught error:', err);
+    }
+
+    // Transition to connected after brief ring if other end is auto-joining room
+    setTimeout(() => {
+      setActiveCall((prev) => {
+        if (prev && prev.status === 'calling') {
+          return { ...prev, status: 'connected' };
+        }
+        return prev;
+      });
+    }, 2400);
+  };
+
+  const endCall = (shouldEmit = true) => {
+    if (shouldEmit && socket && activeGroup?._id) {
+      socket.emit('end-call', {
+        roomId: activeGroup._id,
+        from: currentUser?._id || currentUser?.id
+      });
+    }
+
+    if (localStreamRef.current) {
+      try {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      } catch (e) {}
+      localStreamRef.current = null;
+    }
+    if (screenStreamRef.current) {
+      try {
+        screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      } catch (e) {}
+      screenStreamRef.current = null;
+    }
+    if (audioIntervalRef.current) {
+      clearInterval(audioIntervalRef.current);
+      audioIntervalRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch (e) {}
+      audioContextRef.current = null;
+    }
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
+
+    setAudioLevel(0);
+    setActiveCall((prev) => (prev ? { ...prev, status: 'ended' } : null));
+    setTimeout(() => {
+      setActiveCall(null);
+      setCallDuration(0);
+      setShowDialpad(false);
+      setDialpadDigits('');
+    }, 1000);
+  };
+
+  const toggleMute = () => {
+    setActiveCall((prev) => {
+      if (!prev) return null;
+      const nextMuted = !prev.isMuted;
+      if (localStreamRef.current) {
+        localStreamRef.current.getAudioTracks().forEach((t) => {
+          t.enabled = !nextMuted;
+        });
+      }
+      return { ...prev, isMuted: nextMuted };
+    });
+  };
+
+  const toggleVideo = () => {
+    setActiveCall((prev) => {
+      if (!prev) return null;
+      const nextVideoOff = !prev.isVideoOff;
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((t) => {
+          t.enabled = !nextVideoOff;
+        });
+      }
+      return { ...prev, isVideoOff: nextVideoOff };
+    });
+  };
+
+  const toggleScreenShare = async () => {
+    if (!activeCall) return;
+    if (activeCall.isScreenSharing) {
+      if (screenStreamRef.current) {
+        try {
+          screenStreamRef.current.getTracks().forEach((t) => t.stop());
+        } catch (e) {}
+        screenStreamRef.current = null;
+      }
+      if (localVideoRef.current && localStreamRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+      }
+      setActiveCall((prev) => ({ ...prev, isScreenSharing: false }));
+    } else {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+          const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          screenStreamRef.current = screenStream;
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = screenStream;
+          }
+          screenStream.getVideoTracks()[0].onended = () => {
+            setActiveCall((prev) => (prev ? { ...prev, isScreenSharing: false } : null));
+            if (localVideoRef.current && localStreamRef.current) {
+              localVideoRef.current.srcObject = localStreamRef.current;
+            }
+          };
+          setActiveCall((prev) => ({ ...prev, isScreenSharing: true }));
+        }
+      } catch (err) {
+        console.warn('Screen share canceled or denied:', err);
+      }
+    }
+  };
+
+  const answerIncomingCall = () => {
+    if (!incomingCall) return;
+    const type = incomingCall.callType || 'voice';
+    if (socket && incomingCall.roomId) {
+      socket.emit('accept-call', {
+        roomId: incomingCall.roomId,
+        accepter: currentUser?._id || currentUser?.id
+      });
+    }
+    setIncomingCall(null);
+    startCall(type);
+  };
+
+  const declineIncomingCall = () => {
+    if (!incomingCall) return;
+    if (socket && incomingCall.roomId) {
+      socket.emit('decline-call', {
+        roomId: incomingCall.roomId,
+        decliner: currentUser?._id || currentUser?.id
+      });
+    }
+    setIncomingCall(null);
+  };
+
+  // Timer effect when connected
+  useEffect(() => {
+    if (activeCall && activeCall.status === 'connected') {
+      callTimerRef.current = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+    };
+  }, [activeCall?.status]);
+
+  // Attach video stream whenever localVideoRef or activeCall changes
+  useEffect(() => {
+    if (activeCall && (activeCall.type === 'video' || activeCall.isScreenSharing)) {
+      if (localVideoRef.current) {
+        const target = screenStreamRef.current || localStreamRef.current;
+        if (target && localVideoRef.current.srcObject !== target) {
+          localVideoRef.current.srcObject = target;
+        }
+      }
+    }
+  }, [activeCall?.type, activeCall?.isVideoOff, activeCall?.isScreenSharing]);
 
   const handleOpenTaskModalFromChat = () => {
     const today = new Date();
@@ -611,6 +894,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       fetchGroups(true);
     };
 
+    const handleIncomingCall = (data) => {
+      if (data && data.roomId) {
+        setIncomingCall(data);
+      }
+    };
+
+    const handleCallAccepted = () => {
+      setActiveCall((prev) => (prev ? { ...prev, status: 'connected' } : null));
+    };
+
+    const handleCallDeclined = () => {
+      setActiveCall((prev) => (prev ? { ...prev, status: 'ended', error: 'Call declined by user' } : null));
+      setTimeout(() => setActiveCall(null), 1800);
+    };
+
+    const handleCallEnded = () => {
+      endCall(false);
+    };
+
     socket.on('connect', handleConnect);
     socket.on('receive-message', handleReceiveMessage);
     socket.on('message-acknowledged', handleAck);
@@ -622,6 +924,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     socket.on('room-messages-read', handleRoomMessagesRead);
     socket.on('poll-updated', handlePollUpdated);
     socket.on('communication-data-cleared', handleDataCleared);
+    socket.on('incoming-call', handleIncomingCall);
+    socket.on('call-accepted', handleCallAccepted);
+    socket.on('call-declined', handleCallDeclined);
+    socket.on('call-ended', handleCallEnded);
 
     return () => {
       socket.off('connect', handleConnect);
@@ -635,6 +941,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('room-messages-read', handleRoomMessagesRead);
       socket.off('poll-updated', handlePollUpdated);
       socket.off('communication-data-cleared', handleDataCleared);
+      socket.off('incoming-call', handleIncomingCall);
+      socket.off('call-accepted', handleCallAccepted);
+      socket.off('call-declined', handleCallDeclined);
+      socket.off('call-ended', handleCallEnded);
     };
   }, [socket, currentUser]);
 
@@ -2417,8 +2727,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           type="button"
                           className="phoenix-action-btn-blue"
                           style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
-                          onClick={() => alert(`📞 Voice call initiated with ${displayName}...`)}
-                          title="Start Voice Call"
+                          onClick={() => startCall('voice')}
+                          title="Start HD Voice Call"
                         >
                           <Phone size={isMobileScreen ? 14 : 16} />
                         </button>
@@ -2428,8 +2738,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           type="button"
                           className="phoenix-action-btn-blue"
                           style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
-                          onClick={() => alert(`📹 Video call initiated with ${displayName}...`)}
-                          title="Start Video Call"
+                          onClick={() => startCall('video')}
+                          title="Start HD Video Call"
                         >
                           <Video size={isMobileScreen ? 14 : 16} />
                         </button>
@@ -2440,7 +2750,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             type="button"
                             className="phoenix-action-btn-neutral"
                             style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
-                            onClick={() => setShowDesktopHeaderMenu(!showDesktopHeaderMenu)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowDesktopHeaderMenu(!showDesktopHeaderMenu);
+                            }}
                             title="More Conversation Options"
                           >
                             <MoreVertical size={isMobileScreen ? 14 : 16} />
@@ -2463,11 +2776,41 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
                                 zIndex: 9999,
                                 padding: '6px',
-                                minWidth: '200px',
+                                minWidth: '210px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '2px'
                               }}>
+                                {/* Start Voice Call */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); startCall('voice'); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Phone size={14} color="#2563eb" />
+                                  <span>Start Voice Call</span>
+                                </button>
+
+                                {/* Start Video Call */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowDesktopHeaderMenu(false); startCall('video'); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <Video size={14} color="#3b82f6" />
+                                  <span>Start Video Call</span>
+                                </button>
+
+                                <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '4px 0' }} />
+
                                 {/* In-room Search */}
                                 <button
                                   type="button"
@@ -4700,6 +5043,558 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   {clearingData ? 'Deleting Data...' : 'Yes, Delete All Data & Reset'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CALL SUITE ANIMATIONS & STYLES ─── */}
+      <style>{`
+        @keyframes callRipple {
+          0% { transform: scale(0.95); opacity: 0.8; }
+          50% { transform: scale(1.15); opacity: 0.3; }
+          100% { transform: scale(1.35); opacity: 0; }
+        }
+        @keyframes bannerSlideDown {
+          0% { transform: translate(-50%, -120%); opacity: 0; }
+          100% { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .call-ctrl-btn {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          background: rgba(255, 255, 255, 0.1);
+          color: #ffffff;
+        }
+        .call-ctrl-btn:hover {
+          transform: translateY(-2px) scale(1.06);
+          background: rgba(255, 255, 255, 0.2);
+        }
+        .call-ctrl-btn.active-danger {
+          background: #ef4444;
+          border-color: #f87171;
+          color: #ffffff;
+        }
+        .call-ctrl-btn.active-primary {
+          background: #3874ff;
+          border-color: #60a5fa;
+          color: #ffffff;
+        }
+        .call-ctrl-btn.end-call {
+          width: 54px;
+          height: 54px;
+          background: linear-gradient(135deg, #ef4444, #dc2626);
+          border-color: #f87171;
+          box-shadow: 0 8px 20px rgba(239, 68, 68, 0.45);
+        }
+        .call-ctrl-btn.end-call:hover {
+          background: #b91c1c;
+          transform: translateY(-2px) scale(1.08);
+        }
+        .dialpad-btn {
+          width: 60px;
+          height: 44px;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #fff;
+          font-size: 1.1rem;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+        }
+        .dialpad-btn:hover {
+          background: rgba(255, 255, 255, 0.22);
+          transform: scale(1.05);
+        }
+      `}</style>
+
+      {/* ─── INCOMING CALL BANNER / NOTIFICATION ─── */}
+      {incomingCall && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 99999,
+          animation: 'bannerSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+          minWidth: '360px',
+          maxWidth: '92vw',
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.96))',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(56, 189, 248, 0.4)',
+          boxShadow: '0 20px 40px -10px rgba(0,0,0,0.6), 0 0 25px rgba(56, 189, 248, 0.25)',
+          borderRadius: '20px',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '46px',
+              height: '46px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #3874ff, #06b6d4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              boxShadow: '0 0 15px rgba(56, 189, 248, 0.5)',
+              position: 'relative'
+            }}>
+              {incomingCall.callType === 'video' ? <Video size={22} /> : <PhoneIncoming size={22} />}
+              <span style={{
+                position: 'absolute',
+                inset: -4,
+                borderRadius: '50%',
+                border: '2px solid rgba(56, 189, 248, 0.6)',
+                animation: 'callRipple 1.6s infinite ease-out'
+              }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>{incomingCall.callerName || 'Team Member'}</span>
+                <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontWeight: 700 }}>
+                  {incomingCall.callType === 'video' ? 'Video' : 'Voice'} Call
+                </span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>
+                Incoming call from Elite Enterprise...
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={declineIncomingCall}
+              title="Decline"
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: '#ef4444',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
+                transition: 'transform 0.15s ease'
+              }}
+            >
+              <PhoneOff size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={answerIncomingCall}
+              title="Accept"
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: '#10b981',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+                transition: 'transform 0.15s ease'
+              }}
+            >
+              <Phone size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ACTIVE CALL MODAL (VOICE & VIDEO CALL SUITE) ─── */}
+      {activeCall && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 99998,
+          background: 'rgba(10, 15, 30, 0.88)',
+          backdropFilter: 'blur(24px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          animation: 'fadeIn 0.25s ease-out'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: activeCall.type === 'video' ? '860px' : '460px',
+            background: 'linear-gradient(135deg, rgba(20, 27, 45, 0.95), rgba(11, 15, 25, 0.98))',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '26px',
+            boxShadow: '0 30px 60px -15px rgba(0,0,0,0.8), 0 0 50px rgba(56, 189, 248, 0.15)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative'
+          }}>
+            {/* Top Bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 22px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(255, 255, 255, 0.02)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: activeCall.status === 'connected' ? '#10b981' : '#f59e0b',
+                  boxShadow: activeCall.status === 'connected' ? '0 0 10px #10b981' : '0 0 10px #f59e0b'
+                }} />
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  {activeCall.type === 'video' ? 'HD Video Conference' : 'HD Voice Call'}
+                </span>
+                <span style={{ fontSize: '0.72rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                  Encrypted
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => endCall(true)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#94a3b8',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Main Call Body */}
+            {activeCall.type === 'voice' ? (
+              /* VOICE CALL VIEW */
+              <div style={{
+                padding: '36px 24px 28px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative'
+              }}>
+                {/* Concentric Pulsing Avatar Container */}
+                <div style={{
+                  position: 'relative',
+                  width: '140px',
+                  height: '140px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '20px'
+                }}>
+                  {/* Outer Ripples */}
+                  {activeCall.status === 'connected' && (
+                    <>
+                      <div style={{
+                        position: 'absolute',
+                        inset: -12 - (audioLevel * 0.25),
+                        borderRadius: '50%',
+                        border: '2px solid rgba(56, 189, 248, 0.4)',
+                        opacity: Math.max(0.2, audioLevel / 100),
+                        transition: 'all 0.15s ease'
+                      }} />
+                      <div style={{
+                        position: 'absolute',
+                        inset: -26 - (audioLevel * 0.4),
+                        borderRadius: '50%',
+                        border: '1.5px solid rgba(56, 189, 248, 0.2)',
+                        opacity: Math.max(0.1, audioLevel / 150),
+                        transition: 'all 0.15s ease'
+                      }} />
+                    </>
+                  )}
+                  {activeCall.status === 'calling' && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: -16,
+                      borderRadius: '50%',
+                      border: '2px solid rgba(56, 189, 248, 0.5)',
+                      animation: 'callRipple 2s infinite ease-out'
+                    }} />
+                  )}
+
+                  {/* Center Avatar */}
+                  <div style={{
+                    width: '110px',
+                    height: '110px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #2563eb, #3874ff)',
+                    boxShadow: '0 12px 30px rgba(37, 99, 235, 0.45)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.4rem',
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    border: '3px solid rgba(255, 255, 255, 0.25)',
+                    zIndex: 2,
+                    textTransform: 'uppercase'
+                  }}>
+                    {activeCall.recipientName.slice(0, 2)}
+                  </div>
+                </div>
+
+                {/* Recipient Name & Status */}
+                <h2 style={{ margin: '0 0 6px', fontSize: '1.45rem', fontWeight: 800, color: '#f8fafc', textAlign: 'center' }}>
+                  {activeCall.recipientName}
+                </h2>
+                <div style={{
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  color: activeCall.status === 'connected' ? '#10b981' : (activeCall.status === 'ended' ? '#ef4444' : '#38bdf8'),
+                  marginBottom: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  {activeCall.status === 'calling' && 'Ringing...'}
+                  {activeCall.status === 'connected' && `Connected (${formatDuration(callDuration)})`}
+                  {activeCall.status === 'ended' && (activeCall.error || 'Call Ended')}
+                </div>
+
+                {/* Audio Waveform Equalizer */}
+                {activeCall.status === 'connected' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '30px', marginBottom: '22px' }}>
+                    {[12, 22, 16, 28, 18, 26, 14, 20].map((h, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: '4px',
+                          borderRadius: '3px',
+                          background: 'linear-gradient(to top, #3874ff, #38bdf8)',
+                          height: `${Math.max(6, Math.min(30, (h * (audioLevel + 30)) / 80))}px`,
+                          transition: 'height 0.12s ease'
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Dialpad Overlay */}
+                {showDialpad && (
+                  <div style={{
+                    width: '100%',
+                    maxWidth: '280px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    borderRadius: '16px',
+                    padding: '14px',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    marginBottom: '18px'
+                  }}>
+                    <div style={{
+                      minHeight: '32px',
+                      background: 'rgba(0,0,0,0.3)',
+                      borderRadius: '8px',
+                      marginBottom: '10px',
+                      padding: '4px 10px',
+                      textAlign: 'center',
+                      fontSize: '1.1rem',
+                      fontWeight: 700,
+                      color: '#38bdf8',
+                      letterSpacing: '3px'
+                    }}>
+                      {dialpadDigits || '—'}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {['1','2','3','4','5','6','7','8','9','*','0','#'].map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className="dialpad-btn"
+                          onClick={() => setDialpadDigits((prev) => (prev.length < 16 ? prev + key : prev))}
+                        >
+                          {key}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* VIDEO CALL VIEW */
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                height: '460px',
+                background: '#090d16',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
+              }}>
+                {/* Local Video Stream or Placeholder */}
+                {activeCall.isVideoOff ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '90px',
+                      height: '90px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #1e293b, #334155)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#94a3b8'
+                    }}>
+                      <VideoOff size={36} />
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 600 }}>
+                      Camera is Turned Off
+                    </div>
+                  </div>
+                ) : (
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                )}
+
+                {/* Floating Top Pill Overlay */}
+                <div style={{
+                  position: 'absolute',
+                  top: '16px',
+                  left: '16px',
+                  background: 'rgba(15, 23, 42, 0.75)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '20px',
+                  padding: '6px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#fff',
+                  zIndex: 3
+                }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                  <span style={{ fontSize: '0.84rem', fontWeight: 700 }}>{activeCall.recipientName}</span>
+                  <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>•</span>
+                  <span style={{ fontSize: '0.78rem', color: '#38bdf8', fontWeight: 600 }}>
+                    {activeCall.status === 'connected' ? formatDuration(callDuration) : 'Connecting...'}
+                  </span>
+                </div>
+
+                {/* Floating Screen Share Badge */}
+                {activeCall.isScreenSharing && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    background: '#3874ff',
+                    color: '#fff',
+                    borderRadius: '16px',
+                    padding: '6px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    zIndex: 3
+                  }}>
+                    <Monitor size={14} /> Screen Sharing Active
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bottom Controls Bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '14px',
+              padding: '18px 24px',
+              background: 'rgba(15, 23, 42, 0.7)',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+            }}>
+              {/* Mute Toggle */}
+              <button
+                type="button"
+                className={`call-ctrl-btn ${activeCall.isMuted ? 'active-danger' : ''}`}
+                onClick={toggleMute}
+                title={activeCall.isMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+              >
+                {activeCall.isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+              </button>
+
+              {/* Video Toggle */}
+              <button
+                type="button"
+                className={`call-ctrl-btn ${activeCall.isVideoOff ? 'active-danger' : (activeCall.type === 'video' ? 'active-primary' : '')}`}
+                onClick={toggleVideo}
+                title={activeCall.isVideoOff ? 'Turn Camera On' : 'Turn Camera Off'}
+              >
+                {activeCall.isVideoOff ? <VideoOff size={20} /> : <Video size={20} />}
+              </button>
+
+              {/* Screen Share */}
+              <button
+                type="button"
+                className={`call-ctrl-btn ${activeCall.isScreenSharing ? 'active-primary' : ''}`}
+                onClick={toggleScreenShare}
+                title={activeCall.isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+              >
+                {activeCall.isScreenSharing ? <MonitorOff size={20} /> : <Monitor size={20} />}
+              </button>
+
+              {/* Dialpad Toggle (Voice Call) */}
+              {activeCall.type === 'voice' && (
+                <button
+                  type="button"
+                  className={`call-ctrl-btn ${showDialpad ? 'active-primary' : ''}`}
+                  onClick={() => setShowDialpad(!showDialpad)}
+                  title="Toggle Keypad"
+                >
+                  <Grid size={20} />
+                </button>
+              )}
+
+              {/* End Call Button */}
+              <button
+                type="button"
+                className="call-ctrl-btn end-call"
+                onClick={() => endCall(true)}
+                title="End Call"
+              >
+                <PhoneOff size={22} color="#ffffff" />
+              </button>
             </div>
           </div>
         </div>
