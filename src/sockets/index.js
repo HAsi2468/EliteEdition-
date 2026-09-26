@@ -650,61 +650,109 @@ const setupSockets = (io) => {
     // ══════════════════════════════════════════════════
     // Real-Time Audio / Video Calling Signaling
     // ══════════════════════════════════════════════════
-    socket.on('call-user', (data) => {
-      if (data && data.roomId) {
-        socket.to(String(data.roomId)).emit('incoming-call', {
-          roomId: data.roomId,
+    socket.on('call-user', async (data) => {
+      try {
+        if (!data || !data.roomId) return;
+        const roomId = String(data.roomId);
+        const payload = {
+          roomId: roomId,
           callType: data.callType || 'voice',
           caller: data.caller,
           callerName: data.callerName || data.name || 'Team Member',
-          socketId: socket.id
-        });
+          callerAvatar: data.callerAvatar || null,
+          recipientId: data.recipientId || null,
+          socketId: socket.id,
+          timestamp: Date.now()
+        };
+
+        // 1. Broadcast to the socket room
+        socket.to(roomId).emit('incoming-call', payload);
+
+        // 2. Look up all room members and emit to their dedicated user channels so they receive the call anywhere in the app
+        const targetRoom = await ChatRoom.findById(roomId).populate('members');
+        if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {
+          targetRoom.members.forEach((m) => {
+            const mIdStr = getMemberIdString(m);
+            if (mIdStr && String(mIdStr) !== String(data.caller)) {
+              io.to(`user_${mIdStr}`).emit('incoming-call', payload);
+            }
+          });
+        }
+
+        // 3. If explicit recipientId provided, also emit directly to that user's channel
+        if (data.recipientId && String(data.recipientId) !== String(data.caller)) {
+          io.to(`user_${data.recipientId}`).emit('incoming-call', payload);
+        }
+      } catch (err) {
+        console.error('Error in socket call-user:', err);
       }
     });
 
     socket.on('accept-call', (data) => {
       if (data && data.roomId) {
-        socket.to(String(data.roomId)).emit('call-accepted', {
+        const payload = {
           roomId: data.roomId,
           accepter: data.accepter,
+          caller: data.caller || null,
           socketId: socket.id
-        });
+        };
+        socket.to(String(data.roomId)).emit('call-accepted', payload);
+        if (data.caller) {
+          io.to(`user_${data.caller}`).emit('call-accepted', payload);
+        }
       }
     });
 
     socket.on('decline-call', (data) => {
       if (data && data.roomId) {
-        socket.to(String(data.roomId)).emit('call-declined', {
+        const payload = {
           roomId: data.roomId,
           decliner: data.decliner
-        });
+        };
+        socket.to(String(data.roomId)).emit('call-declined', payload);
+        if (data.caller) {
+          io.to(`user_${data.caller}`).emit('call-declined', payload);
+        }
       }
     });
 
     socket.on('end-call', (data) => {
       if (data && data.roomId) {
-        socket.to(String(data.roomId)).emit('call-ended', {
+        const payload = {
           roomId: data.roomId,
           from: data.from
-        });
+        };
+        socket.to(String(data.roomId)).emit('call-ended', payload);
+        if (data.recipientId) {
+          io.to(`user_${data.recipientId}`).emit('call-ended', payload);
+        }
       }
     });
 
     socket.on('webrtc-offer', (data) => {
       if (data && data.roomId) {
         socket.to(String(data.roomId)).emit('webrtc-offer', data);
+        if (data.recipientId) {
+          io.to(`user_${data.recipientId}`).emit('webrtc-offer', data);
+        }
       }
     });
 
     socket.on('webrtc-answer', (data) => {
       if (data && data.roomId) {
         socket.to(String(data.roomId)).emit('webrtc-answer', data);
+        if (data.caller) {
+          io.to(`user_${data.caller}`).emit('webrtc-answer', data);
+        }
       }
     });
 
     socket.on('webrtc-ice-candidate', (data) => {
       if (data && data.roomId) {
         socket.to(String(data.roomId)).emit('webrtc-ice-candidate', data);
+        if (data.targetUserId) {
+          io.to(`user_${data.targetUserId}`).emit('webrtc-ice-candidate', data);
+        }
       }
     });
 

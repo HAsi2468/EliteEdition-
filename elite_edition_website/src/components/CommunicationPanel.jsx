@@ -348,6 +348,125 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
+  // ── Web Audio Ringtone & Ringback Synthesizer (Zero asset dependencies) ──
+  const ringtoneIntervalRef = useRef(null);
+  const ringtoneAudioCtxRef = useRef(null);
+
+  const playTone = (freq1, freq2, durationMs) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!ringtoneAudioCtxRef.current || ringtoneAudioCtxRef.current.state === 'closed') {
+        ringtoneAudioCtxRef.current = new AudioCtx();
+      }
+      if (ringtoneAudioCtxRef.current.state === 'suspended') {
+        ringtoneAudioCtxRef.current.resume();
+      }
+      const ctx = ringtoneAudioCtxRef.current;
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'sine';
+      osc1.frequency.setValueAtTime(freq1, ctx.currentTime);
+      osc2.frequency.setValueAtTime(freq2, ctx.currentTime);
+
+      gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+
+      osc1.connect(gainNode);
+      osc2.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      osc1.start();
+      osc2.start();
+      osc1.stop(ctx.currentTime + durationMs / 1000);
+      osc2.stop(ctx.currentTime + durationMs / 1000);
+    } catch (e) {
+      console.warn('Audio ringtone error:', e);
+    }
+  };
+
+  const startIncomingRingtone = () => {
+    stopCallRingtones();
+    playTone(587.33, 880, 400);
+    setTimeout(() => playTone(659.25, 987.77, 600), 450);
+    ringtoneIntervalRef.current = setInterval(() => {
+      playTone(587.33, 880, 400);
+      setTimeout(() => playTone(659.25, 987.77, 600), 450);
+    }, 2200);
+  };
+
+  const startOutgoingRingback = () => {
+    stopCallRingtones();
+    playTone(440, 480, 1200);
+    ringtoneIntervalRef.current = setInterval(() => {
+      playTone(440, 480, 1200);
+    }, 3500);
+  };
+
+  const stopCallRingtones = () => {
+    if (ringtoneIntervalRef.current) {
+      clearInterval(ringtoneIntervalRef.current);
+      ringtoneIntervalRef.current = null;
+    }
+  };
+
+  const triggerCallPushNotification = (data) => {
+    // 1. Browser OS Push Notification
+    try {
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          const notif = new Notification(`📞 Incoming ${data.callType === 'video' ? 'Video' : 'Voice'} Call`, {
+            body: `${data.callerName || 'Team Member'} is calling you on Elite Edition... Click to answer!`,
+            icon: '/Logo.png',
+            badge: '/Logo.png',
+            tag: `call-${data.roomId}`,
+            requireInteraction: true,
+            vibrate: [300, 150, 300, 150, 400]
+          });
+          notif.onclick = () => {
+            window.focus();
+            notif.close();
+          };
+        } else if (Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }
+    } catch (e) {
+      console.warn('Call Notification error:', e);
+    }
+
+    // 2. ServiceWorker Notification
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.showNotification(`📞 Incoming ${data.callType === 'video' ? 'Video' : 'Voice'} Call`, {
+            body: `${data.callerName || 'Team Member'} is calling you... Click to answer!`,
+            icon: '/Logo.png',
+            badge: '/Logo.png',
+            tag: `call-${data.roomId}`,
+            requireInteraction: true,
+            vibrate: [300, 150, 300, 150, 400]
+          }).catch(() => {});
+        });
+      }
+    } catch (e) {}
+
+    // 3. In-App Toast
+    try {
+      window.dispatchEvent(new CustomEvent('elite-push-notification', {
+        detail: {
+          title: `📞 Incoming ${data.callType === 'video' ? 'Video' : 'Voice'} Call`,
+          message: `${data.callerName || 'Team Member'} is calling you. Click to Answer!`,
+          type: 'warning',
+          timestamp: Date.now()
+        }
+      }));
+    } catch (e) {}
+  };
+
   const initLocalMedia = async (type) => {
     if (localStreamRef.current) {
       try { localStreamRef.current.getTracks().forEach((t) => t.stop()); } catch (e) {}
@@ -434,6 +553,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const recipientAvatar = activeGroup.avatar || null;
     const roomId = activeGroup._id;
 
+    // Direct Colleague ID for 1-on-1 calls
+    let recipientId = null;
+    if (activeGroup.type === 'direct' && Array.isArray(activeGroup.members)) {
+      const myId = String(currentUser?._id || currentUser?.id || '');
+      const other = activeGroup.members.find((m) => {
+        const mId = String(typeof m === 'object' ? (m._id || m.id) : m);
+        return mId !== myId;
+      });
+      if (other) recipientId = typeof other === 'object' ? (other._id || other.id) : other;
+    }
+
     setActiveCall({
       type,
       recipientName: recipient,
@@ -450,6 +580,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setShowDialpad(false);
     setDialpadDigits('');
 
+    // Play outgoing ringback tone
+    startOutgoingRingback();
+
     const stream = await initLocalMedia(type);
     const pc = createPeerConnection(roomId);
     if (stream && pc) {
@@ -459,14 +592,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (socket && roomId) {
       socket.emit('call-user', {
         roomId,
+        recipientId,
         callType: type,
         caller: currentUser?._id || currentUser?.id,
-        callerName: currentUser?.name || currentUser?.username || 'Elite User'
+        callerName: currentUser?.name || currentUser?.username || 'Team Member',
+        callerAvatar: currentUser?.avatar || null
       });
     }
   };
 
   const endCall = (shouldEmit = true) => {
+    stopCallRingtones();
     const currentRoomId = activeCallRef.current?.roomId || activeGroup?._id;
     if (shouldEmit && socket && currentRoomId) {
       socket.emit('end-call', {
@@ -589,9 +725,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const answerIncomingCall = async () => {
     if (!incomingCall) return;
+    stopCallRingtones();
     const type = incomingCall.callType || 'voice';
     const roomId = incomingCall.roomId;
     const callerName = incomingCall.callerName || 'Team Member';
+    const callerId = incomingCall.caller || null;
     setIncomingCall(null);
 
     setActiveCall({
@@ -619,6 +757,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (socket && roomId) {
       socket.emit('accept-call', {
         roomId,
+        caller: callerId,
         accepter: currentUser?._id || currentUser?.id
       });
     }
@@ -626,9 +765,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const declineIncomingCall = () => {
     if (!incomingCall) return;
+    stopCallRingtones();
     if (socket && incomingCall.roomId) {
       socket.emit('decline-call', {
         roomId: incomingCall.roomId,
+        caller: incomingCall.caller || null,
         decliner: currentUser?._id || currentUser?.id
       });
     }
@@ -1003,11 +1144,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const handleIncomingCall = (data) => {
       if (data && data.roomId) {
+        const myId = String(currentUser?._id || currentUser?.id || '');
+        if (data.caller && String(data.caller) === myId) return; // Don't ring self
         setIncomingCall(data);
+        startIncomingRingtone();
+        triggerCallPushNotification(data);
       }
     };
 
     const handleCallAccepted = async () => {
+      stopCallRingtones();
       setActiveCall((prev) => (prev ? { ...prev, status: 'connected' } : null));
       const pc = peerConnectionRef.current;
       const rId = activeCallRef.current?.roomId || activeGroupIdRef.current;
@@ -1072,11 +1218,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     };
 
     const handleCallDeclined = () => {
+      stopCallRingtones();
       setActiveCall((prev) => (prev ? { ...prev, status: 'ended', error: 'Call declined by user' } : null));
       setTimeout(() => setActiveCall(null), 1800);
     };
 
     const handleCallEnded = () => {
+      stopCallRingtones();
       endCall(false);
     };
 
@@ -1120,6 +1268,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('webrtc-ice-candidate', handleWebRtcIceCandidate);
     };
   }, [socket, currentUser]);
+
+  // Handle global answering from outside tabs (e.g. from App.jsx global call banner)
+  useEffect(() => {
+    const handleGlobalAnswer = (e) => {
+      if (e.detail) {
+        const callData = e.detail;
+        setIncomingCall(callData);
+        setTimeout(() => {
+          answerIncomingCall();
+        }, 150);
+      }
+    };
+    window.addEventListener('elite-answer-call', handleGlobalAnswer);
+    return () => window.removeEventListener('elite-answer-call', handleGlobalAnswer);
+  }, []);
 
   // Join socket room when active group changes & fetch messages with in-memory caching
   useEffect(() => {
@@ -2570,6 +2733,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         display: 'flex',
         flexDirection: 'column',
         width: '100%',
+        flex: 1,
+        minHeight: 0,
         height: isMobileScreen && activeGroup
           ? (viewportHeight ? `${viewportHeight}px` : '100dvh')
           : '100%',
@@ -3204,7 +3369,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 onScroll={handleChatScroll}
                 onClick={() => setActiveMsgMenuId(null)}
                 className="phoenix-chat-stream"
-                style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px' }}
+                style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px' }}
               >
                 {loadingMoreMessages && (
                   <div style={{ textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>

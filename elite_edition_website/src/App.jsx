@@ -96,7 +96,9 @@ import {
   Mail,
   Calendar as CalendarIcon,
   Globe,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Phone,
+  PhoneOff
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -181,6 +183,7 @@ export default function App() {
 
   // Notification Toasts state
   const [toasts, setToasts] = useState([]);
+  const [globalIncomingCall, setGlobalIncomingCall] = useState(null);
 
   // Dark mode state and effect
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -734,6 +737,51 @@ export default function App() {
       triggerGlobalDataRefresh();
     };
 
+    const handleIncomingCallGlobal = (data) => {
+      if (!data || !data.roomId) return;
+      const myId = String(currentUser?._id || currentUser?.id || '');
+      if (data.caller && String(data.caller) === myId) return;
+
+      // 1. Browser OS Push Notification
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const n = new Notification(`📞 Incoming ${data.callType === 'video' ? 'Video' : 'Voice'} Call`, {
+            body: `${data.callerName || 'Team Member'} is calling you on Elite Edition... Click to answer!`,
+            icon: '/Logo.png',
+            tag: `call-${data.roomId}`,
+            requireInteraction: true,
+            vibrate: [300, 150, 300, 150, 400]
+          });
+          n.onclick = () => {
+            window.focus();
+            n.close();
+            setActiveTab('communication');
+          };
+        }
+      } catch (e) {}
+
+      // 2. High-priority in-app notification
+      triggerPushNotification(
+        `📞 Incoming ${data.callType === 'video' ? 'Video' : 'Voice'} Call`,
+        `${data.callerName || 'Team Member'} is calling you. Click to Answer!`,
+        'warning',
+        'communication'
+      );
+
+      // 3. Set global banner if not already in communication tab
+      if (activeTab !== 'communication') {
+        setGlobalIncomingCall(data);
+      }
+    };
+
+    const handleCallDismissGlobal = () => {
+      setGlobalIncomingCall(null);
+    };
+
+    socket.on('incoming-call', handleIncomingCallGlobal);
+    socket.on('call-ended', handleCallDismissGlobal);
+    socket.on('call-declined', handleCallDismissGlobal);
+    socket.on('call-accepted', handleCallDismissGlobal);
     socket.on('receive-message', handleReceiveMessage);
     socket.on('activity-notification', handleActivity);
     socket.on('overdue-task-alert', handleOverdue);
@@ -771,6 +819,10 @@ export default function App() {
     socket.on('returns-updated', handleDataUpdate);
 
     return () => {
+      socket.off('incoming-call', handleIncomingCallGlobal);
+      socket.off('call-ended', handleCallDismissGlobal);
+      socket.off('call-declined', handleCallDismissGlobal);
+      socket.off('call-accepted', handleCallDismissGlobal);
       socket.off('receive-message', handleReceiveMessage);
       socket.off('activity-notification', handleActivity);
       socket.off('overdue-task-alert', handleOverdue);
@@ -2342,7 +2394,7 @@ export default function App() {
         </aside>
 
         {/* Right Content Panel */}
-        <main className={`phoenix-main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <main className={`phoenix-main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${['communication', 'workspace', 'task_management'].includes(activeTab) ? 'phoenix-full-viewport' : ''}`}>
           {error && <div style={styles.globalError}>{error}</div>}
 
           <Suspense fallback={
@@ -2475,7 +2527,7 @@ export default function App() {
           </Suspense>
 
           {/* Persistent CommunicationPanel (Chat & Task Manager - preserved across tab navigation) */}
-          <div style={{ display: (activeTab === 'communication' || activeTab === 'task_management' || activeTab === 'workspace') ? 'block' : 'none', height: '100%' }}>
+          <div style={{ display: (activeTab === 'communication' || activeTab === 'task_management' || activeTab === 'workspace') ? 'flex' : 'none', flex: 1, minHeight: 0, height: '100%', flexDirection: 'column' }}>
             <CommunicationPanel
               currentUser={currentUser}
               initialMainTab={activeTab === 'task_management' ? 'task' : 'chat'}
@@ -2503,6 +2555,117 @@ export default function App() {
         )}
       </button>
 
+
+      {/* Global Incoming Call Banner (Displayed on ANY page across ERP) */}
+      {globalIncomingCall && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 999999,
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.98))',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(56, 189, 248, 0.5)',
+          boxShadow: '0 20px 45px -10px rgba(0,0,0,0.8), 0 0 35px rgba(56, 189, 248, 0.35)',
+          borderRadius: '24px',
+          padding: '16px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '20px',
+          minWidth: '380px',
+          maxWidth: '92vw',
+          animation: 'bannerSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              boxShadow: '0 0 20px rgba(37, 99, 235, 0.6)'
+            }}>
+              <Phone size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>{globalIncomingCall.callerName || 'Team Member'}</span>
+                <span style={{ fontSize: '0.72rem', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '12px' }}>
+                  {globalIncomingCall.callType === 'video' ? 'Video Call' : 'Voice Call'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
+                Incoming call on ERP Communication...
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const callData = globalIncomingCall;
+                setGlobalIncomingCall(null);
+                if (socket && callData.roomId) {
+                  socket.emit('decline-call', {
+                    roomId: callData.roomId,
+                    caller: callData.caller,
+                    decliner: currentUser?._id || currentUser?.id
+                  });
+                }
+              }}
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '10px 18px',
+                fontWeight: 700,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <PhoneOff size={16} />
+              <span>Decline</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const callData = globalIncomingCall;
+                setGlobalIncomingCall(null);
+                setActiveTab('communication');
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('elite-answer-call', { detail: callData }));
+                }, 200);
+              }}
+              style={{
+                background: '#22c55e',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                fontWeight: 800,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 14px rgba(34, 197, 94, 0.4)'
+              }}
+            >
+              <Phone size={16} />
+              <span>Answer</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Global Push / Toast Notifications Container */}
       <NotificationToastContainer toasts={toasts} setToasts={setToasts} />

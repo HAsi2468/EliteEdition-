@@ -2433,6 +2433,26 @@ body:has(.client-portal-container) {
   margin-left: 65px;
 }
 
+.phoenix-main-content.phoenix-full-viewport {
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+@media (max-width: 991px) {
+  .phoenix-main-content.phoenix-full-viewport {
+    height: calc(100dvh - 64px);
+    max-height: calc(100dvh - 64px);
+    padding: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+}
+
 /* ── Floating Chat Demo Button ─────────────────── */
 .phoenix-floating-chat-btn {
   position: fixed;

@@ -1233,28 +1233,6 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => setActiveSubTab('catalogue')}
-              style={{
-                padding: '0.45rem 1rem',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                borderRadius: '8px',
-                border: activeSubTab === 'catalogue' ? '1.5px solid #6366f1' : '1px solid var(--border-light)',
-                background: activeSubTab === 'catalogue' ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-card, #ffffff)',
-                color: activeSubTab === 'catalogue' ? '#4f46e5' : 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <BookOpen size={15} />
-              <span>Design Catalog</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setActiveSubTab('sample')}
               style={{
                 padding: '0.45rem 1rem',
@@ -1273,6 +1251,28 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             >
               <Sparkles size={15} />
               <span>Sample Design</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('catalogue')}
+              style={{
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                borderRadius: '8px',
+                border: activeSubTab === 'catalogue' ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                background: activeSubTab === 'catalogue' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
+                color: activeSubTab === 'catalogue' ? '#1d4ed8' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <BookOpen size={15} />
+              <span>Design Catalog</span>
             </button>
             
             <button
