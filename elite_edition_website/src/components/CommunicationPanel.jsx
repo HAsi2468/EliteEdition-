@@ -180,6 +180,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioIntervalRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const isNearBottomRef = useRef(true);
+  const activeCallRef = useRef(null);
 
   // Job Card PDF preview modal state
   const [pdfPreviewCard, setPdfPreviewCard] = useState(null);
@@ -299,17 +304,135 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       .catch(err => console.warn('Could not load staff users for chat task creation:', err));
   }, []);
 
-  // ─── Real-Time Voice & Video Calling Handlers ───
+  // ─── Real-Time Voice & Video Calling Handlers (WebRTC) ───
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
+
   const formatDuration = (secs) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
+  const setupAudioVisualizer = (stream) => {
+    if (audioIntervalRef.current) {
+      clearInterval(audioIntervalRef.current);
+      audioIntervalRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close(); } catch (e) {}
+      audioContextRef.current = null;
+    }
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx && stream) {
+        const ctx = new AudioCtx();
+        audioContextRef.current = ctx;
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
+        source.connect(analyser);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        audioIntervalRef.current = setInterval(() => {
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          const avg = sum / (dataArray.length || 1);
+          setAudioLevel(Math.min(100, Math.round((avg / 255) * 100)));
+        }, 120);
+      }
+    } catch (visErr) {
+      console.warn('Audio visualizer setup warning:', visErr);
+    }
+  };
+
+  const initLocalMedia = async (type) => {
+    if (localStreamRef.current) {
+      try { localStreamRef.current.getTracks().forEach((t) => t.stop()); } catch (e) {}
+      localStreamRef.current = null;
+    }
+
+    const constraints = type === 'video'
+      ? { audio: true, video: { width: { ideal: 1280 }, height: { ideal: 720 } } }
+      : { audio: true, video: false };
+
+    let stream = null;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      }
+    } catch (err) {
+      console.warn('Initial getUserMedia capture failed, trying audio fallback:', err);
+      try {
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        }
+      } catch (err2) {
+        console.error('Microphone capture failed:', err2);
+      }
+    }
+
+    if (stream) {
+      localStreamRef.current = stream;
+      if (localVideoRef.current && type === 'video') {
+        localVideoRef.current.srcObject = stream;
+      }
+      setupAudioVisualizer(stream);
+    }
+    return stream;
+  };
+
+  const createPeerConnection = (roomId) => {
+    if (peerConnectionRef.current) {
+      try { peerConnectionRef.current.close(); } catch (e) {}
+      peerConnectionRef.current = null;
+    }
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ]
+    });
+    peerConnectionRef.current = pc;
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socket && roomId) {
+        socket.emit('webrtc-ice-candidate', {
+          roomId,
+          candidate: event.candidate
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      const remoteStream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
+        remoteAudioRef.current.play().catch((e) => console.warn('Remote audio autoplay:', e));
+      }
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') {
+        setActiveCall((prev) => (prev ? { ...prev, status: 'connected' } : null));
+      }
+    };
+
+    return pc;
+  };
+
   const startCall = async (type = 'voice') => {
     if (!activeGroup) return;
     const recipient = activeGroup.displayName || activeGroup.name || 'Team Member';
     const recipientAvatar = activeGroup.avatar || null;
+    const roomId = activeGroup._id;
 
     setActiveCall({
       type,
@@ -320,90 +443,50 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       isVideoOff: false,
       isSpeakerOn: true,
       isScreenSharing: false,
-      error: null
+      error: null,
+      roomId
     });
     setCallDuration(0);
     setShowDialpad(false);
     setDialpadDigits('');
 
-    // Emit socket call event
-    if (socket && activeGroup._id) {
+    const stream = await initLocalMedia(type);
+    const pc = createPeerConnection(roomId);
+    if (stream && pc) {
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+    }
+
+    if (socket && roomId) {
       socket.emit('call-user', {
-        roomId: activeGroup._id,
+        roomId,
         callType: type,
         caller: currentUser?._id || currentUser?.id,
         callerName: currentUser?.name || currentUser?.username || 'Elite User'
       });
     }
-
-    // Capture local audio/video media
-    try {
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const constraints = type === 'video' ? { audio: true, video: true } : { audio: true, video: false };
-        let stream = null;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (mediaErr) {
-          console.warn('Initial getUserMedia capture failed, trying audio only fallback:', mediaErr);
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-          } catch (audioErr) {
-            console.warn('Audio capture also failed:', audioErr);
-          }
-        }
-
-        if (stream) {
-          localStreamRef.current = stream;
-          if (localVideoRef.current && type === 'video') {
-            localVideoRef.current.srcObject = stream;
-          }
-
-          // Setup AudioContext for waveform / pulse visualizer
-          try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (AudioCtx) {
-              const ctx = new AudioCtx();
-              audioContextRef.current = ctx;
-              const source = ctx.createMediaStreamSource(stream);
-              const analyser = ctx.createAnalyser();
-              analyser.fftSize = 64;
-              source.connect(analyser);
-              const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-              audioIntervalRef.current = setInterval(() => {
-                analyser.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-                const avg = sum / (dataArray.length || 1);
-                setAudioLevel(Math.min(100, Math.round((avg / 255) * 100)));
-              }, 120);
-            }
-          } catch (visErr) {
-            console.warn('Visualization setup warning:', visErr);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('getUserMedia uncaught error:', err);
-    }
-
-    // Transition to connected after brief ring if other end is auto-joining room
-    setTimeout(() => {
-      setActiveCall((prev) => {
-        if (prev && prev.status === 'calling') {
-          return { ...prev, status: 'connected' };
-        }
-        return prev;
-      });
-    }, 2400);
   };
 
   const endCall = (shouldEmit = true) => {
-    if (shouldEmit && socket && activeGroup?._id) {
+    const currentRoomId = activeCallRef.current?.roomId || activeGroup?._id;
+    if (shouldEmit && socket && currentRoomId) {
       socket.emit('end-call', {
-        roomId: activeGroup._id,
+        roomId: currentRoomId,
         from: currentUser?._id || currentUser?.id
       });
+    }
+
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+      peerConnectionRef.current = null;
+    }
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
     }
 
     if (localStreamRef.current) {
@@ -504,17 +587,41 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
-  const answerIncomingCall = () => {
+  const answerIncomingCall = async () => {
     if (!incomingCall) return;
     const type = incomingCall.callType || 'voice';
-    if (socket && incomingCall.roomId) {
+    const roomId = incomingCall.roomId;
+    const callerName = incomingCall.callerName || 'Team Member';
+    setIncomingCall(null);
+
+    setActiveCall({
+      type,
+      recipientName: callerName,
+      recipientAvatar: null,
+      status: 'connected',
+      isMuted: false,
+      isVideoOff: false,
+      isSpeakerOn: true,
+      isScreenSharing: false,
+      error: null,
+      roomId
+    });
+    setCallDuration(0);
+    setShowDialpad(false);
+    setDialpadDigits('');
+
+    const stream = await initLocalMedia(type);
+    const pc = createPeerConnection(roomId);
+    if (stream && pc) {
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+    }
+
+    if (socket && roomId) {
       socket.emit('accept-call', {
-        roomId: incomingCall.roomId,
+        roomId,
         accepter: currentUser?._id || currentUser?.id
       });
     }
-    setIncomingCall(null);
-    startCall(type);
   };
 
   const declineIncomingCall = () => {
@@ -900,8 +1007,68 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     };
 
-    const handleCallAccepted = () => {
+    const handleCallAccepted = async () => {
       setActiveCall((prev) => (prev ? { ...prev, status: 'connected' } : null));
+      const pc = peerConnectionRef.current;
+      const rId = activeCallRef.current?.roomId || activeGroupIdRef.current;
+      if (pc && rId) {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (socket) {
+            socket.emit('webrtc-offer', {
+              roomId: rId,
+              offer
+            });
+          }
+        } catch (err) {
+          console.error('Failed to create WebRTC offer:', err);
+        }
+      }
+    };
+
+    const handleWebRtcOffer = async (data) => {
+      if (!data || !data.offer) return;
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          if (socket && data.roomId) {
+            socket.emit('webrtc-answer', {
+              roomId: data.roomId,
+              answer
+            });
+          }
+        } catch (err) {
+          console.error('Failed to handle WebRTC offer:', err);
+        }
+      }
+    };
+
+    const handleWebRtcAnswer = async (data) => {
+      if (!data || !data.answer) return;
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } catch (err) {
+          console.error('Failed to handle WebRTC answer:', err);
+        }
+      }
+    };
+
+    const handleWebRtcIceCandidate = async (data) => {
+      if (!data || !data.candidate) return;
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (err) {
+          console.warn('Failed to add ICE candidate:', err);
+        }
+      }
     };
 
     const handleCallDeclined = () => {
@@ -928,6 +1095,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     socket.on('call-accepted', handleCallAccepted);
     socket.on('call-declined', handleCallDeclined);
     socket.on('call-ended', handleCallEnded);
+    socket.on('webrtc-offer', handleWebRtcOffer);
+    socket.on('webrtc-answer', handleWebRtcAnswer);
+    socket.on('webrtc-ice-candidate', handleWebRtcIceCandidate);
 
     return () => {
       socket.off('connect', handleConnect);
@@ -945,6 +1115,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('call-accepted', handleCallAccepted);
       socket.off('call-declined', handleCallDeclined);
       socket.off('call-ended', handleCallEnded);
+      socket.off('webrtc-offer', handleWebRtcOffer);
+      socket.off('webrtc-answer', handleWebRtcAnswer);
+      socket.off('webrtc-ice-candidate', handleWebRtcIceCandidate);
     };
   }, [socket, currentUser]);
 
@@ -967,6 +1140,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       fetchGroupMessages(activeGroup._id, msgFilter, true);
     }
   }, [socket, activeGroup?._id, msgFilter]);
+
+  const scrollToChatBottom = useCallback((smooth = false) => {
+    if (chatScrollRef.current) {
+      if (smooth) {
+        chatScrollRef.current.scrollTo({
+          top: chatScrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      } else {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+    }
+  }, []);
 
   const handleSelectGroup = (targetGroup) => {
     if (!targetGroup) return;
@@ -998,10 +1184,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     // Note: The useEffect on activeGroup?._id handles background/initial fetch automatically
   };
 
-  // Auto-scroll to chat bottom
+  // Auto-scroll to chat bottom safely strictly within message container
   useEffect(() => {
-    if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [messages, viewportHeight]);
 
@@ -1863,11 +2049,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   // Infinite Scroll Handler for Older Messages
   const handleChatScroll = async () => {
-    if (!chatScrollRef.current || loadingMoreMessages || !hasMoreMessages || !activeGroup) return;
-    if (chatScrollRef.current.scrollTop === 0) {
+    const el = chatScrollRef.current;
+    if (!el || !activeGroup) return;
+
+    // Track user distance from bottom to preserve pinned status on incoming messages
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceFromBottom <= 120;
+
+    // Only load older messages if container actually overflows and user deliberately scrolled to the top
+    if (loadingMoreMessages || !hasMoreMessages) return;
+    if (el.scrollHeight > el.clientHeight + 60 && el.scrollTop <= 15) {
       const nextPage = page + 1;
       setLoadingMoreMessages(true);
-      const scrollHeightBefore = chatScrollRef.current.scrollHeight;
+      const scrollHeightBefore = el.scrollHeight;
 
       try {
         const params = { page: nextPage, limit: 50 };
@@ -1879,11 +2073,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           setMessages((prev) => [...res.data, ...prev]);
           setPage(nextPage);
 
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             if (chatScrollRef.current) {
               chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight - scrollHeightBefore;
             }
-          }, 50);
+          });
         }
       } catch (err) {
         console.error('Failed to load older messages:', err);
@@ -1949,6 +2143,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     };
 
     setMessages((prev) => [...prev, tempMsg]);
+    isNearBottomRef.current = true;
+    requestAnimationFrame(() => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+    });
 
     setInputMessage('');
     setAttachedFile(null);
@@ -3837,8 +4037,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         }}
                         onFocus={() => {
                           setTimeout(() => {
-                            chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-                          }, 250);
+                            if (chatScrollRef.current) {
+                              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+                            }
+                          }, 100);
                         }}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -5474,17 +5676,46 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     </div>
                   </div>
                 ) : (
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
+                  <>
+                    {/* Main Remote Video Stream */}
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+
+                    {/* Floating Local Video PiP Preview */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '20px',
+                      right: '20px',
+                      width: '130px',
+                      height: '95px',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      border: '2px solid rgba(255,255,255,0.4)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                      background: '#0f172a',
+                      zIndex: 4
+                    }}>
+                      <video
+                        ref={localVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    </div>
+                  </>
                 )}
 
                 {/* Floating Top Pill Overlay */}
@@ -5600,6 +5831,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
       )}
 
+      {/* WebRTC Remote Audio Player (auto-plays incoming voice on speaker) */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
     </div>
   );
 }

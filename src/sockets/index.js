@@ -690,6 +690,24 @@ const setupSockets = (io) => {
       }
     });
 
+    socket.on('webrtc-offer', (data) => {
+      if (data && data.roomId) {
+        socket.to(String(data.roomId)).emit('webrtc-offer', data);
+      }
+    });
+
+    socket.on('webrtc-answer', (data) => {
+      if (data && data.roomId) {
+        socket.to(String(data.roomId)).emit('webrtc-answer', data);
+      }
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+      if (data && data.roomId) {
+        socket.to(String(data.roomId)).emit('webrtc-ice-candidate', data);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`User disconnected from socket: ${socket.id}`);
       activeUsers.delete(socket.id);

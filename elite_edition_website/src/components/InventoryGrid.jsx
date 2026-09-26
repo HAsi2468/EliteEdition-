@@ -143,6 +143,13 @@ export default function InventoryGrid({
   const [outwardError, setOutwardError] = useState('');
   const [downloadingOutwardPdf, setDownloadingOutwardPdf] = useState(false);
 
+  // Challan-Wise Outward View States
+  const [outwardViewMode, setOutwardViewMode] = useState('challan'); // 'challan' (default) | 'items'
+  const [selectedOutwardChallan, setSelectedOutwardChallan] = useState(null);
+  const [expandedOutwardChallanId, setExpandedOutwardChallanId] = useState(null);
+  const [outwardChallanSortField, setOutwardChallanSortField] = useState('date');
+  const [outwardChallanSortOrder, setOutwardChallanSortOrder] = useState('desc');
+
   // Managed custom brands in localStorage + Event Listener for real-time updates from Manage Brands
   const [customBrands, setCustomBrands] = useState(() => {
     try {
@@ -847,8 +854,299 @@ export default function InventoryGrid({
 
       if (aVal < bVal) return outwardSortOrder === 'asc' ? -1 : 1;
       if (aVal > bVal) return outwardSortOrder === 'asc' ? 1 : -1;
+    });
+
+  const handleOutwardChallanSort = (field) => {
+    if (outwardChallanSortField === field) {
+      setOutwardChallanSortOrder(outwardChallanSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setOutwardChallanSortField(field);
+      setOutwardChallanSortOrder('asc');
+    }
+  };
+
+  // Group Outward Items into Challan Batches
+  const outwardChallans = useMemo(() => {
+    const rawItems = outwardData.items || [];
+    if (!rawItems.length) return [];
+
+    // Sort chronologically descending
+    const sorted = [...rawItems].sort((a, b) => {
+      const tA = new Date(a.created_date_time || a.createdAt || a.date || 0).getTime();
+      const tB = new Date(b.created_date_time || b.createdAt || b.date || 0).getTime();
+      return tB - tA;
+    });
+
+    const groups = [];
+    let curGroup = null;
+
+    sorted.forEach((item, idx) => {
+      const rawDt = item.created_date_time || item.createdAt || item.date;
+      const timeMs = new Date(rawDt).getTime();
+      const challanNo = (item.challanNo || item.challan || '').trim();
+      const party = (item.party || item.client || item.vendor || 'Party').trim();
+
+      const itemQty = Math.abs(Number(item.total || item.qty || 0));
+      const buyPrice = Number(item.purchasePrice || item.buyPrice || 0);
+      const sellPrice = Number(item.salePrice || 0);
+      const totalBuy = Number(item.totalPurchaseAmount || (buyPrice * itemQty));
+      const totalSell = Number(item.totalSellableAmount || item.saleRevenue || (sellPrice * itemQty));
+      const profit = Number(item.profit !== undefined ? item.profit : (totalSell - totalBuy));
+      const skuCode = item.skuCode || item.sku || `ITEM-${idx}`;
+
+      if (curGroup) {
+        const sameExplicitChallan = challanNo && curGroup.challanNo && challanNo.toLowerCase() === curGroup.challanNo.toLowerCase();
+        const sameParty = (party || '').toLowerCase() === (curGroup.party || '').toLowerCase();
+        const timeDiff = Math.abs(curGroup.earliestTimeMs - timeMs);
+        const sameTimeBatch = (!challanNo || !curGroup.challanNo) && sameParty && (timeDiff <= 300000 || Math.abs(curGroup.latestTimeMs - timeMs) <= 90000);
+
+        if (sameExplicitChallan || sameTimeBatch) {
+          curGroup.items.push(item);
+          curGroup.totalQty += itemQty;
+          curGroup.totalBuyAmount += totalBuy;
+          curGroup.totalSellAmount += totalSell;
+          curGroup.totalProfit += profit;
+          curGroup.skuCodes.add(skuCode);
+          curGroup.latestTimeMs = Math.max(curGroup.latestTimeMs, timeMs);
+          curGroup.earliestTimeMs = Math.min(curGroup.earliestTimeMs, timeMs);
+          if (!curGroup.sampleImage && item.imageUrl) {
+            curGroup.sampleImage = item.imageUrl;
+          }
+          return;
+        }
+      }
+
+      curGroup = {
+        id: challanNo ? `OUT-CH-${challanNo}-${timeMs}` : `OUT-BATCH-${item._id || item.id || idx}`,
+        challanNo: challanNo,
+        party: party,
+        date: rawDt,
+        latestTimeMs: timeMs,
+        earliestTimeMs: timeMs,
+        items: [item],
+        totalQty: itemQty,
+        totalBuyAmount: totalBuy,
+        totalSellAmount: totalSell,
+        totalProfit: profit,
+        skuCodes: new Set([skuCode]),
+        sampleImage: item.imageUrl || ''
+      };
+      groups.push(curGroup);
+    });
+
+    // Assign sequential Challan No (DISP-DDMM-01, DISP-DDMM-02...) if not entered by user
+    const dayCounters = {};
+    const reversed = [...groups].reverse();
+    reversed.forEach((g) => {
+      const dt = new Date(g.date);
+      const dayStr = String(dt.getDate()).padStart(2, '0') + String(dt.getMonth() + 1).padStart(2, '0');
+      if (!dayCounters[dayStr]) dayCounters[dayStr] = 0;
+      dayCounters[dayStr]++;
+
+      if (!g.challanNo) {
+        const seqStr = String(dayCounters[dayStr]).padStart(2, '0');
+        g.displayChallanNo = `DISP-${dayStr}-${seqStr}`;
+        g.isAutoChallan = true;
+      } else {
+        g.displayChallanNo = g.challanNo.startsWith('DISP-') || g.challanNo.startsWith('CH-') || g.challanNo.startsWith('OUT-')
+          ? g.challanNo
+          : `CH-${g.challanNo}`;
+        g.isAutoChallan = false;
+      }
+    });
+
+    return groups;
+  }, [outwardData.items]);
+
+  // Filtered & Sorted Outward Challans
+  const filteredOutwardChallans = useMemo(() => {
+    let list = outwardChallans;
+    if (outwardSearchTerm.trim()) {
+      const q = outwardSearchTerm.trim().toLowerCase();
+      list = list.filter((ch) => {
+        if (ch.displayChallanNo.toLowerCase().includes(q)) return true;
+        if (ch.party.toLowerCase().includes(q)) return true;
+        return ch.items.some((it) =>
+          (it.skuCode && it.skuCode.toLowerCase().includes(q)) ||
+          (it.sku && it.sku.toLowerCase().includes(q)) ||
+          (it.itemName && it.itemName.toLowerCase().includes(q)) ||
+          (it.size && it.size.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    return [...list].sort((a, b) => {
+      let aVal = a[outwardChallanSortField];
+      let bVal = b[outwardChallanSortField];
+
+      if (outwardChallanSortField === 'date') {
+        aVal = new Date(a.date || 0).getTime();
+        bVal = new Date(b.date || 0).getTime();
+      } else if (outwardChallanSortField === 'totalQty') {
+        aVal = Number(a.totalQty || 0);
+        bVal = Number(b.totalQty || 0);
+      } else if (outwardChallanSortField === 'totalSkus') {
+        aVal = a.skuCodes.size;
+        bVal = b.skuCodes.size;
+      } else if (outwardChallanSortField === 'totalSellAmount' || outwardChallanSortField === 'totalAmount') {
+        aVal = Number(a.totalSellAmount || 0);
+        bVal = Number(b.totalSellAmount || 0);
+      } else if (outwardChallanSortField === 'profit') {
+        aVal = Number(a.totalProfit || 0);
+        bVal = Number(b.totalProfit || 0);
+      } else if (outwardChallanSortField === 'party') {
+        aVal = (a.party || '').toLowerCase();
+        bVal = (b.party || '').toLowerCase();
+      } else if (outwardChallanSortField === 'challanNo') {
+        aVal = (a.displayChallanNo || '').toLowerCase();
+        bVal = (b.displayChallanNo || '').toLowerCase();
+      }
+
+      if (aVal < bVal) return outwardChallanSortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return outwardChallanSortOrder === 'asc' ? 1 : -1;
       return 0;
     });
+  }, [outwardChallans, outwardSearchTerm, outwardChallanSortField, outwardChallanSortOrder]);
+
+  const handlePrintOutwardChallan = (challan) => {
+    if (!challan) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print Outward Challan');
+      return;
+    }
+    const dtObj = new Date(challan.date);
+    const dateFormatted = !isNaN(dtObj.getTime())
+      ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : 'N/A';
+    const timeFormatted = !isNaN(dtObj.getTime())
+      ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      : '';
+
+    const rowsHtml = (challan.items || []).map((item, index) => {
+      const itemQty = Math.abs(Number(item.total || item.qty || 0));
+      const sellPrice = Number(item.salePrice || 0);
+      const totalAmount = Number(item.totalSellableAmount || item.saleRevenue || (itemQty * sellPrice));
+      const sizeStr = item.sizes && item.sizes.length > 0
+        ? item.sizes.map(s => `${s.size}: ${s.qty}`).join(', ')
+        : (item.size || 'Free Size');
+
+      return `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 8px 10px; font-size: 12px; text-align: center;">${index + 1}</td>
+          <td style="padding: 8px 10px; font-size: 12px; font-weight: 600;">${item.sku || item.skuCode || '-'}</td>
+          <td style="padding: 8px 10px; font-size: 12px;">${item.itemName || '-'}</td>
+          <td style="padding: 8px 10px; font-size: 11px; color: #475569;">${sizeStr}</td>
+          <td style="padding: 8px 10px; font-size: 12px; font-weight: 700; text-align: center; color: #dc2626;">-${itemQty} Pcs</td>
+          <td style="padding: 8px 10px; font-size: 12px; text-align: right;">₹${sellPrice.toFixed(2)}</td>
+          <td style="padding: 8px 10px; font-size: 12px; font-weight: 700; text-align: right;">₹${totalAmount.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Outward Dispatch Challan - ${challan.displayChallanNo}</title>
+          <style>
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              @page { margin: 12mm; }
+            }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #ea580c; padding-bottom: 14px; margin-bottom: 16px; }
+            .title { font-size: 20px; font-weight: 800; color: #c2410c; text-transform: uppercase; letter-spacing: 0.5px; }
+            .subtitle { font-size: 12px; color: #64748b; margin-top: 2px; }
+            .badge { background: #ffedd5; color: #c2410c; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 14px; border: 1px solid #fed7aa; }
+            .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #fffaf5; padding: 12px 14px; border-radius: 8px; border: 1px solid #fed7aa; margin-bottom: 16px; font-size: 12px; }
+            .info-label { font-size: 10px; color: #9a3412; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+            .info-val { font-size: 13px; font-weight: 700; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th { background: #ea580c; color: #ffffff; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px; text-align: left; }
+            .summary-box { margin-top: 16px; display: flex; justify-content: flex-end; }
+            .summary-table { width: 280px; border-collapse: collapse; }
+            .summary-table td { padding: 6px 10px; font-size: 13px; }
+            .signatures { margin-top: 48px; display: flex; justify-content: space-between; padding: 0 24px; }
+            .sig-line { border-top: 1px dashed #94a3b8; width: 180px; text-align: center; padding-top: 6px; font-size: 11px; color: #475569; font-weight: 600; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">ELITE EDITION - GOODS OUTWARD CHALLAN</div>
+              <div class="subtitle">Official Inventory Dispatch Delivery Slip & Gate Pass</div>
+            </div>
+            <div class="badge">${challan.displayChallanNo}</div>
+          </div>
+
+          <div class="info-grid">
+            <div>
+              <div class="info-label">Dispatch Challan No</div>
+              <div class="info-val">${challan.displayChallanNo}</div>
+            </div>
+            <div>
+              <div class="info-label">Dispatched To / Party</div>
+              <div class="info-val">${challan.party || 'Customer / Party'}</div>
+            </div>
+            <div>
+              <div class="info-label">Date & Time</div>
+              <div class="info-val">${dateFormatted} ${timeFormatted}</div>
+            </div>
+            <div>
+              <div class="info-label">Total Dispatch Qty</div>
+              <div class="info-val" style="color: #c2410c;">${challan.totalQty} Units</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 35px; text-align: center;">#</th>
+                <th style="width: 140px;">SKU Code</th>
+                <th>Product Description</th>
+                <th style="width: 150px;">Size Breakdown</th>
+                <th style="width: 90px; text-align: center;">Qty Dispatched</th>
+                <th style="width: 100px; text-align: right;">Unit Sale Price</th>
+                <th style="width: 110px; text-align: right;">Total Sale Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="summary-box">
+            <table class="summary-table">
+              <tr>
+                <td style="color: #64748b; font-weight: 600;">Total Unique SKUs:</td>
+                <td style="text-align: right; font-weight: 700;">${challan.skuCodes.size}</td>
+              </tr>
+              <tr>
+                <td style="color: #64748b; font-weight: 600;">Total Units Out:</td>
+                <td style="text-align: right; font-weight: 700; color: #c2410c;">${challan.totalQty} Units</td>
+              </tr>
+              <tr style="border-top: 1.5px solid #fed7aa; background: #fffaf5;">
+                <td style="color: #c2410c; font-weight: 800; font-size: 14px;">Total Value:</td>
+                <td style="text-align: right; font-weight: 800; font-size: 15px; color: #c2410c;">₹${(challan.totalSellAmount || 0).toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="signatures">
+            <div class="sig-line">Prepared & Dispatched By</div>
+            <div class="sig-line">Quality Checked By</div>
+            <div class="sig-line">Receiver's Signature & Stamp</div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 400);
+  };
 
   // Thermal Barcode Printing
   const printBarcode = (item) => {
@@ -2290,7 +2588,8 @@ export default function InventoryGrid({
               <div>
                 <div style={styles.statLabel}>DISPATCH TRANSACTIONS</div>
                 <div style={{ ...styles.statVal, color: '#b45309' }}>
-                  {outwardData.items?.length || 0} <span style={styles.statSubText}>records</span>
+                  {outwardChallans.length} <span style={styles.statSubText}>challans</span>
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500, marginLeft: '6px' }}>({outwardData.items?.length || 0} items)</span>
                 </div>
               </div>
             </div>
@@ -2350,6 +2649,84 @@ export default function InventoryGrid({
                   setCustomOutwardEnd(e);
                 }}
               />
+
+              {/* View Switcher: Challan Wise (Default) vs Individual SKUs */}
+              <div style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                padding: '3px',
+                borderRadius: '9px',
+                border: '1px solid #cbd5e1',
+                gap: '3px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setOutwardViewMode('challan')}
+                  style={{
+                    padding: '0.35rem 0.7rem',
+                    borderRadius: '7px',
+                    border: 'none',
+                    background: outwardViewMode === 'challan' ? '#ea580c' : 'transparent',
+                    color: outwardViewMode === 'challan' ? '#ffffff' : '#475569',
+                    fontWeight: outwardViewMode === 'challan' ? 700 : 500,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s ease',
+                    boxShadow: outwardViewMode === 'challan' ? '0 2px 6px rgba(234, 88, 12, 0.3)' : 'none'
+                  }}
+                  title="View Outward Stock grouped by Challan"
+                >
+                  <FileText size={13} />
+                  <span>Challan Wise</span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    background: outwardViewMode === 'challan' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                    color: outwardViewMode === 'challan' ? '#ffffff' : '#64748b',
+                    fontWeight: 700
+                  }}>
+                    {filteredOutwardChallans.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOutwardViewMode('items')}
+                  style={{
+                    padding: '0.35rem 0.7rem',
+                    borderRadius: '7px',
+                    border: 'none',
+                    background: outwardViewMode === 'items' ? '#ea580c' : 'transparent',
+                    color: outwardViewMode === 'items' ? '#ffffff' : '#475569',
+                    fontWeight: outwardViewMode === 'items' ? 700 : 500,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s ease',
+                    boxShadow: outwardViewMode === 'items' ? '0 2px 6px rgba(234, 88, 12, 0.3)' : 'none'
+                  }}
+                  title="View flattened individual SKU log"
+                >
+                  <Layers3 size={13} />
+                  <span>Individual SKUs</span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    background: outwardViewMode === 'items' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                    color: outwardViewMode === 'items' ? '#ffffff' : '#64748b',
+                    fontWeight: 700
+                  }}>
+                    {filteredOutwardItems.length}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
@@ -2390,6 +2767,421 @@ export default function InventoryGrid({
                 <span>{outwardError}</span>
                 <button onClick={() => fetchOutwardData()} style={styles.retryBtn}>Retry</button>
               </div>
+            ) : outwardViewMode === 'challan' ? (
+              /* ================= OUTWARD CHALLAN-WISE VIEW ================= */
+              filteredOutwardChallans.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <span style={{ fontSize: '2.8rem' }}>📋</span>
+                  <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No outward dispatch challans found</h4>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or record a stock dispatch.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-th, #f1f5f9)', borderBottom: '2px solid var(--border-light, #cbd5e1)' }}>
+                        <th style={{ width: '45px', padding: '0.65rem 0.4rem', textAlign: 'center', color: 'var(--text-muted, #64748b)', fontWeight: 800 }}>#</th>
+                        <th onClick={() => handleOutwardChallanSort('date')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>DATE & TIME</span>
+                            <span style={{ fontSize: '0.7rem', color: outwardChallanSortField === 'date' ? '#ea580c' : '#94a3b8' }}>
+                              {outwardChallanSortField === 'date' ? (outwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleOutwardChallanSort('challanNo')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Challan No">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>CHALLAN NO</span>
+                            <span style={{ fontSize: '0.7rem', color: outwardChallanSortField === 'challanNo' ? '#ea580c' : '#94a3b8' }}>
+                              {outwardChallanSortField === 'challanNo' ? (outwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleOutwardChallanSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Customer / Party">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>CUSTOMER / PARTY</span>
+                            <span style={{ fontSize: '0.7rem', color: outwardChallanSortField === 'party' ? '#ea580c' : '#94a3b8' }}>
+                              {outwardChallanSortField === 'party' ? (outwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleOutwardChallanSort('totalSkus')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Total SKUs">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                            <span>TOTAL SKUs</span>
+                            <span style={{ fontSize: '0.7rem', color: outwardChallanSortField === 'totalSkus' ? '#ea580c' : '#94a3b8' }}>
+                              {outwardChallanSortField === 'totalSkus' ? (outwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleOutwardChallanSort('totalQty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Total Dispatched Units">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                            <span>UNITS OUT</span>
+                            <span style={{ fontSize: '0.7rem', color: outwardChallanSortField === 'totalQty' ? '#ea580c' : '#94a3b8' }}>
+                              {outwardChallanSortField === 'totalQty' ? (outwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>ITEMS PREVIEW</th>
+                        <th onClick={() => handleOutwardChallanSort('totalSellAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Sale Revenue">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                            <span>SALE VALUE</span>
+                            <span style={{ fontSize: '0.7rem', color: outwardChallanSortField === 'totalSellAmount' ? '#ea580c' : '#94a3b8' }}>
+                              {outwardChallanSortField === 'totalSellAmount' ? (outwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleOutwardChallanSort('totalProfit')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }} title="Sort by Gross Profit">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                            <span>PROFIT</span>
+                            <span style={{ fontSize: '0.7rem', color: outwardChallanSortField === 'totalProfit' ? '#ea580c' : '#94a3b8' }}>
+                              {outwardChallanSortField === 'totalProfit' ? (outwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap' }}>
+                          ACTIONS
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOutwardChallans.map((ch, idx) => {
+                        const dtObj = ch.date ? new Date(ch.date) : null;
+                        const dateStr = dtObj && !isNaN(dtObj.getTime())
+                          ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : 'N/A';
+                        const timeStr = dtObj && !isNaN(dtObj.getTime())
+                          ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                          : '';
+
+                        const isExpanded = expandedOutwardChallanId === ch.id;
+                        const skuList = Array.from(ch.skuCodes || []);
+                        const visibleSkus = skuList.slice(0, 2);
+                        const extraSkusCount = skuList.length - visibleSkus.length;
+
+                        return (
+                          <React.Fragment key={ch.id || idx}>
+                            <tr style={{
+                              borderBottom: isExpanded ? 'none' : '1px solid #e2e8f0',
+                              background: isExpanded ? '#fff7ed' : (idx % 2 === 0 ? '#ffffff' : '#fffbfb'),
+                              transition: 'background 0.15s ease'
+                            }}>
+                              {/* Row Index # */}
+                              <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#64748b', fontWeight: 700, fontSize: '0.78rem' }}>
+                                {idx + 1}
+                              </td>
+
+                              {/* Date & Time */}
+                              <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>{dateStr}</div>
+                                {timeStr && <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>{timeStr}</div>}
+                              </td>
+
+                              {/* Challan No */}
+                              <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  background: '#fff7ed',
+                                  color: '#c2410c',
+                                  border: '1px solid #fed7aa',
+                                  padding: '0.25rem 0.55rem',
+                                  borderRadius: '6px',
+                                  fontWeight: 800,
+                                  fontSize: '0.78rem',
+                                  letterSpacing: '0.02em',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}>
+                                  <FileText size={12} color="#ea580c" />
+                                  {ch.displayChallanNo}
+                                </span>
+                              </td>
+
+                              {/* Customer / Party */}
+                              <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#1e293b', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                {ch.party || 'Customer / Party'}
+                              </td>
+
+                              {/* Total SKUs */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  background: '#f5f3ff',
+                                  color: '#6d28d9',
+                                  border: '1px solid #ddd6fe',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem'
+                                }}>
+                                  {ch.skuCodes ? ch.skuCodes.size : ch.items.length} SKUs
+                                </span>
+                              </td>
+
+                              {/* Total Units Dispatched */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  background: '#fff1f2',
+                                  color: '#e11d48',
+                                  border: '1px solid #fecdd3',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}>
+                                  -{ch.totalQty} Units
+                                </span>
+                              </td>
+
+                              {/* Items Preview */}
+                              <td style={{ padding: '0.6rem 0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  {ch.sampleImage && (
+                                    <img
+                                      src={ch.sampleImage}
+                                      alt="preview"
+                                      style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                                    />
+                                  )}
+                                  {visibleSkus.map((sku, sIdx) => (
+                                    <span key={sIdx} style={{
+                                      background: '#f8fafc',
+                                      color: '#334155',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.7rem',
+                                      fontWeight: 600,
+                                      border: '1px solid #cbd5e1'
+                                    }}>
+                                      {sku}
+                                    </span>
+                                  ))}
+                                  {extraSkusCount > 0 && (
+                                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                                      +{extraSkusCount} more
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Total Sale Value */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                {ch.totalSellAmount > 0 ? (
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0284c7' }}>
+                                    ₹{ch.totalSellAmount.toFixed(2)}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>
+                                    ₹0.00
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Profit */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  fontSize: '0.84rem',
+                                  fontWeight: 800,
+                                  color: ch.totalProfit >= 0 ? '#059669' : '#dc2626'
+                                }}>
+                                  ₹{(ch.totalProfit || 0).toFixed(2)}
+                                </span>
+                              </td>
+
+                              {/* Actions */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
+                                  {/* View Challan Details Modal */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedOutwardChallan(ch)}
+                                    style={{
+                                      width: '30px',
+                                      height: '30px',
+                                      padding: 0,
+                                      background: '#fff7ed',
+                                      border: '1px solid #fed7aa',
+                                      color: '#ea580c',
+                                      borderRadius: '7px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title="View Full Dispatch Challan"
+                                  >
+                                    <Eye size={15} />
+                                  </button>
+
+                                  {/* Print Delivery Challan */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePrintOutwardChallan(ch)}
+                                    style={{
+                                      width: '30px',
+                                      height: '30px',
+                                      padding: 0,
+                                      background: '#f0fdf4',
+                                      border: '1px solid #bbf7d0',
+                                      color: '#16a34a',
+                                      borderRadius: '7px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title="Print Delivery Challan Slip"
+                                  >
+                                    <Printer size={15} />
+                                  </button>
+
+                                  {/* Expand / Collapse Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedOutwardChallanId(isExpanded ? null : ch.id)}
+                                    style={{
+                                      padding: '0 0.5rem',
+                                      height: '30px',
+                                      background: isExpanded ? '#ea580c' : '#f8fafc',
+                                      border: isExpanded ? '1px solid #ea580c' : '1px solid #cbd5e1',
+                                      color: isExpanded ? '#ffffff' : '#475569',
+                                      borderRadius: '7px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.2rem',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title={isExpanded ? 'Hide Items' : 'Show All Items'}
+                                  >
+                                    <span>{isExpanded ? 'Hide' : 'Items'}</span>
+                                    {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Inline Expandable Subtable */}
+                            {isExpanded && (
+                              <tr style={{ background: '#fff7ed', borderBottom: '2px solid #fed7aa' }}>
+                                <td colSpan="10" style={{ padding: '0.85rem 1.25rem' }}>
+                                  <div style={{
+                                    background: '#ffffff',
+                                    borderRadius: '10px',
+                                    border: '1px solid #fed7aa',
+                                    overflow: 'hidden',
+                                    boxShadow: '0 4px 12px rgba(234, 88, 12, 0.08)'
+                                  }}>
+                                    <div style={{
+                                      padding: '0.65rem 1rem',
+                                      background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
+                                      borderBottom: '1px solid #fed7aa',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Package size={14} color="#ea580c" />
+                                        <span style={{ fontWeight: 800, fontSize: '0.78rem', color: '#9a3412' }}>
+                                          Dispatched Items in Challan: {ch.displayChallanNo}
+                                        </span>
+                                      </div>
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c2410c' }}>
+                                        {ch.items.length} items &bull; -{ch.totalQty} total units &bull; Total Sale: ₹{ch.totalSellAmount.toFixed(2)}
+                                      </span>
+                                    </div>
+
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                                      <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700 }}>PHOTO</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700 }}>SKU</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700 }}>ITEM NAME</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontWeight: 700 }}>SIZES</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontWeight: 700 }}>QTY OUT</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>BUY PRICE</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>SALE PRICE</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>TOTAL SALE</th>
+                                          <th style={{ padding: '0.5rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>PROFIT</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {ch.items.map((subItem, sIdx) => {
+                                          const subQty = Math.abs(Number(subItem.total || subItem.qty || 0));
+                                          const subBuy = Number(subItem.purchasePrice || subItem.buyPrice || 0);
+                                          const subSell = Number(subItem.salePrice || 0);
+                                          const subTotalBuy = Number(subItem.totalPurchaseAmount || (subBuy * subQty));
+                                          const subTotalSell = Number(subItem.totalSellableAmount || subItem.saleRevenue || (subSell * subQty));
+                                          const subProfit = Number(subItem.profit !== undefined ? subItem.profit : (subTotalSell - subTotalBuy));
+
+                                          return (
+                                            <tr key={subItem._id || subItem.id || sIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                              <td style={{ padding: '0.45rem 0.6rem' }}>
+                                                <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                  {subItem.imageUrl ? (
+                                                    <img src={subItem.imageUrl} alt={subItem.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                  ) : (
+                                                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8' }}>{subItem.itemName ? subItem.itemName[0] : 'E'}</span>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', fontWeight: 700, color: '#ea580c' }}>
+                                                {subItem.skuCode || subItem.sku || '-'}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', fontWeight: 600, color: '#1e293b' }}>
+                                                {subItem.itemName || '-'}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                                  {subItem.sizes && subItem.sizes.length > 0 ? (
+                                                    subItem.sizes.map((s, szIdx) => (
+                                                      <span key={szIdx} style={{ background: '#fff7ed', color: '#c2410c', padding: '1px 5px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                                                        {s.size}: {s.qty}
+                                                      </span>
+                                                    ))
+                                                  ) : (
+                                                    <span style={{ color: '#64748b', fontSize: '0.7rem' }}>{subItem.size || '-'}</span>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                                                <span style={{ background: '#fff1f2', color: '#e11d48', padding: '2px 6px', borderRadius: '4px', fontWeight: 800, fontSize: '0.72rem' }}>
+                                                  -{subQty}
+                                                </span>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', color: '#64748b' }}>
+                                                ₹{subBuy.toFixed(2)}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
+                                                ₹{subSell.toFixed(2)}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>
+                                                ₹{subTotalSell.toFixed(2)}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: subProfit >= 0 ? '#059669' : '#dc2626' }}>
+                                                ₹{subProfit.toFixed(2)}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
             ) : filteredOutwardItems.length === 0 ? (
               <div style={styles.emptyState}>
                 <span style={{ fontSize: '2.8rem' }}>📤</span>
@@ -2908,6 +3700,236 @@ export default function InventoryGrid({
                 <button
                   type="button"
                   onClick={() => setSelectedChallan(null)}
+                  style={{
+                    padding: '0.5rem 1.2rem',
+                    background: '#64748b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Outward Challan Details Modal */}
+      {selectedOutwardChallan && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '920px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #fed7aa',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              background: 'linear-gradient(135deg, #ea580c, #c2410c)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 800 }}>Dispatch Challan {selectedOutwardChallan.displayChallanNo}</span>
+                  <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    {selectedOutwardChallan.party || 'Customer / Party'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#ffedd5', marginTop: '2px' }}>
+                  Dispatched on {new Date(selectedOutwardChallan.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} at {new Date(selectedOutwardChallan.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOutwardChallan(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  width: '32px',
+                  height: '32px',
+                  padding: 0,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Metrics Ribbon */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '0.75rem',
+              padding: '0.85rem 1.5rem',
+              background: '#fff7ed',
+              borderBottom: '1px solid #fed7aa'
+            }}>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #fed7aa' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9a3412' }}>DISPATCHED UNITS</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#e11d48', marginTop: '2px' }}>-{selectedOutwardChallan.totalQty} Units</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #fed7aa' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9a3412' }}>TOTAL SKUs</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#6d28d9', marginTop: '2px' }}>{selectedOutwardChallan.skuCodes ? selectedOutwardChallan.skuCodes.size : selectedOutwardChallan.items.length} SKUs</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #fed7aa' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9a3412' }}>TOTAL SALE VALUE</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0284c7', marginTop: '2px' }}>₹{(selectedOutwardChallan.totalSellAmount || 0).toFixed(2)}</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #fed7aa' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9a3412' }}>TOTAL PROFIT</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: selectedOutwardChallan.totalProfit >= 0 ? '#059669' : '#dc2626', marginTop: '2px' }}>₹{(selectedOutwardChallan.totalProfit || 0).toFixed(2)}</div>
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>#</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>PHOTO</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>SKU CODE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>PRODUCT NAME</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>SIZES</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>QTY OUT</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>BUY PRICE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>SALE PRICE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>TOTAL SALE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>PROFIT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(selectedOutwardChallan.items || []).map((item, idx) => {
+                    const itemQty = Math.abs(Number(item.total || item.qty || 0));
+                    const buyPrice = Number(item.purchasePrice || item.buyPrice || 0);
+                    const sellPrice = Number(item.salePrice || 0);
+                    const totalBuy = Number(item.totalPurchaseAmount || (buyPrice * itemQty));
+                    const totalSell = Number(item.totalSellableAmount || item.saleRevenue || (sellPrice * itemQty));
+                    const profit = Number(item.profit !== undefined ? item.profit : (totalSell - totalBuy));
+
+                    return (
+                      <tr key={item._id || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '0.6rem 0.75rem', color: '#64748b' }}>{idx + 1}</td>
+                        <td style={{ padding: '0.6rem 0.75rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{item.itemName ? item.itemName[0] : 'E'}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#ea580c' }}>{item.skuCode || item.sku || '-'}</td>
+                        <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600, color: '#0f172a' }}>{item.itemName || '-'}</td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {item.sizes && item.sizes.length > 0 ? (
+                              item.sizes.map((s, sIdx) => (
+                                <span key={sIdx} style={{ background: '#fff7ed', color: '#c2410c', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700 }}>
+                                  {s.size}: {s.qty}
+                                </span>
+                              ))
+                            ) : (
+                              <span style={{ color: '#64748b', fontSize: '0.72rem' }}>{item.size || '-'}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
+                          <span style={{ background: '#fff1f2', color: '#e11d48', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.78rem' }}>
+                            -{itemQty} Units
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 600, color: '#64748b' }}>
+                          ₹{buyPrice.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
+                          ₹{sellPrice.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>
+                          ₹{totalSell.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: profit >= 0 ? '#059669' : '#dc2626' }}>
+                          ₹{profit.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '0.85rem 1.5rem',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                Total Sale: <strong style={{ color: '#0284c7', fontSize: '0.95rem' }}>₹{(selectedOutwardChallan.totalSellAmount || 0).toFixed(2)}</strong> &bull; Total Profit: <strong style={{ color: selectedOutwardChallan.totalProfit >= 0 ? '#059669' : '#dc2626', fontSize: '0.95rem' }}>₹{(selectedOutwardChallan.totalProfit || 0).toFixed(2)}</strong>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => handlePrintOutwardChallan(selectedOutwardChallan)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#ea580c',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  <Printer size={15} />
+                  <span>Print Challan Slip</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOutwardChallan(null)}
                   style={{
                     padding: '0.5rem 1.2rem',
                     background: '#64748b',
