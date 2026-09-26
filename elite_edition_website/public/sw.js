@@ -68,7 +68,15 @@ self.addEventListener('fetch', (event) => {
       .catch(async () => {
         const cached = await caches.match(event.request);
         if (cached) return cached;
-        return new Response('', { status: 408, statusText: 'Request Timeout' });
+        if (event.request.mode === 'navigate') {
+          const rootCached = (await caches.match('/index.html')) || (await caches.match('/'));
+          if (rootCached) return rootCached;
+        }
+        return new Response('Network offline or resource unavailable', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain' }
+        });
       })
   );
 });
