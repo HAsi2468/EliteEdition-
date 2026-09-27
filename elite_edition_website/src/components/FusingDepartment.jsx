@@ -4,7 +4,8 @@ import {
   Flame, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, FileSpreadsheet,
-  AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle, ChevronDown
+  AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle, ChevronDown,
+  ChevronUp, PlayCircle, Filter, ArrowRight
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
@@ -83,6 +84,12 @@ export default function FusingDepartment() {
   const [dateEnd, setDateEnd] = useState('');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
+
+  // Tab & Form Collapsed State
+  const [activeFusingTab, setActiveFusingTab] = useState('entry'); // 'entry' | 'queue'
+  const [isFormExpanded, setIsFormExpanded] = useState(true);
+  const [queueFabricFilter, setQueueFabricFilter] = useState('All');
+  const [queueSearchQuery, setQueueSearchQuery] = useState('');
 
   // Top Form Job Search & Eligibility State
   const [jobSearchText, setJobSearchText] = useState('');
@@ -413,6 +420,52 @@ export default function FusingDepartment() {
       );
     });
   }, [eligibleFusingCards, jobSearchText]);
+
+  // Active card selected in top form
+  const activeSelectedCard = useMemo(() => {
+    if (!topForm.jobCardId) return null;
+    return cards.find(c => String(c._id || c.id) === String(topForm.jobCardId));
+  }, [cards, topForm.jobCardId]);
+
+  const activeFabricPreset = useMemo(() => {
+    if (!activeSelectedCard) return null;
+    return getFabricFusingPreset(activeSelectedCard.fabric);
+  }, [activeSelectedCard]);
+
+  const isHeatWarning = useMemo(() => {
+    if (!activeSelectedCard || !activeFabricPreset) return false;
+    const f = String(activeSelectedCard.fabric || '').toLowerCase();
+    const tempNum = parseInt(String(topForm.fusingTemp || '').replace(/[^0-9]/g, ''), 10) || 0;
+    if ((f.includes('organza') || f.includes('chiffon') || f.includes('modal') || f.includes('rayon')) && tempNum > 200) {
+      return true;
+    }
+    return false;
+  }, [activeSelectedCard, activeFabricPreset, topForm.fusingTemp]);
+
+  // Unique fabrics in fusing queue
+  const queueFabricsList = useMemo(() => {
+    const set = new Set();
+    eligibleFusingCards.forEach(c => {
+      if (c.fabric) set.add(c.fabric);
+    });
+    return Array.from(set).sort();
+  }, [eligibleFusingCards]);
+
+  // Filtered cards in fusing queue
+  const filteredQueueCards = useMemo(() => {
+    return eligibleFusingCards.filter(c => {
+      if (queueFabricFilter !== 'All' && (c.fabric || '') !== queueFabricFilter) return false;
+      if (queueSearchQuery && queueSearchQuery.trim()) {
+        const q = queueSearchQuery.toLowerCase().trim();
+        const jNo = String(c.jobNo || '').toLowerCase();
+        const party = String(c.party || c.clientName || c.partyName || '').toLowerCase();
+        const design = String(c.designName || c.designNo || '').toLowerCase();
+        const fabric = String(c.fabric || '').toLowerCase();
+        if (!jNo.includes(q) && !party.includes(q) && !design.includes(q) && !fabric.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [eligibleFusingCards, queueFabricFilter, queueSearchQuery]);
 
   // Handle Selection of Job Card in Top Form
   const handleTopJobCardSelect = (cardOrId) => {
@@ -926,6 +979,110 @@ export default function FusingDepartment() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
 
+      {/* ── TOP NAVIGATION TABS ── */}
+      <div style={{ display: 'flex', gap: '0.75rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.6rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setActiveFusingTab('entry')}
+            style={{
+              padding: '0.6rem 1.25rem',
+              borderRadius: '10px',
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: activeFusingTab === 'entry' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+              background: activeFusingTab === 'entry' ? '#e0f2fe' : '#ffffff',
+              color: activeFusingTab === 'entry' ? '#0369a1' : '#64748b',
+              cursor: 'pointer',
+              boxShadow: activeFusingTab === 'entry' ? '0 2px 8px rgba(2, 132, 199, 0.2)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Flame size={16} color={activeFusingTab === 'entry' ? '#0284c7' : '#64748b'} />
+            <span>⚡ Production Entry & Logs</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveFusingTab('queue')}
+            style={{
+              padding: '0.6rem 1.25rem',
+              borderRadius: '10px',
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: activeFusingTab === 'queue' ? '2px solid #ea580c' : '1px solid #cbd5e1',
+              background: activeFusingTab === 'queue' ? '#fff7ed' : '#ffffff',
+              color: activeFusingTab === 'queue' ? '#c2410c' : '#64748b',
+              cursor: 'pointer',
+              boxShadow: activeFusingTab === 'queue' ? '0 2px 8px rgba(234, 88, 12, 0.2)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Zap size={16} color={activeFusingTab === 'queue' ? '#ea580c' : '#64748b'} />
+            <span>📥 Ready for Fusing Queue</span>
+            <span style={{
+              marginLeft: 4,
+              padding: '2px 8px',
+              borderRadius: '999px',
+              background: activeFusingTab === 'queue' ? '#ea580c' : '#e2e8f0',
+              color: activeFusingTab === 'queue' ? '#ffffff' : '#475569',
+              fontSize: '0.74rem',
+              fontWeight: 900
+            }}>
+              {eligibleFusingCards.length}
+            </span>
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowButterPaperInwardModal(true)}
+            style={{
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#ffffff', border: 'none',
+              padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 800,
+              fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+              boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)'
+            }}
+          >
+            <PlusCircle size={15} /> 📦 Inward Butter Paper
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowReportModal(true)}
+            style={{
+              background: '#059669', color: '#ffffff', border: 'none',
+              padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 800,
+              fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+              boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+            }}
+          >
+            <Zap size={15} /> Generate Report
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            style={{
+              background: '#6d28d9', color: '#ffffff', border: 'none',
+              padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 800,
+              fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+              boxShadow: '0 3px 10px rgba(109, 40, 217, 0.25)'
+            }}
+          >
+            <Download size={15} /> Download CSV
+          </button>
+        </div>
+      </div>
+
+      {/* ── TAB 1: PRODUCTION ENTRY & LOGS ── */}
+      {activeFusingTab === 'entry' && (
+      <>
       {/* ── TOP SECTION: NEW FUSING ENTRY FORM CARD (Matches User Reference Image) ── */}
       <div className="glass-panel" style={{
         padding: '1.35rem 1.5rem',
@@ -935,7 +1092,7 @@ export default function FusingDepartment() {
         border: '1px solid #e0f2fe'
       }}>
         {/* Form Card Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isFormExpanded ? '1.25rem' : '0.5rem', flexWrap: 'wrap', gap: '0.8rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
             <div style={{
               width: 28, height: 28, borderRadius: '50%', background: '#e0f2fe',
@@ -948,48 +1105,69 @@ export default function FusingDepartment() {
             </h3>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => setShowButterPaperInwardModal(true)}
+              onClick={() => setIsFormExpanded(prev => !prev)}
               style={{
-                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#ffffff', border: 'none',
-                padding: '0.5rem 1.1rem', borderRadius: '8px', fontWeight: 800,
-                fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-                boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)'
+                background: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '5px 12px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#0369a1',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
             >
-              <PlusCircle size={15} /> 📦 INWARD BUTTER PAPER ROLL
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowReportModal(true)}
-              style={{
-                background: '#059669', color: '#ffffff', border: 'none',
-                padding: '0.5rem 1.1rem', borderRadius: '8px', fontWeight: 800,
-                fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-                boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
-              }}
-            >
-              <Zap size={15} /> GENERATE REPORT
-            </button>
-            <button
-              type="button"
-              onClick={handleExportCSV}
-              style={{
-                background: '#6d28d9', color: '#ffffff', border: 'none',
-                padding: '0.5rem 1.1rem', borderRadius: '8px', fontWeight: 800,
-                fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-                boxShadow: '0 3px 10px rgba(109, 40, 217, 0.25)'
-              }}
-            >
-              <Download size={15} /> Download Report
+              {isFormExpanded ? (
+                <>
+                  <ChevronUp size={15} /> Minimize Form
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={15} /> Expand Entry Form
+                </>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Entry Form Grid */}
-        <form onSubmit={handleTopFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {!isFormExpanded ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#f8fafc',
+            padding: '0.75rem 1rem',
+            borderRadius: '8px',
+            border: '1px dashed #94a3b8'
+          }}>
+            <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 700 }}>
+              {topForm.jobCardId ? `Active Selection: ${formatJobCardNo(topForm.jobNo)} (${topForm.printedMtr || 0} mtr)` : 'Fusing Entry Form is minimized. Click expand to enter production log.'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsFormExpanded(true)}
+              style={{
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              ⚡ Expand Form
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleTopFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
           {/* Row 1: DATE, SHIFT, ON TIME, OFF TIME */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
@@ -1434,6 +1612,58 @@ export default function FusingDepartment() {
                   ))}
                 </select>
               </div>
+
+              {/* Smart Heat & Speed Guard Indicator Banner */}
+              {activeFabricPreset && (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  padding: '0.6rem 0.95rem',
+                  borderRadius: '8px',
+                  background: isHeatWarning ? '#fff1f2' : '#f0fdf4',
+                  border: `1.5px solid ${isHeatWarning ? '#fda4af' : '#86efac'}`,
+                  fontSize: '0.82rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Thermometer size={16} color={isHeatWarning ? '#e11d48' : '#16a34a'} />
+                    <span style={{ color: isHeatWarning ? '#9f1239' : '#166534', fontWeight: 800 }}>
+                      {activeSelectedCard?.fabric || 'Fabric'} Thermal Guard: Recommended {activeFabricPreset.temp} @ {activeFabricPreset.speed} m/min ({activeFabricPreset.note})
+                    </span>
+                  </div>
+                  {isHeatWarning ? (
+                    <span style={{ color: '#e11d48', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                      <AlertTriangle size={15} /> ⚠️ High Temperature Warning! Delicate fabric risk.
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTopForm(f => ({
+                          ...f,
+                          fusingTemp: activeFabricPreset.temp,
+                          fusingSpeed: activeFabricPreset.speed
+                        }));
+                      }}
+                      style={{
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        border: '1px solid #86efac',
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⚡ Auto-Sync Preset
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
           {/* Row 3: OPERATOR NAME, REMARKS / NOTES */}
@@ -1452,9 +1682,23 @@ export default function FusingDepartment() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                REMARKS / NOTES
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem', flexWrap: 'wrap', gap: '4px' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  REMARKS / NOTES
+                </label>
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  {['Heat Crease', 'Fabric Shrinkage', 'Paper Jam', 'Color Bleed', 'Roller Mark'].map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setTopForm(f => ({ ...f, notes: f.notes ? `${f.notes}, [${tag}]` : `[${tag}]` }))}
+                      style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
+                    >
+                      +{tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <input
                 type="text"
                 value={topForm.notes}
@@ -1491,6 +1735,7 @@ export default function FusingDepartment() {
             </button>
           </div>
         </form>
+        )}
       </div>
 
       {/* Summary KPI Statistics Bar */}
@@ -1842,6 +2087,156 @@ export default function FusingDepartment() {
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {/* ── TAB 2: READY FOR FUSING QUEUE ── */}
+      {activeFusingTab === 'queue' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Queue Header & Filters Banner */}
+          <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', background: '#ffffff', borderRadius: '14px', border: '1px solid #fed7aa', borderLeft: '5px solid #ea580c' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Zap size={20} color="#ea580c" />
+                  Ready for Fusing Queue (Handoff from Printing)
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                  These jobs have completed printing and are awaiting heat press / roll sublimation. Batch identical fabrics together to optimize machine temperature stability.
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ padding: '0.4rem 0.85rem', borderRadius: '8px', background: '#fff7ed', border: '1px solid #ffedd5', fontSize: '0.82rem', fontWeight: 800, color: '#c2410c' }}>
+                  🔥 <strong>{eligibleFusingCards.length}</strong> Jobs In Queue
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Toolbar */}
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: '1 1 240px' }}>
+                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  value={queueSearchQuery}
+                  onChange={e => setQueueSearchQuery(e.target.value)}
+                  placeholder="Filter queue by Job No, Party, Design, Fabric..."
+                  style={{ width: '100%', padding: '0.5rem 0.8rem 0.5rem 2.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <select
+                value={queueFabricFilter}
+                onChange={e => setQueueFabricFilter(e.target.value)}
+                style={{ padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', background: '#ffffff', cursor: 'pointer' }}
+              >
+                <option value="All">All Fabrics ({eligibleFusingCards.length})</option>
+                {queueFabricsList.map(fab => (
+                  <option key={fab} value={fab}>{fab}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Queue Table */}
+          <div className="glass-panel" style={{ padding: '0', borderRadius: '12px', overflow: 'hidden', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>JOB NO.</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>PARTY</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>DESIGN</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>FABRIC & PANNA</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>TEMP & SPEED PRESET</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>PRINTED MTR</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredQueueCards.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <Flame size={32} color="#cbd5e1" style={{ margin: '0 auto 8px', display: 'block' }} />
+                        <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>No jobs currently waiting in Fusing Queue</div>
+                        <div style={{ fontSize: '0.8rem', marginTop: 4 }}>Completed prints will automatically flow into this queue for heat processing.</div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredQueueCards.map((c, idx) => {
+                      const pMtr = getCardPrintedMeters(c);
+                      const preset = getFabricFusingPreset(c.fabric);
+                      return (
+                        <tr
+                          key={c._id || c.id || idx}
+                          style={{
+                            borderBottom: '1px solid #f1f5f9',
+                            background: idx % 2 === 0 ? '#ffffff' : '#fafafa',
+                            transition: 'background 0.15s ease'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#fff7ed'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#fafafa'; }}
+                        >
+                          <td style={{ padding: '0.75rem 1rem', fontWeight: 900, color: '#0369a1' }}>
+                            {formatJobCardNo(c.jobNo)}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>
+                            {c.party || c.clientName || '—'}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
+                            {c.designName || c.designNo || '—'}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <span style={{ fontWeight: 800, color: '#0f172a' }}>{c.fabric || '—'}</span>
+                            <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                              {c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                            <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '3px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Thermometer size={12} /> {preset.temp} @ {preset.speed} m/min
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 900, color: '#16a34a' }}>
+                            {pMtr ? `${pMtr} m` : (c.totalMtr || c.consumption || '—')}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleTopJobCardSelect(c);
+                                setActiveFusingTab('entry');
+                                setIsFormExpanded(true);
+                                window.scrollTo({ top: 120, behavior: 'smooth' });
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '0.45rem 0.95rem',
+                                borderRadius: '8px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                boxShadow: '0 2px 8px rgba(234, 88, 12, 0.25)'
+                              }}
+                            >
+                              <Zap size={14} /> Start Fusing
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL 1: EDIT FUSING ENTRY & WASTAGE MODAL ── */}
       {showFormModal && (
@@ -2069,7 +2464,21 @@ export default function FusingDepartment() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Remarks / Notes</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '4px' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Fusing Remarks / Notes</label>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {['Heat Crease', 'Fabric Shrinkage', 'Paper Jam', 'Color Bleed', 'Roller Mark'].map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, notes: f.notes ? `${f.notes}, [${tag}]` : `[${tag}]` }))}
+                          style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 5px', fontSize: '0.66rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
+                        >
+                          +{tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input
                     type="text"
                     value={form.notes}

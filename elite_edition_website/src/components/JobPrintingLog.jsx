@@ -1139,6 +1139,35 @@ export default function JobPrintingLog() {
     };
   }, [logs]);
 
+  // ── Live Machine Fleet Output & Status ──
+  const machineFleetStats = useMemo(() => {
+    const today = toLocalYMD();
+    const stats = {};
+    machinesList.forEach(m => {
+      stats[m] = { totalMtr: 0, todayMtr: 0, morningMtr: 0, nightMtr: 0, lastJob: null, count: 0 };
+    });
+
+    logs.forEach(l => {
+      const mach = l.machineName || 'Machine 1';
+      if (!stats[mach]) {
+        stats[mach] = { totalMtr: 0, todayMtr: 0, morningMtr: 0, nightMtr: 0, lastJob: null, count: 0 };
+      }
+      const m = Number(l.meters) || 0;
+      stats[mach].totalMtr += m;
+      stats[mach].count += 1;
+      if (l.date === today) {
+        stats[mach].todayMtr += m;
+      }
+      if (l.shift === 'Morning') stats[mach].morningMtr += m;
+      else if (l.shift === 'Night') stats[mach].nightMtr += m;
+      if (!stats[mach].lastJob && l.jobNo) {
+        stats[mach].lastJob = l.jobNo;
+      }
+    });
+
+    return stats;
+  }, [logs, machinesList]);
+
   // ── Pending Job Cards for Machine Queue & Batch Scheduling ──
   const printQueueJobs = useMemo(() => {
     return jobCards.filter(jc => {
@@ -1360,7 +1389,161 @@ export default function JobPrintingLog() {
             {printQueueJobs.length}
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveView('fleet')}
+          style={{
+            padding: '0.55rem 1.1rem',
+            borderRadius: '8px',
+            fontSize: '0.84rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            border: activeView === 'fleet' ? '1px solid #10b981' : '1px solid transparent',
+            background: activeView === 'fleet' ? 'rgba(16,185,129,0.15)' : 'transparent',
+            color: activeView === 'fleet' ? '#10b981' : 'var(--text-muted)',
+            cursor: 'pointer'
+          }}
+        >
+          <Cpu size={15} /> Live Machine Fleet Monitor
+        </button>
       </div>
+
+      {/* ── FLEET VIEW (When activeView === 'fleet') ── */}
+      {activeView === 'fleet' && (
+        <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderLeft: '4px solid #10b981' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div>
+              <div style={{ fontSize: '1rem', fontWeight: 900, color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Cpu size={20} /> Digital Printer Fleet Performance Monitor
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                Live daily status, shift output, and quick print log assignment for all active printing machinery.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: '6px' }}>
+                🟢 {machinesList.filter(m => (machineFleetStats[m]?.todayMtr || 0) > 0).length} of {machinesList.length} Active Today
+              </span>
+            </div>
+          </div>
+
+          {/* Fleet Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            {machinesList.map(mach => {
+              const mStats = machineFleetStats[mach] || { totalMtr: 0, todayMtr: 0, morningMtr: 0, nightMtr: 0, lastJob: null, count: 0 };
+              const isActiveToday = mStats.todayMtr > 0;
+              return (
+                <div
+                  key={mach}
+                  className="glass-panel"
+                  style={{
+                    padding: '1.1rem',
+                    borderRadius: '12px',
+                    border: isActiveToday ? '2px solid rgba(16,185,129,0.4)' : '1px solid var(--border-light)',
+                    background: isActiveToday ? 'rgba(16,185,129,0.04)' : 'transparent',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '0.85rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize: '0.98rem', fontWeight: 900, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Printer size={16} color={isActiveToday ? '#10b981' : '#94a3b8'} />
+                        {mach}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                        {mStats.count} total print runs recorded
+                      </div>
+                    </div>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      background: isActiveToday ? '#dcfce7' : 'rgba(255,255,255,0.08)',
+                      color: isActiveToday ? '#15803d' : 'var(--text-muted)',
+                      border: isActiveToday ? '1px solid #86efac' : '1px solid transparent'
+                    }}>
+                      {isActiveToday ? '🟢 Running Today' : '⚪ Standby / Idle'}
+                    </span>
+                  </div>
+
+                  {/* Output KPIs */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Today Output</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: isActiveToday ? '#10b981' : 'var(--text-muted)', marginTop: 2 }}>
+                        {mStats.todayMtr.toFixed(1)} <span style={{ fontSize: '0.7rem' }}>m</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Period</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
+                        {mStats.totalMtr.toFixed(1)} <span style={{ fontSize: '0.7rem' }}>m</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Shift split & Last job */}
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>☀️ Day: <strong style={{ color: '#38bdf8' }}>{mStats.morningMtr.toFixed(0)}m</strong> | 🌙 Night: <strong style={{ color: '#a78bfa' }}>{mStats.nightMtr.toFixed(0)}m</strong></span>
+                    {mStats.lastJob && <span>Last: <strong>#{mStats.lastJob}</strong></span>}
+                  </div>
+
+                  {/* Quick actions */}
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(f => ({ ...f, machineName: mach }));
+                        setActiveView('log');
+                        window.scrollTo({ top: 120, behavior: 'smooth' });
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '0.4rem',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        borderRadius: '6px',
+                        border: '1px solid rgba(56,189,248,0.3)',
+                        background: 'rgba(56,189,248,0.1)',
+                        color: '#38bdf8',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⚡ Assign in Form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterMachine(mach);
+                        setActiveView('log');
+                      }}
+                      style={{
+                        padding: '0.4rem 0.75rem',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-light)',
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Filter
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── BATCH QUEUE VIEW (When activeView === 'queue') ── */}
       {activeView === 'queue' && (
@@ -1803,7 +1986,21 @@ export default function JobPrintingLog() {
               </div>
 
               <div>
-                <label style={labelStyle}>REMARKS / NOTES</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '4px' }}>
+                  <label style={labelStyle}>REMARKS / NOTES</label>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {['Nozzle Banding', 'Head Strike', 'Paper Wrinkle', 'Ink Drop', 'Color Mismatch'].map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, notes: f.notes ? `${f.notes}, [${tag}]` : `[${tag}]` }))}
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-light)', borderRadius: '4px', padding: '1px 5px', fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer' }}
+                      >
+                        +{tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={form.notes}
@@ -1973,12 +2170,25 @@ export default function JobPrintingLog() {
                     <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={tdStyle}>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</td>
                       <td style={{ ...tdStyle, fontWeight: 800, color: 'var(--text-primary)' }}>
-                        <button
-                          onClick={() => loadJobCardHistory(log.jobNo)}
-                          style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
-                        >
-                          #{log.jobNo}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => loadJobCardHistory(log.jobNo)}
+                            style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            #{log.jobNo}
+                          </button>
+                          {(() => {
+                            const jc = jobCards.find(c => String(c.jobNo) === String(log.jobNo));
+                            if (jc && (jc.printStatus === 'Printing Done' || jc.fusingStatus === 'Fusing Pending')) {
+                              return (
+                                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }} title="Completed printing - ready for heat press">
+                                  🔥 Ready for Fusing
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                       </td>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{log.machineName}</td>
                       <td style={tdStyle}>{log.pass}</td>
