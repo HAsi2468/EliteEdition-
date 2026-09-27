@@ -2,43 +2,44 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom';
 import { api, getBaseUrl, setBaseUrl } from './services/api';
 import Login from './components/Login';
-import ClientLogin from './components/ClientLogin';
-import ClientPortal from './components/ClientPortal';
-import DashboardStats from './components/DashboardStats';
-import InventoryGrid from './components/InventoryGrid';
-import ProductCatalogGrid from './components/ProductCatalogGrid';
-import InventoryForm from './components/InventoryForm';
-import BulkInwardModal from './components/BulkInwardModal';
-import SalesGrid from './components/SalesGrid';
-import StockOutForm from './components/StockOutForm';
-import CatalogManagerModal from './components/CatalogManagerModal';
-import JobCardPanel from './components/JobCardPanel';
-import StitchingSettings from './components/StitchingSettings';
-import AdminPanel from './components/AdminPanel';
-import Workspace from './components/Workspace';
-import CommunicationPanel from './components/CommunicationPanel';
-import TaskManagerPanel from './components/TaskManagerPanel';
-import EliteModalDialog from './components/EliteModalDialog';
-import AutoUpdateNotification from './components/AutoUpdateNotification';
-import CompanySettingsPanel from './components/CompanySettingsPanel';
-import { matchSkuOrBrandCode } from './utils/skuHelper';
-import EliteBillingDepartment from './components/EliteBillingDepartment';
-import CompanyDevelopmentWorkspace from './components/CompanyDevelopmentWorkspace';
-import DigitalPrintComplainModule from './components/DigitalPrintComplainModule';
-import DigitalPrintExpenseModule from './components/DigitalPrintExpenseModule';
-import CompanyDedicatedDashboard from './components/CompanyDedicatedDashboard';
-import GarmentJobCardDashboard from './components/GarmentJobCardDashboard';
-import CrmPanel from './components/CrmPanel';
-import BusinessConnectionPanel from './components/BusinessConnectionPanel';
-import { COMPANIES, getCompanyById } from './config/companiesConfig';
 
-// Code-splitting lazy loads for heavy tab modules
+// Dynamic code-splitting for all route and workspace modules
+const ClientLogin = lazy(() => import('./components/ClientLogin'));
+const ClientPortal = lazy(() => import('./components/ClientPortal'));
+const DashboardStats = lazy(() => import('./components/DashboardStats'));
+const InventoryGrid = lazy(() => import('./components/InventoryGrid'));
+const ProductCatalogGrid = lazy(() => import('./components/ProductCatalogGrid'));
+const InventoryForm = lazy(() => import('./components/InventoryForm'));
+const BulkInwardModal = lazy(() => import('./components/BulkInwardModal'));
+const SalesGrid = lazy(() => import('./components/SalesGrid'));
+const StockOutForm = lazy(() => import('./components/StockOutForm'));
+const CatalogManagerModal = lazy(() => import('./components/CatalogManagerModal'));
+const JobCardPanel = lazy(() => import('./components/JobCardPanel'));
+const StitchingSettings = lazy(() => import('./components/StitchingSettings'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const Workspace = lazy(() => import('./components/Workspace'));
+const CommunicationPanel = lazy(() => import('./components/CommunicationPanel'));
+const TaskManagerPanel = lazy(() => import('./components/TaskManagerPanel'));
+const CompanySettingsPanel = lazy(() => import('./components/CompanySettingsPanel'));
+const EliteBillingDepartment = lazy(() => import('./components/EliteBillingDepartment'));
+const CompanyDevelopmentWorkspace = lazy(() => import('./components/CompanyDevelopmentWorkspace'));
+const DigitalPrintComplainModule = lazy(() => import('./components/DigitalPrintComplainModule'));
+const DigitalPrintExpenseModule = lazy(() => import('./components/DigitalPrintExpenseModule'));
+const CompanyDedicatedDashboard = lazy(() => import('./components/CompanyDedicatedDashboard'));
+const GarmentJobCardDashboard = lazy(() => import('./components/GarmentJobCardDashboard'));
+const CrmPanel = lazy(() => import('./components/CrmPanel'));
+const BusinessConnectionPanel = lazy(() => import('./components/BusinessConnectionPanel'));
 const ReportsCenter = lazy(() => import('./components/ReportsCenter'));
 const UnicommerceHub = lazy(() => import('./components/UnicommerceHub'));
 const MyntraHub = lazy(() => import('./components/MyntraHub'));
 const ReturnsManager = lazy(() => import('./components/ReturnsManager'));
-import DesignerModule from './components/DesignerModule';
-import DesignerScreen from './components/DesignerScreen';
+const DesignerModule = lazy(() => import('./components/DesignerModule'));
+const DesignerScreen = lazy(() => import('./components/DesignerScreen'));
+
+import EliteModalDialog from './components/EliteModalDialog';
+import AutoUpdateNotification from './components/AutoUpdateNotification';
+import { matchSkuOrBrandCode } from './utils/skuHelper';
+import { COMPANIES, getCompanyById } from './config/companiesConfig';
 import { 
   LogOut, 
   LayoutDashboard, 
@@ -1123,15 +1124,21 @@ export default function App() {
   if (!isAuthenticated) {
     if (isClientPortalMode) {
       return (
-        <ClientLogin
-          onLoginSuccess={handleLoginSuccess}
-          onSwitchToStaff={() => {
-            if (window.location.hash.includes('client')) {
-              window.location.hash = '';
-            }
-            setIsClientPortalMode(false);
-          }}
-        />
+        <Suspense fallback={
+          <div style={{ minHeight: '100vh', background: '#0b0f19', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+            <RefreshCw size={32} className="spin-loader" />
+          </div>
+        }>
+          <ClientLogin
+            onLoginSuccess={handleLoginSuccess}
+            onSwitchToStaff={() => {
+              if (window.location.hash.includes('client')) {
+                window.location.hash = '';
+              }
+              setIsClientPortalMode(false);
+            }}
+          />
+        </Suspense>
       );
     }
     return (
@@ -1151,10 +1158,16 @@ export default function App() {
       ? currentUser
       : api.getClientData();
     return (
-      <ClientPortal
-        client={activeClient}
-        onLogout={handleLogout}
-      />
+      <Suspense fallback={
+        <div style={{ minHeight: '100vh', background: '#0b0f19', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+          <RefreshCw size={32} className="spin-loader" />
+        </div>
+      }>
+        <ClientPortal
+          client={activeClient}
+          onLogout={handleLogout}
+        />
+      </Suspense>
     );
   }
 
@@ -2536,56 +2549,58 @@ export default function App() {
         onSelectTab={(tab) => setActiveTab(tab)}
       />
 
-      {/* Modal Dialog */}
-      {isFormOpen && (
-        <InventoryForm
-          item={editingItem}
-          isCatalog={formMode === 'catalog'}
-          onSubmit={editingItem ? handleEditSubmit : handleAddSubmit}
-          onClose={() => {
-            setIsFormOpen(false);
-            setEditingItem(null);
-            restoreSavedScrollPos();
-          }}
-        />
-      )}
-
-      {isStockOutOpen && (
-        <StockOutForm
-          items={items}
-          parties={parties}
-          prefilledItem={stockOutItem}
-          onSubmit={handleStockOutSubmit}
-          onClose={() => {
-            setIsStockOutOpen(false);
-            setStockOutItem(null);
-            restoreSavedScrollPos();
-          }}
-        />
-      )}
-
-      {isManagerOpen && (
-        <CatalogManagerModal
-          initialTab={managerTab}
-          onClose={() => {
-            setIsManagerOpen(false);
-            fetchData().finally(() => {
+      {/* Modal Dialogs with Deferred Suspense Loading */}
+      <Suspense fallback={null}>
+        {isFormOpen && (
+          <InventoryForm
+            item={editingItem}
+            isCatalog={formMode === 'catalog'}
+            onSubmit={editingItem ? handleEditSubmit : handleAddSubmit}
+            onClose={() => {
+              setIsFormOpen(false);
+              setEditingItem(null);
               restoreSavedScrollPos();
-            });
-            restoreSavedScrollPos();
-          }}
-        />
-      )}
+            }}
+          />
+        )}
 
-      {isBulkInwardOpen && (
-        <BulkInwardModal
-          onSubmit={handleBulkInwardSubmit}
-          onClose={() => {
-            setIsBulkInwardOpen(false);
-            restoreSavedScrollPos();
-          }}
-        />
-      )}
+        {isStockOutOpen && (
+          <StockOutForm
+            items={items}
+            parties={parties}
+            prefilledItem={stockOutItem}
+            onSubmit={handleStockOutSubmit}
+            onClose={() => {
+              setIsStockOutOpen(false);
+              setStockOutItem(null);
+              restoreSavedScrollPos();
+            }}
+          />
+        )}
+
+        {isManagerOpen && (
+          <CatalogManagerModal
+            initialTab={managerTab}
+            onClose={() => {
+              setIsManagerOpen(false);
+              fetchData().finally(() => {
+                restoreSavedScrollPos();
+              });
+              restoreSavedScrollPos();
+            }}
+          />
+        )}
+
+        {isBulkInwardOpen && (
+          <BulkInwardModal
+            onSubmit={handleBulkInwardSubmit}
+            onClose={() => {
+              setIsBulkInwardOpen(false);
+              restoreSavedScrollPos();
+            }}
+          />
+        )}
+      </Suspense>
 
       {/* Loading Overlay */}
       {loading && items.length === 0 && sales.length === 0 && (
