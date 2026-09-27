@@ -96,219 +96,217 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
       color: '#141824',
       fontFamily: 'inherit'
     }}>
-      {/* ── Phoenix Hero Grid (Left: Header, 3 Badges, Velocity Chart; Right: 4 Smart KPI Cards) ── */}
-      <div className="phoenix-hero-row">
-        {/* LEFT COLUMN: Overview, 3 Iconic Badges, and Velocity Chart */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {/* Header Title & Subtitle */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <h2 className="phoenix-page-title" style={{ margin: '0 0 0.25rem 0' }}>Digital Print Operations Dashboard</h2>
-                <h5 className="phoenix-page-subtitle" style={{ margin: 0 }}>Real-time operations command center across Printing, Fusing, Dispatch & Financials</h5>
-              </div>
+      {/* ── Dashboard Header Toolbar & 3 Iconic Badges ── */}
+      <div style={{ marginBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+          <div>
+            <h2 className="phoenix-page-title" style={{ margin: '0 0 0.25rem 0' }}>Digital Print Operations Dashboard</h2>
+            <h5 className="phoenix-page-subtitle" style={{ margin: 0 }}>Real-time operations command center across Printing, Fusing, Dispatch & Financials</h5>
+          </div>
 
-              {/* Phoenix Filters Toolbar */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <DateRangePicker
-                  preset={datePreset}
-                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
-                    setDatePreset(p);
-                    setDateStart(ds);
-                    setDateEnd(de);
-                  }}
-                  customStart={customDateStart}
-                  customEnd={customDateEnd}
-                  onCustomChange={(s, e) => {
-                    setCustomDateStart(s);
-                    setCustomDateEnd(e);
-                    setDateStart(s);
-                    setDateEnd(e);
-                  }}
-                  theme="light"
-                />
+          {/* Phoenix Filters Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <DateRangePicker
+              preset={datePreset}
+              onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                setDatePreset(p);
+                setDateStart(ds);
+                setDateEnd(de);
+              }}
+              customStart={customDateStart}
+              customEnd={customDateEnd}
+              onCustomChange={(s, e) => {
+                setCustomDateStart(s);
+                setCustomDateEnd(e);
+                setDateStart(s);
+                setDateEnd(e);
+              }}
+              theme="light"
+            />
 
-                <select
-                  value={shift}
-                  onChange={e => setShift(e.target.value)}
-                  className="phoenix-form-select"
-                >
-                  <option value="All">All Shifts</option>
-                  <option value="Morning">Morning Shift</option>
-                  <option value="Night">Night Shift</option>
-                </select>
+            <select
+              value={shift}
+              onChange={e => setShift(e.target.value)}
+              className="phoenix-form-select"
+            >
+              <option value="All">All Shifts</option>
+              <option value="Morning">Morning Shift</option>
+              <option value="Night">Night Shift</option>
+            </select>
 
-                <button
-                  type="button"
-                  onClick={fetchDashboardData}
-                  title={`Last refreshed at ${lastRefreshed.toLocaleTimeString()}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    padding: '0.45rem 0.85rem',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd0dd',
-                    background: '#ffffff',
-                    color: '#3874ff',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-                  <span>Refresh</span>
-                </button>
+            <button
+              type="button"
+              onClick={fetchDashboardData}
+              title={`Last refreshed at ${lastRefreshed.toLocaleTimeString()}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '6px',
+                border: '1px solid #cbd0dd',
+                background: '#ffffff',
+                color: '#3874ff',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
+              <span>Refresh</span>
+            </button>
 
-                {onNavigateDepartment && (
-                  <button
-                    type="button"
-                    onClick={() => onNavigateDepartment('list')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      padding: '0.45rem 0.95rem',
-                      borderRadius: '6px',
-                      border: '1px solid #3874ff',
-                      background: '#3874ff',
-                      color: '#ffffff',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      fontSize: '0.82rem',
-                      boxShadow: '0 2px 4px rgba(56, 116, 255, 0.25)'
-                    }}
-                  >
-                    <Layers size={14} />
-                    <span>Job Cards</span>
-                  </button>
-                )}
+            {onNavigateDepartment && (
+              <button
+                type="button"
+                onClick={() => onNavigateDepartment('list')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem 0.95rem',
+                  borderRadius: '6px',
+                  border: '1px solid #3874ff',
+                  background: '#3874ff',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  boxShadow: '0 2px 4px rgba(56, 116, 255, 0.25)'
+                }}
+              >
+                <Layers size={14} />
+                <span>Job Cards</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 3 Iconic Phoenix Badges */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          {/* Badge 1: Print Orders / Output Today */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('printing_log')}>
+            <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+              <div style={{
+                position: 'absolute',
+                width: '30px',
+                height: '30px',
+                background: '#e8f7ee',
+                borderRadius: '6px',
+                transform: 'rotate(-10deg) translate(2px, 6px)'
+              }} />
+              <div style={{
+                position: 'absolute',
+                width: '30px',
+                height: '30px',
+                background: '#25b003',
+                borderRadius: '50%',
+                right: '0',
+                top: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 2px 6px rgba(37, 176, 3, 0.3)'
+              }}>
+                <span style={{ fontSize: '13px' }}>★</span>
               </div>
             </div>
-
-            {/* 3 Iconic Phoenix Badges */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-              {/* Badge 1: Print Orders / Output Today */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('printing_log')}>
-                <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
-                  <div style={{
-                    position: 'absolute',
-                    width: '30px',
-                    height: '30px',
-                    background: '#e8f7ee',
-                    borderRadius: '6px',
-                    transform: 'rotate(-10deg) translate(2px, 6px)'
-                  }} />
-                  <div style={{
-                    position: 'absolute',
-                    width: '30px',
-                    height: '30px',
-                    background: '#25b003',
-                    borderRadius: '50%',
-                    right: '0',
-                    top: '0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ffffff',
-                    boxShadow: '0 2px 6px rgba(37, 176, 3, 0.3)'
-                  }}>
-                    <span style={{ fontSize: '13px' }}>★</span>
-                  </div>
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
-                    {summary.dailyPrintedJobs || 0} Print Orders
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
-                    {summary.dailyPrintedMeters ? `${fmtMtr(summary.dailyPrintedMeters)} printed today` : 'Awaiting print run'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Badge 2: Fusing Queue / Pending Fusing */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('fusing')}>
-                <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
-                  <div style={{
-                    position: 'absolute',
-                    width: '30px',
-                    height: '30px',
-                    background: '#fdf3e6',
-                    borderRadius: '6px',
-                    transform: 'rotate(-10deg) translate(2px, 6px)'
-                  }} />
-                  <div style={{
-                    position: 'absolute',
-                    width: '30px',
-                    height: '30px',
-                    background: '#e5780b',
-                    borderRadius: '50%',
-                    right: '0',
-                    top: '0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ffffff',
-                    boxShadow: '0 2px 6px rgba(229, 120, 11, 0.3)'
-                  }}>
-                    <span style={{ fontSize: '12px', fontWeight: 900 }}>❚❚</span>
-                  </div>
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
-                    {summary.pendingFusingCards || 0} Fusing Queue
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
-                    {summary.pendingFusingMeters ? `${fmtMtr(summary.pendingFusingMeters)} pending fusing` : 'In sync with print'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Badge 3: Dispatch Ready */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('list')}>
-                <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
-                  <div style={{
-                    position: 'absolute',
-                    width: '30px',
-                    height: '30px',
-                    background: '#feecee',
-                    borderRadius: '6px',
-                    transform: 'rotate(-10deg) translate(2px, 6px)'
-                  }} />
-                  <div style={{
-                    position: 'absolute',
-                    width: '30px',
-                    height: '30px',
-                    background: '#3874ff',
-                    borderRadius: '50%',
-                    right: '0',
-                    top: '0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ffffff',
-                    boxShadow: '0 2px 6px rgba(56, 116, 255, 0.3)'
-                  }}>
-                    <span style={{ fontSize: '13px', fontWeight: 900 }}>✓</span>
-                  </div>
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
-                    {pipeline.readyForDelivery?.count || 0} Ready for Dispatch
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
-                    {pipeline.readyForDelivery?.meters ? `${fmtMtr(pipeline.readyForDelivery?.meters)} ready for dispatch` : 'Packaged & verified'}
-                  </p>
-                </div>
-              </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
+                {summary.dailyPrintedJobs || 0} Print Orders
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
+                {summary.dailyPrintedMeters ? `${fmtMtr(summary.dailyPrintedMeters)} printed today` : 'Awaiting print run'}
+              </p>
             </div>
           </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #e3e6ed', margin: '0.5rem 0 1.25rem 0' }} />
+          {/* Badge 2: Fusing Queue / Pending Fusing */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('fusing')}>
+            <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+              <div style={{
+                position: 'absolute',
+                width: '30px',
+                height: '30px',
+                background: '#fdf3e6',
+                borderRadius: '6px',
+                transform: 'rotate(-10deg) translate(2px, 6px)'
+              }} />
+              <div style={{
+                position: 'absolute',
+                width: '30px',
+                height: '30px',
+                background: '#e5780b',
+                borderRadius: '50%',
+                right: '0',
+                top: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 2px 6px rgba(229, 120, 11, 0.3)'
+              }}>
+                <span style={{ fontSize: '12px', fontWeight: 900 }}>❚❚</span>
+              </div>
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
+                {summary.pendingFusingCards || 0} Fusing Queue
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
+                {summary.pendingFusingMeters ? `${fmtMtr(summary.pendingFusingMeters)} pending fusing` : 'In sync with print'}
+              </p>
+            </div>
+          </div>
 
-          {/* Velocity Line Chart Card */}
-          <div className="phoenix-card" style={{ padding: '1.35rem 1.4rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          {/* Badge 3: Dispatch Ready */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => onNavigateDepartment?.('list')}>
+            <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+              <div style={{
+                position: 'absolute',
+                width: '30px',
+                height: '30px',
+                background: '#feecee',
+                borderRadius: '6px',
+                transform: 'rotate(-10deg) translate(2px, 6px)'
+              }} />
+              <div style={{
+                position: 'absolute',
+                width: '30px',
+                height: '30px',
+                background: '#3874ff',
+                borderRadius: '50%',
+                right: '0',
+                top: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 2px 6px rgba(56, 116, 255, 0.3)'
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: 900 }}>✓</span>
+              </div>
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
+                {pipeline.readyForDelivery?.count || 0} Ready for Dispatch
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
+                {pipeline.readyForDelivery?.meters ? `${fmtMtr(pipeline.readyForDelivery?.meters)} ready for dispatch` : 'Packaged & verified'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr style={{ border: 'none', borderTop: '1px solid #e3e6ed', margin: '0.5rem 0 1.25rem 0' }} />
+
+      {/* ── Phoenix Hero Grid (Left: Velocity Chart; Right: 4 Smart KPI Cards) ── */}
+      <div className="phoenix-hero-row">
+        {/* LEFT COLUMN: Velocity Line Chart Card */}
+        <div className="phoenix-card" style={{ padding: '1.35rem 1.4rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#141824' }}>Production & Delivery Velocity</h3>
@@ -406,7 +404,6 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               </div>
             </div>
           </div>
-        </div>
 
         {/* RIGHT COLUMN: 4 Smart KPI Cards in 2x2 Grid with Micro Visualizations */}
         <div className="phoenix-kpi-grid">

@@ -1125,7 +1125,7 @@ export default function App() {
     if (isClientPortalMode) {
       return (
         <Suspense fallback={
-          <div style={{ minHeight: '100vh', background: '#0b0f19', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+          <div style={{ minHeight: '100vh', background: '#f0f4f8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
             <RefreshCw size={32} className="spin-loader" />
           </div>
         }>
@@ -1159,7 +1159,7 @@ export default function App() {
       : api.getClientData();
     return (
       <Suspense fallback={
-        <div style={{ minHeight: '100vh', background: '#0b0f19', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+        <div style={{ minHeight: '100vh', background: '#f0f4f8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
           <RefreshCw size={32} className="spin-loader" />
         </div>
       }>
