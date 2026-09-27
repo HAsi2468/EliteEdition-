@@ -336,7 +336,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
   const [selectedDesigner, setSelectedDesigner] = useState('All');
+  const [selectedColourMatcher, setSelectedColourMatcher] = useState('All');
   const [selectedFabric, setSelectedFabric] = useState('All');
+  const [selectedPriority, setSelectedPriority] = useState('All');
+  const [selectedMachine, setSelectedMachine] = useState('All');
+  const [selectedCreatedBy, setSelectedCreatedBy] = useState('All');
   const [drowFilter, setDrowFilter] = useState('All');
   const [cmFilter, setCmFilter] = useState('All');
   const [stage3Filter, setStage3Filter] = useState('All');
@@ -392,7 +396,19 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       const dList = Array.isArray(t.designers) ? t.designers : (t.designerName ? t.designerName.split(',') : []);
       dList.forEach(d => {
         const clean = String(d || '').trim();
-        if (clean) set.add(clean);
+        if (clean && clean !== '--') set.add(clean);
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const availableColourMatchers = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const list = Array.isArray(t.colourMatches) ? t.colourMatches : (t.colourMatching ? t.colourMatching.split(',') : []);
+      list.forEach(c => {
+        const clean = String(c || '').trim();
+        if (clean && clean !== '--') set.add(clean);
       });
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
@@ -404,8 +420,30 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       const fList = Array.isArray(t.fabrics) ? t.fabrics : (t.fabricName ? t.fabricName.split(',') : []);
       fList.forEach(f => {
         const clean = String(f || '').trim();
-        if (clean) set.add(clean);
+        if (clean && clean !== '--') set.add(clean);
       });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const availableMachines = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const m = t.machineName || t.machine;
+      if (m && String(m).trim() && String(m).trim() !== '--') {
+        set.add(String(m).trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const availableCreatedBy = useMemo(() => {
+    const set = new Set();
+    (tasks || []).forEach(t => {
+      const c = t.createdByName || t.createdBy;
+      if (c && String(c).trim() && String(c).trim() !== '--') {
+        set.add(String(c).trim());
+      }
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [tasks]);
@@ -640,8 +678,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       });
     }
 
-    // Filter by Operational Stage Tab (only in standalone mode)
-    if (!embedded && stageTab !== 'ALL') {
+    // Filter by Operational Stage Tab (Drawing, Colour Match, Hold, Approved, Revisions)
+    if (stageTab !== 'ALL') {
       result = result.filter(t => {
         const isApproved = t.finalDesignStatus === 'Approved' || t.finalDesignStatus === 'APPROVED SAMPLE' || t.status === 'Approved';
         const isRevision = String(t.finalDesignStatus || '').toLowerCase().startsWith('reject');
@@ -676,43 +714,41 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       });
     }
 
-    // Embedded Image 1 filters
-    if (embedded) {
-      // Filter by Category
-      if (categoryFilter && categoryFilter !== 'All') {
-        result = result.filter(t => {
-          const cat = t.category || (Array.isArray(t.fabrics) ? t.fabrics[0] : t.fabricName);
-          return cat && String(cat).toLowerCase() === categoryFilter.toLowerCase();
-        });
-      }
+    // Filter by colour matching
+    if (selectedColourMatcher && selectedColourMatcher !== 'All') {
+      result = result.filter(t => {
+        const matchers = Array.isArray(t.colourMatches) ? t.colourMatches : (t.colourMatching || '').split(',').map(s => s.trim());
+        return matchers.some(m => m && m.toLowerCase() === selectedColourMatcher.toLowerCase());
+      });
+    }
 
-      // Filter by Color
-      if (colorFilter && colorFilter !== 'All') {
-        result = result.filter(t => {
-          const cMatches = Array.isArray(t.colourMatches) ? t.colourMatches : (t.colourMatching ? [t.colourMatching] : []);
-          const col = t.colors ? [t.colors] : [];
-          const allC = [...cMatches, ...col];
-          return allC.some(c => c && String(c).toLowerCase().includes(colorFilter.toLowerCase()));
-        });
-      }
+    // Filter by priority
+    if (selectedPriority && selectedPriority !== 'All') {
+      result = result.filter(t => String(t.priority || 'Medium').toLowerCase() === selectedPriority.toLowerCase());
+    }
 
-      // Filter by Party
-      if (partyFilter && partyFilter !== 'All') {
-        result = result.filter(t => {
-          const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : []);
-          return pList.some(p => p && String(p).toLowerCase().includes(partyFilter.toLowerCase()));
-        });
-      }
+    // Filter by machine
+    if (selectedMachine && selectedMachine !== 'All') {
+      result = result.filter(t => {
+        const m = t.machineName || t.machine || '';
+        return String(m).toLowerCase() === selectedMachine.toLowerCase();
+      });
+    }
 
-      // Filter by Status (Active / Inactive / All)
-      if (statusFilter && statusFilter !== 'All') {
-        result = result.filter(t => {
-          const isInactive = t.status === 'Inactive' || t.status === 'Cancelled' || String(t.finalDesignStatus || '').toLowerCase().startsWith('reject');
-          if (statusFilter === 'Active') return !isInactive;
-          if (statusFilter === 'Inactive') return isInactive;
-          return true;
-        });
-      }
+    // Filter by createdBy
+    if (selectedCreatedBy && selectedCreatedBy !== 'All') {
+      result = result.filter(t => {
+        const c = t.createdByName || t.createdBy || '';
+        return String(c).toLowerCase().includes(selectedCreatedBy.toLowerCase());
+      });
+    }
+
+    // Filter by Party (if filtered)
+    if (partyFilter && partyFilter !== 'All') {
+      result = result.filter(t => {
+        const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : []);
+        return pList.some(p => p && String(p).toLowerCase().includes(partyFilter.toLowerCase()));
+      });
     }
 
     // Search query
@@ -721,17 +757,23 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       result = result.filter((t) => {
         const taskNo = String(t.taskNo || '').toLowerCase();
         const designName = String(t.designName || '').toLowerCase();
-        const designer = String(t.designerName || '').toLowerCase();
-        const fabric = String(t.fabricName || '').toLowerCase();
-        const cm = String(t.colourMatching || '').toLowerCase();
-        const party = String(t.partyName || t.party || '').toLowerCase();
+        const designer = String(t.designerName || (Array.isArray(t.designers) ? t.designers.join(' ') : '')).toLowerCase();
+        const cm = String(t.colourMatching || (Array.isArray(t.colourMatches) ? t.colourMatches.join(' ') : '')).toLowerCase();
+        const fabric = String(t.fabricName || (Array.isArray(t.fabrics) ? t.fabrics.join(' ') : '')).toLowerCase();
+        const machine = String(t.machineName || t.machine || '').toLowerCase();
+        const createdBy = String(t.createdByName || t.createdBy || '').toLowerCase();
+        const priority = String(t.priority || '').toLowerCase();
+        const party = String(t.partyName || t.party || (Array.isArray(t.parties) ? t.parties.join(' ') : '')).toLowerCase();
         const notes = String(t.notes || '').toLowerCase();
         return (
           taskNo.includes(q) ||
           designName.includes(q) ||
           designer.includes(q) ||
-          fabric.includes(q) ||
           cm.includes(q) ||
+          fabric.includes(q) ||
+          machine.includes(q) ||
+          createdBy.includes(q) ||
+          priority.includes(q) ||
           party.includes(q) ||
           notes.includes(q)
         );
@@ -742,12 +784,32 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       let cmp = 0;
       if (sortBy === 'date' || sortBy === 'createdAt') {
         cmp = new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0);
+      } else if (sortBy === 'priority') {
+        const order = { urgent: 4, high: 3, medium: 2, low: 1 };
+        const pA = order[String(a.priority || '').toLowerCase()] || 0;
+        const pB = order[String(b.priority || '').toLowerCase()] || 0;
+        cmp = pA - pB;
       } else {
         cmp = (a.designName || '').localeCompare(b.designName || '', undefined, { numeric: true, sensitivity: 'base' });
       }
       return sortOrder === 'asc' ? cmp : -cmp;
     });
-  }, [tasks, searchQuery, stageTab, isUserRestricted, effectiveDesignerTokens, selectedFabric, selectedDesigner, sortBy, sortOrder, embedded, categoryFilter, colorFilter, partyFilter, statusFilter]);
+  }, [
+    tasks,
+    searchQuery,
+    stageTab,
+    isUserRestricted,
+    effectiveDesignerTokens,
+    selectedFabric,
+    selectedDesigner,
+    selectedColourMatcher,
+    selectedPriority,
+    selectedMachine,
+    selectedCreatedBy,
+    sortBy,
+    sortOrder,
+    partyFilter
+  ]);
 
   // Create & Edit Task Handlers
   const handleOpenCreate = () => {
@@ -1338,232 +1400,89 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
 
 
-      {/* ─── Operational Stage Navigation Tabs (Only in standalone mode) ── */}
-      {!embedded && (
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.4rem',
-            overflowX: 'auto',
-            paddingBottom: '0.35rem',
-            marginBottom: '1rem',
-            scrollbarWidth: 'thin',
-          }}
-        >
-          {[
-            { id: 'ALL', label: 'All Designs', count: stageCounts.all, color: '#1d4ed8', bg: '#eff6ff' },
-            { id: 'DROW', label: '1. Drawing', count: stageCounts.drow, color: '#0284c7', bg: '#f0f9ff' },
-            { id: 'CM', label: '2. Colour Match', count: stageCounts.cm, color: '#db2777', bg: '#fdf2f8' },
-            { id: 'STAGE_3', label: '3. Hold / Continue', count: stageCounts.stage3, color: '#ea580c', bg: '#fff7ed' },
-            { id: 'APPROVED', label: 'Approved', count: stageCounts.approved, color: '#16a34a', bg: '#f0fdf4' },
-            { id: 'REVISION', label: 'Reject / Revisions', count: stageCounts.revision, color: '#dc2626', bg: '#fef2f2' },
-          ].map((tab) => {
-            const isActive = stageTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setStageTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '0.45rem 0.85rem',
-                  borderRadius: '8px',
-                  border: isActive ? `1.5px solid ${tab.color}` : '1px solid #cbd5e1',
-                  background: isActive ? tab.color : '#ffffff',
-                  color: isActive ? '#ffffff' : '#475569',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  boxShadow: isActive ? `0 2px 8px ${tab.color}35` : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <span>{tab.label}</span>
-                <span
-                  style={{
-                    fontSize: '0.7rem',
-                    fontWeight: 800,
-                    padding: '0.1rem 0.45rem',
-                    borderRadius: '10px',
-                    background: isActive ? 'rgba(255, 255, 255, 0.25)' : tab.bg,
-                    color: isActive ? '#ffffff' : tab.color,
-                  }}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
-          </div>
-      )}
-
-      {/* ─── Search & Filters Toolbar ───────────────────────────────────── */}
-      {embedded ? (
-        /* Single clean toolbar exactly matching Design Catalog */
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem' }}>
-          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Search Input */}
-            <div style={{ position: 'relative', flex: '1 1 220px' }}>
-              <label htmlFor="sample-search-field" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-                Search Design Name, Fabric, Matching, Designer
-              </label>
-              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                id="sample-search-field"
-                name="sampleSearch"
-                aria-label="Search Design name, fabric, matching, designer"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search Design name, fabric, matching, designer..."
-                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
-              />
-            </div>
-
-            {/* Categories select filter */}
-            <div style={{ minWidth: 150 }}>
-              <label htmlFor="sample-category-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-                Filter by Category
-              </label>
-              <select
-                id="sample-category-filter"
-                name="sampleCategory"
-                aria-label="Filter by Category"
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-              >
-                <option value="All">All Categories</option>
-                {availableCategories.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Colors select filter */}
-            <div style={{ minWidth: 150 }}>
-              <label htmlFor="sample-color-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-                Filter by Color
-              </label>
-              <select
-                id="sample-color-filter"
-                name="sampleColor"
-                aria-label="Filter by Color"
-                value={colorFilter}
-                onChange={(e) => setColorFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-              >
-                <option value="All">All Colors</option>
-                {availableColors.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Party (Client) select filter */}
-            <div style={{ minWidth: 160 }}>
-              <label htmlFor="sample-party-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-                Filter by Party
-              </label>
-              <select
-                id="sample-party-filter"
-                name="sampleParty"
-                aria-label="Filter by Party (Clients)"
-                value={partyFilter}
-                onChange={(e) => setPartyFilter(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-              >
-                <option value="All">All Parties (Clients)</option>
-                {availableParties.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Status Buttons */}
-            <div style={{ display: 'flex', border: '1px solid var(--border-light)', borderRadius: '8px', overflow: 'hidden' }}>
-              {['Active', 'Inactive', 'All'].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatusFilter(s)}
-                  style={{
-                    padding: '0.45rem 0.85rem',
-                    fontSize: '0.82rem',
-                    fontWeight: statusFilter === s ? 700 : 500,
-                    border: 'none',
-                    background: statusFilter === s ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-                    color: statusFilter === s ? 'var(--primary)' : 'var(--text-muted)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-
-            {/* Sorting */}
-            <div style={{ minWidth: 140 }}>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-              >
-                <option value="designName">Sort by Name</option>
-                <option value="createdAt">Sort by Date</option>
-              </select>
-            </div>
-
-            {/* Sort Order Button */}
+      {/* ─── Operational Stage Navigation Tabs (Drawing, Colour Match, Hold, Approved, Revisions) ── */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.45rem',
+          overflowX: 'auto',
+          paddingBottom: '0.4rem',
+          marginBottom: '0.85rem',
+          scrollbarWidth: 'thin',
+        }}
+      >
+        {[
+          { id: 'ALL', label: 'All Designs', count: stageCounts.all, color: '#1d4ed8', bg: '#eff6ff' },
+          { id: 'DROW', label: '1. Drawing', count: stageCounts.drow, color: '#0284c7', bg: '#f0f9ff' },
+          { id: 'CM', label: '2. Colour Match', count: stageCounts.cm, color: '#db2777', bg: '#fdf2f8' },
+          { id: 'STAGE_3', label: '3. Hold / Continue', count: stageCounts.stage3, color: '#ea580c', bg: '#fff7ed' },
+          { id: 'APPROVED', label: 'Approved', count: stageCounts.approved, color: '#16a34a', bg: '#f0fdf4' },
+          { id: 'REVISION', label: 'Reject / Revisions', count: stageCounts.revision, color: '#dc2626', bg: '#fef2f2' },
+        ].map((tab) => {
+          const isActive = stageTab === tab.id;
+          return (
             <button
-              type="button"
-              onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+              key={tab.id}
+              onClick={() => setStageTab(tab.id)}
               style={{
-                padding: '0.45rem 0.65rem',
-                fontSize: '0.85rem',
-                border: '1px solid var(--border-light)',
-                borderRadius: '8px',
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '0.45rem',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                border: isActive ? `1.5px solid ${tab.color}` : '1px solid #cbd5e1',
+                background: isActive ? tab.color : '#ffffff',
+                color: isActive ? '#ffffff' : '#475569',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: isActive ? `0 2px 8px ${tab.color}35` : 'none',
+                transition: 'all 0.15s ease',
               }}
             >
-              {sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}
+              <span>{tab.label}</span>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  padding: '0.1rem 0.45rem',
+                  borderRadius: '10px',
+                  background: isActive ? 'rgba(255, 255, 255, 0.25)' : tab.bg,
+                  color: isActive ? '#ffffff' : tab.color,
+                }}
+              >
+                {tab.count}
+              </span>
             </button>
-          </div>
-        </div>
-      ) : (
-        /* Standalone toolbar */
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            padding: '0.85rem 1rem',
-            marginBottom: '1.25rem',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.75rem',
-            alignItems: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          }}
-        >
+          );
+        })}
+      </div>
+
+      {/* ─── Search & Filters Toolbar (Tailored for Sample Design Screen) ── */}
+      <div
+        className="glass-panel"
+        style={{
+          padding: '0.85rem 1.15rem',
+          marginBottom: '1rem',
+          background: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Search Input */}
-          <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
-            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div style={{ position: 'relative', flex: '1 1 230px', minWidth: '200px' }}>
+            <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search design, task #, fabric, designer..."
+              placeholder="Search design, task #, designer, fabric..."
               style={{
                 width: '100%',
-                padding: '0.48rem 0.75rem 0.48rem 2.1rem',
+                padding: '0.45rem 0.75rem 0.45rem 2.1rem',
                 borderRadius: '8px',
                 border: '1px solid #cbd5e1',
                 fontSize: '0.82rem',
@@ -1575,8 +1494,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => setSearchQuery('')}
-                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
               >
                 <X size={14} />
               </button>
@@ -1596,44 +1516,45 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             />
           </div>
 
-          {/* Designer Filter */}
-          <div style={{ flex: '0 0 auto' }}>
+          {/* Assign Design (Designer) Filter */}
+          <div style={{ minWidth: '150px' }}>
             {isUserRestricted ? (
               <div
                 style={{
-                  padding: '0.45rem 0.85rem',
+                  padding: '0.45rem 0.75rem',
                   borderRadius: '8px',
                   border: '1.5px solid #bfdbfe',
-                  fontSize: '0.82rem',
+                  fontSize: '0.8rem',
                   background: '#eff6ff',
                   color: '#1d4ed8',
                   fontWeight: 800,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.4rem',
+                  gap: '0.35rem',
                 }}
-                title="Locked to your assigned designs & colour matching tasks"
+                title="Locked to your assigned designs"
               >
                 <User size={13} color="#2563eb" />
-                <span>👤 My Designs & C.M.: {userAssignedName || 'Not Configured'}</span>
+                <span>👤 {userAssignedName || 'My Designs'}</span>
               </div>
             ) : (
               <select
                 value={selectedDesigner}
                 onChange={(e) => setSelectedDesigner(e.target.value)}
                 style={{
-                  padding: '0.48rem 0.75rem',
+                  width: '100%',
+                  padding: '0.45rem 0.7rem',
+                  fontSize: '0.82rem',
                   borderRadius: '8px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.82rem',
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  fontWeight: 600,
+                  background: selectedDesigner !== 'All' ? 'rgba(37, 99, 235, 0.08)' : '#ffffff',
+                  color: selectedDesigner !== 'All' ? '#1d4ed8' : '#0f172a',
+                  fontWeight: selectedDesigner !== 'All' ? 700 : 500,
                   cursor: 'pointer',
                   outline: 'none',
                 }}
               >
-                <option value="All">👤 All Designers & Staff</option>
+                <option value="All">👤 Assign Design: All</option>
                 {availableDesigners.map((d, i) => (
                   <option key={i} value={d}>{d}</option>
                 ))}
@@ -1641,60 +1562,306 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             )}
           </div>
 
-          {/* Fabric Dropdown Filter */}
-          <div style={{ flex: '0 0 auto' }}>
+          {/* Colour Matching Filter */}
+          <div style={{ minWidth: '150px' }}>
             <select
-              value={selectedFabric}
-              onChange={(e) => setSelectedFabric(e.target.value)}
+              value={selectedColourMatcher}
+              onChange={(e) => setSelectedColourMatcher(e.target.value)}
               style={{
-                padding: '0.48rem 0.75rem',
+                width: '100%',
+                padding: '0.45rem 0.7rem',
+                fontSize: '0.82rem',
                 borderRadius: '8px',
                 border: '1px solid #cbd5e1',
-                fontSize: '0.82rem',
-                background: '#ffffff',
-                color: '#0f172a',
-                fontWeight: 600,
+                background: selectedColourMatcher !== 'All' ? 'rgba(219, 39, 119, 0.08)' : '#ffffff',
+                color: selectedColourMatcher !== 'All' ? '#be185d' : '#0f172a',
+                fontWeight: selectedColourMatcher !== 'All' ? 700 : 500,
                 cursor: 'pointer',
                 outline: 'none',
               }}
             >
-              <option value="All">🧵 All Fabrics</option>
+              <option value="All">🎨 Colour Match: All</option>
+              {availableColourMatchers.map((cm, i) => (
+                <option key={i} value={cm}>{cm}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fabric Filter */}
+          <div style={{ minWidth: '140px' }}>
+            <select
+              value={selectedFabric}
+              onChange={(e) => setSelectedFabric(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.7rem',
+                fontSize: '0.82rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: selectedFabric !== 'All' ? 'rgba(5, 150, 105, 0.08)' : '#ffffff',
+                color: selectedFabric !== 'All' ? '#047857' : '#0f172a',
+                fontWeight: selectedFabric !== 'All' ? 700 : 500,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="All">🧵 Fabric: All</option>
               {availableFabrics.map((f, i) => (
                 <option key={i} value={f}>{f}</option>
               ))}
             </select>
           </div>
 
-          {/* Reset Filters */}
-          {(datePreset !== 'all' || (!isDesignerRestricted && selectedDesigner !== 'All') || selectedFabric !== 'All' || drowFilter !== 'All' || cmFilter !== 'All' || finalFilter !== 'All' || stageTab !== 'ALL' || searchQuery) && (
+          {/* Priority Filter */}
+          <div style={{ minWidth: '130px' }}>
+            <select
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.7rem',
+                fontSize: '0.82rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: selectedPriority !== 'All' ? 'rgba(234, 88, 12, 0.08)' : '#ffffff',
+                color: selectedPriority !== 'All' ? '#c2410c' : '#0f172a',
+                fontWeight: selectedPriority !== 'All' ? 700 : 500,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="All">⚡ Priority: All</option>
+              <option value="Urgent">🔴 Urgent</option>
+              <option value="High">🟠 High</option>
+              <option value="Medium">🟡 Medium</option>
+              <option value="Low">🟢 Low</option>
+            </select>
+          </div>
+
+          {/* Machine Filter */}
+          {availableMachines.length > 0 && (
+            <div style={{ minWidth: '130px' }}>
+              <select
+                value={selectedMachine}
+                onChange={(e) => setSelectedMachine(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.7rem',
+                  fontSize: '0.82rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: selectedMachine !== 'All' ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
+                  color: selectedMachine !== 'All' ? '#4338ca' : '#0f172a',
+                  fontWeight: selectedMachine !== 'All' ? 700 : 500,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="All">🖨️ Machine: All</option>
+                {availableMachines.map((m, i) => (
+                  <option key={i} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Created By Filter */}
+          {availableCreatedBy.length > 0 && (
+            <div style={{ minWidth: '140px' }}>
+              <select
+                value={selectedCreatedBy}
+                onChange={(e) => setSelectedCreatedBy(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.7rem',
+                  fontSize: '0.82rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: selectedCreatedBy !== 'All' ? 'rgba(79, 70, 229, 0.08)' : '#ffffff',
+                  color: selectedCreatedBy !== 'All' ? '#3730a3' : '#0f172a',
+                  fontWeight: selectedCreatedBy !== 'All' ? 700 : 500,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="All">✍️ Created By: All</option>
+                {availableCreatedBy.map((c, i) => (
+                  <option key={i} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Sorting */}
+          <div style={{ minWidth: '130px' }}>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.7rem',
+                fontSize: '0.82rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#0f172a',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="designName">Sort: Name</option>
+              <option value="date">Sort: Date</option>
+              <option value="priority">Sort: Priority</option>
+            </select>
+          </div>
+
+          {/* Sort Order Toggle */}
+          <button
+            type="button"
+            onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+            style={{
+              padding: '0.45rem 0.65rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              background: '#f8fafc',
+              color: '#475569',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title={sortOrder === 'asc' ? 'Ascending Order' : 'Descending Order'}
+          >
+            {sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}
+          </button>
+
+          {/* View Mode Switcher: Cards vs Table */}
+          <div
+            style={{
+              display: 'inline-flex',
+              background: '#f1f5f9',
+              padding: '3px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              marginLeft: 'auto',
+            }}
+          >
             <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.38rem 0.7rem',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                background: viewMode === 'grid' ? '#ffffff' : 'transparent',
+                color: viewMode === 'grid' ? '#2563eb' : '#64748b',
+                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+              title="Cards Grid View"
+            >
+              <LayoutGrid size={13} /> <span>Cards</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.38rem 0.7rem',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                background: viewMode === 'table' ? '#ffffff' : 'transparent',
+                color: viewMode === 'table' ? '#2563eb' : '#64748b',
+                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+              title="Table List View"
+            >
+              <List size={13} /> <span>Table</span>
+            </button>
+          </div>
+
+          {/* Refresh Button */}
+          <button
+            type="button"
+            onClick={() => loadData(false)}
+            disabled={loading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.45rem 0.75rem',
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#334155',
+              cursor: 'pointer',
+            }}
+            title="Refresh Data"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+
+          {/* Reset Filters Button */}
+          {(datePreset !== 'all' ||
+            (!isDesignerRestricted && selectedDesigner !== 'All') ||
+            selectedColourMatcher !== 'All' ||
+            selectedFabric !== 'All' ||
+            selectedPriority !== 'All' ||
+            selectedMachine !== 'All' ||
+            selectedCreatedBy !== 'All' ||
+            stageTab !== 'ALL' ||
+            searchQuery) && (
+            <button
+              type="button"
               onClick={() => {
                 setDatePreset('all');
                 if (!isDesignerRestricted) setSelectedDesigner('All');
+                setSelectedColourMatcher('All');
                 setSelectedFabric('All');
-                setDrowFilter('All');
-                setCmFilter('All');
-                setStage3Filter('All');
-                setFinalFilter('All');
+                setSelectedPriority('All');
+                setSelectedMachine('All');
+                setSelectedCreatedBy('All');
                 setStageTab('ALL');
                 setSearchQuery('');
               }}
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
                 padding: '0.45rem 0.75rem',
-                background: '#f1f5f9',
-                border: '1px solid #cbd5e1',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
                 borderRadius: '8px',
                 fontSize: '0.78rem',
                 fontWeight: 700,
-                color: '#64748b',
+                color: '#dc2626',
                 cursor: 'pointer',
               }}
+              title="Reset all filters"
             >
-              Reset Filters
+              <X size={13} />
+              <span>Reset Filters</span>
             </button>
           )}
         </div>
-      )}
+      </div>
 
       {/* ─── Task Content: Cards Grid vs Table View ───────────────────────── */}
       {loading ? (
