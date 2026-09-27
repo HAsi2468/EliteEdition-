@@ -37,7 +37,8 @@ import {
   List,
   ShieldAlert,
   Play,
-  Pause
+  Pause,
+  ChevronDown
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 import DesignImage from './DesignImage';
@@ -327,6 +328,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   // View Mode & Operational Stage Tabs
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
   const [stageTab, setStageTab] = useState('ALL'); // 'ALL' | 'DROW' | 'CM' | 'STAGE_3' | 'APPROVED' | 'REVISION'
+  const [openStatusDropdownId, setOpenStatusDropdownId] = useState(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -941,6 +943,141 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
     setFilePreviews((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // Close status dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.status-dropdown-container')) {
+        setOpenStatusDropdownId(null);
+      }
+    };
+    if (openStatusDropdownId) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [openStatusDropdownId]);
+
+  // Directly update task status without opening form modal
+  const handleDirectStatusChange = async (task, opt) => {
+    setOpenStatusDropdownId(null);
+    try {
+      const payload = {
+        category: opt.category,
+        statusType: opt.statusType,
+        statusValue: opt.value,
+        stage: opt.value,
+        images: [],
+        note: `Status updated to ${opt.value}`,
+        outputLink: '',
+      };
+      await api.updateDesignerTaskStage(task._id, payload);
+      triggerPushNotification(
+        '🎨 Status Updated',
+        `${task.designName}: Status updated to "${opt.value}"`,
+        'success'
+      );
+      // Optimistically update local task state to reflect immediately
+      setTasks(prev => prev.map(t => {
+        if (t._id !== task._id) return t;
+        const updated = { ...t };
+        if (opt.category === 'drow_design') updated.drowDesignStatus = opt.value;
+        else if (opt.category === 'colour_matching') updated.colourMatchingStatus = opt.value;
+        else if (opt.category === 'stage_3') updated.stage3Status = opt.value;
+        else if (opt.category === 'final_design') updated.finalDesignStatus = opt.value;
+        return updated;
+      }));
+      fetchTasks();
+    } catch (err) {
+      alert('Failed to update status: ' + err.message);
+    }
+  };
+
+  const getTaskCurrentStatusBadge = (task) => {
+    if (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE') {
+      return { label: 'Approved', icon: Check, color: '#16a34a', bg: '#f0fdf4', border: '#86efac' };
+    }
+    if (String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')) {
+      return { label: 'Rejected', icon: X, color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' };
+    }
+    if (task.stage3Status === 'Hold') {
+      return { label: 'On Hold', icon: Pause, color: '#ea580c', bg: '#fff7ed', border: '#fdba74' };
+    }
+    if (task.stage3Status === 'Continue') {
+      return { label: 'Continuing', icon: Play, color: '#0284c7', bg: '#eff6ff', border: '#bfdbfe' };
+    }
+    if (task.colourMatchingStatus) {
+      return { label: `Colour Match: ${task.colourMatchingStatus}`, icon: Palette, color: '#db2777', bg: '#fdf2f8', border: '#f472b6' };
+    }
+    if (task.drowDesignStatus) {
+      return { label: `Drow: ${task.drowDesignStatus}`, icon: Play, color: '#0284c7', bg: '#f0f9ff', border: '#38bdf8' };
+    }
+    return { label: 'Select Status', icon: null, color: '#475569', bg: '#f8fafc', border: '#cbd5e1' };
+  };
+
+  const getStatusDropdownOptions = (task) => [
+    {
+      id: 'drow_design',
+      category: 'drow_design',
+      statusType: 'DROW DESIGN STATUS',
+      value: 'Start Design',
+      label: '1. Start Design (Drow)',
+      icon: Play,
+      color: '#0284c7',
+      bg: '#eff6ff',
+      border: '#bfdbfe',
+      isActive: task.drowDesignStatus === 'Start Design' || task.drowDesignStatus === 'START WORKING'
+    },
+    {
+      id: 'colour_matching',
+      category: 'colour_matching',
+      statusType: 'COLOUR MATCHING STATUS',
+      value: 'Start Design',
+      label: '2. Start Design (Colour Match)',
+      icon: Palette,
+      color: '#db2777',
+      bg: '#fdf2f8',
+      border: '#fbcfe8',
+      isActive: task.colourMatchingStatus === 'Start Design'
+    },
+    {
+      id: 'stage_3',
+      category: 'stage_3',
+      statusType: 'STAGE 3 STATUS',
+      value: task.stage3Status === 'Hold' ? 'Continue' : 'Hold',
+      label: task.stage3Status === 'Hold' ? '3. Continue (Resume)' : '3. Hold Task',
+      icon: task.stage3Status === 'Hold' ? Play : Pause,
+      color: '#ea580c',
+      bg: '#fff7ed',
+      border: '#ffedd5',
+      isActive: task.stage3Status === 'Hold'
+    },
+    {
+      id: 'final_approved',
+      category: 'final_design',
+      statusType: 'FINAL DESIGN STATUS',
+      value: 'Approved',
+      label: '4. Approved',
+      icon: Check,
+      color: '#16a34a',
+      bg: '#f0fdf4',
+      border: '#bbf7d0',
+      isActive: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
+    },
+    {
+      id: 'final_reject',
+      category: 'final_design',
+      statusType: 'FINAL DESIGN STATUS',
+      value: 'Reject',
+      label: '5. Reject',
+      icon: X,
+      color: '#dc2626',
+      bg: '#fef2f2',
+      border: '#fecaca',
+      isActive: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
+    }
+  ];
 
   // Submit Status Change & Upload Images to Cloudflare R2
   const handleSubmitStatusUpdate = async (e) => {
@@ -1710,18 +1847,14 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       ) : viewMode === 'table' ? (
         /* ─── TABLE VIEW ──────────────────────────────────────────────── */
         <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', minHeight: '360px', paddingBottom: openStatusDropdownId ? '160px' : '20px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Date</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Design & Priority</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Design, Date &amp; Priority</th>
                   <th style={{ padding: '0.85rem 0.75rem', fontWeight: 800 }}>Sample Ref</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Assigned Team</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>1. Drow Status</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>2. Colour Match</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>3. Hold / Continue</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>4. Final Approval</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Stage / Status</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -1752,24 +1885,27 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         transition: 'background 0.1s ease',
                       }}
                     >
-                      {/* Date */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>
-                          {task.date || '--'}
-                        </div>
-                      </td>
-
-                      {/* Design & Priority */}
+                      {/* Design, Date & Priority (Combined) */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
-                          {task.designName}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {task.taskNo && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', padding: '0.1rem 0.45rem', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+                              {task.taskNo}
+                            </span>
+                          )}
+                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
+                            {task.designName}
+                          </span>
                         </div>
-                        <div style={{ marginTop: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <Calendar size={11} color="#64748b" /> {task.date || '--'}
+                          </span>
                           <span
                             style={{
-                              fontSize: '0.66rem',
+                              fontSize: '0.65rem',
                               fontWeight: 800,
-                              padding: '0.15rem 0.45rem',
+                              padding: '0.12rem 0.4rem',
                               borderRadius: '5px',
                               background: priorityConfig.bg,
                               color: priorityConfig.color,
@@ -1839,226 +1975,148 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         </div>
                       </td>
 
-                      {/* 1. Drow Status */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus || 'Start Design')}
-                            style={{
-                              padding: '0.28rem 0.6rem',
-                              borderRadius: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              border: task.drowDesignStatus === 'FINAL SAMPLE' || task.drowDesignStatus === 'Final Sample'
-                                ? '1.5px solid #4338ca'
-                                : task.drowDesignStatus
-                                ? '1.5px solid #0284c7'
-                                : '1px solid #38bdf8',
-                              background: task.drowDesignStatus === 'FINAL SAMPLE' || task.drowDesignStatus === 'Final Sample'
-                                ? '#eef2ff'
-                                : task.drowDesignStatus
-                                ? '#eff6ff'
-                                : '#e0f2fe',
-                              color: task.drowDesignStatus === 'FINAL SAMPLE' || task.drowDesignStatus === 'Final Sample'
-                                ? '#4338ca'
-                                : task.drowDesignStatus
-                                ? '#0284c7'
-                                : '#0369a1',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                            }}
-                            title="Start or update Drow Design status"
-                          >
-                            <Play size={11} fill="currentColor" />
-                            <span>{task.drowDesignStatus || 'Start Design'}</span>
-                          </button>
-                          {drowImgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
-                              title={`${drowImgs.length} proof image(s)`}
-                            >
-                              🖼️ {drowImgs.length}
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      {/* Stage / Status Dropdown Menu (5 options, direct update without form) */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', position: 'relative' }}>
+                        {(() => {
+                          const currentBadge = getTaskCurrentStatusBadge(task);
+                          const statusOpts = getStatusDropdownOptions(task);
+                          const isOpen = openStatusDropdownId === task._id;
+                          const CurrentIcon = currentBadge.icon;
 
-                      {/* 2. Colour Match */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus || 'Start Design')}
-                            style={{
-                              padding: '0.28rem 0.6rem',
-                              borderRadius: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              border: task.colourMatchingStatus === 'FINAL SAMPLE' || task.colourMatchingStatus === 'Final Sample'
-                                ? '1.5px solid #4338ca'
-                                : task.colourMatchingStatus
-                                ? '1.5px solid #db2777'
-                                : '1px solid #f472b6',
-                              background: task.colourMatchingStatus === 'FINAL SAMPLE' || task.colourMatchingStatus === 'Final Sample'
-                                ? '#eef2ff'
-                                : task.colourMatchingStatus
-                                ? '#fdf2f8'
-                                : '#fce7f3',
-                              color: task.colourMatchingStatus === 'FINAL SAMPLE' || task.colourMatchingStatus === 'Final Sample'
-                                ? '#4338ca'
-                                : task.colourMatchingStatus
-                                ? '#db2777'
-                                : '#be185d',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                            }}
-                            title="Start or update Colour Matching status"
-                          >
-                            <Palette size={12} />
-                            <span>{task.colourMatchingStatus || 'Start Design'}</span>
-                          </button>
-                          {cmImgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#db2777', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
-                              title={`${cmImgs.length} proof image(s)`}
-                            >
-                              🎨 {cmImgs.length}
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                          return (
+                            <div className="status-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenStatusDropdownId(isOpen ? null : task._id)}
+                                  style={{
+                                    padding: '0.35rem 0.65rem',
+                                    borderRadius: '7px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    border: `1.5px solid ${currentBadge.border}`,
+                                    background: currentBadge.bg,
+                                    color: currentBadge.color,
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                  title="Click to select status action"
+                                >
+                                  {CurrentIcon && <CurrentIcon size={12} />}
+                                  <span>{currentBadge.label}</span>
+                                  <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                                </button>
 
-                      {/* 3. Hold / Continue */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status || 'Hold')}
-                            style={{
-                              padding: '0.28rem 0.6rem',
-                              borderRadius: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              border: task.stage3Status === 'Continue'
-                                ? '1.5px solid #0284c7'
-                                : task.stage3Status === 'Hold'
-                                ? '1.5px solid #ea580c'
-                                : '1px solid #fdba74',
-                              background: task.stage3Status === 'Continue'
-                                ? '#eff6ff'
-                                : '#fff7ed',
-                              color: task.stage3Status === 'Continue'
-                                ? '#0284c7'
-                                : '#ea580c',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                            }}
-                            title="Hold or continue task"
-                          >
-                            <Pause size={11} fill="currentColor" />
-                            <span>{task.stage3Status || 'Hold'}</span>
-                          </button>
-                          {stage3Imgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
-                              title={`${stage3Imgs.length} proof image(s)`}
-                            >
-                              ⏸️ {stage3Imgs.length}
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                                {/* Proof thumbnails / count if available */}
+                                {drowImgs.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    title={`${drowImgs.length} Drow proof image(s)`}
+                                  >
+                                    🖼️ {drowImgs.length}
+                                  </button>
+                                )}
+                                {cmImgs.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#db2777', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    title={`${cmImgs.length} Colour proof image(s)`}
+                                  >
+                                    🎨 {cmImgs.length}
+                                  </button>
+                                )}
+                                {stage3Imgs.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    title={`${stage3Imgs.length} Stage 3 proof image(s)`}
+                                  >
+                                    ⏸️ {stage3Imgs.length}
+                                  </button>
+                                )}
+                                {finalImgs.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    title={`${finalImgs.length} Final proof image(s)`}
+                                  >
+                                    ✨ {finalImgs.length}
+                                  </button>
+                                )}
+                              </div>
 
-                      {/* 4. Final Approval */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'nowrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', 'Approved')}
-                            style={{
-                              padding: '0.28rem 0.6rem',
-                              borderRadius: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              border: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
-                                ? '1.5px solid #15803d'
-                                : '1px solid #86efac',
-                              background: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
-                                ? '#16a34a'
-                                : '#f0fdf4',
-                              color: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
-                                ? '#ffffff'
-                                : '#15803d',
-                              boxShadow: (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE')
-                                ? '0 1px 4px rgba(22, 163, 74, 0.3)'
-                                : 'none',
-                            }}
-                            title="Mark as Approved"
-                          >
-                            <Check size={12} /> Approved
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', 'Reject')}
-                            style={{
-                              padding: '0.28rem 0.6rem',
-                              borderRadius: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              border: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                ? '1.5px solid #b91c1c'
-                                : '1px solid #fca5a5',
-                              background: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                ? '#dc2626'
-                                : '#fef2f2',
-                              color: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                ? '#ffffff'
-                                : '#b91c1c',
-                              boxShadow: String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
-                                ? '0 1px 4px rgba(220, 38, 38, 0.3)'
-                                : 'none',
-                            }}
-                            title="Mark as Rejected"
-                          >
-                            <X size={12} /> Reject
-                          </button>
-
-                          {finalImgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
-                              title={`${finalImgs.length} final proof image(s)`}
-                            >
-                              ✨ {finalImgs.length}
-                            </button>
-                          )}
-                        </div>
+                              {/* Floating Dropdown Menu with 5 options */}
+                              {isOpen && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 9999,
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                                    minWidth: '220px',
+                                    padding: '0.35rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.2rem',
+                                  }}
+                                >
+                                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
+                                    Select Stage Status
+                                  </div>
+                                  {statusOpts.map((opt) => {
+                                    const OptIcon = opt.icon;
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => handleDirectStatusChange(task, opt)}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.45rem',
+                                          width: '100%',
+                                          padding: '0.42rem 0.55rem',
+                                          borderRadius: '6px',
+                                          border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
+                                          background: opt.isActive ? opt.bg : 'transparent',
+                                          color: opt.color,
+                                          fontSize: '0.74rem',
+                                          fontWeight: opt.isActive ? 800 : 700,
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          transition: 'background 0.12s ease',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!opt.isActive) e.currentTarget.style.background = '#f8fafc';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (!opt.isActive) e.currentTarget.style.background = 'transparent';
+                                        }}
+                                      >
+                                        <OptIcon size={13} color={opt.color} />
+                                        <span style={{ flex: 1 }}>{opt.label}</span>
+                                        {opt.isActive && <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>✓</span>}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Actions */}
