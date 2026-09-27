@@ -39,7 +39,8 @@ import {
   Play,
   Pause,
   ChevronDown,
-  MessageSquare
+  MessageSquare,
+  Clipboard
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 import DesignImage from './DesignImage';
@@ -337,6 +338,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [editingCommentTaskId, setEditingCommentTaskId] = useState(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [savingCommentId, setSavingCommentId] = useState(null);
+
+  // Dedicated Drag & Drop and Clipboard Paste Multiple Upload Modal
+  const [multipleUploadModalTask, setMultipleUploadModalTask] = useState(null);
+  const [multiUploadFiles, setMultiUploadFiles] = useState([]);
+  const [multiUploadPreviews, setMultiUploadPreviews] = useState([]);
+  const [multiUploadLoading, setMultiUploadLoading] = useState(false);
+  const [multiUploadProgress, setMultiUploadProgress] = useState(0);
+  const [isDraggingOverModal, setIsDraggingOverModal] = useState(false);
+  const [dragOverTaskId, setDragOverTaskId] = useState(null);
+  const [hoveredTaskId, setHoveredTaskId] = useState(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -889,10 +900,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     }
   };
 
-  const handleSampleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
+  const processSampleFile = async (file) => {
     if (!file) return;
-
     setUploadingSampleImage(true);
     try {
       const options = {
@@ -912,6 +921,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     } finally {
       setUploadingSampleImage(false);
     }
+  };
+
+  const handleSampleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) await processSampleFile(file);
   };
 
   const handleSubmitTask = async (e) => {
@@ -1150,6 +1164,202 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       setSavingCommentId(null);
     }
   };
+
+  // Extract image files from clipboard event (supports screenshot pastes, copied image files, browser copy)
+  const extractClipboardImages = (e) => {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData) return [];
+
+    const items = clipboardData.items || [];
+    const imageFiles = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type && item.type.startsWith('image/')) {
+        const blob = item.getAsFile();
+        if (blob) {
+          const ext = blob.type.split('/')[1] || 'png';
+          const file = new File(
+            [blob],
+            `pasted_image_${Date.now()}_${i + 1}.${ext}`,
+            { type: blob.type }
+          );
+          imageFiles.push(file);
+        }
+      }
+    }
+
+    if (imageFiles.length === 0 && clipboardData.files && clipboardData.files.length > 0) {
+      for (let i = 0; i < clipboardData.files.length; i++) {
+        const f = clipboardData.files[i];
+        if (f.type && f.type.startsWith('image/')) {
+          imageFiles.push(f);
+        }
+      }
+    }
+
+    return imageFiles;
+  };
+
+  // Add files to multi-upload modal queue with local previews
+  const addMultiUploadFiles = (incomingFiles) => {
+    const valid = Array.from(incomingFiles || []).filter(
+      (f) => f && f.type && f.type.startsWith('image/')
+    );
+    if (!valid.length) return;
+
+    setMultiUploadFiles((prev) => [...prev, ...valid]);
+    valid.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setMultiUploadPreviews((prev) => [
+          ...prev,
+          { name: file.name, size: file.size, previewUrl: reader.result },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Remove individual queued file in multi-upload modal
+  const handleRemoveQueuedMultiFile = (idx) => {
+    setMultiUploadFiles((prev) => prev.filter((_, i) => i !== idx));
+    setMultiUploadPreviews((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Execute upload of queued multiple images from modal
+  const handleExecuteModalUpload = async () => {
+    if (!multipleUploadModalTask || multiUploadFiles.length === 0) return;
+    setMultiUploadLoading(true);
+    setMultiUploadProgress(10);
+
+    try {
+      const uploadedUrls = [];
+      for (let i = 0; i < multiUploadFiles.length; i++) {
+        const file = multiUploadFiles[i];
+        let fileToUpload = file;
+        try {
+          const options = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
+          fileToUpload = await imageCompression(file, options);
+        } catch (compErr) {
+          console.warn('Image compression skipped for', file.name, compErr);
+        }
+        const res = await api.uploadImage(fileToUpload, 'designs/outputs');
+        if (res && res.url) {
+          uploadedUrls.push(res.url);
+        }
+        setMultiUploadProgress(Math.round(((i + 1) / multiUploadFiles.length) * 85));
+      }
+
+      if (uploadedUrls.length > 0) {
+        const currentOutputImages = Array.isArray(multipleUploadModalTask.outputImages)
+          ? multipleUploadModalTask.outputImages
+          : [];
+        const updatedImages = Array.from(new Set([...currentOutputImages, ...uploadedUrls]));
+
+        await api.updateDesignerTask(multipleUploadModalTask._id, {
+          newOutputImages: uploadedUrls,
+          outputImages: updatedImages,
+          outputImage: updatedImages[0] || '',
+        });
+
+        setTasks((prev) =>
+          prev.map((t) =>
+            t._id === multipleUploadModalTask._id
+              ? {
+                  ...t,
+                  outputImages: updatedImages,
+                  outputImage: updatedImages[0] || t.outputImage,
+                }
+              : t
+          )
+        );
+
+        triggerPushNotification(
+          '📷 Images Uploaded',
+          `${multipleUploadModalTask.designName}: ${uploadedUrls.length} image(s) uploaded successfully!`,
+          'success'
+        );
+        loadData(true);
+        setMultipleUploadModalTask(null);
+        setMultiUploadFiles([]);
+        setMultiUploadPreviews([]);
+      }
+    } catch (err) {
+      console.error('Failed to upload modal images:', err);
+      alert('Failed to upload image(s): ' + (err.message || 'Network error'));
+    } finally {
+      setMultiUploadLoading(false);
+      setMultiUploadProgress(0);
+    }
+  };
+
+  // Global window paste handler: captures clipboard images across modals & table rows
+  useEffect(() => {
+    const handleGlobalPaste = (e) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea') return;
+
+      const pastedFiles = extractClipboardImages(e);
+      if (!pastedFiles || pastedFiles.length === 0) return;
+
+      // 1. Multiple Upload Modal is currently open
+      if (multipleUploadModalTask) {
+        e.preventDefault();
+        addMultiUploadFiles(pastedFiles);
+        triggerPushNotification('Image Pasted 📋', `Added ${pastedFiles.length} image(s) from clipboard`, 'info');
+        return;
+      }
+
+      // 2. Stage status update modal (activeModalData) is open
+      if (activeModalData) {
+        e.preventDefault();
+        setSelectedFiles((prev) => [...prev, ...pastedFiles]);
+        pastedFiles.forEach((file) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setFilePreviews((prev) => [...prev, { name: file.name, size: file.size, previewUrl: reader.result }]);
+          };
+          reader.readAsDataURL(file);
+        });
+        triggerPushNotification('Image Pasted 📋', `Added ${pastedFiles.length} image(s) from clipboard`, 'info');
+        return;
+      }
+
+      // 3. Create / Edit Task Modal is open
+      if (showCreateModal && pastedFiles[0]) {
+        e.preventDefault();
+        processSampleFile(pastedFiles[0]);
+        triggerPushNotification('Sample Pasted 📋', 'Set pasted image as sample reference', 'info');
+        return;
+      }
+
+      // 4. Mouse is hovering over a table row
+      if (hoveredTaskId) {
+        const targetTask = tasks.find((t) => t._id === hoveredTaskId);
+        if (targetTask) {
+          e.preventDefault();
+          setMultipleUploadModalTask(targetTask);
+          setMultiUploadFiles(pastedFiles);
+          pastedFiles.forEach((file) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setMultiUploadPreviews((prev) => [
+                ...prev,
+                { name: file.name, size: file.size, previewUrl: reader.result },
+              ]);
+            };
+            reader.readAsDataURL(file);
+          });
+          triggerPushNotification('Image Pasted 📋', `Pasted ${pastedFiles.length} image(s) for ${targetTask.designName}`, 'info');
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [multipleUploadModalTask, activeModalData, showCreateModal, hoveredTaskId, tasks]);
 
   const getTaskCurrentStatusBadge = (task) => {
     if (task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE') {
@@ -2154,6 +2364,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   return (
                     <tr
                       key={task._id}
+                      onMouseEnter={() => setHoveredTaskId(task._id)}
+                      onMouseLeave={() => setHoveredTaskId(null)}
                       style={{
                         borderBottom: '1px solid #f1f5f9',
                         background: idx % 2 === 0 ? '#ffffff' : '#fcfdff',
@@ -2415,106 +2627,135 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         })()}
                       </td>
 
-                      {/* Image upload multiple Column */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', minWidth: '170px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          {/* Display existing uploaded images */}
-                          {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
-                            <div
-                              key={imgIdx}
-                              onClick={() => handleOpenLightbox(taskImages, imgIdx, `Uploaded Images: ${task.designName}`)}
-                              style={{
-                                width: '42px',
-                                height: '42px',
-                                borderRadius: '6px',
-                                overflow: 'hidden',
-                                border: '1px solid #cbd5e1',
-                                cursor: 'pointer',
-                                position: 'relative',
-                                background: '#f1f5f9',
-                                flexShrink: 0,
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                              }}
-                              title="Click to view image"
-                            >
-                              <img
-                                src={imgUrl}
-                                alt={`Uploaded ${imgIdx + 1}`}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            </div>
-                          ))}
+                      {/* Image upload multiple Column (Supports Drag & Drop, Paste & Click) */}
+                      <td
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (dragOverTaskId !== task._id) setDragOverTaskId(task._id);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOverTaskId(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOverTaskId(null);
+                          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                            handleTableMultipleImageUpload(task, e.dataTransfer.files);
+                          }
+                        }}
+                        style={{
+                          padding: '0.85rem 1rem',
+                          verticalAlign: 'middle',
+                          minWidth: '180px',
+                          background: dragOverTaskId === task._id ? '#ecfdf5' : 'transparent',
+                          outline: dragOverTaskId === task._id ? '2px dashed #10b981' : 'none',
+                          borderRadius: dragOverTaskId === task._id ? '6px' : '0',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {dragOverTaskId === task._id ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#059669', fontWeight: 800, fontSize: '0.74rem', padding: '0.35rem' }}>
+                            <Upload size={14} /> <span>Drop images here to upload!</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            {/* Display existing uploaded images */}
+                            {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
+                              <div
+                                key={imgIdx}
+                                onClick={() => handleOpenLightbox(taskImages, imgIdx, `Uploaded Images: ${task.designName}`)}
+                                style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '6px',
+                                  overflow: 'hidden',
+                                  border: '1px solid #cbd5e1',
+                                  cursor: 'pointer',
+                                  position: 'relative',
+                                  background: '#f1f5f9',
+                                  flexShrink: 0,
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                }}
+                                title="Click to view image"
+                              >
+                                <img
+                                  src={imgUrl}
+                                  alt={`Uploaded ${imgIdx + 1}`}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              </div>
+                            ))}
 
-                          {/* +N More indicator if > 3 images */}
-                          {taskImages.length > 3 && (
+                            {/* +N More indicator if > 3 images */}
+                            {taskImages.length > 3 && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenLightbox(taskImages, 3, `Uploaded Images: ${task.designName}`)}
+                                style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '6px',
+                                  background: '#f1f5f9',
+                                  border: '1px solid #cbd5e1',
+                                  color: '#475569',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                                title={`View all ${taskImages.length} images`}
+                              >
+                                +{taskImages.length - 3}
+                              </button>
+                            )}
+
+                            {/* Multiple Image Upload Button (Opens Dedicated Drag & Drop / Paste Modal) */}
                             <button
                               type="button"
-                              onClick={() => handleOpenLightbox(taskImages, 3, `Uploaded Images: ${task.designName}`)}
+                              onClick={() => {
+                                setMultipleUploadModalTask(task);
+                                setMultiUploadFiles([]);
+                                setMultiUploadPreviews([]);
+                              }}
                               style={{
-                                width: '42px',
-                                height: '42px',
-                                borderRadius: '6px',
-                                background: '#f1f5f9',
-                                border: '1px solid #cbd5e1',
-                                color: '#475569',
-                                fontSize: '0.72rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                padding: '0.35rem 0.55rem',
+                                borderRadius: '6px',
+                                background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
+                                border: uploadingRowId === task._id ? '1px dashed #6366f1' : '1px dashed #86efac',
+                                color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
+                                transition: 'all 0.15s ease',
+                                userSelect: 'none',
                                 flexShrink: 0,
                               }}
-                              title={`View all ${taskImages.length} images`}
+                              title="Click to open image uploader (supports Drag & Drop and Copy/Paste)"
                             >
-                              +{taskImages.length - 3}
+                              {uploadingRowId === task._id ? (
+                                <>
+                                  <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                                  <span>{uploadRowProgress}%</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload size={11} />
+                                  <span>+ Upload</span>
+                                </>
+                              )}
                             </button>
-                          )}
-
-                          {/* Multiple Image Upload Button */}
-                          <label
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              padding: '0.35rem 0.55rem',
-                              borderRadius: '6px',
-                              background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
-                              border: uploadingRowId === task._id ? '1px dashed #6366f1' : '1px dashed #86efac',
-                              color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
-                              transition: 'all 0.15s ease',
-                              userSelect: 'none',
-                              flexShrink: 0,
-                            }}
-                            title="Upload multiple design images"
-                          >
-                            <input
-                              type="file"
-                              multiple
-                              accept="image/*"
-                              disabled={uploadingRowId === task._id}
-                              onChange={(e) => {
-                                handleTableMultipleImageUpload(task, e.target.files);
-                                e.target.value = '';
-                              }}
-                              style={{ display: 'none' }}
-                            />
-                            {uploadingRowId === task._id ? (
-                              <>
-                                <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                                <span>{uploadRowProgress}%</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload size={11} />
-                                <span>+ Upload</span>
-                              </>
-                            )}
-                          </label>
-                        </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* Comment Column */}
@@ -4080,6 +4321,22 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 </div>
 
                 <div
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const files = Array.from(e.dataTransfer.files || []).filter(f => f.type && f.type.startsWith('image/'));
+                    if (files.length) {
+                      setSelectedFiles((prev) => [...prev, ...files]);
+                      files.forEach((file) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setFilePreviews((prev) => [...prev, { name: file.name, size: file.size, previewUrl: reader.result }]);
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                    }
+                  }}
                   style={{
                     border: '2px dashed #93c5fd',
                     borderRadius: '10px',
@@ -4099,9 +4356,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     onChange={handleFileChange}
                     style={{ display: 'none' }}
                   />
-                  <ImageIcon size={32} color="#3b82f6" style={{ margin: '0 auto 0.5rem' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                    <ImageIcon size={26} color="#3b82f6" />
+                    <Clipboard size={22} color="#db2777" />
+                  </div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1d4ed8' }}>
-                    Click to select multiple sample images
+                    Drag &amp; Drop images here, paste from clipboard (Ctrl+V), or click to select
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
                     PNG, JPG, WEBP • Automatically compressed and uploaded to Cloudflare R2
@@ -4272,6 +4532,371 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: DEDICATED MULTIPLE IMAGE UPLOAD (DRAG & DROP + COPY/PASTE) ─── */}
+      {multipleUploadModalTask && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !multiUploadLoading) {
+              setMultipleUploadModalTask(null);
+              setMultiUploadFiles([]);
+              setMultiUploadPreviews([]);
+            }
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '580px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#f8fafc',
+                borderTopLeftRadius: '16px',
+                borderTopRightRadius: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    color: '#2563eb',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Upload size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                    Upload Multiple Images
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748b' }}>
+                    Design: <strong style={{ color: '#2563eb' }}>{multipleUploadModalTask.designName}</strong> • {multipleUploadModalTask.taskNo}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!multiUploadLoading) {
+                    setMultipleUploadModalTask(null);
+                    setMultiUploadFiles([]);
+                    setMultiUploadPreviews([]);
+                  }
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '0.35rem',
+                  borderRadius: '6px',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Drag & Drop & Paste Zone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOverModal(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOverModal(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOverModal(false);
+                  addMultiUploadFiles(e.dataTransfer.files);
+                }}
+                onClick={() => document.getElementById('modal-multi-image-file-input')?.click()}
+                style={{
+                  border: isDraggingOverModal ? '2.5px dashed #2563eb' : '2px dashed #93c5fd',
+                  borderRadius: '12px',
+                  padding: '1.75rem 1.25rem',
+                  textAlign: 'center',
+                  background: isDraggingOverModal ? '#eff6ff' : '#f8faff',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  position: 'relative',
+                }}
+              >
+                <input
+                  id="modal-multi-image-file-input"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => {
+                    addMultiUploadFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                  style={{ display: 'none' }}
+                />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1d4ed8' }}>
+                    <Upload size={22} />
+                  </div>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fce7f3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#be185d' }}>
+                    <Clipboard size={22} />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e40af', marginBottom: '0.25rem' }}>
+                  Drag &amp; Drop images here, or paste from clipboard
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  Press <kbd style={{ padding: '2px 6px', background: '#e2e8f0', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>Ctrl+V</kbd> or <kbd style={{ padding: '2px 6px', background: '#e2e8f0', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>⌘V</kbd> to paste screenshot or copied image
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                  or click here to browse files • Multiple images supported (JPG, PNG, WEBP)
+                </div>
+              </div>
+
+              {/* Previews of Queued Images */}
+              {multiUploadPreviews.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                      Selected for Upload ({multiUploadPreviews.length}):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMultiUploadFiles([]);
+                        setMultiUploadPreviews([]);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: '0.6rem', maxHeight: '180px', overflowY: 'auto', padding: '4px' }}>
+                    {multiUploadPreviews.map((p, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          borderRadius: '8px',
+                          border: '1px solid #bfdbfe',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          background: '#f8fafc',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                        }}
+                      >
+                        <img
+                          src={p.previewUrl}
+                          alt={p.name}
+                          style={{ width: '100%', height: '75px', objectFit: 'cover', display: 'block' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveQueuedMultiFile(idx);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '3px',
+                            right: '3px',
+                            background: 'rgba(239, 68, 68, 0.9)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                          }}
+                          title="Remove image"
+                        >
+                          ✕
+                        </button>
+                        <div style={{ padding: '0.2rem 0.35rem', fontSize: '0.65rem', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Progress Bar when Uploading */}
+              {multiUploadLoading && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', marginBottom: '0.3rem' }}>
+                    <span>Compressing &amp; uploading to Cloudflare R2...</span>
+                    <span>{multiUploadProgress}%</span>
+                  </div>
+                  <div style={{ height: '7px', background: '#dbeafe', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${multiUploadProgress}%`, height: '100%', background: '#2563eb', transition: 'width 0.2s ease' }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Existing Uploaded Images on Task */}
+              {(() => {
+                const existingTaskImages = Array.from(
+                  new Set([
+                    ...(Array.isArray(multipleUploadModalTask.outputImages) ? multipleUploadModalTask.outputImages : []),
+                    ...(multipleUploadModalTask.outputImage ? [multipleUploadModalTask.outputImage] : []),
+                    ...(Array.isArray(multipleUploadModalTask.finalDesignImages) ? multipleUploadModalTask.finalDesignImages : []),
+                    ...(Array.isArray(multipleUploadModalTask.drowDesignImages) ? multipleUploadModalTask.drowDesignImages : []),
+                    ...(Array.isArray(multipleUploadModalTask.colourMatchingImages) ? multipleUploadModalTask.colourMatchingImages : []),
+                    ...(Array.isArray(multipleUploadModalTask.stage3Images) ? multipleUploadModalTask.stage3Images : []),
+                  ])
+                ).filter(Boolean);
+
+                if (existingTaskImages.length === 0) return null;
+
+                return (
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.85rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.45rem' }}>
+                      Currently Attached Images ({existingTaskImages.length}):
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', maxHeight: '110px', overflowY: 'auto' }}>
+                      {existingTaskImages.map((imgUrl, imgIdx) => (
+                        <div
+                          key={imgIdx}
+                          onClick={() => handleOpenLightbox(existingTaskImages, imgIdx, `Design Images: ${multipleUploadModalTask.designName}`)}
+                          style={{
+                            width: '54px',
+                            height: '54px',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                          }}
+                          title="Click to view image in full screen"
+                        >
+                          <img src={imgUrl} alt={`Attached ${imgIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                borderBottomLeftRadius: '16px',
+                borderBottomRightRadius: '16px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.65rem',
+              }}
+            >
+              <button
+                type="button"
+                disabled={multiUploadLoading}
+                onClick={() => {
+                  setMultipleUploadModalTask(null);
+                  setMultiUploadFiles([]);
+                  setMultiUploadPreviews([]);
+                }}
+                style={{
+                  padding: '0.55rem 1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: multiUploadLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={multiUploadLoading || multiUploadFiles.length === 0}
+                onClick={handleExecuteModalUpload}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background:
+                    multiUploadFiles.length === 0 || multiUploadLoading
+                      ? '#94a3b8'
+                      : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  cursor: multiUploadFiles.length === 0 || multiUploadLoading ? 'not-allowed' : 'pointer',
+                  boxShadow: multiUploadFiles.length === 0 ? 'none' : '0 2px 8px rgba(22, 163, 74, 0.25)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+              >
+                {multiUploadLoading ? (
+                  <>
+                    <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>Uploading ({multiUploadProgress}%)...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    <span>Upload {multiUploadFiles.length > 0 ? `${multiUploadFiles.length} Image(s)` : 'Images'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -4859,6 +5484,13 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   </div>
                 ) : (
                   <div
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) processSampleFile(file);
+                    }}
                     style={{
                       border: '2px dashed #93c5fd',
                       borderRadius: '8px',
@@ -4876,9 +5508,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       style={{ display: 'none' }}
                       onChange={handleSampleImageUpload}
                     />
-                    <Upload size={22} color="#2563eb" style={{ margin: '0 auto 0.35rem' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <Upload size={20} color="#2563eb" />
+                      <Clipboard size={18} color="#db2777" />
+                    </div>
                     <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: '#1e40af' }}>
-                      {uploadingSampleImage ? 'Compressing & Uploading to R2...' : 'Click to select sample reference image'}
+                      {uploadingSampleImage ? 'Compressing & Uploading to R2...' : 'Drag & drop, paste (Ctrl+V), or click to select sample image'}
                     </p>
                     <p style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', color: '#64748b' }}>
                       JPG, PNG, WebP up to 10MB
