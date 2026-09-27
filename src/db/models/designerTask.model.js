@@ -1,5 +1,34 @@
 const mongoose = require('mongoose');
 
+const commentSchema = new mongoose.Schema(
+  {
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    authorId: {
+      type: String,
+      default: '',
+    },
+    authorName: {
+      type: String,
+      default: 'Admin',
+      trim: true,
+    },
+    authorRole: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: true }
+);
+
 const stageHistorySchema = new mongoose.Schema(
   {
     category: {
@@ -204,6 +233,10 @@ const designerTaskSchema = new mongoose.Schema(
     },
     stageHistory: {
       type: [stageHistorySchema],
+      default: [],
+    },
+    comments: {
+      type: [commentSchema],
       default: [],
     },
     createdById: {

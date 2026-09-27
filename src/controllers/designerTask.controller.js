@@ -504,6 +504,36 @@ const updateDesignerTask = async (req, res) => {
       ...(task.colourMatching ? task.colourMatching.split(',').map(s => s.trim()) : []),
     ].map(n => n.trim().toLowerCase()));
 
+    // If a new comment or updated note was sent, record in comments and stageHistory
+    const incomingComment = body.newComment || (body.notes !== undefined && body.notes.trim() && body.notes.trim() !== (task.notes || '').trim() ? body.notes : null);
+    if (incomingComment && typeof incomingComment === 'string' && incomingComment.trim()) {
+      const cleanComment = incomingComment.trim();
+      const authorRole = req.body.authorRole || req.user?.role || req.headers['x-user-role'] || 'User';
+      if (!Array.isArray(task.comments)) {
+        task.comments = [];
+      }
+      task.comments.push({
+        text: cleanComment,
+        authorId: String(editorId),
+        authorName: editorName,
+        authorRole,
+        createdAt: new Date(),
+      });
+      if (!Array.isArray(task.stageHistory)) {
+        task.stageHistory = [];
+      }
+      task.stageHistory.push({
+        category: 'comment',
+        statusType: 'Comment',
+        stage: 'Comment Added',
+        updatedBy: String(editorId),
+        updatedByName: editorName,
+        updatedAt: new Date(),
+        note: cleanComment,
+      });
+      body.notes = cleanComment;
+    }
+
     Object.assign(task, body);
     await task.save();
 
@@ -531,6 +561,71 @@ const updateDesignerTask = async (req, res) => {
   } catch (err) {
     logger.error('updateDesignerTask error: %o', err);
     return res.status(500).json({ error: err.message || 'Failed to update designer task' });
+  }
+};
+
+/**
+ * Add a comment to designer task with author & timestamp history
+ */
+const addTaskComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const text = (req.body.text || req.body.comment || req.body.notes || '').trim();
+    if (!text) {
+      return res.status(400).json({ error: 'Comment text cannot be empty' });
+    }
+
+    let task = await db.DesignerTask.findById(id);
+    if (!task) {
+      task = await db.DesignerTask.findOne({ taskNo: id });
+    }
+    if (!task) {
+      return res.status(404).json({ error: 'Designer task not found' });
+    }
+
+    const authorName = req.body.authorName || req.user?.name || req.headers['x-user-name'] || 'Admin';
+    const authorId = req.body.authorId || req.user?._id || req.headers['x-user-id'] || '';
+    const authorRole = req.body.authorRole || req.user?.role || req.headers['x-user-role'] || 'User';
+
+    const newComment = {
+      text,
+      authorId: String(authorId),
+      authorName,
+      authorRole,
+      createdAt: new Date(),
+    };
+
+    if (!Array.isArray(task.comments)) {
+      task.comments = [];
+    }
+    task.comments.push(newComment);
+
+    if (!Array.isArray(task.stageHistory)) {
+      task.stageHistory = [];
+    }
+    task.stageHistory.push({
+      category: 'comment',
+      statusType: 'Comment',
+      stage: 'Comment Added',
+      updatedBy: String(authorId),
+      updatedByName: authorName,
+      updatedAt: new Date(),
+      note: text,
+    });
+
+    task.notes = text;
+    await task.save();
+
+    emitSocketEvent(req, 'designer-task-updated', task);
+
+    return res.status(200).json({
+      success: true,
+      data: task,
+      comment: newComment,
+    });
+  } catch (err) {
+    logger.error('addTaskComment error: %o', err);
+    return res.status(500).json({ error: err.message || 'Failed to add comment' });
   }
 };
 
@@ -815,6 +910,7 @@ module.exports = {
   getDesignerTasks,
   getDesignerTaskById,
   updateDesignerTask,
+  addTaskComment,
   updateTaskStage,
   deleteDesignerTask,
   getDesignerStats,

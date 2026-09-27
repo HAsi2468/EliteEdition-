@@ -19,6 +19,10 @@ router
   .delete(designerTaskController.deleteDesignerTask);
 
 router
+  .route('/:id/comments')
+  .post(designerTaskController.addTaskComment);
+
+router
   .route('/:id/stage')
   .put(designerTaskController.updateTaskStage);
 

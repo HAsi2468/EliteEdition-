@@ -40,7 +40,8 @@ import {
   Pause,
   ChevronDown,
   MessageSquare,
-  Clipboard
+  Clipboard,
+  Send
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 import DesignImage from './DesignImage';
@@ -514,8 +515,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // History & Image Lightbox Modals
+  // History, Comments & Image Lightbox Modals
   const [historyTask, setHistoryTask] = useState(null);
+  const [commentModalTask, setCommentModalTask] = useState(null);
+  const [modalCommentDraft, setModalCommentDraft] = useState('');
+  const [isPostingModalComment, setIsPostingModalComment] = useState(false);
   const [lightboxImages, setLightboxImages] = useState(null); // { images: [], activeIndex: 0, title: '' }
 
   // Resolve effective designer identifier from currentUser profile & registered designers
@@ -1144,19 +1148,70 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     }
   };
 
-  // Save comment/note for task directly from table row
-  const handleSaveComment = async (taskId) => {
+  // Save comment/note for task directly with author and multiple history support
+  const handleSaveComment = async (taskId, textToSave = null) => {
     if (!taskId) return;
-    setSavingCommentId(taskId);
-    try {
-      const trimmed = commentDraft.trim();
-      await api.updateDesignerTask(taskId, { notes: trimmed });
-      setTasks((prev) =>
-        prev.map((t) => (t._id === taskId ? { ...t, notes: trimmed } : t))
-      );
+    const text = (textToSave !== null ? textToSave : commentDraft).trim();
+    if (!text) {
       setEditingCommentTaskId(null);
       setCommentDraft('');
-      triggerPushNotification('💬 Comment Saved', 'Task note updated successfully', 'success');
+      return;
+    }
+    setSavingCommentId(taskId);
+    try {
+      const authorName = currentUser?.name || currentUser?.username || 'User';
+      const authorRole = currentUser?.role || 'Designer';
+      const authorId = currentUser?._id || currentUser?.id || '';
+
+      const res = await api.addDesignerTaskComment(taskId, {
+        text,
+        authorName,
+        authorRole,
+        authorId,
+      });
+
+      const updatedTask = res?.data;
+      if (updatedTask) {
+        setTasks((prev) =>
+          prev.map((t) => (t._id === taskId ? updatedTask : t))
+        );
+        if (commentModalTask && commentModalTask._id === taskId) {
+          setCommentModalTask(updatedTask);
+        }
+        if (historyTask && historyTask._id === taskId) {
+          setHistoryTask(updatedTask);
+        }
+      } else {
+        // Optimistic local update
+        const newC = { text, authorName, authorRole, authorId, createdAt: new Date() };
+        setTasks((prev) =>
+          prev.map((t) =>
+            t._id === taskId
+              ? {
+                  ...t,
+                  notes: text,
+                  comments: [...(t.comments || []), newC],
+                  stageHistory: [
+                    ...(t.stageHistory || []),
+                    {
+                      category: 'comment',
+                      statusType: 'Comment',
+                      stage: 'Comment Added',
+                      updatedBy: authorId,
+                      updatedByName: authorName,
+                      updatedAt: new Date(),
+                      note: text,
+                    },
+                  ],
+                }
+              : t
+          )
+        );
+      }
+      setEditingCommentTaskId(null);
+      setCommentDraft('');
+      setModalCommentDraft('');
+      triggerPushNotification('💬 Comment Added', `Comment recorded by ${authorName}`, 'success');
     } catch (err) {
       console.error('Failed to save comment:', err);
       alert('Failed to save comment: ' + (err.message || 'Error'));
@@ -2836,53 +2891,106 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                               </button>
                             </div>
                           </div>
-                        ) : (
-                          <div
-                            onClick={() => {
-                              setEditingCommentTaskId(task._id);
-                              setCommentDraft(task.notes || '');
-                            }}
-                            style={{
-                              cursor: 'pointer',
-                              padding: '0.4rem 0.6rem',
-                              borderRadius: '7px',
-                              background: task.notes ? '#f8fafc' : '#fbfcfd',
-                              border: task.notes ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              justifyContent: 'space-between',
-                              gap: '0.4rem',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = '#94a3b8';
-                              e.currentTarget.style.background = '#f1f5f9';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = task.notes ? '#e2e8f0' : '#cbd5e1';
-                              e.currentTarget.style.background = task.notes ? '#f8fafc' : '#fbfcfd';
-                            }}
-                            title="Click to view or edit comment"
-                          >
+                        ) : (() => {
+                          const commentsList = Array.isArray(task.comments) ? task.comments : [];
+                          const latestComment = commentsList.length > 0 ? commentsList[commentsList.length - 1] : null;
+                          const displayText = latestComment ? latestComment.text : (task.notes || '');
+                          const displayAuthor = latestComment ? (latestComment.authorName || 'User') : '';
+
+                          return (
                             <div
+                              onClick={() => setCommentModalTask(task)}
                               style={{
-                                flex: 1,
-                                fontSize: '0.75rem',
-                                color: task.notes ? '#1e293b' : '#94a3b8',
-                                fontStyle: task.notes ? 'normal' : 'italic',
-                                wordBreak: 'break-word',
-                                whiteSpace: 'pre-wrap',
-                                maxHeight: '56px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                lineHeight: '1.3',
+                                cursor: 'pointer',
+                                padding: '0.45rem 0.65rem',
+                                borderRadius: '8px',
+                                background: displayText ? '#f8fafc' : '#fbfcfd',
+                                border: displayText ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.25rem',
+                                transition: 'all 0.15s ease',
                               }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#94a3b8';
+                                e.currentTarget.style.background = '#f1f5f9';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = displayText ? '#e2e8f0' : '#cbd5e1';
+                                e.currentTarget.style.background = displayText ? '#f8fafc' : '#fbfcfd';
+                              }}
+                              title="Click to view complete comments history & thread"
                             >
-                              {task.notes || '+ Add comment...'}
+                              {displayText ? (
+                                <>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>
+                                        {displayAuthor || 'Note'}
+                                      </span>
+                                      {latestComment?.authorRole && (
+                                        <span style={{ fontSize: '0.6rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                                          {latestComment.authorRole}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                                      {commentsList.length > 1 && (
+                                        <span style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 800,
+                                          background: '#eff6ff',
+                                          color: '#2563eb',
+                                          border: '1px solid #bfdbfe',
+                                          borderRadius: '10px',
+                                          padding: '1px 5px',
+                                        }}>
+                                          💬 {commentsList.length}
+                                        </span>
+                                      )}
+                                      <Edit2
+                                        size={12}
+                                        color="#94a3b8"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingCommentTaskId(task._id);
+                                          setCommentDraft(displayText);
+                                        }}
+                                        title="Quick edit comment inline"
+                                        style={{ cursor: 'pointer' }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      color: '#1e293b',
+                                      wordBreak: 'break-word',
+                                      whiteSpace: 'pre-wrap',
+                                      maxHeight: '44px',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      lineHeight: '1.3',
+                                    }}
+                                  >
+                                    {displayText}
+                                  </div>
+                                  {latestComment?.createdAt && (
+                                    <div style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                                      <span>{new Date(latestComment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                      <span style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.64rem' }}>View history & reply →</span>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#94a3b8' }}>
+                                  <span style={{ fontSize: '0.75rem', fontStyle: 'italic' }}>+ Add comment...</span>
+                                  <Edit2 size={12} color="#94a3b8" />
+                                </div>
+                              )}
                             </div>
-                            <Edit2 size={12} color="#94a3b8" style={{ marginTop: '2px', flexShrink: 0 }} />
-                          </div>
-                        )}
+                          );
+                        })()}
                       </td>
 
                       {/* Actions */}
@@ -3438,6 +3546,27 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       <span>{task.stageHistory?.length || 0}</span>
                     </button>
 
+                    <button
+                      onClick={() => setCommentModalTask(task)}
+                      title="View & Add Comments"
+                      style={{
+                        padding: '0.3rem 0.55rem',
+                        background: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <MessageSquare size={13} />
+                      <span>{task.comments?.length || (task.notes ? 1 : 0)}</span>
+                    </button>
+
                     {isUserAdmin && !embedded && (
                       <>
                         <button
@@ -3619,6 +3748,89 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     </div>
                   </div>
                 )}
+
+                {/* ── Card Comments & Thread Bar ── */}
+                {(() => {
+                  const cardComments = Array.isArray(task.comments) ? task.comments : [];
+                  const latestComment = cardComments.length > 0 ? cardComments[cardComments.length - 1] : null;
+                  const displayText = latestComment ? latestComment.text : (task.notes || '');
+
+                  return (
+                    <div
+                      onClick={() => setCommentModalTask(task)}
+                      style={{
+                        background: displayText ? '#f8fafc' : '#ffffff',
+                        border: displayText ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '0.45rem 0.65rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#94a3b8';
+                        e.currentTarget.style.background = '#f1f5f9';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = displayText ? '#e2e8f0' : '#cbd5e1';
+                        e.currentTarget.style.background = displayText ? '#f8fafc' : '#ffffff';
+                      }}
+                      title="Click to view all comments, author history and add replies"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          background: latestComment ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#e2e8f0',
+                          color: latestComment ? '#ffffff' : '#64748b',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}>
+                          {latestComment ? (latestComment.authorName || 'U').charAt(0).toUpperCase() : <MessageSquare size={11} />}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: latestComment ? '#1e293b' : '#64748b', whiteSpace: 'nowrap' }}>
+                              {latestComment ? (latestComment.authorName || 'User') : 'Comments'}
+                            </span>
+                            {latestComment?.authorRole && (
+                              <span style={{ fontSize: '0.58rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', borderRadius: '3px', padding: '0 4px', whiteSpace: 'nowrap' }}>
+                                {latestComment.authorRole}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: displayText ? '#334155' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: displayText ? 'normal' : 'italic' }}>
+                            {displayText || '+ Add comment...'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                        {cardComments.length > 0 && (
+                          <span style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '10px',
+                            padding: '1px 6px',
+                          }}>
+                            💬 {cardComments.length}
+                          </span>
+                        )}
+                        <Edit2 size={11} color="#94a3b8" />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* ── STAGE 1: DROW DESIGN STATUS ─────────────────────────────────── */}
                 <div
@@ -4953,70 +5165,283 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {historyTask.stageHistory.slice().reverse().map((entry, idx) => (
+                {historyTask.stageHistory.slice().reverse().map((entry, idx) => {
+                  const isComment = entry.category === 'comment' || entry.statusType === 'Comment' || entry.stage === 'Comment Added';
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        background: isComment ? '#faf5ff' : '#f8fafc',
+                        borderRadius: '10px',
+                        border: isComment ? '1px solid #e9d5ff' : '1px solid #e2e8f0',
+                        padding: '0.85rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            padding: '0.15rem 0.55rem',
+                            borderRadius: '6px',
+                            background: isComment ? '#f3e8ff' : '#eff6ff',
+                            color: isComment ? '#7e22ce' : '#1d4ed8',
+                            border: isComment ? '1px solid #d8b4fe' : '1px solid #bfdbfe',
+                          }}
+                        >
+                          {isComment ? '💬 Comment' : `${entry.statusType ? `${entry.statusType}: ` : ''}${entry.stage}`}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                          {new Date(entry.updatedAt).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: '#334155', fontWeight: 600 }}>
+                        {isComment ? 'Commented by: ' : 'Updated by: '}
+                        <span style={{ color: '#0f172a', fontWeight: 700 }}>{entry.updatedByName || 'Designer'}</span>
+                      </div>
+
+                      {entry.note && (
+                        <div style={{
+                          margin: '0.4rem 0 0',
+                          fontSize: '0.82rem',
+                          color: isComment ? '#3b0764' : '#475569',
+                          background: isComment ? '#ffffff' : 'transparent',
+                          border: isComment ? '1px solid #f3e8ff' : 'none',
+                          borderLeft: isComment ? '3px solid #9333ea' : 'none',
+                          borderRadius: isComment ? '6px' : '0',
+                          padding: isComment ? '0.45rem 0.65rem' : '0',
+                          lineHeight: '1.4',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          "{entry.note}"
+                        </div>
+                      )}
+
+                      {/* Stage Images */}
+                      {(Array.isArray(entry.images) && entry.images.length > 0) && (
+                        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                          {entry.images.map((imgUrl, i) => (
+                            <div
+                              key={i}
+                              onClick={() => handleOpenLightbox(entry.images, i, `History Proof (${entry.stage})`)}
+                              style={{
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                border: '1px solid #cbd5e1',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <img src={imgUrl} alt="proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: TASK COMMENTS & THREAD HISTORY ─────────────────────── */}
+      {commentModalTask && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={() => setCommentModalTask(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '580px',
+              width: '100%',
+              padding: '1.5rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MessageSquare size={13} />
+                  <span>Comments & History</span>
+                </div>
+                <h3 style={{ margin: '2px 0 0', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  {commentModalTask.taskNo} — {commentModalTask.designName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setCommentModalTask(null)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Comments List */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', marginBottom: '1rem', minHeight: '160px', maxHeight: '420px' }}>
+              {(() => {
+                const list = Array.isArray(commentModalTask.comments) && commentModalTask.comments.length > 0
+                  ? commentModalTask.comments
+                  : (commentModalTask.notes ? [{ text: commentModalTask.notes, authorName: 'Admin', createdAt: commentModalTask.updatedAt || commentModalTask.createdAt }] : []);
+
+                if (list.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', color: '#94a3b8', margin: 'auto 0', padding: '2rem 0' }}>
+                      <MessageSquare size={36} color="#cbd5e1" style={{ margin: '0 auto 0.5rem' }} />
+                      <p style={{ margin: 0, fontSize: '0.85rem' }}>No comments recorded yet.</p>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Add a note or comment below to start the thread.</span>
+                    </div>
+                  );
+                }
+
+                return list.map((cmt, idx) => (
                   <div
                     key={idx}
                     style={{
                       background: '#f8fafc',
-                      borderRadius: '10px',
                       border: '1px solid #e2e8f0',
-                      padding: '0.85rem',
+                      borderRadius: '12px',
+                      padding: '0.75rem 1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.3rem',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <span
-                        style={{
-                          fontSize: '0.72rem',
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                          color: '#ffffff',
+                          fontSize: '0.68rem',
                           fontWeight: 800,
-                          padding: '0.15rem 0.55rem',
-                          borderRadius: '6px',
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe',
-                        }}
-                      >
-                        {entry.statusType ? `${entry.statusType}: ` : ''}{entry.stage}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
-                        {new Date(entry.updatedAt).toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '0.78rem', color: '#334155', fontWeight: 600 }}>
-                      Updated by: <span style={{ color: '#0f172a' }}>{entry.updatedByName || 'Designer'}</span>
-                    </div>
-
-                    {entry.note && (
-                      <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: '#475569', fontStyle: 'italic' }}>
-                        "{entry.note}"
-                      </p>
-                    )}
-
-                    {/* Stage Images */}
-                    {(Array.isArray(entry.images) && entry.images.length > 0) && (
-                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                        {entry.images.map((imgUrl, i) => (
-                          <div
-                            key={i}
-                            onClick={() => handleOpenLightbox(entry.images, i, `History Proof (${entry.stage})`)}
-                            style={{
-                              width: '44px',
-                              height: '44px',
-                              borderRadius: '6px',
-                              overflow: 'hidden',
-                              border: '1px solid #cbd5e1',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <img src={imgUrl} alt="proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        ))}
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textTransform: 'uppercase',
+                        }}>
+                          {(cmt.authorName || 'U').charAt(0)}
+                        </div>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                          {cmt.authorName || 'User'}
+                        </span>
+                        {cmt.authorRole && (
+                          <span style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '4px',
+                            padding: '1px 5px',
+                          }}>
+                            {cmt.authorRole}
+                          </span>
+                        )}
                       </div>
-                    )}
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
+                        {cmt.createdAt ? new Date(cmt.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#334155', lineHeight: '1.4', whiteSpace: 'pre-wrap', wordBreak: 'break-word', paddingLeft: '28px' }}>
+                      {cmt.text}
+                    </div>
                   </div>
-                ))}
+                ));
+              })()}
+            </div>
+
+            {/* Add New Comment Box */}
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Commenting as <strong style={{ color: '#0f172a' }}>{currentUser?.name || currentUser?.username || 'You'}</strong></span>
+                <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Press Ctrl+Enter to send</span>
               </div>
-            )}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+                <textarea
+                  value={modalCommentDraft}
+                  onChange={(e) => setModalCommentDraft(e.target.value)}
+                  placeholder="Type a new comment..."
+                  rows={2}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.82rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                    resize: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      if (modalCommentDraft.trim() && !isPostingModalComment) {
+                        setIsPostingModalComment(true);
+                        handleSaveComment(commentModalTask._id, modalCommentDraft)
+                          .finally(() => setIsPostingModalComment(false));
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!modalCommentDraft.trim() || isPostingModalComment}
+                  onClick={() => {
+                    if (modalCommentDraft.trim() && !isPostingModalComment) {
+                      setIsPostingModalComment(true);
+                      handleSaveComment(commentModalTask._id, modalCommentDraft)
+                        .finally(() => setIsPostingModalComment(false));
+                    }
+                  }}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    borderRadius: '8px',
+                    background: modalCommentDraft.trim() ? '#2563eb' : '#94a3b8',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.8rem',
+                    cursor: modalCommentDraft.trim() ? 'pointer' : 'not-allowed',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    height: '42px',
+                  }}
+                >
+                  {isPostingModalComment ? (
+                    <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <Send size={14} />
+                  )}
+                  <span>Send</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -2442,6 +2442,13 @@ export const api = {
     });
   },
 
+  async addDesignerTaskComment(id, commentData) {
+    return request(`/designer-tasks/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(commentData)
+    });
+  },
+
   async updateDesignerTaskStage(id, stageData) {
     return request(`/designer-tasks/${id}/stage`, {
       method: 'PUT',
