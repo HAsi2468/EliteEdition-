@@ -988,7 +988,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         else if (opt.category === 'final_design') updated.finalDesignStatus = opt.value;
         return updated;
       }));
-      fetchTasks();
+      loadData(true);
     } catch (err) {
       alert('Failed to update status: ' + err.message);
     }
