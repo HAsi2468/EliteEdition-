@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import ConnectionProfilesPanel from './ConnectionProfilesPanel';
 
 const RECORD_TYPES = [
   { key: 'ALL', label: 'All Connections', icon: Users, color: '#2563eb' },
@@ -28,6 +29,13 @@ const RECORD_TYPES = [
 ];
 
 export default function BusinessConnectionPanel({ currentUser }) {
+  const [subTab, setSubTab] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.hash.toLowerCase().includes('profile')) {
+      return 'profiles';
+    }
+    return 'profiles'; // Default to Connection Profiles view
+  });
+
   const [connections, setConnections] = useState([]);
   const [counts, setCounts] = useState({ total: 0, vendor: 0, employee: 0, worker: 0 });
   const [loading, setLoading] = useState(false);
@@ -346,26 +354,118 @@ export default function BusinessConnectionPanel({ currentUser }) {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingId(null);
-            setFormData({
-              record_type: activeType === 'ALL' ? 'VENDOR' : activeType,
-              common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
-              vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
-              employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
-              worker_data: { designation: '', station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
-            });
-            setShowModal(true);
-          }}
-          style={styles.addBtn}
-        >
-          <Plus size={18} />
-          <span>Add New Connection</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* SubTab Switcher Buttons */}
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '4px',
+              borderRadius: '12px',
+              background: 'var(--bg-card, #ffffff)',
+              border: '1px solid var(--border-light, #e2e8f0)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+              gap: '4px'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setSubTab('profiles')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: subTab === 'profiles' ? '#2563eb' : 'transparent',
+                color: subTab === 'profiles' ? '#ffffff' : '#64748b',
+                fontWeight: subTab === 'profiles' ? 700 : 600,
+                fontSize: '0.86rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: subTab === 'profiles' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
+              }}
+            >
+              <Users size={16} />
+              <span>Connection Profiles</span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  background: subTab === 'profiles' ? 'rgba(255,255,255,0.25)' : '#dbeafe',
+                  color: subTab === 'profiles' ? '#ffffff' : '#1e40af',
+                  fontWeight: 700
+                }}
+              >
+                Directory
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSubTab('directory')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: subTab === 'directory' ? '#2563eb' : 'transparent',
+                color: subTab === 'directory' ? '#ffffff' : '#64748b',
+                fontWeight: subTab === 'directory' ? 700 : 600,
+                fontSize: '0.86rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: subTab === 'directory' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
+              }}
+            >
+              <FileText size={16} />
+              <span>List / Board View</span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  background: subTab === 'directory' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                  color: subTab === 'directory' ? '#ffffff' : '#475569',
+                  fontWeight: 700
+                }}
+              >
+                {connections.length}
+              </span>
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              setEditingId(null);
+              setFormData({
+                record_type: activeType === 'ALL' ? 'VENDOR' : activeType,
+                common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
+                vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
+                employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
+                worker_data: { designation: '', station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
+              });
+              setShowModal(true);
+            }}
+            style={styles.addBtn}
+          >
+            <Plus size={18} />
+            <span>Add Connection</span>
+          </button>
+        </div>
       </div>
 
-      {/* Metric Cards Grid */}
+      {subTab === 'profiles' ? (
+        <ConnectionProfilesPanel
+          currentUser={currentUser}
+          onSwitchToDirectory={() => setSubTab('directory')}
+        />
+      ) : (
+        <>
+          {/* Metric Cards Grid */}
       <div style={styles.metricsGrid}>
         {RECORD_TYPES.map((cat) => {
           const IconComponent = cat.icon;
@@ -604,6 +704,8 @@ export default function BusinessConnectionPanel({ currentUser }) {
             );
           })}
         </div>
+      )}
+        </>
       )}
 
       {/* Modal: Add or Edit Connection */}
