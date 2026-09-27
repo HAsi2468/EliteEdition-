@@ -42,7 +42,7 @@ const createInventory = async (req, res) => {
           throw new Error('Party, Item Name, and Size are required for all bulk items');
         }
 
-        const targetFacility = (facility || 'Main Facility').trim();
+        const targetFacility = (facility || 'Pankhudi').trim();
         const masterSku = await resolveMasterSkuForBackend(skuCode, size);
         const finalItemName = (itemName === skuCode || !itemName) ? masterSku : itemName;
 
@@ -80,7 +80,7 @@ const createInventory = async (req, res) => {
     }
 
     const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes, facility } = req.body;
-    const targetFacility = (facility || 'Main Facility').trim();
+    const targetFacility = (facility || 'Pankhudi').trim();
     logger.info(`[INVENTORY] Create request — Party: "${party}" | Facility: "${targetFacility}" | Item: "${itemName}" | Size: ${size} | Qty: ${qty} | Challan: ${challanNo || 'N/A'}`);
 
     if (!party || !itemName || !size) {
@@ -493,7 +493,7 @@ const bulkInward = async (req, res) => {
           throw new Error(`Invalid quantity ${qty} for SKU ${skuCode}`);
         }
 
-        const targetFacility = (facility || 'Main Facility').trim();
+        const targetFacility = (facility || 'Pankhudi').trim();
 
         // 1. Check if SKU exists in db.Inventory for the specified facility
         let inventoryItem = await db.Inventory.findOne({ skuCode: skuCode.trim(), facility: targetFacility });

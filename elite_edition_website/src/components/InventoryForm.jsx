@@ -42,7 +42,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
     skuCode: '',
     itemName: '',
     party: 'ANOUK',
-    facility: 'Main Facility',
+    facility: 'Pankhudi',
     categoryName: 'KURTA SET',
     size: '',
     purchasePrice: 0.0,
@@ -112,7 +112,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
 
       const brandOrParty = item.brand || item.party || 'ANOUK';
       const category = item.categoryName || item.category || 'KURTA SET';
-      const facilityName = item.facility || item.party || 'Main Facility';
+      const facilityName = item.facility || item.party || 'Pankhudi';
 
       setFormData({
         skuCode: sku,
@@ -616,12 +616,12 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
                   </label>
                   <select
                     name="facility"
-                    value={formData.facility || 'Main Facility'}
+                    value={formData.facility || 'Pankhudi'}
                     onChange={handleChange}
                     style={{ ...styles.input, cursor: 'pointer', fontWeight: 600 }}
                   >
                     {facilitiesList.length === 0 ? (
-                      <option value="Main Facility">Main Facility</option>
+                      <option value="Pankhudi">Pankhudi</option>
                     ) : (
                       facilitiesList.map(f => (
                         <option key={f._id || f.id || f.name} value={f.name}>

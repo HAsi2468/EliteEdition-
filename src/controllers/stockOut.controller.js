@@ -69,7 +69,7 @@ const createStockOut = async (req, res) => {
           skuCode: inventoryItem.skuCode,
           party,
           qtyOut: qty,
-          facility: facility || inventoryItem.facility || 'Main Facility',
+          facility: facility || inventoryItem.facility || 'Pankhudi',
         });
         results.push(stockOutLog);
       }

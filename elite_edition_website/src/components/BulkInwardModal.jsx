@@ -67,7 +67,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   // Quick Set Header Controls
   const [bulkVendor, setBulkVendor] = useState('');
   const [bulkChallanNo, setBulkChallanNo] = useState('');
-  const [bulkFacility, setBulkFacility] = useState('Main Facility');
+  const [bulkFacility, setBulkFacility] = useState('Pankhudi');
 
   // Barcode / SKU Scanner Input
   const [scanSkuInput, setScanSkuInput] = useState('');
@@ -81,7 +81,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     purchasePrice: 0,
     salePrice: 0,
     party: vendorName || '',
-    facility: facName || bulkFacility || 'Main Facility',
+    facility: facName || bulkFacility || 'Pankhudi',
     challanNo: challanNum || '',
     imageUrl: '',
     status: 'NEW'
@@ -167,7 +167,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const handleAddRow = () => {
     const defaultVendor = resolveVendorName(bulkVendor) || (formRows[0]?.party || '');
     const defaultChallan = bulkChallanNo || (formRows[0]?.challanNo || '');
-    const defaultFacility = bulkFacility || (formRows[0]?.facility || 'Main Facility');
+    const defaultFacility = bulkFacility || (formRows[0]?.facility || 'Pankhudi');
 
     setFormRows(prev => [
       ...prev,
@@ -323,7 +323,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         let salePrice = matchedInventory?.salePrice || matchedCatalog?.price || 0;
         let party = resolveVendorName(bulkVendor) || (prev[0]?.party || '');
         let challanNo = bulkChallanNo || (prev[0]?.challanNo || '');
-        let facility = bulkFacility || (prev[0]?.facility || 'Main Facility');
+        let facility = bulkFacility || (prev[0]?.facility || 'Pankhudi');
         let imageUrl = matchedCatalog?.imageUrl || matchedInventory?.imageUrl || '';
         let status = 'NEW';
 
@@ -379,7 +379,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       ...item,
       party: resolvedVendor || item.party,
       challanNo: bulkChallanNo !== '' ? bulkChallanNo : item.challanNo,
-      facility: bulkFacility || item.facility || 'Main Facility',
+      facility: bulkFacility || item.facility || 'Pankhudi',
     })));
   };
 
@@ -393,7 +393,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       .filter(r => r.skuCode && r.skuCode.trim() && r.qty > 0)
       .map(r => ({
         ...r,
-        facility: r.facility || bulkFacility || 'Main Facility'
+        facility: r.facility || bulkFacility || 'Pankhudi'
       }));
 
     if (validRows.length === 0) {
@@ -863,7 +863,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       <span>STORAGE FACILITY</span>
                     </label>
                     <select
-                      value={row.facility || bulkFacility || 'Main Facility'}
+                      value={row.facility || bulkFacility || 'Pankhudi'}
                       onChange={(e) => handleRowFieldChange(idx, 'facility', e.target.value)}
                       style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #bae6fd', fontSize: '16px', fontWeight: 600, color: '#0369a1', background: '#f0f9ff', boxSizing: 'border-box' }}
                     >
@@ -1015,7 +1015,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       {/* Storage Facility */}
                       <td style={{ padding: '0.5rem 0.6rem' }}>
                         <select
-                          value={row.facility || bulkFacility || 'Main Facility'}
+                          value={row.facility || bulkFacility || 'Pankhudi'}
                           onChange={(e) => handleRowFieldChange(idx, 'facility', e.target.value)}
                           style={{
                             ...styles.cellInput,

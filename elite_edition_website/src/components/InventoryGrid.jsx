@@ -232,7 +232,7 @@ export default function InventoryGrid({
     return safeItems.filter(item => {
       const itemFac = (item.facility || '').trim();
       if (!itemFac) {
-        return (item.party && item.party.trim().toLowerCase() === facilityFilter.toLowerCase()) || facilityFilter === 'Main Facility';
+        return (item.party && item.party.trim().toLowerCase() === facilityFilter.toLowerCase()) || facilityFilter === 'Pankhudi';
       }
       return itemFac.toLowerCase() === facilityFilter.toLowerCase();
     });
@@ -1577,7 +1577,7 @@ export default function InventoryGrid({
                     const countInFac = safeItems.filter(item => {
                       const itemFac = (item.facility || '').trim();
                       if (!itemFac) {
-                        return (item.party && item.party.trim().toLowerCase() === facName.toLowerCase()) || facName === 'Main Facility';
+                        return (item.party && item.party.trim().toLowerCase() === facName.toLowerCase()) || facName === 'Pankhudi';
                       }
                       return itemFac.toLowerCase() === facName.toLowerCase();
                     }).length;
@@ -1792,7 +1792,7 @@ export default function InventoryGrid({
                               fontWeight: 700
                             }}>
                               <Warehouse size={12} color="#0284c7" />
-                              <span>{item.facility || 'Main Facility'}</span>
+                              <span>{item.facility || 'Pankhudi'}</span>
                             </span>
                           </td>
                           <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
@@ -2632,7 +2632,7 @@ export default function InventoryGrid({
                                 fontWeight: 700
                               }}>
                                 <Warehouse size={11} color="#0284c7" />
-                                <span>{item.facility || 'Main Facility'}</span>
+                                <span>{item.facility || 'Pankhudi'}</span>
                               </span>
                             </td>
                             <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center' }}>
@@ -3541,7 +3541,7 @@ export default function InventoryGrid({
                               fontWeight: 700
                             }}>
                               <Warehouse size={11} color="#ea580c" />
-                              <span>{item.facility || 'Main Facility'}</span>
+                              <span>{item.facility || 'Pankhudi'}</span>
                             </span>
                           </td>
                           <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center' }}>

@@ -2,8 +2,8 @@ const db = require('../db/models');
 const logger = require('../config/logger');
 
 const DEFAULT_FACILITIES = [
-  { name: 'Main Facility', code: 'MAIN', address: 'Main Warehouse', isDefault: true },
-  { name: 'Pramukh Park', code: 'PP', address: 'Pramukh Park Godown', isDefault: false }
+  { name: 'Pankhudi', code: 'MAIN', address: 'Main Warehouse', isDefault: true },
+  { name: 'Eon', code: 'EON', address: 'Elite Online', isDefault: false }
 ];
 
 const getFacilities = async (req, res) => {

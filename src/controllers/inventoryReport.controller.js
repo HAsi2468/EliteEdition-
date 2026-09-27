@@ -1062,7 +1062,7 @@ const getStockInwardData = async (req, res) => {
       const qty = Number(item.qty || item.currentlyAvailableStock || 0);
       const buyPrice = Number(item.purchasePrice || 0);
       const purchaseVal = qty * buyPrice;
-      const facName = item.facility || 'Main Facility';
+      const facName = item.facility || 'Pankhudi';
 
       totalQty += qty;
       totalPurchase += purchaseVal;
@@ -1127,7 +1127,7 @@ const getStockOutwardData = async (req, res) => {
       const sellPrice = Number(inv?.salePrice || 0);
       const buyVal = qty * buyPrice;
       const sellVal = qty * sellPrice;
-      const facName = log.facility || inv?.facility || 'Main Facility';
+      const facName = log.facility || inv?.facility || 'Pankhudi';
 
       totalQty += qty;
       totalPurchase += buyVal;

@@ -61,7 +61,7 @@ const inventorySchema = new mongoose.Schema(
     facility: {
       type: String,
       trim: true,
-      default: 'Main Facility',
+      default: 'Pankhudi',
     },
   },
   {
