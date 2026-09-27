@@ -609,19 +609,6 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
         </div>
 
         <div className="catalog-action-group" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0, flexWrap: 'nowrap' }}>
-          <button 
-            type="button"
-            onClick={handleOpenBrandManager}
-            className="btn-secondary" 
-            style={{ ...styles.addBtn, padding: '0.45rem 0.75rem', background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }}
-            title="Manage Brands, Categories & Dynamic Catalog Values"
-          >
-            <Building2 size={14} />
-            <span>Manage Brands & Categories</span>
-          </button>
-
-
-
           <button onClick={onAdd} className="btn-success" style={{ ...styles.primaryAddBtn, padding: '0.45rem 0.85rem' }}>
             <Plus size={14} />
             <span>+ Add Product</span>

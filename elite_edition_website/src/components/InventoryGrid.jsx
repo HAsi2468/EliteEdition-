@@ -4,13 +4,14 @@ import {
   TrendingDown, MoreVertical, Sparkles, Package, AlertTriangle, 
   CheckCircle2, XCircle, DollarSign, Download, Filter, Calendar,
   RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2, BookOpen, Eye, X,
-  ChevronDown, ChevronUp, Camera, Tag, Warehouse
+  ChevronDown, ChevronUp, Camera, Tag, Warehouse, Settings, Users
 } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { api } from '../services/api';
 import DateRangePicker from './DateRangePicker';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
+import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
@@ -86,6 +87,36 @@ export default function InventoryGrid({
   const [showVendorManager, setShowVendorManager] = useState(false);
   const [showPartyManager, setShowPartyManager] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
+
+  // Settings & Dynamic Values Dropdown State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [localManagerTab, setLocalManagerTab] = useState('facilities');
+  const [isLocalManagerOpen, setIsLocalManagerOpen] = useState(false);
+  const settingsMenuRef = React.useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target)) {
+        setIsSettingsOpen(false);
+      }
+    };
+    if (isSettingsOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isSettingsOpen]);
+
+  const handleOpenDynamicManager = (tabName = 'facilities') => {
+    setIsSettingsOpen(false);
+    if (onOpenManager) {
+      onOpenManager(tabName);
+    } else {
+      setLocalManagerTab(tabName);
+      setIsLocalManagerOpen(true);
+    }
+  };
 
   // --- Sub-Screen 1: Stock Overview State ---
   const [facilities, setFacilities] = useState([]);
@@ -1453,6 +1484,228 @@ export default function InventoryGrid({
             </span>
           </button>
         </div>
+
+        {/* Right side Settings & Dynamic Value Setters Button */}
+        <div style={{ position: 'relative', flexShrink: 0 }} ref={settingsMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.52rem 0.95rem',
+              borderRadius: '9px',
+              background: isSettingsOpen ? '#eff6ff' : '#ffffff',
+              border: isSettingsOpen ? '1.5px solid #2563eb' : '1.5px solid #cbd5e1',
+              color: isSettingsOpen ? '#1d4ed8' : '#1e293b',
+              fontWeight: 800,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              boxShadow: isSettingsOpen ? '0 0 0 3px rgba(37, 99, 235, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
+              transition: 'all 0.15s ease',
+            }}
+            title="Configure Dynamic Dropdown Values (Facilities, Brands, Categories, Vendors, Parties)"
+          >
+            <Settings size={16} color="#2563eb" style={{ transition: 'transform 0.3s ease', transform: isSettingsOpen ? 'rotate(45deg)' : 'none' }} />
+            <span>Settings</span>
+            <ChevronDown size={14} color="#64748b" style={{ transition: 'transform 0.2s ease', transform: isSettingsOpen ? 'rotate(180deg)' : 'none' }} />
+          </button>
+
+          {/* Settings Dropdown Menu */}
+          {isSettingsOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 'calc(100% + 8px)',
+                width: '275px',
+                background: '#ffffff',
+                borderRadius: '14px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                padding: '0.5rem',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+              }}
+            >
+              <div style={{ padding: '0.4rem 0.65rem', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #f1f5f9', marginBottom: '3px' }}>
+                Dynamic Dropdown Value Setters
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOpenDynamicManager('facilities')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.55rem 0.75rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Warehouse size={15} color="#0284c7" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Storage Facilities</div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Pankhudi, Warehouse A, Godowns</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenDynamicManager('brands')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.55rem 0.75rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Tag size={15} color="#2563eb" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Catalog Brands</div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>ANOUK, ELITE EDITION, HERA...</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenDynamicManager('categories')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.55rem 0.75rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#ecfdf5'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <SlidersHorizontal size={15} color="#059669" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Product Categories</div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Kurta Set, Dress, Saree, Lehenga...</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenDynamicManager('vendors')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.55rem 0.75rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f5f3ff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Building2 size={15} color="#7c3aed" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Vendors & Suppliers</div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Fabric & Material Suppliers</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenDynamicManager('parties')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.55rem 0.75rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#fff7ed'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Users size={15} color="#ea580c" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Client Parties</div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Customer Accounts & Receivers</div>
+                </div>
+              </button>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '4px', paddingTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleOpenDynamicManager('facilities')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    fontWeight: 800,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    width: '100%',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+                >
+                  <Settings size={14} />
+                  <span>Open Full Manager Panel →</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
 
@@ -1590,35 +1843,7 @@ export default function InventoryGrid({
                 </select>
               </div>
 
-              {/* Quick Manage Facilities Button */}
-              {onOpenManager && (
-                <button
-                  type="button"
-                  onClick={() => onOpenManager('facilities')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    padding: '0.38rem 0.65rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    color: '#0369a1',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                    transition: 'all 0.15s ease',
-                  }}
-                  title="Manage and configure dynamic storage facilities"
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.borderColor = '#38bdf8'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                >
-                  <Warehouse size={13} color="#0284c7" />
-                  <span>Facilities</span>
-                </button>
-              )}
+              {/* Quick Manage Facilities Button removed - centralized in Top Right Settings */}
 
               <div style={styles.filterBox}>
                 <SlidersHorizontal size={14} color="#64748b" />
@@ -3614,6 +3839,16 @@ export default function InventoryGrid({
         />
       )}
 
+      {isLocalManagerOpen && (
+        <CatalogManagerModal
+          initialTab={localManagerTab}
+          onClose={() => {
+            setIsLocalManagerOpen(false);
+            loadFacilities();
+          }}
+        />
+      )}
+
       {/* Display Item Modal */}
       {viewingItem && (
         <div
@@ -4657,22 +4892,25 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '1rem',
+    gap: '0.75rem',
     background: '#ffffff',
-    padding: '0.75rem 1rem',
+    padding: '0.55rem 0.85rem',
     borderRadius: '16px',
     border: '1px solid #e2e8f0',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   subTabBar: {
     display: 'flex',
-    gap: '0.4rem',
+    gap: '0.35rem',
     alignItems: 'center',
     background: '#f1f5f9',
-    padding: '5px',
+    padding: '4px',
     borderRadius: '12px',
     border: '1px solid #cbd5e1',
+    flexShrink: 0,
   },
   subTabButton: (active, type) => {
     let activeBg = 'linear-gradient(135deg, #1e293b, #0f172a)';
@@ -4693,17 +4931,18 @@ const styles = {
     return {
       display: 'flex',
       alignItems: 'center',
-      gap: '0.6rem',
-      padding: '0.65rem 1.25rem',
-      borderRadius: '9px',
+      gap: '0.45rem',
+      padding: '0.5rem 0.85rem',
+      borderRadius: '8px',
       border: 'none',
       background: active ? activeBg : 'transparent',
       color: active ? activeColor : '#475569',
-      fontSize: '0.85rem',
+      fontSize: '0.8rem',
       fontWeight: active ? 800 : 600,
       cursor: 'pointer',
       boxShadow: active ? activeShadow : 'none',
       transition: 'all 0.2s ease',
+      whiteSpace: 'nowrap',
     };
   },
   tabBadge: (active, color) => ({

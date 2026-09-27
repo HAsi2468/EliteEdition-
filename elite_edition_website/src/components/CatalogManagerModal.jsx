@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check, Warehouse } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check, Warehouse, SlidersHorizontal } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
@@ -58,6 +58,20 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
   const [brandSearchTerm, setBrandSearchTerm] = useState('');
   const [editingBrandTag, setEditingBrandTag] = useState(null);
   const [editingBrandInputValue, setEditingBrandInputValue] = useState('');
+
+  // Categories State synced with localStorage
+  const [customCategories, setCustomCategories] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_managed_categories');
+      return saved ? JSON.parse(saved) : ['KURTA SET', 'CO-ORD SET', 'DRESS', 'SUIT', 'SAREE', 'LEHENGA', 'TOP', 'BOTTOM', 'ETHNIC', 'STITCHING SET'];
+    } catch (e) {
+      return ['KURTA SET', 'CO-ORD SET', 'DRESS', 'SUIT', 'SAREE', 'LEHENGA', 'TOP', 'BOTTOM', 'ETHNIC', 'STITCHING SET'];
+    }
+  });
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
+  const [editingCategoryTag, setEditingCategoryTag] = useState(null);
+  const [editingCategoryInputValue, setEditingCategoryInputValue] = useState('');
 
   // Loading states
   const [loading, setLoading] = useState(false);
@@ -179,6 +193,65 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     } catch (e) {}
     setEditingBrandTag(null);
     setSuccess(`Updated brand "${oldBrandName}" to "${trimmed}".`);
+  };
+
+  // --- CATEGORY ACTION HANDLERS ---
+  const handleAddCategoryTag = (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    const trimmed = newCategoryInput.trim().toUpperCase();
+    if (!trimmed) return;
+    if (customCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This category already exists.');
+      return;
+    }
+    const updated = [...customCategories, trimmed];
+    setCustomCategories(updated);
+    try {
+      localStorage.setItem('elite_managed_categories', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_categories_updated', { detail: updated }));
+    } catch (e) {}
+    setNewCategoryInput('');
+    setSuccess(`Category "${trimmed}" added successfully.`);
+  };
+
+  const handleDeleteCategoryTag = (catName) => {
+    if (!window.confirm(`Are you sure you want to delete category "${catName}"?`)) return;
+    setError('');
+    setSuccess('');
+    const updated = customCategories.filter(c => c.toLowerCase() !== catName.toLowerCase());
+    setCustomCategories(updated);
+    try {
+      localStorage.setItem('elite_managed_categories', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_categories_updated', { detail: updated }));
+    } catch (e) {}
+    setSuccess(`Category "${catName}" removed.`);
+  };
+
+  const handleSaveRenameCategory = (oldCatName) => {
+    setError('');
+    setSuccess('');
+    const trimmed = editingCategoryInputValue.trim().toUpperCase();
+    if (!trimmed) {
+      setError('Category name cannot be empty.');
+      return;
+    }
+    if (trimmed !== oldCatName.toUpperCase() && customCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError(`Category "${trimmed}" already exists.`);
+      return;
+    }
+    const updated = customCategories.map(c => (c.toLowerCase() === oldCatName.toLowerCase() ? trimmed : c));
+    setCustomCategories(updated);
+    try {
+      localStorage.setItem('elite_managed_categories', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_categories_updated', { detail: updated }));
+    } catch (e) {}
+    setEditingCategoryTag(null);
+    setSuccess(`Category renamed to "${trimmed}".`);
   };
 
   // 1. Vendors
@@ -409,6 +482,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
   const handleAddBrand = handleAddBrandTag;
   const handleSaveRenameBrand = handleSaveEditedBrandTag;
   const filteredCustomBrands = customBrands.filter(b => b.toLowerCase().includes((brandSearchTerm || '').toLowerCase()));
+  const filteredCustomCategories = customCategories.filter(c => c.toLowerCase().includes((categorySearchTerm || '').toLowerCase()));
 
   const modalMarkup = (
     <div className="modal-overlay" style={styles.overlay} onClick={handleModalClose}>
@@ -443,6 +517,13 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
             >
               <Tag size={16} />
               <span>Catalog Brands</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('categories')}
+              style={{ ...styles.tabBtn, ...(activeTab === 'categories' ? styles.tabBtnActive : {}) }}
+            >
+              <SlidersHorizontal size={16} />
+              <span>Categories</span>
             </button>
             <button
               onClick={() => setActiveTab('vendors')}
@@ -570,6 +651,87 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                               </button>
                             )}
                             <button onClick={() => handleDeleteBrandTag(b)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0, display: 'flex' }} title="Delete Custom Brand">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 0.1 CATEGORIES TAB */}
+                {activeTab === 'categories' && (
+                  <div style={styles.tabContent}>
+                    <form onSubmit={handleAddCategoryTag} style={styles.inlineForm}>
+                      <span style={styles.formTitle}>
+                        <SlidersHorizontal size={16} color="#059669" />
+                        Add New Product Category
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={newCategoryInput}
+                          onChange={(e) => setNewCategoryInput(e.target.value)}
+                          placeholder="Type category name (e.g. KURTA SET, DRESS, SAREE)..."
+                          style={{ ...styles.formInput, flex: 1 }}
+                        />
+                        <button type="submit" style={{ ...styles.submitBtn, background: '#059669' }}>
+                          <Plus size={15} /> Add Category
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Search & Filter Bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '8px', padding: '0.5rem 0.75rem', gap: '0.5rem' }}>
+                      <Search size={15} color="#64748b" />
+                      <input
+                        type="text"
+                        value={categorySearchTerm}
+                        onChange={(e) => setCategorySearchTerm(e.target.value)}
+                        placeholder="Filter categories..."
+                        style={{ background: 'none', border: 'none', color: '#0f172a', fontSize: '0.85rem', outline: 'none', flex: 1, fontWeight: '500' }}
+                      />
+                      {categorySearchTerm && (
+                        <button onClick={() => setCategorySearchTerm('')} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }} title="Clear Search">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: '800', color: '#475569', letterSpacing: '0.04em' }}>
+                        MANAGED PRODUCT CATEGORIES ({filteredCustomCategories.length})
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '350px', overflowY: 'auto', padding: '0.2rem' }}>
+                        {filteredCustomCategories.map((c, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', backgroundColor: '#ecfdf5', border: '1.5px solid #a7f3d0', padding: '0.35rem 0.75rem', borderRadius: '20px', fontSize: '0.82rem', fontWeight: '700', color: '#047857' }}>
+                            <SlidersHorizontal size={13} color="#059669" />
+                            {editingCategoryTag === c ? (
+                              <input
+                                type="text"
+                                value={editingCategoryInputValue}
+                                onChange={(e) => setEditingCategoryInputValue(e.target.value)}
+                                autoFocus
+                                style={{ background: '#ffffff', border: '1.5px solid #059669', color: '#0f172a', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', width: '110px', outline: 'none' }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveRenameCategory(c);
+                                  if (e.key === 'Escape') setEditingCategoryTag(null);
+                                }}
+                              />
+                            ) : (
+                              <span>{c}</span>
+                            )}
+                            {editingCategoryTag === c ? (
+                              <button onClick={() => handleSaveRenameCategory(c)} style={{ background: 'none', border: 'none', color: '#16a34a', cursor: 'pointer', padding: 0, display: 'flex' }} title="Save">
+                                <Check size={13} />
+                              </button>
+                            ) : (
+                              <button onClick={() => { setEditingCategoryTag(c); setEditingCategoryInputValue(c); }} style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', padding: 0, display: 'flex' }} title="Rename Category">
+                                <Edit2 size={12} />
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteCategoryTag(c)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0, display: 'flex' }} title="Delete Custom Category">
                               <Trash2 size={12} />
                             </button>
                           </div>
