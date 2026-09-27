@@ -193,6 +193,10 @@ const designerTaskSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    outputImages: {
+      type: [String],
+      default: [],
+    },
     outputLink: {
       type: String,
       default: '',

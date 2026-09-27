@@ -476,6 +476,12 @@ const updateDesignerTask = async (req, res) => {
     }
 
     // Handle updates to workflow status images
+    if (Array.isArray(body.newOutputImages) && body.newOutputImages.length > 0) {
+      task.outputImages = Array.from(new Set([...(task.outputImages || []), ...body.newOutputImages]));
+      if (!task.outputImage && body.newOutputImages.length > 0) {
+        task.outputImage = body.newOutputImages[0];
+      }
+    }
     if (Array.isArray(body.newDrowImages) && body.newDrowImages.length > 0) {
       task.drowDesignImages = Array.from(new Set([...(task.drowDesignImages || []), ...body.newDrowImages]));
     }
@@ -634,8 +640,10 @@ const updateTaskStage = async (req, res) => {
     // Always update overall output image/link if new images provided
     if (incomingImages.length > 0) {
       task.outputImage = incomingImages[0];
+      task.outputImages = Array.from(new Set([...(task.outputImages || []), ...incomingImages]));
     } else if (outputImage) {
       task.outputImage = outputImage;
+      task.outputImages = Array.from(new Set([...(task.outputImages || []), outputImage]));
     }
     if (outputLink) task.outputLink = outputLink;
 

@@ -38,7 +38,8 @@ import {
   ShieldAlert,
   Play,
   Pause,
-  ChevronDown
+  ChevronDown,
+  MessageSquare
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 import DesignImage from './DesignImage';
@@ -329,6 +330,13 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
   const [stageTab, setStageTab] = useState('ALL'); // 'ALL' | 'DROW' | 'CM' | 'STAGE_3' | 'APPROVED' | 'REVISION'
   const [openStatusDropdownId, setOpenStatusDropdownId] = useState(null);
+
+  // Table view: Multiple image upload and comment inline editing states
+  const [uploadingRowId, setUploadingRowId] = useState(null);
+  const [uploadRowProgress, setUploadRowProgress] = useState(0);
+  const [editingCommentTaskId, setEditingCommentTaskId] = useState(null);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [savingCommentId, setSavingCommentId] = useState(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -1053,6 +1061,93 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       loadData(true);
     } catch (err) {
       alert('Failed to update status: ' + err.message);
+    }
+  };
+
+  // Upload multiple images directly from table row
+  const handleTableMultipleImageUpload = async (task, fileList) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    setUploadingRowId(task._id);
+    setUploadRowProgress(10);
+
+    try {
+      const uploadedUrls = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        let fileToUpload = file;
+        if (file.type.startsWith('image/')) {
+          try {
+            const options = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
+            fileToUpload = await imageCompression(file, options);
+          } catch (compErr) {
+            console.warn('Image compression skipped for', file.name, compErr);
+          }
+        }
+        const res = await api.uploadImage(fileToUpload, 'designs/outputs');
+        if (res && res.url) {
+          uploadedUrls.push(res.url);
+        }
+        setUploadRowProgress(Math.round(((i + 1) / files.length) * 85));
+      }
+
+      if (uploadedUrls.length > 0) {
+        const currentOutputImages = Array.isArray(task.outputImages) ? task.outputImages : [];
+        const updatedImages = Array.from(new Set([...currentOutputImages, ...uploadedUrls]));
+
+        await api.updateDesignerTask(task._id, {
+          newOutputImages: uploadedUrls,
+          outputImages: updatedImages,
+          outputImage: updatedImages[0] || '',
+        });
+
+        // Also update local task state immediately for instant feedback
+        setTasks((prev) =>
+          prev.map((t) =>
+            t._id === task._id
+              ? {
+                  ...t,
+                  outputImages: updatedImages,
+                  outputImage: updatedImages[0] || t.outputImage,
+                }
+              : t
+          )
+        );
+
+        triggerPushNotification(
+          '📷 Images Uploaded',
+          `${task.designName}: ${uploadedUrls.length} image(s) uploaded successfully`,
+          'success'
+        );
+        loadData(true);
+      }
+    } catch (err) {
+      console.error('Failed to upload images:', err);
+      alert('Failed to upload image(s): ' + (err.message || 'Network error'));
+    } finally {
+      setUploadingRowId(null);
+      setUploadRowProgress(0);
+    }
+  };
+
+  // Save comment/note for task directly from table row
+  const handleSaveComment = async (taskId) => {
+    if (!taskId) return;
+    setSavingCommentId(taskId);
+    try {
+      const trimmed = commentDraft.trim();
+      await api.updateDesignerTask(taskId, { notes: trimmed });
+      setTasks((prev) =>
+        prev.map((t) => (t._id === taskId ? { ...t, notes: trimmed } : t))
+      );
+      setEditingCommentTaskId(null);
+      setCommentDraft('');
+      triggerPushNotification('💬 Comment Saved', 'Task note updated successfully', 'success');
+    } catch (err) {
+      console.error('Failed to save comment:', err);
+      alert('Failed to save comment: ' + (err.message || 'Error'));
+    } finally {
+      setSavingCommentId(null);
     }
   };
 
@@ -2019,9 +2114,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Design, Date &amp; Priority</th>
-                  <th style={{ padding: '0.85rem 0.75rem', fontWeight: 800 }}>Sample Ref</th>
+                  <th style={{ padding: '0.85rem 0.75rem', fontWeight: 800, minWidth: '85px' }}>Sample Ref</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Assigned Team</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Stage / Status</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Image upload multiple</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Comment</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -2043,6 +2140,17 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   const stage3Imgs = task.stage3Images || [];
                   const finalImgs = task.finalDesignImages || [];
 
+                  const taskImages = Array.from(
+                    new Set([
+                      ...(Array.isArray(task.outputImages) ? task.outputImages : []),
+                      ...(task.outputImage ? [task.outputImage] : []),
+                      ...(Array.isArray(task.finalDesignImages) ? task.finalDesignImages : []),
+                      ...(Array.isArray(task.drowDesignImages) ? task.drowDesignImages : []),
+                      ...(Array.isArray(task.colourMatchingImages) ? task.colourMatchingImages : []),
+                      ...(Array.isArray(task.stage3Images) ? task.stage3Images : []),
+                    ])
+                  ).filter(Boolean);
+
                   return (
                     <tr
                       key={task._id}
@@ -2052,12 +2160,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         transition: 'background 0.1s ease',
                       }}
                     >
-                      {/* Design, Date & Priority (Combined) */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                      {/* Design, Date & Priority (Combined in one cell) */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', minWidth: '150px' }}>
+                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem' }}>
                           {task.designName}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                             <Calendar size={11} color="#64748b" /> {task.date || '--'}
                           </span>
@@ -2065,7 +2173,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                             style={{
                               fontSize: '0.65rem',
                               fontWeight: 800,
-                              padding: '0.12rem 0.4rem',
+                              padding: '0.14rem 0.45rem',
                               borderRadius: '5px',
                               background: priorityConfig.bg,
                               color: priorityConfig.color,
@@ -2081,36 +2189,64 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         </div>
                       </td>
 
-                      {/* Sample Ref */}
+                      {/* Sample Ref (Enlarged to 68px) */}
                       <td style={{ padding: '0.85rem 0.75rem', verticalAlign: 'middle' }}>
                         {task.sampleImage ? (
                           <div
                             onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
                             style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '6px',
+                              width: '68px',
+                              height: '68px',
+                              borderRadius: '8px',
                               overflow: 'hidden',
-                              border: '1px solid #cbd5e1',
+                              border: '1.5px solid #cbd5e1',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
                               cursor: 'pointer',
                               position: 'relative',
+                              background: '#f8fafc',
+                              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                             }}
-                            title="Click to view sample"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
+                            }}
+                            title="Click to zoom sample image"
                           >
-                            <img src={task.sampleImage} alt="Sample" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img
+                              src={task.sampleImage}
+                              alt="Sample"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              loading="lazy"
+                            />
                           </div>
                         ) : task.sampleLink ? (
                           <a
                             href={task.sampleLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 700 }}
+                            style={{
+                              color: '#2563eb',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: '#eff6ff',
+                              padding: '0.35rem 0.6rem',
+                              borderRadius: '6px',
+                              border: '1px solid #bfdbfe',
+                              textDecoration: 'none',
+                            }}
                             title="Open reference link"
                           >
-                            <ExternalLink size={14} /> Link
+                            <ExternalLink size={13} /> Link
                           </a>
                         ) : (
-                          <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>--</span>
+                          <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>--</span>
                         )}
                       </td>
 
@@ -2277,6 +2413,235 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                             </div>
                           );
                         })()}
+                      </td>
+
+                      {/* Image upload multiple Column */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', minWidth: '170px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {/* Display existing uploaded images */}
+                          {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
+                            <div
+                              key={imgIdx}
+                              onClick={() => handleOpenLightbox(taskImages, imgIdx, `Uploaded Images: ${task.designName}`)}
+                              style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                border: '1px solid #cbd5e1',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                background: '#f1f5f9',
+                                flexShrink: 0,
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                              }}
+                              title="Click to view image"
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Uploaded ${imgIdx + 1}`}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            </div>
+                          ))}
+
+                          {/* +N More indicator if > 3 images */}
+                          {taskImages.length > 3 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLightbox(taskImages, 3, `Uploaded Images: ${task.designName}`)}
+                              style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '6px',
+                                background: '#f1f5f9',
+                                border: '1px solid #cbd5e1',
+                                color: '#475569',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                              title={`View all ${taskImages.length} images`}
+                            >
+                              +{taskImages.length - 3}
+                            </button>
+                          )}
+
+                          {/* Multiple Image Upload Button */}
+                          <label
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              padding: '0.35rem 0.55rem',
+                              borderRadius: '6px',
+                              background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
+                              border: uploadingRowId === task._id ? '1px dashed #6366f1' : '1px dashed #86efac',
+                              color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
+                              transition: 'all 0.15s ease',
+                              userSelect: 'none',
+                              flexShrink: 0,
+                            }}
+                            title="Upload multiple design images"
+                          >
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              disabled={uploadingRowId === task._id}
+                              onChange={(e) => {
+                                handleTableMultipleImageUpload(task, e.target.files);
+                                e.target.value = '';
+                              }}
+                              style={{ display: 'none' }}
+                            />
+                            {uploadingRowId === task._id ? (
+                              <>
+                                <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                                <span>{uploadRowProgress}%</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={11} />
+                                <span>+ Upload</span>
+                              </>
+                            )}
+                          </label>
+                        </div>
+                      </td>
+
+                      {/* Comment Column */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', minWidth: '180px', maxWidth: '260px' }}>
+                        {editingCommentTaskId === task._id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <textarea
+                              value={commentDraft}
+                              onChange={(e) => setCommentDraft(e.target.value)}
+                              placeholder="Write a comment..."
+                              rows={2}
+                              style={{
+                                width: '100%',
+                                fontSize: '0.75rem',
+                                padding: '0.35rem 0.5rem',
+                                borderRadius: '6px',
+                                border: '1.5px solid #3b82f6',
+                                outline: 'none',
+                                fontFamily: 'inherit',
+                                resize: 'vertical',
+                                background: '#ffffff',
+                                color: '#1e293b',
+                              }}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                  handleSaveComment(task._id);
+                                } else if (e.key === 'Escape') {
+                                  setEditingCommentTaskId(null);
+                                  setCommentDraft('');
+                                }
+                              }}
+                            />
+                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveComment(task._id)}
+                                disabled={savingCommentId === task._id}
+                                style={{
+                                  padding: '0.25rem 0.55rem',
+                                  borderRadius: '5px',
+                                  background: '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                {savingCommentId === task._id ? (
+                                  <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                                ) : (
+                                  <Check size={11} />
+                                )}
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCommentTaskId(null);
+                                  setCommentDraft('');
+                                }}
+                                style={{
+                                  padding: '0.25rem 0.45rem',
+                                  borderRadius: '5px',
+                                  background: '#f1f5f9',
+                                  color: '#64748b',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => {
+                              setEditingCommentTaskId(task._id);
+                              setCommentDraft(task.notes || '');
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              padding: '0.4rem 0.6rem',
+                              borderRadius: '7px',
+                              background: task.notes ? '#f8fafc' : '#fbfcfd',
+                              border: task.notes ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: 'space-between',
+                              gap: '0.4rem',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.background = '#f1f5f9';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = task.notes ? '#e2e8f0' : '#cbd5e1';
+                              e.currentTarget.style.background = task.notes ? '#f8fafc' : '#fbfcfd';
+                            }}
+                            title="Click to view or edit comment"
+                          >
+                            <div
+                              style={{
+                                flex: 1,
+                                fontSize: '0.75rem',
+                                color: task.notes ? '#1e293b' : '#94a3b8',
+                                fontStyle: task.notes ? 'normal' : 'italic',
+                                wordBreak: 'break-word',
+                                whiteSpace: 'pre-wrap',
+                                maxHeight: '56px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                lineHeight: '1.3',
+                              }}
+                            >
+                              {task.notes || '+ Add comment...'}
+                            </div>
+                            <Edit2 size={12} color="#94a3b8" style={{ marginTop: '2px', flexShrink: 0 }} />
+                          </div>
+                        )}
                       </td>
 
                       {/* Actions */}
