@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check, Plus, Minus, Trash2, Sparkles, Package, Building2 } from 'lucide-react';
+import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check, Plus, Minus, Trash2, Sparkles, Package, Building2, Warehouse } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
@@ -63,6 +63,10 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [customParty, setCustomParty] = useState('');
   const [useCustomParty, setUseCustomParty] = useState(false);
   const [bulkChallanNo, setBulkChallanNo] = useState('');
+  const [facilities, setFacilities] = useState([]);
+  const [selectedFacility, setSelectedFacility] = useState(() => {
+    return (prefilledItem && prefilledItem.facility) ? prefilledItem.facility : 'All';
+  });
 
   const [scanInput, setScanInput] = useState('');
   const [error, setError] = useState('');
@@ -72,6 +76,21 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [justScannedSku, setJustScannedSku] = useState(null);
   const [lastScannedItem, setLastScannedItem] = useState(null);
   const scannedTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    api.getFacilities().then(res => {
+      if (Array.isArray(res)) {
+        setFacilities(res);
+        if (!prefilledItem?.facility) {
+          const def = res.find(f => f.isDefault);
+          if (def) {
+            setSelectedFacility(def.name);
+            setFormRows(prev => prev.map(r => ({ ...r, facility: r.facility || def.name })));
+          }
+        }
+      }
+    }).catch(err => console.warn('Failed to load facilities in StockOutForm:', err));
+  }, [prefilledItem]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -84,13 +103,14 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const scanInputRef = useRef(null);
 
   // Helper to create empty row
-  const createEmptyRow = (partyVal = '') => ({
+  const createEmptyRow = (partyVal = '', facVal = '') => ({
     skuCode: '',
     itemName: '',
     size: '',
     qtyOut: 1,
     availableStock: 0,
     party: partyVal,
+    facility: facVal || (selectedFacility !== 'All' ? selectedFacility : ''),
     imageUrl: '',
   });
 
@@ -104,6 +124,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
         qtyOut: 1,
         availableStock: prefilledItem.currentlyAvailableStock || 0,
         party: prefilledItem.party || '',
+        facility: prefilledItem.facility || '',
         imageUrl: prefilledItem.imageUrl || '',
         originalItem: prefilledItem
       }];
@@ -402,6 +423,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
       skuCode: r.skuCode.trim(),
       party: r.party || (useCustomParty ? customParty.trim() : defaultParty.trim()),
       qtyOut: Number(r.qtyOut),
+      facility: r.facility || (selectedFacility !== 'All' ? selectedFacility : undefined),
       challanNo: bulkChallanNo.trim() || undefined
     }));
 
@@ -628,7 +650,30 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   )}
                 </div>
 
-                <div style={{ width: isMobile ? '100%' : '200px' }}>
+                <div style={{ width: isMobile ? '100%' : '170px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Warehouse size={12} color="#0284c7" />
+                    <span>Dispatch Facility</span>
+                  </label>
+                  <select
+                    value={selectedFacility}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedFacility(val);
+                      setFormRows(prev => prev.map(r => ({ ...r, facility: val !== 'All' ? val : undefined })));
+                    }}
+                    style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a', background: '#fff', fontWeight: 600, boxSizing: 'border-box' }}
+                  >
+                    <option value="All">All Facilities</option>
+                    {facilities.map(f => (
+                      <option key={f._id || f.id || f.name} value={f.name}>
+                        {f.name} {f.code ? `(${f.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ width: isMobile ? '100%' : '170px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem', display: 'block' }}>
                     Challan / Ref No. (Optional)
                   </label>

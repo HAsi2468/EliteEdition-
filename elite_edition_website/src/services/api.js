@@ -250,9 +250,10 @@ export const api = {
     });
   },
 
-  async getInventory(search = '') {
+  async getInventory(search = '', facility = '') {
     const params = [];
     if (search) params.push(`search=${encodeURIComponent(search)}`);
+    if (facility && facility !== 'All') params.push(`facility=${encodeURIComponent(facility)}`);
     params.push('excludeUniware=true');
     const query = '?' + params.join('&');
     return request(`/inventory${query}`);
@@ -359,6 +360,31 @@ export const api = {
     });
   },
 
+  // Storage Facilities
+  async getFacilities() {
+    return request('/facilities');
+  },
+
+  async createFacility(data) {
+    return request('/facilities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateFacility(id, data) {
+    return request(`/facilities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteFacility(id) {
+    return request(`/facilities/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   // Fabric Vendors
   async getFabricVendors() {
     return request('/fabric-vendors');
@@ -420,8 +446,11 @@ export const api = {
   },
 
   // Stock Out Logs
-  async getStockOuts() {
-    return request('/stockOut');
+  async getStockOuts(facility = '') {
+    const params = new URLSearchParams();
+    if (facility && facility !== 'All') params.append('facility', facility);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request(`/stockOut${query}`);
   },
 
   // Reports
@@ -624,12 +653,20 @@ export const api = {
     return request('/inventory/report/stock-value-data');
   },
 
-  async getStockInwardReportData(dateStart, dateEnd) {
-    return request(`/inventory/report/stock-inward-data?dateStart=${dateStart}&dateEnd=${dateEnd}`);
+  async getStockInwardReportData(dateStart, dateEnd, facility = '') {
+    const params = new URLSearchParams();
+    if (dateStart) params.append('dateStart', dateStart);
+    if (dateEnd) params.append('dateEnd', dateEnd);
+    if (facility && facility !== 'All') params.append('facility', facility);
+    return request(`/inventory/report/stock-inward-data?${params.toString()}`);
   },
 
-  async getStockOutwardReportData(dateStart, dateEnd) {
-    return request(`/inventory/report/stock-outward-data?dateStart=${dateStart}&dateEnd=${dateEnd}`);
+  async getStockOutwardReportData(dateStart, dateEnd, facility = '') {
+    const params = new URLSearchParams();
+    if (dateStart) params.append('dateStart', dateStart);
+    if (dateEnd) params.append('dateEnd', dateEnd);
+    if (facility && facility !== 'All') params.append('facility', facility);
+    return request(`/inventory/report/stock-outward-data?${params.toString()}`);
   },
 
   async getSalesReportData(dateStart, dateEnd, searchCode = '') {

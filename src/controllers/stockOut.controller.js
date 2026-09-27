@@ -8,14 +8,16 @@ const createStockOut = async (req, res) => {
     const results = [];
 
     for (const item of itemsToProcess) {
-      const { skuCode, party, qtyOut } = item;
+      const { skuCode, party, qtyOut, facility } = item;
       if (!skuCode || !party) continue;
 
       const qty = parseInt(qtyOut, 10) || 1;
       const cleanSku = (skuCode || '').trim();
+      const facilityQuery = facility && facility !== 'All' ? { facility } : {};
       
       let inventoryItem = await db.Inventory.findOne({
-        skuCode: { $regex: new RegExp(`^${cleanSku}$`, 'i') }
+        skuCode: { $regex: new RegExp(`^${cleanSku}$`, 'i') },
+        ...facilityQuery
       });
 
       if (!inventoryItem) {
@@ -34,7 +36,8 @@ const createStockOut = async (req, res) => {
         if (matchedProd && matchedProd.skuCode) {
           const masterSku = matchedProd.skuCode.trim();
           inventoryItem = await db.Inventory.findOne({
-            skuCode: { $regex: new RegExp(`^${masterSku}$`, 'i') }
+            skuCode: { $regex: new RegExp(`^${masterSku}$`, 'i') },
+            ...facilityQuery
           });
         }
       }
@@ -44,7 +47,15 @@ const createStockOut = async (req, res) => {
           $or: [
             { 'brandCodes': cleanSku },
             { 'brandCodes.code': cleanSku }
-          ]
+          ],
+          ...facilityQuery
+        });
+      }
+
+      // Fallback without facility if not found in specific facility
+      if (!inventoryItem && facility) {
+        inventoryItem = await db.Inventory.findOne({
+          skuCode: { $regex: new RegExp(`^${cleanSku}$`, 'i') }
         });
       }
       
@@ -58,6 +69,7 @@ const createStockOut = async (req, res) => {
           skuCode: inventoryItem.skuCode,
           party,
           qtyOut: qty,
+          facility: facility || inventoryItem.facility || 'Main Facility',
         });
         results.push(stockOutLog);
       }
@@ -79,7 +91,13 @@ const createStockOut = async (req, res) => {
 
 const getStockOuts = async (req, res) => {
   try {
-    const stockOuts = await db.StockOut.find()
+    const { facility } = req.query;
+    const query = {};
+    if (facility && facility !== 'All') {
+      query.facility = facility;
+    }
+
+    const stockOuts = await db.StockOut.find(query)
       .sort({ created_date_time: -1 })
       .lean();
 

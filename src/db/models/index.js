@@ -59,6 +59,7 @@ const db = {
   Client: require('./client.model'),
   MonthlyCosting: require('./monthlyCosting.model'),
   DesignerTask: require('./designerTask.model'),
+  Facility: require('./facility.model'),
   mongoose,
 };
 

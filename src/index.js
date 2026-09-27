@@ -64,6 +64,8 @@ server.listen(port, '0.0.0.0', async () => {
   }
 
   await syncCommunicationGroups();
+  const { seedFacilitiesOnStartup } = require('./controllers/facility.controller');
+  await seedFacilitiesOnStartup();
 
   if (typeof process.send === 'function') {
     process.send('ready');

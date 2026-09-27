@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Plus, Minus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera, Building2, Package } from 'lucide-react';
+import { X, Plus, Minus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera, Building2, Package, Warehouse } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
@@ -59,6 +59,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   
   // Master Reference Lists
   const [vendorsList, setVendorsList] = useState([]);
+  const [facilitiesList, setFacilitiesList] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
   const [storeInventory, setStoreInventory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,12 +67,13 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   // Quick Set Header Controls
   const [bulkVendor, setBulkVendor] = useState('');
   const [bulkChallanNo, setBulkChallanNo] = useState('');
+  const [bulkFacility, setBulkFacility] = useState('Main Facility');
 
   // Barcode / SKU Scanner Input
   const [scanSkuInput, setScanSkuInput] = useState('');
 
   // Multi-Row Form Data State (Default 3 rows)
-  const createEmptyRow = (vendorName = '', challanNum = '') => ({
+  const createEmptyRow = (vendorName = '', challanNum = '', facName = '') => ({
     skuCode: '',
     itemName: '',
     size: '',
@@ -79,6 +81,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     purchasePrice: 0,
     salePrice: 0,
     party: vendorName || '',
+    facility: facName || bulkFacility || 'Main Facility',
     challanNo: challanNum || '',
     imageUrl: '',
     status: 'NEW'
@@ -95,15 +98,24 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     const loadRefData = async () => {
       try {
         setIsLoading(true);
-        const [vData, cData, invData] = await Promise.all([
+        const [vData, cData, invData, fData] = await Promise.all([
           api.getVendors().catch(() => []),
           api.getProductsCatalog().catch(() => []),
           api.getInventory().catch(() => []),
+          api.getFacilities().catch(() => []),
         ]);
 
         setVendorsList(vData || []);
         setCatalogItems(cData || []);
         setStoreInventory(invData || []);
+        if (Array.isArray(fData) && fData.length > 0) {
+          setFacilitiesList(fData);
+          const def = fData.find(f => f.isDefault) || fData[0];
+          if (def) {
+            setBulkFacility(def.name);
+            setFormRows(prev => prev.map(r => ({ ...r, facility: r.facility || def.name })));
+          }
+        }
       } catch (err) {
         console.warn('Failed to load auto-complete suggestions:', err);
       } finally {
@@ -142,14 +154,24 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     })));
   };
 
+  // Quick Set Facility for all rows
+  const applyQuickSetFacility = (val) => {
+    setBulkFacility(val);
+    setFormRows(prev => prev.map(item => ({
+      ...item,
+      facility: val
+    })));
+  };
+
   // Add a new empty row
   const handleAddRow = () => {
     const defaultVendor = resolveVendorName(bulkVendor) || (formRows[0]?.party || '');
     const defaultChallan = bulkChallanNo || (formRows[0]?.challanNo || '');
+    const defaultFacility = bulkFacility || (formRows[0]?.facility || 'Main Facility');
 
     setFormRows(prev => [
       ...prev,
-      createEmptyRow(defaultVendor, defaultChallan)
+      createEmptyRow(defaultVendor, defaultChallan, defaultFacility)
     ]);
   };
 
@@ -301,6 +323,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         let salePrice = matchedInventory?.salePrice || matchedCatalog?.price || 0;
         let party = resolveVendorName(bulkVendor) || (prev[0]?.party || '');
         let challanNo = bulkChallanNo || (prev[0]?.challanNo || '');
+        let facility = bulkFacility || (prev[0]?.facility || 'Main Facility');
         let imageUrl = matchedCatalog?.imageUrl || matchedInventory?.imageUrl || '';
         let status = 'NEW';
 
@@ -331,6 +354,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             purchasePrice,
             salePrice,
             party,
+            facility,
             challanNo,
             imageUrl,
             status
@@ -355,6 +379,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       ...item,
       party: resolvedVendor || item.party,
       challanNo: bulkChallanNo !== '' ? bulkChallanNo : item.challanNo,
+      facility: bulkFacility || item.facility || 'Main Facility',
     })));
   };
 
@@ -364,7 +389,12 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     setError('');
 
     // Filter valid rows (non-empty SKU and qty > 0)
-    const validRows = formRows.filter(r => r.skuCode && r.skuCode.trim() && r.qty > 0);
+    const validRows = formRows
+      .filter(r => r.skuCode && r.skuCode.trim() && r.qty > 0)
+      .map(r => ({
+        ...r,
+        facility: r.facility || bulkFacility || 'Main Facility'
+      }));
 
     if (validRows.length === 0) {
       setError('Please add at least one valid item row with a SKU Code and Quantity.');
@@ -574,6 +604,29 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   placeholder="Bulk Challan No for all rows..."
                   style={{ ...styles.quickInput, width: isMobile ? '100%' : 'auto', fontSize: isMobile ? '16px' : '0.82rem' }}
                 />
+                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
+                  <Warehouse size={14} color="#0284c7" />
+                  <select
+                    value={bulkFacility}
+                    onChange={e => applyQuickSetFacility(e.target.value)}
+                    style={{
+                      ...styles.quickInput,
+                      width: isMobile ? '100%' : '175px',
+                      fontSize: isMobile ? '16px' : '0.82rem',
+                      fontWeight: 700,
+                      color: '#0369a1',
+                      background: '#f0f9ff',
+                      borderColor: '#bae6fd'
+                    }}
+                    title="Storage Facility for all inward items"
+                  >
+                    {facilitiesList.map(fac => (
+                      <option key={fac._id || fac.id || fac.name} value={fac.name}>
+                        {fac.name} {fac.isDefault ? '(Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           )}
@@ -775,7 +828,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                     </div>
                   </div>
 
-                  {/* Card Bottom: Vendor & Challan */}
+                  {/* Card Bottom: Vendor, Facility & Challan */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.5rem' }}>
                     <div>
                       <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '2px' }}>
@@ -804,6 +857,23 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       />
                     </div>
                   </div>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
+                      <Warehouse size={12} color="#0284c7" />
+                      <span>STORAGE FACILITY</span>
+                    </label>
+                    <select
+                      value={row.facility || bulkFacility || 'Main Facility'}
+                      onChange={(e) => handleRowFieldChange(idx, 'facility', e.target.value)}
+                      style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #bae6fd', fontSize: '16px', fontWeight: 600, color: '#0369a1', background: '#f0f9ff', boxSizing: 'border-box' }}
+                    >
+                      {facilitiesList.map(fac => (
+                        <option key={fac._id || fac.id || fac.name} value={fac.name}>
+                          {fac.name} {fac.isDefault ? '(Default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               );
             })}
@@ -813,16 +883,17 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SR NO</th>
-                    <th style={{ width: '6%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>IMAGE</th>
-                    <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>SKU CODE *</th>
-                    <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>ITEM NAME / DETAILS</th>
-                    <th style={{ width: '10%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SIZE</th>
-                    <th style={{ width: '9%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>QTY *</th>
-                    <th style={{ width: '11%', padding: '0.75rem 0.4rem', textAlign: 'right' }}>BUY PRICE</th>
-                    <th style={{ width: '12%', padding: '0.75rem 0.6rem' }}>VENDOR / COMPANY *</th>
-                    <th style={{ width: '10%', padding: '0.75rem 0.6rem' }}>CHALLAN NO.</th>
-                    <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}></th>
+                    <th style={{ width: '3%', padding: '0.75rem 0.3rem', textAlign: 'center' }}>SR NO</th>
+                    <th style={{ width: '5%', padding: '0.75rem 0.3rem', textAlign: 'center' }}>IMAGE</th>
+                    <th style={{ width: '18%', padding: '0.75rem 0.5rem' }}>SKU CODE *</th>
+                    <th style={{ width: '18%', padding: '0.75rem 0.5rem' }}>ITEM NAME / DETAILS</th>
+                    <th style={{ width: '8%', padding: '0.75rem 0.3rem', textAlign: 'center' }}>SIZE</th>
+                    <th style={{ width: '8%', padding: '0.75rem 0.3rem', textAlign: 'center' }}>QTY *</th>
+                    <th style={{ width: '10%', padding: '0.75rem 0.4rem', textAlign: 'right' }}>BUY PRICE</th>
+                    <th style={{ width: '11%', padding: '0.75rem 0.5rem' }}>VENDOR / COMPANY *</th>
+                    <th style={{ width: '11%', padding: '0.75rem 0.5rem' }}>FACILITY</th>
+                    <th style={{ width: '9%', padding: '0.75rem 0.5rem' }}>CHALLAN NO.</th>
+                    <th style={{ width: '4%', padding: '0.75rem 0.3rem', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -939,6 +1010,27 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                           style={styles.cellInput}
                           required
                         />
+                      </td>
+
+                      {/* Storage Facility */}
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
+                        <select
+                          value={row.facility || bulkFacility || 'Main Facility'}
+                          onChange={(e) => handleRowFieldChange(idx, 'facility', e.target.value)}
+                          style={{
+                            ...styles.cellInput,
+                            fontWeight: 600,
+                            color: '#0369a1',
+                            background: '#f0f9ff',
+                            border: '1px solid #bae6fd'
+                          }}
+                        >
+                          {facilitiesList.map(fac => (
+                            <option key={fac._id || fac.id || fac.name} value={fac.name}>
+                              {fac.name} {fac.isDefault ? '(Default)' : ''}
+                            </option>
+                          ))}
+                        </select>
                       </td>
 
                       {/* Challan No. */}

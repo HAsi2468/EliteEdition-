@@ -58,6 +58,11 @@ const inventorySchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.Mixed],
       default: [],
     },
+    facility: {
+      type: String,
+      trim: true,
+      default: 'Main Facility',
+    },
   },
   {
     timestamps: {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check, Warehouse } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
@@ -45,6 +45,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
   const [parties, setParties] = useState([]);
   const [products, setProducts] = useState([]);
   const [history, setHistory] = useState([]);
+  const [facilities, setFacilities] = useState([]);
   const [customBrands, setCustomBrands] = useState(() => {
     try {
       const saved = localStorage.getItem('elite_managed_brands');
@@ -69,6 +70,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
   const [vendorForm, setVendorForm] = useState({ name: '', businessName: '', phone: '', gstin: '', address: '' });
   const [partyForm, setPartyForm] = useState({ name: '', phone: '', address: '' });
   const [productForm, setProductForm] = useState({ skuCode: '', description: '', imageUrl: '', size: '' });
+  const [facilityForm, setFacilityForm] = useState({ name: '', code: '', address: '', contactPerson: '', phone: '', isDefault: false });
 
   // Load data depending on active tab
   useEffect(() => {
@@ -87,6 +89,9 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
       } else if (activeTab === 'parties') {
         const res = await api.getParties();
         setParties(res || []);
+      } else if (activeTab === 'facilities') {
+        const res = await api.getFacilities();
+        setFacilities(res || []);
       } else if (activeTab === 'products') {
         const res = await api.getProductsCatalog();
 
@@ -317,6 +322,57 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     }
   };
 
+  // 4. Storage Facilities
+  const handleFacilitySubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    try {
+      if (editingId) {
+        await api.updateFacility(editingId, facilityForm);
+        setSuccess('Storage facility updated successfully.');
+      } else {
+        await api.createFacility(facilityForm);
+        setSuccess('Storage facility created successfully.');
+      }
+      setFacilityForm({ name: '', code: '', address: '', contactPerson: '', phone: '', isDefault: false });
+      setEditingId(null);
+      loadTabData();
+      try {
+        window.dispatchEvent(new CustomEvent('elite_facilities_updated'));
+      } catch (ev) {}
+    } catch (err) {
+      setError(err.message || 'Failed to save storage facility.');
+    }
+  };
+
+  const handleEditFacility = (fac) => {
+    setEditingId(fac._id || fac.id);
+    setFacilityForm({
+      name: fac.name || '',
+      code: fac.code || '',
+      address: fac.address || '',
+      contactPerson: fac.contactPerson || '',
+      phone: fac.phone || '',
+      isDefault: Boolean(fac.isDefault),
+    });
+  };
+
+  const handleDeleteFacility = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete storage facility "${name}"?`)) return;
+    setError('');
+    try {
+      await api.deleteFacility(id);
+      setSuccess('Storage facility deleted successfully.');
+      loadTabData();
+      try {
+        window.dispatchEvent(new CustomEvent('elite_facilities_updated'));
+      } catch (ev) {}
+    } catch (err) {
+      setError(err.message || 'Failed to delete storage facility.');
+    }
+  };
+
   const handleSyncProducts = async () => {
     setSyncing(true);
     setError('');
@@ -394,6 +450,15 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
               >
                 <Users size={16} />
                 <span>Parties</span>
+              </button>
+            )}
+            {context === 'elite_online' && (
+              <button
+                onClick={() => setActiveTab('facilities')}
+                style={{ ...styles.tabBtn, ...(activeTab === 'facilities' ? styles.tabBtnActive : {}) }}
+              >
+                <Warehouse size={16} />
+                <span>Storage Facilities</span>
               </button>
             )}
             {context === 'elite_online' && (
@@ -848,6 +913,147 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                                   }</td>
                                 <td style={{ fontSize: '0.8rem' }}>
                                   {log.created_date_time ? new Date(log.created_date_time).toLocaleString('en-IN') : 'N/A'}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. STORAGE FACILITIES TAB */}
+                {activeTab === 'facilities' && (
+                  <div style={styles.tabContent}>
+                    <form onSubmit={handleFacilitySubmit} style={styles.inlineForm}>
+                      <span style={styles.formTitle}>
+                        {editingId ? 'Edit Storage Facility' : 'Add New Storage Facility'}
+                      </span>
+                      <div style={styles.formGrid}>
+                        <input
+                          type="text"
+                          placeholder="Facility / Godown Name (e.g. Pramukh Park, Godown 1) *"
+                          value={facilityForm.name}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, name: e.target.value })}
+                          required
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Short Code (e.g. PP, W1)"
+                          value={facilityForm.code}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, code: e.target.value.toUpperCase() })}
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Contact Person (Optional)"
+                          value={facilityForm.contactPerson}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, contactPerson: e.target.value })}
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Phone / Mobile (Optional)"
+                          value={facilityForm.phone}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, phone: e.target.value })}
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Full Address / Location (Optional)"
+                          value={facilityForm.address}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, address: e.target.value })}
+                          style={{ ...styles.formInput, gridColumn: 'span 2' }}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', gridColumn: 'span 2', marginTop: '0.2rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8' }}>
+                            <input
+                              type="checkbox"
+                              checked={facilityForm.isDefault}
+                              onChange={(e) => setFacilityForm({ ...facilityForm, isDefault: e.target.checked })}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span>Set as Default Facility for new stock inward</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div style={styles.formActions}>
+                        {editingId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(null);
+                              setFacilityForm({ name: '', code: '', address: '', contactPerson: '', phone: '', isDefault: false });
+                            }}
+                            className="btn-secondary"
+                            style={styles.cancelBtn}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <button type="submit" className="btn-primary" style={styles.submitBtn}>
+                          <Save size={14} /> {editingId ? 'Update Facility' : 'Save Facility'}
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="table-container" style={styles.tableWrap}>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Facility Name</th>
+                            <th>Code</th>
+                            <th>Address</th>
+                            <th>Contact</th>
+                            <th className="text-center">Default</th>
+                            <th className="text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {facilities.length === 0 ? (
+                            <tr>
+                              <td colSpan="6" className="text-center" style={{ color: 'var(--text-muted)' }}>No storage facilities configured.</td>
+                            </tr>
+                          ) : (
+                            facilities.map((fac) => (
+                              <tr key={fac._id || fac.id}>
+                                <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <Warehouse size={15} color="#38bdf8" />
+                                    <span>{fac.name}</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  {fac.code ? (
+                                    <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                      {fac.code}
+                                    </span>
+                                  ) : '—'}
+                                </td>
+                                <td style={{ fontSize: '0.82rem', color: '#94a3b8' }}>{fac.address || '—'}</td>
+                                <td style={{ fontSize: '0.82rem' }}>
+                                  {fac.contactPerson || fac.phone ? (
+                                    <span>{fac.contactPerson} {fac.phone && `(${fac.phone})`}</span>
+                                  ) : '—'}
+                                </td>
+                                <td className="text-center">
+                                  {fac.isDefault ? (
+                                    <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                                      Default
+                                    </span>
+                                  ) : '—'}
+                                </td>
+                                <td>
+                                  <div style={styles.actionsCell}>
+                                    <button onClick={() => handleEditFacility(fac)} className="btn-icon" title="Edit Facility">
+                                      <Edit2 size={13} />
+                                    </button>
+                                    <button onClick={() => handleDeleteFacility(fac._id || fac.id, fac.name)} className="btn-icon" style={styles.trashBtn} title="Delete Facility">
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))

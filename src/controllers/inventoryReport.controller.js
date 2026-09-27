@@ -1020,7 +1020,14 @@ const downloadMachineProductionReportPdf = async (req, res) => {
 
 const getStockValueData = async (req, res) => {
   try {
-    const raw = await db.Inventory.find({ party: { $ne: 'Uniware Channel Sync' } }).lean();
+    const { facility } = req.query;
+    let query = { party: { $ne: 'Uniware Channel Sync' } };
+
+    if (facility && facility !== 'All') {
+      query.facility = facility;
+    }
+
+    const raw = await db.Inventory.find(query).lean();
     const { totalQty, totalSell, items } = groupInventoryItems(raw, 'currentlyAvailableStock');
     await enrichImages(items);
     res.json({ totalQty, totalSell, items });
@@ -1032,8 +1039,12 @@ const getStockValueData = async (req, res) => {
 
 const getStockInwardData = async (req, res) => {
   try {
-    const { dateStart = '', dateEnd = '' } = req.query;
+    const { dateStart = '', dateEnd = '', facility } = req.query;
     let query = { party: { $ne: 'Uniware Channel Sync' } };
+
+    if (facility && facility !== 'All') {
+      query.facility = facility;
+    }
 
     if (dateStart && dateEnd) {
       const start = new Date(dateStart);
@@ -1045,14 +1056,17 @@ const getStockInwardData = async (req, res) => {
     const raw = await db.Inventory.find(query).sort({ created_date_time: -1 }).lean();
     let totalQty = 0;
     let totalPurchase = 0;
+    const byFacility = {};
 
     const items = raw.map(item => {
       const qty = Number(item.qty || item.currentlyAvailableStock || 0);
       const buyPrice = Number(item.purchasePrice || 0);
       const purchaseVal = qty * buyPrice;
+      const facName = item.facility || 'Main Facility';
 
       totalQty += qty;
       totalPurchase += purchaseVal;
+      byFacility[facName] = (byFacility[facName] || 0) + qty;
 
       return {
         _id: item._id,
@@ -1062,6 +1076,7 @@ const getStockInwardData = async (req, res) => {
         sku: item.skuCode,
         itemName: item.itemName || item.skuCode,
         party: item.party || 'N/A',
+        facility: facName,
         challanNo: item.challanNo || '',
         size: item.size || 'N/A',
         sizes: [{ size: item.size || 'N/A', qty }],
@@ -1075,7 +1090,7 @@ const getStockInwardData = async (req, res) => {
     });
 
     await enrichImages(items);
-    res.json({ totalQty, totalPurchase, items });
+    res.json({ totalQty, totalPurchase, byFacility, items });
   } catch (err) {
     logger.error('getStockInwardData error: %o', err);
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
@@ -1084,8 +1099,12 @@ const getStockInwardData = async (req, res) => {
 
 const getStockOutwardData = async (req, res) => {
   try {
-    const { dateStart = '', dateEnd = '' } = req.query;
+    const { dateStart = '', dateEnd = '', facility } = req.query;
     let query = {};
+
+    if (facility && facility !== 'All') {
+      query.facility = facility;
+    }
 
     if (dateStart && dateEnd) {
       const start = new Date(dateStart);
@@ -1098,6 +1117,7 @@ const getStockOutwardData = async (req, res) => {
     let totalQty = 0;
     let totalPurchase = 0;
     let totalSell = 0;
+    const byFacility = {};
 
     const items = [];
     for (const log of stockOutLogs) {
@@ -1107,10 +1127,12 @@ const getStockOutwardData = async (req, res) => {
       const sellPrice = Number(inv?.salePrice || 0);
       const buyVal = qty * buyPrice;
       const sellVal = qty * sellPrice;
+      const facName = log.facility || inv?.facility || 'Main Facility';
 
       totalQty += qty;
       totalPurchase += buyVal;
       totalSell += sellVal;
+      byFacility[facName] = (byFacility[facName] || 0) + qty;
 
       items.push({
         _id: log._id,
@@ -1120,6 +1142,7 @@ const getStockOutwardData = async (req, res) => {
         sku: log.skuCode,
         itemName: inv?.itemName || log.skuCode || 'Unknown',
         party: log.party || inv?.party || 'N/A',
+        facility: facName,
         size: inv?.size || log.size || 'N/A',
         sizes: [{ size: inv?.size || log.size || 'N/A', qty }],
         qty: qty,
@@ -1135,7 +1158,7 @@ const getStockOutwardData = async (req, res) => {
     const totalProfit = totalSell - totalPurchase;
     await enrichImages(items);
 
-    res.json({ totalQty, totalSell, totalPurchase, totalProfit, items });
+    res.json({ totalQty, totalSell, totalPurchase, totalProfit, byFacility, items });
   } catch (err) {
     logger.error('getStockOutwardData error: %o', err);
     res.status(500).json({ error: 'Internal Server Error', details: err.message });

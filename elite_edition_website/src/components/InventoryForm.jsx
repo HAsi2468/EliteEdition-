@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode, Plus, Search, AlertTriangle } from 'lucide-react';
+import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode, Plus, Search, AlertTriangle, Warehouse } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 
@@ -42,6 +42,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
     skuCode: '',
     itemName: '',
     party: 'ANOUK',
+    facility: 'Main Facility',
     categoryName: 'KURTA SET',
     size: '',
     purchasePrice: 0.0,
@@ -54,6 +55,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
 
   const [error, setError] = useState('');
   const [vendorsList, setVendorsList] = useState([]);
+  const [facilitiesList, setFacilitiesList] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
   const [imageError, setImageError] = useState(false);
   const [isFetchingUniware, setIsFetchingUniware] = useState(false);
@@ -65,12 +67,20 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
   useEffect(() => {
     const loadFormData = async () => {
       try {
-        const [vData, cData] = await Promise.all([
+        const [vData, cData, fData] = await Promise.all([
           api.getVendors().catch(() => []),
           api.getProductsCatalog().catch(() => []),
+          api.getFacilities().catch(() => []),
         ]);
         setVendorsList(vData || []);
         setCatalogItems(cData || []);
+        setFacilitiesList(fData || []);
+        if (fData && fData.length > 0 && !item?.facility) {
+          const def = fData.find(f => f.isDefault) || fData[0];
+          if (def) {
+            setFormData(prev => ({ ...prev, facility: def.name }));
+          }
+        }
       } catch (err) {
         console.warn('Failed to load form reference data:', err);
       }
@@ -102,11 +112,13 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
 
       const brandOrParty = item.brand || item.party || 'ANOUK';
       const category = item.categoryName || item.category || 'KURTA SET';
+      const facilityName = item.facility || item.party || 'Main Facility';
 
       setFormData({
         skuCode: sku,
         itemName: titleOrName,
         party: brandOrParty,
+        facility: facilityName,
         categoryName: category,
         size: formattedSize,
         purchasePrice: item.basePrice ?? item.purchasePrice ?? 0.0,
@@ -578,7 +590,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
                 </div>
               </div>
 
-              {/* Row 2: Brand & Category */}
+              {/* Row 2: Brand & Storage Facility */}
               <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
@@ -597,6 +609,32 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
                   </select>
                 </div>
 
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Warehouse size={14} color="#059669" />
+                    Storage Facility *
+                  </label>
+                  <select
+                    name="facility"
+                    value={formData.facility || 'Main Facility'}
+                    onChange={handleChange}
+                    style={{ ...styles.input, cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    {facilitiesList.length === 0 ? (
+                      <option value="Main Facility">Main Facility</option>
+                    ) : (
+                      facilitiesList.map(f => (
+                        <option key={f._id || f.id || f.name} value={f.name}>
+                          {f.name} {f.code ? `(${f.code})` : ''}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Category & HSN Code */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Layers size={14} color="#059669" />
@@ -621,10 +659,7 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
                     <option value="TOP" />
                   </datalist>
                 </div>
-              </div>
 
-              {/* Row 3: HSN Code & Size */}
-              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <FileCode size={14} color="#059669" />
@@ -639,7 +674,10 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
                     style={styles.input}
                   />
                 </div>
+              </div>
 
+              {/* Row 4: Size & Challan / Ref No */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     Product Size(s) *
@@ -652,6 +690,21 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
                     placeholder="e.g., L or S, M, L, XL, 2XL"
                     style={styles.input}
                     required
+                  />
+                </div>
+
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Tag size={14} color="#059669" />
+                    Challan / Ref No.
+                  </label>
+                  <input
+                    type="text"
+                    name="challanNo"
+                    value={formData.challanNo}
+                    onChange={handleChange}
+                    placeholder="e.g., CH-2026-001"
+                    style={styles.input}
                   />
                 </div>
               </div>

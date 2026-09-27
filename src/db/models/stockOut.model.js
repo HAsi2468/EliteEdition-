@@ -16,6 +16,11 @@ const stockOutSchema = new mongoose.Schema(
       required: true,
       default: 1,
     },
+    facility: {
+      type: String,
+      trim: true,
+      default: 'Main Facility',
+    },
   },
   {
     timestamps: {

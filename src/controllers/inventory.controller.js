@@ -37,16 +37,17 @@ const createInventory = async (req, res) => {
       
       const processedItems = [];
       for (const item of req.body) {
-        const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes } = item;
+        const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes, facility } = item;
         if (!party || !itemName || !size) {
           throw new Error('Party, Item Name, and Size are required for all bulk items');
         }
 
+        const targetFacility = (facility || 'Main Facility').trim();
         const masterSku = await resolveMasterSkuForBackend(skuCode, size);
         const finalItemName = (itemName === skuCode || !itemName) ? masterSku : itemName;
 
-        // Check if an existing inventory record exists for masterSku to consolidate stock
-        let existingRecord = await db.Inventory.findOne({ skuCode: masterSku });
+        // Check if an existing inventory record exists for masterSku and facility to consolidate stock
+        let existingRecord = await db.Inventory.findOne({ skuCode: masterSku, facility: targetFacility });
         if (existingRecord) {
           existingRecord.qty = (existingRecord.qty || 0) + (qty || 0);
           existingRecord.currentlyAvailableStock = existingRecord.qty;
@@ -66,6 +67,7 @@ const createInventory = async (req, res) => {
             skuCode: masterSku,
             challanNo: challanNo || '',
             brandCodes: brandCodes || [],
+            facility: targetFacility,
             date: date || new Date(),
           });
           processedItems.push(newRecord);
@@ -77,8 +79,9 @@ const createInventory = async (req, res) => {
       return res.status(201).json(processedItems);
     }
 
-    const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes } = req.body;
-    logger.info(`[INVENTORY] Create request — Party: "${party}" | Item: "${itemName}" | Size: ${size} | Qty: ${qty} | Challan: ${challanNo || 'N/A'}`);
+    const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes, facility } = req.body;
+    const targetFacility = (facility || 'Main Facility').trim();
+    logger.info(`[INVENTORY] Create request — Party: "${party}" | Facility: "${targetFacility}" | Item: "${itemName}" | Size: ${size} | Qty: ${qty} | Challan: ${challanNo || 'N/A'}`);
 
     if (!party || !itemName || !size) {
       logger.warn(`[INVENTORY] Validation failed — Party, Item Name, Size required`);
@@ -88,13 +91,13 @@ const createInventory = async (req, res) => {
     const masterSku = await resolveMasterSkuForBackend(skuCode, size);
     const finalItemName = (itemName === skuCode || !itemName) ? masterSku : itemName;
 
-    let existingRecord = await db.Inventory.findOne({ skuCode: masterSku });
+    let existingRecord = await db.Inventory.findOne({ skuCode: masterSku, facility: targetFacility });
     if (existingRecord) {
       existingRecord.qty = (existingRecord.qty || 0) + (qty || 0);
       existingRecord.currentlyAvailableStock = existingRecord.qty;
       if (imageUrl) existingRecord.imageUrl = imageUrl;
       await existingRecord.save();
-      logger.info(`[INVENTORY] ✅ Consolidated into existing Master SKU — ID: ${existingRecord._id} | SKU: ${masterSku} | Total Qty: ${existingRecord.qty}`);
+      logger.info(`[INVENTORY] ✅ Consolidated into existing Master SKU — ID: ${existingRecord._id} | SKU: ${masterSku} | Facility: ${targetFacility} | Total Qty: ${existingRecord.qty}`);
       emitSocketEvent(req, 'inventory-updated', existingRecord);
       return res.status(200).json(existingRecord);
     }
@@ -111,10 +114,11 @@ const createInventory = async (req, res) => {
       skuCode: masterSku,
       challanNo: challanNo || '',
       brandCodes: brandCodes || [],
+      facility: targetFacility,
       date: date || new Date(),
     });
 
-    logger.info(`[INVENTORY] ✅ Created — ID: ${newItem._id} | SKU: "${newItem.skuCode}" | Party: "${newItem.party}" | Size: ${newItem.size} | Qty: ${newItem.qty}`);
+    logger.info(`[INVENTORY] ✅ Created — ID: ${newItem._id} | SKU: "${newItem.skuCode}" | Facility: "${newItem.facility}" | Party: "${newItem.party}" | Size: ${newItem.size} | Qty: ${newItem.qty}`);
     emitSocketEvent(req, 'inventory-created', newItem);
     res.status(201).json(newItem);
   } catch (error) {
@@ -125,11 +129,15 @@ const createInventory = async (req, res) => {
 
 const getInventory = async (req, res) => {
   try {
-    const { search, excludeUniware } = req.query;
+    const { search, excludeUniware, facility } = req.query;
     const whereClause = {};
 
     if (excludeUniware !== 'false') {
       whereClause.party = { $ne: 'Uniware Channel Sync' };
+    }
+
+    if (facility && facility !== 'All') {
+      whereClause.facility = facility;
     }
 
     if (search) {
@@ -476,7 +484,7 @@ const bulkInward = async (req, res) => {
 
     for (const item of items) {
       try {
-        const { skuCode, qty, purchasePrice, salePrice, party, itemName, size, imageUrl, challanNo } = item;
+        const { skuCode, qty, purchasePrice, salePrice, party, itemName, size, imageUrl, challanNo, facility } = item;
         if (!skuCode) {
           throw new Error('SKU Code is required for all inward items');
         }
@@ -485,8 +493,10 @@ const bulkInward = async (req, res) => {
           throw new Error(`Invalid quantity ${qty} for SKU ${skuCode}`);
         }
 
-        // 1. Check if SKU exists in db.Inventory
-        let inventoryItem = await db.Inventory.findOne({ skuCode: skuCode.trim() });
+        const targetFacility = (facility || 'Main Facility').trim();
+
+        // 1. Check if SKU exists in db.Inventory for the specified facility
+        let inventoryItem = await db.Inventory.findOne({ skuCode: skuCode.trim(), facility: targetFacility });
         if (inventoryItem) {
           // Increment stock
           inventoryItem.qty += inwardQty;
@@ -543,6 +553,7 @@ const bulkInward = async (req, res) => {
             purchasePrice: Number(resolvedPurchasePrice) || 0.0,
             salePrice: Number(resolvedSalePrice) || 0.0,
             party: resolvedParty,
+            facility: targetFacility,
             imageUrl: resolvedImageUrl,
             challanNo: challanNo ? challanNo.trim() : '',
             date: new Date()
