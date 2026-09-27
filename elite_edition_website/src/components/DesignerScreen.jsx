@@ -2054,15 +2054,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     >
                       {/* Design, Date & Priority (Combined) */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          {task.taskNo && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', padding: '0.1rem 0.45rem', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
-                              {task.taskNo}
-                            </span>
-                          )}
-                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
-                            {task.designName}
-                          </span>
+                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                          {task.designName}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
