@@ -65,5 +65,6 @@ router.use('/costing', require('./costing.route'));
 router.use('/digital-print', require('./digitalPrintDashboard.route'));
 router.use('/facilities', require('./facility.route'));
 router.use('/designer-tasks', require('./designerTask.route'));
+router.use('/customer-profiles', require('./customerProfile.route'));
 
 module.exports = router;

@@ -2118,6 +2118,45 @@ export const api = {
     return request(`/leads/${id}`, { method: 'DELETE' });
   },
 
+  // Customer Profiles Management (CRM Person & Business Directory)
+  async getCustomerProfiles(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/customer-profiles${query ? `?${query}` : ''}`);
+  },
+
+  async getCustomerProfileById(id) {
+    return request(`/customer-profiles/${id}`);
+  },
+
+  async createCustomerProfile(payload) {
+    return request('/customer-profiles', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async updateCustomerProfile(id, payload) {
+    return request(`/customer-profiles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async addCustomerProfileInteraction(id, payload) {
+    return request(`/customer-profiles/${id}/interactions`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async deleteCustomerProfile(id) {
+    return request(`/customer-profiles/${id}`, { method: 'DELETE' });
+  },
+
+  async syncAllCustomerProfiles() {
+    return request('/customer-profiles/sync-all', { method: 'POST' });
+  },
+
   // Business Connections (Master AI Agent & Directory)
   async parseBusinessConnectionAI(rawText) {
     return request('/business-connections/parse-ai', {

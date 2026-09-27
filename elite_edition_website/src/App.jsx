@@ -290,7 +290,7 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
@@ -437,7 +437,7 @@ export default function App() {
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
-      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent',
+      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent',
       'jobcards_business_connection', 'business_connection', 'complaint_dashboard', 'complaint_create'
     ];
 
@@ -457,7 +457,7 @@ export default function App() {
         if ((activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') && (p === 'stitching_fabric' || p === 'jobcards_stitching_challan' || p === 'jobcards_fabric')) return true;
         if (activeTab === 'jobcards_stitching_settings' && (p === 'stitching_settings' || p === 'jobcards_stitching_settings')) return true;
         if ((activeTab === 'jobcards_business_connection' || activeTab === 'business_connection') && (p === 'jobcards_business_connection' || p === 'business_connection' || p === 'jobcards_master_ai' || p === 'jobcards')) return true;
-        if ((activeTab === 'jobcards_crm' || activeTab === 'crm_leads') && (p === 'jobcards_crm' || p === 'crm_department' || p === 'crm' || p === 'crm_leads' || p === 'jobcards')) return true;
+        if ((activeTab === 'jobcards_crm' || activeTab === 'crm_leads' || activeTab === 'crm_profiles') && (p === 'jobcards_crm' || p === 'crm_department' || p === 'crm' || p === 'crm_leads' || p === 'crm_profiles' || p === 'jobcards')) return true;
         if (activeTab.startsWith('jobcards_') && (p === 'jobcards' || p === activeTab)) return true;
         if (activeTab === 'jobcards' && p.startsWith('jobcards')) return true;
         if (activeTab.startsWith('stitching_') && (p.startsWith('stitching_') || p === 'jobcards')) return true;
@@ -2335,8 +2335,8 @@ export default function App() {
             <SalesGrid />
           ) : activeTab === 'reports' ? (
             <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
-          ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' ? (
-            <CrmPanel currentUser={currentUser} />
+          ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' || activeTab === 'crm_profiles' || activeTab === 'crm_leads' ? (
+            <CrmPanel currentUser={currentUser} initialSubTab={activeTab === 'crm_profiles' ? 'profiles' : 'leads'} />
           ) : activeTab === 'jobcards_business_connection' || activeTab === 'jobcards_master_ai' || activeTab === 'master_ai_agent' || activeTab === 'business_connection' ? (
             <BusinessConnectionPanel currentUser={currentUser} />
           ) : activeTab.startsWith('jobcards') ? (

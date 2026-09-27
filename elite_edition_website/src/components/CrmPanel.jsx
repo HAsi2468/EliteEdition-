@@ -19,10 +19,14 @@ import {
   ChevronRight,
   ExternalLink,
   UserPlus,
-  Printer
+  Printer,
+  Sparkles,
+  FileText,
+  UserCheck
 } from 'lucide-react';
 import { api } from '../services/api';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import CustomerProfilesPanel from './CustomerProfilesPanel';
 
 const STAGES = [
   { id: 'All', label: 'All Leads', color: 'var(--text-muted)' },
@@ -36,8 +40,31 @@ const STAGES = [
 
 const SOURCES = ['WhatsApp', 'Phone Call', 'Reference', 'Instagram', 'Direct Visit', 'Other'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
+const CUSTOMER_TYPES = [
+  'Boutique / Designer',
+  'Wholesaler / Trader',
+  'Garment Manufacturer',
+  'Retail Brand',
+  'Fabric Merchant',
+  'Exporter',
+  'Individual / Other'
+];
 
-export default function CrmPanel({ currentUser }) {
+export default function CrmPanel({ currentUser, initialSubTab }) {
+  const [subTab, setSubTab] = useState(() => {
+    if (initialSubTab) return initialSubTab;
+    if (typeof window !== 'undefined' && window.location.hash.toLowerCase().includes('profile')) {
+      return 'profiles';
+    }
+    return 'leads';
+  });
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -59,6 +86,10 @@ export default function CrmPanel({ currentUser }) {
     phone: '',
     companyName: '',
     email: '',
+    city: '',
+    address: '',
+    gstin: '',
+    customerType: 'Boutique / Designer',
     source: 'WhatsApp',
     stage: 'New',
     priority: 'Medium',
@@ -248,20 +279,24 @@ export default function CrmPanel({ currentUser }) {
     printWindow.document.close();
   };
 
-  const openAddModal = () => {
+  const openAddModal = (presetData = {}) => {
     setEditingLead(null);
     setFormData({
-      name: '',
-      phone: '',
-      companyName: '',
-      email: '',
-      source: 'WhatsApp',
-      stage: 'New',
-      priority: 'Medium',
-      estimatedValue: '',
-      requirement: '',
-      notes: '',
-      followUpDate: '',
+      name: presetData.name || '',
+      phone: presetData.phone || '',
+      companyName: presetData.companyName || '',
+      email: presetData.email || '',
+      city: presetData.city || '',
+      address: presetData.address || '',
+      gstin: presetData.gstin || '',
+      customerType: presetData.customerType || 'Boutique / Designer',
+      source: presetData.source || 'WhatsApp',
+      stage: presetData.stage || 'New',
+      priority: presetData.priority || 'Medium',
+      estimatedValue: presetData.estimatedValue || '',
+      requirement: presetData.requirement || '',
+      notes: presetData.notes || '',
+      followUpDate: presetData.followUpDate || '',
       assignedTo: currentUser?.name || 'Unassigned'
     });
     setShowModal(true);
@@ -274,6 +309,10 @@ export default function CrmPanel({ currentUser }) {
       phone: lead.phone || '',
       companyName: lead.companyName || '',
       email: lead.email || '',
+      city: lead.city || '',
+      address: lead.address || '',
+      gstin: lead.gstin || '',
+      customerType: lead.customerType || 'Boutique / Designer',
       source: lead.source || 'WhatsApp',
       stage: lead.stage || 'New',
       priority: lead.priority || 'Medium',
@@ -284,6 +323,21 @@ export default function CrmPanel({ currentUser }) {
       assignedTo: lead.assignedTo || currentUser?.name || 'Unassigned'
     });
     setShowModal(true);
+  };
+
+  const handleAddNewLeadForCustomer = (profile) => {
+    setSubTab('leads');
+    openAddModal({
+      name: profile?.name || '',
+      phone: profile?.phone || '',
+      companyName: profile?.companyName || '',
+      email: profile?.email || '',
+      city: profile?.city || '',
+      address: profile?.address || '',
+      gstin: profile?.gstin || '',
+      customerType: profile?.customerType || 'Boutique / Designer',
+      notes: profile?.notes ? `Profile Note: ${profile.notes}` : ''
+    });
   };
 
   const handleSaveLead = async (e) => {
@@ -359,7 +413,7 @@ export default function CrmPanel({ currentUser }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '1rem',
-          padding: '1.5rem 1.8rem',
+          padding: '1.4rem 1.8rem',
           borderRadius: '16px',
           background: 'linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(59,130,246,0.06) 100%)',
           border: '1px solid rgba(37,99,235,0.25)',
@@ -380,42 +434,135 @@ export default function CrmPanel({ currentUser }) {
               boxShadow: '0 8px 16px rgba(37, 99, 235, 0.35)'
             }}
           >
-            <Users size={28} />
+            {subTab === 'profiles' ? <Users size={28} /> : <FileText size={28} />}
           </div>
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
-              CRM & Lead Management
+              CRM & Customer Management
             </h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-              Track customer inquiries, sales pipeline, follow-ups, and orders cleanly.
+              Unified customer profiles, inquiry tracking, follow-ups, and sales pipeline.
             </p>
           </div>
         </div>
 
-        <button
-          onClick={openAddModal}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-            color: '#fff',
-            border: 'none',
-            fontWeight: 700,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <UserPlus size={18} />
-          Add New Lead
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* SubTab Switcher Buttons */}
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '4px',
+              borderRadius: '12px',
+              background: 'var(--bg-card, #ffffff)',
+              border: '1px solid var(--border-light, #e2e8f0)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+              gap: '4px'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setSubTab('leads')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: subTab === 'leads' ? '#2563eb' : 'transparent',
+                color: subTab === 'leads' ? '#ffffff' : 'var(--text-muted, #64748b)',
+                fontWeight: subTab === 'leads' ? 700 : 600,
+                fontSize: '0.86rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: subTab === 'leads' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
+              }}
+            >
+              <FileText size={16} />
+              <span>Customer Leads</span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  background: subTab === 'leads' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                  color: subTab === 'leads' ? '#ffffff' : '#475569',
+                  fontWeight: 700
+                }}
+              >
+                {leads.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSubTab('profiles')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: subTab === 'profiles' ? '#2563eb' : 'transparent',
+                color: subTab === 'profiles' ? '#ffffff' : 'var(--text-muted, #64748b)',
+                fontWeight: subTab === 'profiles' ? 700 : 600,
+                fontSize: '0.86rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: subTab === 'profiles' ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
+              }}
+            >
+              <Users size={16} />
+              <span>Customer Profiles</span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  background: subTab === 'profiles' ? 'rgba(255,255,255,0.25)' : '#dbeafe',
+                  color: subTab === 'profiles' ? '#ffffff' : '#1e40af',
+                  fontWeight: 700
+                }}
+              >
+                Directory
+              </span>
+            </button>
+          </div>
+
+          <button
+            onClick={() => openAddModal()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <UserPlus size={17} />
+            Add New Lead
+          </button>
+        </div>
       </div>
 
-      {/* Summary Cards */}
+      {subTab === 'profiles' ? (
+        <CustomerProfilesPanel
+          currentUser={currentUser}
+          onSwitchToLeads={() => setSubTab('leads')}
+          onAddNewLeadForCustomer={handleAddNewLeadForCustomer}
+        />
+      ) : (
+        <>
+          {/* Summary Cards */}
       <div
         style={{
           display: 'grid',
@@ -928,6 +1075,8 @@ export default function CrmPanel({ currentUser }) {
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Add / Edit Lead Modal */}
       {showModal && (
@@ -968,6 +1117,27 @@ export default function CrmPanel({ currentUser }) {
             </div>
 
             <form onSubmit={handleSaveLead} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Auto Sync Notice */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  background: 'rgba(37, 99, 235, 0.08)',
+                  border: '1px solid rgba(37, 99, 235, 0.25)',
+                  color: '#2563eb',
+                  fontSize: '0.82rem',
+                  fontWeight: 600
+                }}
+              >
+                <Sparkles size={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Auto Customer Profile Sync:</strong> Submitting this lead automatically creates or updates this person's complete Customer Profile in the CRM Customer Directory.
+                </span>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
@@ -1043,6 +1213,97 @@ export default function CrmPanel({ currentUser }) {
                     placeholder="rahul@example.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-main)',
+                      fontSize: '0.88rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Customer Profile Attributes */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                    Customer Type (Category)
+                  </label>
+                  <select
+                    value={formData.customerType || 'Boutique / Designer'}
+                    onChange={(e) => setFormData({ ...formData, customerType: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-main)',
+                      fontSize: '0.88rem'
+                    }}
+                  >
+                    {CUSTOMER_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                    City / Market Hub
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Surat, Delhi, Mumbai, Ahmedabad"
+                    value={formData.city || ''}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-main)',
+                      fontSize: '0.88rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                    Full Address / Market Location (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 402, Millennium Textile Market, Ring Road"
+                    value={formData.address || ''}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-main)',
+                      fontSize: '0.88rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                    GSTIN (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 24ABCDE1234F1Z5"
+                    value={formData.gstin || ''}
+                    onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
                     style={{
                       width: '100%',
                       padding: '9px 12px',

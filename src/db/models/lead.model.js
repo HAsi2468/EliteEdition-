@@ -56,6 +56,26 @@ const leadSchema = new mongoose.Schema({
     type: String,
     default: 'Unassigned'
   },
+  city: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  address: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  gstin: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  customerType: {
+    type: String,
+    default: 'Boutique / Designer',
+    trim: true
+  },
   companyEntity: {
     type: String,
     default: 'Elite Digital Print'

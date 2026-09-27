@@ -1,4 +1,5 @@
 const Lead = require('../db/models/lead.model');
+const { syncProfileFromLead } = require('./customerProfile.controller');
 
 // Create new lead
 const createLead = async (req, res) => {
@@ -16,6 +17,10 @@ const createLead = async (req, res) => {
       notes,
       followUpDate,
       assignedTo,
+      city,
+      address,
+      gstin,
+      customerType,
       companyEntity
     } = req.body;
 
@@ -36,14 +41,25 @@ const createLead = async (req, res) => {
       notes: notes ? String(notes).trim() : '',
       followUpDate: followUpDate ? new Date(followUpDate) : null,
       assignedTo: assignedTo || 'Unassigned',
+      city: city ? String(city).trim() : '',
+      address: address ? String(address).trim() : '',
+      gstin: gstin ? String(gstin).trim() : '',
+      customerType: customerType || 'Boutique / Designer',
       companyEntity: companyEntity || 'Elite Digital Print'
     });
 
     await newLead.save();
 
+    // Automatically sync / create Person Profile in Customer Directory
+    try {
+      await syncProfileFromLead(newLead);
+    } catch (syncErr) {
+      console.error('Warning: Error auto-syncing customer profile:', syncErr);
+    }
+
     return res.status(201).json({
       success: true,
-      message: 'Lead created successfully',
+      message: 'Lead created successfully and customer profile synced',
       data: newLead
     });
   } catch (error) {
@@ -115,6 +131,13 @@ const updateLead = async (req, res) => {
     if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead not found.' });
     }
+
+    try {
+      await syncProfileFromLead(lead);
+    } catch (syncErr) {
+      console.error('Warning: Error syncing profile on lead update:', syncErr);
+    }
+
     return res.status(200).json({ success: true, data: lead });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
