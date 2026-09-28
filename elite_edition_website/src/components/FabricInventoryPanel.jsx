@@ -16,6 +16,7 @@ import {
   AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock, Truck, Calendar
 } from 'lucide-react';
+import '../styles/fabricEnterprise.css';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
@@ -2217,13 +2218,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const jobMtrNeeded = activeJob ? parseFloat(activeJob.totalMtr) || 0 : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+    <div className="fabric-container">
       {/* Minimal White Card Header with Entry Buttons Top Right & Sub-Tabs */}
       {!onlyChallan && (
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+        <div className="fabric-header-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#0284c7,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#0284c7,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 6px rgba(2,132,199,0.3)' }}>
                 <Database size={20} color="#fff" />
               </div>
               <div>
@@ -2240,48 +2241,35 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             </div>
 
             {/* Entry Buttons Top in Header */}
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="fabric-header-actions">
               <button
                 onClick={() => setIsInwardOpen(true)}
-                style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                className="fabric-action-btn inward-btn"
               >
                 <PlusCircle size={15} /> Inward Roll Stock
               </button>
               <button
                 onClick={() => setIsCombinedModalOpen(true)}
-                style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                className="fabric-action-btn report-btn"
               >
                 <FileDown size={15} /> PDF Report
               </button>
             </div>
           </div>
 
-          {/* Sub-Tabs Bar */}
-          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem', overflowX: 'auto' }}>
+          {/* Sub-Tabs Bar - Horizontal Swipe Track without squishing */}
+          <div className="fabric-subtabs-track subtabs-scroll-track">
             {tabs.map(tab => {
               const TabIcon = tab.icon;
+              const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    padding: '0.42rem 0.9rem',
-                    borderRadius: '8px',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    border: '1px solid',
-                    borderColor: activeTab === tab.id ? '#0284c7' : 'var(--border-light, #e2e8f0)',
-                    background: activeTab === tab.id ? '#e0f2fe' : '#ffffff',
-                    color: activeTab === tab.id ? '#0369a1' : 'var(--text-muted, #64748b)',
-                    transition: 'all 0.15s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
+                  className={`fabric-tab-chip subtab-chip ${isActive ? 'active' : ''}`}
                 >
-                  {TabIcon && <TabIcon size={15} />}
-                  {tab.label}
+                  {TabIcon && <TabIcon size={14} />}
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
@@ -2292,17 +2280,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
 
       {/* Main Content Area */}
-      <div className={onlyChallan ? '' : 'glass-panel'} style={{ flex: 1, overflowY: 'auto', padding: onlyChallan ? 0 : '1.5rem' }}>
+      <div className={onlyChallan ? '' : 'glass-panel fabric-content-panel'}>
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Layers size={20} color="var(--primary)" /> Current Fabric Stock
+            <div className="fabric-stock-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <Layers size={20} color="var(--primary, #0284c7)" /> Current Fabric Stock
               </h2>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div className="fabric-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 <DateRangePicker
                   preset={stockDatePreset}
                   onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
@@ -2325,39 +2313,71 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onClick={handleDownloadStockPDF}
                   style={{
                     background: '#059669', color: '#ffffff', border: 'none',
-                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: 800,
+                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: 700,
                     fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-                    boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+                    boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
                   }}
                 >
                   <Download size={15} /> Download PDF
                 </button>
 
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, marginLeft: '0.5rem' }}>Sort Stock:</span>
-                <button
-                  type="button"
-                  className={stockSortOrder === 'highToLow' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setStockSortOrder('highToLow')}
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
-                >
-                  High to Low (Mtr)
-                </button>
-                <button
-                  type="button"
-                  className={stockSortOrder === 'lowToHigh' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setStockSortOrder('lowToHigh')}
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
-                >
-                  Low to High (Mtr)
-                </button>
-                <button
-                  type="button"
-                  className={stockSortOrder === 'nameAsc' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setStockSortOrder('nameAsc')}
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
-                >
-                  Name (A-Z)
-                </button>
+                <div className="fabric-sort-group" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f1f5f9', padding: '3px 6px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap', paddingRight: '2px' }}>Sort:</span>
+                  <button
+                    type="button"
+                    onClick={() => setStockSortOrder('highToLow')}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: stockSortOrder === 'highToLow' ? '#0284c7' : 'transparent',
+                      color: stockSortOrder === 'highToLow' ? '#ffffff' : '#475569',
+                      boxShadow: stockSortOrder === 'highToLow' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    High to Low
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStockSortOrder('lowToHigh')}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: stockSortOrder === 'lowToHigh' ? '#0284c7' : 'transparent',
+                      color: stockSortOrder === 'lowToHigh' ? '#ffffff' : '#475569',
+                      boxShadow: stockSortOrder === 'lowToHigh' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    Low to High
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStockSortOrder('nameAsc')}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: stockSortOrder === 'nameAsc' ? '#0284c7' : 'transparent',
+                      color: stockSortOrder === 'nameAsc' ? '#ffffff' : '#475569',
+                      boxShadow: stockSortOrder === 'nameAsc' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    Name (A-Z)
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2372,21 +2392,48 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
               return (
                 <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '10px', display: 'flex', gap: '1.8rem', flexWrap: 'wrap', border: '1px solid var(--border-light)' }}>
-                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Total Fabrics</span><br /><strong style={{ fontSize: '1.15rem' }}>{displayStock.length}</strong></div>
-                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Total Received</span><br /><strong style={{ color: 'var(--success)', fontSize: '1.15rem' }}>{totalInward.toFixed(2)} mtr</strong></div>
-                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Total Used</span><br /><strong style={{ color: 'var(--danger)', fontSize: '1.15rem' }}>{totalOutward.toFixed(2)} mtr</strong></div>
-                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Net Available</span><br /><strong style={{ color: 'var(--primary)', fontSize: '1.15rem' }}>{netAvailable.toFixed(2)} mtr</strong></div>
-                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Dispatched Yield</span><br /><strong style={{ color: '#38bdf8', fontSize: '1.15rem' }}>{deliveryYieldPct}%</strong></div>
-                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Low Stock Alert</span><br /><strong style={{ color: lowStockItems.length + outOfStockItems.length > 0 ? '#ef4444' : '#10b981', fontSize: '1.15rem' }}>{lowStockItems.length + outOfStockItems.length} Qualities</strong></div>
+                  <div style={{
+                    padding: '1rem',
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
+                    gap: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                  }}>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #edf2f7' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Fabrics</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '3px' }}>{displayStock.length}</div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #dcfce7' }}>
+                      <span style={{ color: '#166534', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Received</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#15803d', marginTop: '3px' }}>{totalInward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fee2e2' }}>
+                      <span style={{ color: '#991b1b', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Used</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#b91c1c', marginTop: '3px' }}>{totalOutward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0f9ff', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
+                      <span style={{ color: '#0369a1', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Net Available</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0284c7', marginTop: '3px' }}>{netAvailable.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0fdfa', borderRadius: '10px', border: '1px solid #ccfbf1' }}>
+                      <span style={{ color: '#0f766e', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Dispatched Yield</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0d9488', marginTop: '3px' }}>{deliveryYieldPct}%</div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: lowStockItems.length + outOfStockItems.length > 0 ? '#fff1f2' : '#f0fdf4', borderRadius: '10px', border: `1px solid ${lowStockItems.length + outOfStockItems.length > 0 ? '#ffe4e6' : '#dcfce7'}` }}>
+                      <span style={{ color: lowStockItems.length + outOfStockItems.length > 0 ? '#be123c' : '#166534', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Low Stock Alert</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: lowStockItems.length + outOfStockItems.length > 0 ? '#e11d48' : '#15803d', marginTop: '3px' }}>{lowStockItems.length + outOfStockItems.length} Qualities</div>
+                    </div>
                   </div>
 
                   {/* Critical Low Stock Warning Banner */}
                   {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
-                    <div style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <AlertTriangle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 200, fontSize: '0.8rem', color: '#f87171' }}>
-                        <strong>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey rolls for upcoming job cards.</span>}
+                    <div style={{ padding: '0.85rem 1.1rem', borderRadius: '10px', background: '#fff5f5', border: '1px solid #fed7d7', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', boxShadow: '0 1px 3px rgba(239,68,68,0.06)' }}>
+                      <AlertTriangle size={18} color="#e53e3e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', color: '#9b2c2c', lineHeight: 1.5 }}>
+                        <strong style={{ color: '#c53030' }}>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey rolls for upcoming job cards.</span>}
                       </div>
                     </div>
                   )}
@@ -2396,7 +2443,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
             {/* Fabric Quality Cards with Panna breakdown */}
             {displayStock.length === 0 && !loading && <p>No stock data found.</p>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {[...displayStock].sort((a, b) => {
                 const stockA = Number(a.currentStock || 0);
                 const stockB = Number(b.currentStock || 0);
@@ -2413,84 +2460,89 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 );
                 return (
                   <div key={idx} style={{
-                    background: isEmpty ? 'rgba(239,68,68,0.05)' : isLow ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isEmpty ? 'var(--danger)' : isLow ? '#f59e0b' : 'var(--border-light)'}`,
-                    borderRadius: 'var(--radius-md)',
+                    background: isEmpty ? '#fef2f2' : isLow ? '#fffbeb' : '#ffffff',
+                    border: `1px solid ${isEmpty ? '#fecaca' : isLow ? '#fde68a' : '#e2e8f0'}`,
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
                     overflow: 'hidden'
                   }}>
                     {/* Header row */}
                     <div
                       onClick={() => setExpandedFabric(isExpanded ? null : item.fabricQuality)}
-                      style={{ display: 'flex', alignItems: 'center', padding: '1rem 1.2rem', cursor: 'pointer', gap: '1rem' }}
+                      style={{ display: 'flex', alignItems: 'center', padding: '0.9rem 1.1rem', cursor: 'pointer', gap: '0.75rem', flexWrap: 'wrap' }}
                     >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: 700, fontSize: '1rem' }}>{item.fabricQuality}</span>
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>{item.fabricQuality}</span>
                           {isLow && !isEmpty && (
-                            <span style={{ fontSize: '0.65rem', background: '#f59e0b', color: '#000', borderRadius: '4px', padding: '2px 6px', fontWeight: 700 }}>LOW</span>
+                            <span style={{ fontSize: '0.65rem', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '4px', padding: '2px 6px', fontWeight: 800 }}>LOW</span>
                           )}
                           {isEmpty && (
-                            <span style={{ fontSize: '0.65rem', background: 'var(--danger)', color: '#fff', borderRadius: '4px', padding: '2px 6px', fontWeight: 700 }}>EMPTY</span>
+                            <span style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '4px', padding: '2px 6px', fontWeight: 800 }}>EMPTY</span>
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: '1.2rem', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                          <span>In: <strong style={{ color: 'var(--success)' }}>{Number(item.totalInward || 0).toFixed(2)} mtr</strong></span>
-                          <span>Out: <strong style={{ color: '#f87171' }}>{Number(item.freshOutward || (item.totalOutward - (item.totalShortage || 0)) || item.totalOutward).toFixed(2)} mtr</strong></span>
+                        <div style={{ display: 'flex', gap: '0.85rem', marginTop: '0.35rem', fontSize: '0.75rem', color: '#64748b', flexWrap: 'wrap' }}>
+                          <span>In: <strong style={{ color: '#16a34a' }}>{Number(item.totalInward || 0).toFixed(2)} mtr</strong></span>
+                          <span>Out: <strong style={{ color: '#dc2626' }}>{Number(item.freshOutward || (item.totalOutward - (item.totalShortage || 0)) || item.totalOutward).toFixed(2)} mtr</strong></span>
                           {item.totalShortage > 0 && (
-                            <span>Shortage: <strong style={{ color: '#fbbf24' }}>+{Number(item.totalShortage).toFixed(2)} mtr</strong></span>
+                            <span>Shortage: <strong style={{ color: '#d97706' }}>+{Number(item.totalShortage).toFixed(2)} mtr</strong></span>
                           )}
-                          <span>Net Out: <strong style={{ color: '#ef4444' }}>{Number(item.totalOutward || 0).toFixed(2)} mtr</strong></span>
-                          <span>{pannaRows.length} panna variant{pannaRows.length !== 1 ? 's' : ''}</span>
+                          <span>Net Out: <strong style={{ color: '#b91c1c' }}>{Number(item.totalOutward || 0).toFixed(2)} mtr</strong></span>
+                          <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', color: '#475569' }}>{pannaRows.length} panna variant{pannaRows.length !== 1 ? 's' : ''}</span>
                         </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: isEmpty ? 'var(--danger)' : isLow ? '#f59e0b' : 'var(--primary)' }}>
-                          {Number(item.currentStock || 0).toFixed(2)}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: isEmpty ? '#dc2626' : isLow ? '#d97706' : '#0284c7' }}>
+                            {Number(item.currentStock || 0).toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '-3px' }}>mtr available</div>
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-4px' }}>mtr available</div>
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        <div style={{ color: '#94a3b8' }}>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </div>
                       </div>
                     </div>
 
                     {/* Panna-wise breakdown (collapsible) */}
                     {isExpanded && pannaRows.length > 0 && (
-                      <div style={{ borderTop: '1px solid var(--border-light)', padding: '0 1.2rem 1rem' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.75rem', fontSize: '0.85rem' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                              <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Panna (Width)</th>
-                              <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Inward (mtr)</th>
-                              <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Outward (mtr)</th>
-                              <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Available (mtr)</th>
-                              <th style={{ textAlign: 'center', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lots</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {pannaRows.map((p, pi) => {
-                              const rowIsLow = p.currentStock <= 50;
-                              const rowIsEmpty = p.currentStock <= 0;
-                              return (
-                                <tr key={pi} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                  <td style={{ padding: '0.5rem 0.5rem', fontWeight: 600 }}>
-                                    <span style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '4px', padding: '2px 8px', fontSize: '0.8rem' }}>
-                                      {p.panna && p.panna !== 'Unknown' ? String(p.panna).replace(/['"]/g, '') : '—'}
-                                    </span>
-                                  </td>
-                                  <td style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--success)' }}>+{Number(p.totalInward || 0).toFixed(2)}</td>
-                                  <td style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--danger)' }}>-{Number(p.totalOutward || 0).toFixed(2)}</td>
-                                  <td style={{ textAlign: 'right', padding: '0.5rem', fontWeight: 700, color: rowIsEmpty ? 'var(--danger)' : rowIsLow ? '#f59e0b' : 'var(--text-primary)' }}>
-                                    {Number(p.currentStock || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ textAlign: 'center', padding: '0.5rem' }}>
-                                    <span style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '20px', padding: '2px 8px', fontSize: '0.75rem' }}>{p.lotCount}</span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                      <div style={{ borderTop: '1px solid #f1f5f9', padding: '0.5rem 1rem 1rem' }}>
+                        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                          <table style={{ width: '100%', minWidth: '380px', borderCollapse: 'collapse', marginTop: '0.5rem', fontSize: '0.82rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                <th style={{ textAlign: 'left', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Panna (Width)</th>
+                                <th style={{ textAlign: 'right', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Inward (mtr)</th>
+                                <th style={{ textAlign: 'right', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Outward (mtr)</th>
+                                <th style={{ textAlign: 'right', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Available (mtr)</th>
+                                <th style={{ textAlign: 'center', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Lots</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {pannaRows.map((p, pi) => {
+                                const rowIsLow = p.currentStock <= 50;
+                                const rowIsEmpty = p.currentStock <= 0;
+                                return (
+                                  <tr key={pi} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                    <td style={{ padding: '0.5rem 0.5rem', fontWeight: 700 }}>
+                                      <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', borderRadius: '4px', padding: '2px 8px', fontSize: '0.78rem' }}>
+                                        {p.panna && p.panna !== 'Unknown' ? String(p.panna).replace(/['"]/g, '') : '—'}
+                                      </span>
+                                    </td>
+                                    <td style={{ textAlign: 'right', padding: '0.5rem', color: '#16a34a', fontWeight: 700 }}>+{Number(p.totalInward || 0).toFixed(2)}</td>
+                                    <td style={{ textAlign: 'right', padding: '0.5rem', color: '#dc2626', fontWeight: 700 }}>-{Number(p.totalOutward || 0).toFixed(2)}</td>
+                                    <td style={{ textAlign: 'right', padding: '0.5rem', fontWeight: 800, color: rowIsEmpty ? '#dc2626' : rowIsLow ? '#d97706' : '#0284c7' }}>
+                                      {Number(p.currentStock || 0).toFixed(2)}
+                                    </td>
+                                    <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                                      <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '20px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }}>{p.lotCount}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                     {isExpanded && pannaRows.length === 0 && (
