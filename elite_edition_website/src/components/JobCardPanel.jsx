@@ -2580,24 +2580,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
             <div style={{ height: '1px', background: 'var(--border-light)', width: '100%', margin: '0.6rem 0 0.4rem 0' }} />
 
             {/* Sub-Tab Navigation Bar */}
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="subtabs-scroll-track" style={{ margin: '0.4rem 0 0 0' }}>
               <button
                 type="button"
                 onClick={() => setOverrideSubTab('list')}
-                style={{
-                  padding: '0.45rem 1rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 800,
-                  borderRadius: '8px',
-                  border: (effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
-                  background: (effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
-                  color: (effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? '#1d4ed8' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  transition: 'all 0.15s ease'
-                }}
+                className={`subtab-chip ${(effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'active' : ''}`}
               >
                 <FileText size={15} />
                 <span>📋 Production Cards</span>
@@ -2606,20 +2593,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
               <button
                 type="button"
                 onClick={() => setOverrideSubTab('tracking')}
-                style={{
-                  padding: '0.45rem 1rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 800,
-                  borderRadius: '8px',
-                  border: effectiveSubTab === 'tracking' ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
-                  background: effectiveSubTab === 'tracking' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
-                  color: effectiveSubTab === 'tracking' ? '#1d4ed8' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  transition: 'all 0.15s ease'
-                }}
+                className={`subtab-chip ${effectiveSubTab === 'tracking' ? 'active' : ''}`}
               >
                 <RefreshCw size={15} />
                 <span>🔄 Job Card Tracking</span>

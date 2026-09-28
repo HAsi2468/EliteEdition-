@@ -644,7 +644,7 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
               <img
                 src={directUrl}
                 alt="Preview"
-                style={{ height: '60px', width: '60px', objectFit: 'cover', borderRadius: '4px', background: '#000' }}
+                style={{ height: '60px', width: '60px', objectFit: 'cover', borderRadius: '4px', background: '#f8fafc', border: '1px solid #e2e8f0' }}
                 onError={(e) => {
                   e.target.style.display = 'none';
                   e.target.nextSibling.style.display = 'block';
@@ -1634,8 +1634,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                             }}
                             style={{
                               position: 'absolute', bottom: 6, right: 6, width: '38px', height: '38px',
-                              border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', overflow: 'hidden',
-                              background: '#000', cursor: 'pointer', zIndex: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                              border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden',
+                              background: '#ffffff', cursor: 'pointer', zIndex: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
                             }}
                             title="Click to view secondary image"
                           >

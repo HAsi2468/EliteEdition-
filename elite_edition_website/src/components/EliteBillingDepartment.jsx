@@ -13,6 +13,7 @@ import { triggerEliteAlert } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
 import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
+import QuickActionMenu from './common/QuickActionMenu';
 import * as XLSX from 'xlsx';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
@@ -2346,128 +2347,45 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </div>
           </div>
 
-          {/* Entry Buttons Top in Header */}
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setShowLedgerModal(true)}
-              style={{
-                padding: '0.45rem 0.95rem',
-                borderRadius: '8px',
-                background: '#ffffff',
-                color: '#0f172a',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                border: '1px solid #cbd5e1',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <BookOpen size={15} color="#059669" /> Ledger Reports
-            </button>
-            <button
-              onClick={() => {
+          {/* Consolidated Quick Action Menu */}
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+            <QuickActionMenu
+              onNewInvoice={() => handleOpenCreateTab()}
+              onNewChallan={handleOpenCreateChallan}
+              onExpenseEntry={() => {
                 setActiveTab('expense');
                 setAutoOpenExpenseModal(true);
               }}
-              style={{
-                padding: '0.45rem 0.95rem',
-                borderRadius: '8px',
-                background: '#ffffff',
-                color: '#0f172a',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                border: '1px solid #cbd5e1',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <PlusCircle size={15} color="#d97706" /> Expense Entry
-            </button>
-            <button
-              onClick={() => handleOpenCreateTab()}
-              style={{
-                padding: '0.48rem 1.1rem',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-                color: '#ffffff',
-                fontSize: '0.84rem',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <PlusCircle size={15} /> Create Invoice
-            </button>
-            <button
-              onClick={handleOpenCreateChallan}
-              style={{
-                padding: '0.48rem 1.1rem',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
-                color: '#ffffff',
-                fontSize: '0.84rem',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.25)',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Truck size={15} /> Create Challan
-            </button>
+              onLedgerReports={() => setShowLedgerModal(true)}
+            />
           </div>
         </div>
 
-        {/* Sub-Tabs Bar */}
-        <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem', overflowX: 'auto' }}>
-          {[
-            { id: 'challans', label: '🚚 Challan' },
-            { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
-            { id: 'costing', label: '📊 Costing' },
-            { id: 'purchase', label: '🛒 Purchase Invoices' },
-            ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice' }] : []),
-            { id: 'expense', label: '💰 Expenses & Ledger' },
-            { id: 'customers', label: `👥 Customers (${customers.length})` },
-            { id: 'items', label: `📦 Item (${itemsList.length})` }
-          ].map(t => {
-            const isActive = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                style={{
-                  padding: '0.45rem 1rem',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  border: isActive ? '1px solid #4f46e5' : '1px solid #cbd5e1',
-                  background: isActive ? '#4f46e5' : '#ffffff',
-                  color: isActive ? '#ffffff' : '#334155',
-                  boxShadow: isActive ? '0 2px 8px rgba(79, 70, 229, 0.3)' : '0 1px 2px rgba(0,0,0,0.03)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {t.label}
-              </button>
-            );
-          })}
+        {/* Sub-Tabs Non-Wrapping Swipe Track */}
+        <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem' }}>
+          <div className="subtabs-scroll-track">
+            {[
+              { id: 'challans', label: '🚚 Challan' },
+              { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
+              { id: 'costing', label: '📊 Costing' },
+              { id: 'purchase', label: '🛒 Purchase Invoices' },
+              ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice' }] : []),
+              { id: 'expense', label: '💰 Expenses & Ledger' },
+              { id: 'customers', label: `👥 Customers (${customers.length})` },
+              { id: 'items', label: `📦 Item (${itemsList.length})` }
+            ].map(t => {
+              const isActive = activeTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`subtab-chip ${isActive ? 'active' : ''}`}
+                >
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

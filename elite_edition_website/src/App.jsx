@@ -82,7 +82,9 @@ import {
   Sliders,
   Bot,
   Phone,
-  PhoneOff
+  PhoneOff,
+  Search,
+  MoreHorizontal
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -418,6 +420,7 @@ export default function App() {
     return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
   });
   const [showAiMeasurementModal, setShowAiMeasurementModal] = useState(false);
+  const [mobileHeaderMoreOpen, setMobileHeaderMoreOpen] = useState(false);
 
   const toggleSidebarCollapse = () => {
     setIsSidebarCollapsed(prev => {
@@ -1508,112 +1511,332 @@ export default function App() {
         </div>
 
         <div style={styles.headerRight} className="header-right-wrap">
-          <button
-            type="button"
-            onClick={() => setShowGlobalSearch(true)}
-            className="btn-secondary"
-            title="Global Search (Ctrl/Cmd+K)"
-            style={{
-              minHeight: '38px',
-              padding: '6px 12px',
-              fontSize: 'var(--font-size-meta, 0.75rem)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            <span>Search</span>
-            {!isMobile && (
-              <kbd style={{
-                fontSize: '10px',
-                background: '#f1f5f9',
-                color: '#475569',
-                padding: '1px 5px',
-                borderRadius: '4px',
-                border: '1px solid #cbd5e1'
-              }}>⌘K</kbd>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowAiMeasurementModal(true)}
-            className="btn-secondary"
-            title="AI Fabric Measurement Agent"
-            style={{
-              minHeight: '38px',
-              padding: '6px 12px',
-              fontSize: 'var(--font-size-meta, 0.75rem)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: '#1d4ed8',
-              borderColor: '#bfdbfe',
-              backgroundColor: '#eff6ff',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            <Sparkles size={14} color="#2563eb" />
-            <span>AI Measurement</span>
-          </button>
-
-          {deferredInstallPrompt && !isStandalone && (
-            <button
-              onClick={handleInstallClick}
-              className="btn-primary"
-              title="Install Elite ERP App"
-              style={{ minHeight: '38px', padding: '6px 14px', fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 600 }}
-            >
-              Install App
-            </button>
-          )}
-
-          <button
-            onClick={() => setShowNotificationDrawer(true)}
-            className="btn-secondary"
-            title="Notifications & Alerts"
-            style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
-          >
-            Alerts {unreadNotifCount > 0 ? `(${unreadNotifCount})` : ''}
-          </button>
-
-          <button
-            onClick={() => {
-              fetchData();
-              triggerGlobalDataRefresh();
-              if (typeof window !== 'undefined' && window.showToast) {
-                window.showToast('Data refreshed', 'info');
-              }
-            }}
-            className="btn-secondary"
-            title="Refresh data"
-            style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
-          >
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
-
-          {!isMobile && currentUser && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              paddingLeft: '8px'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 'var(--font-size-body, 0.875rem)', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>{currentUser.name}</span>
-                <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', color: 'var(--text-muted)' }}>{currentUser.role || 'user'}</span>
-              </div>
+          {isMobile ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
               <button
-                onClick={handleLogout}
+                type="button"
+                onClick={() => setShowGlobalSearch(true)}
+                className="btn-icon"
+                title="Global Search"
+                style={{
+                  minWidth: '36px',
+                  minHeight: '36px',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <Search size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAiMeasurementModal(true)}
+                className="btn-icon"
+                title="AI Fabric Measurement Agent"
+                style={{
+                  minWidth: '36px',
+                  minHeight: '36px',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: '1px solid #bfdbfe',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <Sparkles size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowNotificationDrawer(true)}
+                className="btn-icon"
+                title="Notifications & Alerts"
+                style={{
+                  minWidth: '36px',
+                  minHeight: '36px',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  cursor: 'pointer'
+                }}
+              >
+                <Bell size={18} />
+                {unreadNotifCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '4px',
+                    right: '4px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: '#ef4444'
+                  }} />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileHeaderMoreOpen(prev => !prev)}
+                className="btn-icon"
+                title="More Actions"
+                style={{
+                  minWidth: '36px',
+                  minHeight: '36px',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  background: mobileHeaderMoreOpen ? '#f1f5f9' : '#ffffff',
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <MoreHorizontal size={18} />
+              </button>
+
+              {mobileHeaderMoreOpen && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                    onClick={() => setMobileHeaderMoreOpen(false)}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      right: 0,
+                      width: '210px',
+                      background: '#ffffff',
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+                      zIndex: 1000,
+                      padding: '6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      animation: 'fadeInMenu 0.12s ease-out'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileHeaderMoreOpen(false);
+                        fetchData();
+                        triggerGlobalDataRefresh();
+                        if (typeof window !== 'undefined' && window.showToast) {
+                          window.showToast('Data refreshed', 'info');
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 10px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.82rem',
+                        fontWeight: 500,
+                        color: '#1e293b',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <RefreshCw size={15} />
+                      <span>{loading ? 'Refreshing...' : 'Refresh Data'}</span>
+                    </button>
+
+                    {deferredInstallPrompt && !isStandalone && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileHeaderMoreOpen(false);
+                          handleInstallClick();
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 10px',
+                          background: '#eff6ff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          color: '#2563eb',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <ShoppingBag size={15} />
+                        <span>Install App</span>
+                      </button>
+                    )}
+
+                    {currentUser && (
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '4px', marginTop: '2px' }}>
+                        <div style={{ padding: '6px 10px', fontSize: '0.74rem', color: '#64748b' }}>
+                          Signed in as <strong style={{ color: '#0f172a' }}>{currentUser.name}</strong>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileHeaderMoreOpen(false);
+                            handleLogout();
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 10px',
+                            background: 'transparent',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '0.82rem',
+                            fontWeight: 500,
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            width: '100%'
+                          }}
+                        >
+                          <LogOut size={15} />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowGlobalSearch(true)}
                 className="btn-secondary"
-                title="Sign Out"
+                title="Global Search (Ctrl/Cmd+K)"
+                style={{
+                  minHeight: '38px',
+                  padding: '6px 12px',
+                  fontSize: 'var(--font-size-meta, 0.75rem)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <span>Search</span>
+                <kbd style={{
+                  fontSize: '10px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  border: '1px solid #cbd5e1'
+                }}>⌘K</kbd>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAiMeasurementModal(true)}
+                className="btn-secondary"
+                title="AI Fabric Measurement Agent"
+                style={{
+                  minHeight: '38px',
+                  padding: '6px 12px',
+                  fontSize: 'var(--font-size-meta, 0.75rem)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: '#1d4ed8',
+                  borderColor: '#bfdbfe',
+                  backgroundColor: '#eff6ff',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <Sparkles size={14} color="#2563eb" />
+                <span>AI Measurement</span>
+              </button>
+
+              {deferredInstallPrompt && !isStandalone && (
+                <button
+                  onClick={handleInstallClick}
+                  className="btn-primary"
+                  title="Install Elite ERP App"
+                  style={{ minHeight: '38px', padding: '6px 14px', fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 600 }}
+                >
+                  Install App
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowNotificationDrawer(true)}
+                className="btn-secondary"
+                title="Notifications & Alerts"
                 style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
               >
-                Sign Out
+                Alerts {unreadNotifCount > 0 ? `(${unreadNotifCount})` : ''}
               </button>
-            </div>
+
+              <button
+                onClick={() => {
+                  fetchData();
+                  triggerGlobalDataRefresh();
+                  if (typeof window !== 'undefined' && window.showToast) {
+                    window.showToast('Data refreshed', 'info');
+                  }
+                }}
+                className="btn-secondary"
+                title="Refresh data"
+                style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </button>
+
+              {currentUser && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  paddingLeft: '8px'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: 'var(--font-size-body, 0.875rem)', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>{currentUser.name}</span>
+                    <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', color: 'var(--text-muted)' }}>{currentUser.role || 'user'}</span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="btn-secondary"
+                    title="Sign Out"
+                    style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </header>

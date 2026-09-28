@@ -852,6 +852,67 @@ tr:hover td {
   padding-right: 2px;
 }
 
+/* ─────────────────────────────────────────────────
+   Sub-Tabs Non-Wrapping Swipe Track & Pills
+───────────────────────────────────────────────── */
+.subtabs-scroll-track {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  gap: 8px !important;
+  padding: 6px 2px !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  overscroll-behavior-x: contain !important;
+  width: 100% !important;
+}
+
+.subtabs-scroll-track::-webkit-scrollbar {
+  display: none !important;
+}
+
+.subtab-chip {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  padding: 6px 14px !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  border-radius: 9999px !important;
+  border: 1px solid #E2E8F0 !important;
+  background: #FFFFFF !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease-in-out !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+}
+
+.subtab-chip:hover {
+  background: #F8FAFC !important;
+  color: #1E293B !important;
+  border-color: #CBD5E1 !important;
+}
+
+.subtab-chip.active {
+  background: #EFF6FF !important;
+  color: #1D4ED8 !important;
+  border-color: #BFDBFE !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 3px 0 rgba(37, 99, 235, 0.1) !important;
+}
+
+@keyframes fadeInMenu {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 .nav-link,
 .dept-switch-btn {
   width: 100%;
