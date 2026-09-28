@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check, Warehouse, SlidersHorizontal } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check, Warehouse, SlidersHorizontal, MapPin, Phone, User, Sparkles, CheckCircle2, Layers } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
@@ -491,11 +491,16 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
         <div style={styles.header}>
           <div style={styles.headerLeft}>
             <div style={styles.headerIconBadge}>
-              <Building2 size={20} color="#2563eb" />
+              <Warehouse size={22} color="#ffffff" />
             </div>
             <div>
-              <h2 style={styles.title}>Manager Control Panel</h2>
-              <p style={styles.subtitle}>Brands, Vendors, Parties & Storage Facility Management</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                <h2 style={styles.title}>Manager Control Panel</h2>
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '12px', border: '1px solid #bfdbfe', letterSpacing: '0.03em' }}>
+                  Master Directory
+                </span>
+              </div>
+              <p style={styles.subtitle}>Storage Facilities, Catalog Brands, Categories & Master Settings</p>
             </div>
           </div>
           <button type="button" onClick={handleModalClose} style={styles.closeBtn} title="Close Modal">
@@ -511,6 +516,18 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
         <div className="catalog-manager-layout" style={styles.layout}>
           {/* Left Navigation Tabs */}
           <nav className="catalog-manager-sidebar" style={styles.sidebar}>
+            <div style={{ padding: '0.2rem 0.5rem 0.6rem', fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Master Management
+            </div>
+            {context === 'elite_online' && (
+              <button
+                onClick={() => setActiveTab('facilities')}
+                style={{ ...styles.tabBtn, ...(activeTab === 'facilities' ? styles.tabBtnActive : {}) }}
+              >
+                <Warehouse size={16} />
+                <span>Storage Facilities</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('brands')}
               style={{ ...styles.tabBtn, ...(activeTab === 'brands' ? styles.tabBtnActive : {}) }}
@@ -539,15 +556,6 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
               >
                 <Users size={16} />
                 <span>Parties</span>
-              </button>
-            )}
-            {context === 'elite_online' && (
-              <button
-                onClick={() => setActiveTab('facilities')}
-                style={{ ...styles.tabBtn, ...(activeTab === 'facilities' ? styles.tabBtnActive : {}) }}
-              >
-                <Warehouse size={16} />
-                <span>Storage Facilities</span>
               </button>
             )}
             {context === 'elite_online' && (
@@ -1108,59 +1116,136 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                 {activeTab === 'facilities' && (
                   <div style={styles.tabContent}>
                     <form onSubmit={handleFacilitySubmit} style={styles.inlineForm}>
-                      <span style={styles.formTitle}>
-                        <Warehouse size={16} color="#2563eb" />
-                        {editingId ? 'Edit Storage Facility' : 'Add New Storage Facility'}
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <div style={{ width: 34, height: 34, borderRadius: '9px', background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                            <Warehouse size={18} />
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em', display: 'block' }}>
+                              {editingId ? 'Edit Storage Facility' : 'Add New Storage Facility'}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                              Configure warehouse locations, identification codes and default inward storage
+                            </span>
+                          </div>
+                        </div>
+                        {editingId && (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, background: '#fef3c7', color: '#b45309', padding: '3px 9px', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                            Editing Active Record
+                          </span>
+                        )}
+                      </div>
+
                       <div style={styles.formGrid}>
-                        <input
-                          type="text"
-                          placeholder="Facility / Godown Name (e.g. Pramukh Park, Godown 1) *"
-                          value={facilityForm.name}
-                          onChange={(e) => setFacilityForm({ ...facilityForm, name: e.target.value })}
-                          required
-                          style={styles.formInput}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Short Code (e.g. PP, W1)"
-                          value={facilityForm.code}
-                          onChange={(e) => setFacilityForm({ ...facilityForm, code: e.target.value.toUpperCase() })}
-                          style={styles.formInput}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Contact Person (Optional)"
-                          value={facilityForm.contactPerson}
-                          onChange={(e) => setFacilityForm({ ...facilityForm, contactPerson: e.target.value })}
-                          style={styles.formInput}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Phone / Mobile (Optional)"
-                          value={facilityForm.phone}
-                          onChange={(e) => setFacilityForm({ ...facilityForm, phone: e.target.value })}
-                          style={styles.formInput}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Full Address / Location (Optional)"
-                          value={facilityForm.address}
-                          onChange={(e) => setFacilityForm({ ...facilityForm, address: e.target.value })}
-                          style={{ ...styles.formInput, gridColumn: 'span 2' }}
-                        />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', gridColumn: 'span 2', marginTop: '0.2rem' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                        <div>
+                          <label style={styles.fieldLabel}>
+                            Facility / Godown Name *
+                          </label>
+                          <div style={styles.inputWrapper}>
+                            <Warehouse size={15} color="#94a3b8" style={styles.inputIcon} />
                             <input
-                              type="checkbox"
-                              checked={facilityForm.isDefault}
-                              onChange={(e) => setFacilityForm({ ...facilityForm, isDefault: e.target.checked })}
-                              style={{ width: '17px', height: '17px', cursor: 'pointer', accentColor: '#2563eb' }}
+                              type="text"
+                              placeholder="e.g. Pramukh Park Warehouse, Godown 1"
+                              value={facilityForm.name}
+                              onChange={(e) => setFacilityForm({ ...facilityForm, name: e.target.value })}
+                              required
+                              style={styles.iconFormInput}
                             />
-                            <span>Set as Default Facility for new stock inward</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={styles.fieldLabel}>
+                            Short Code
+                          </label>
+                          <div style={styles.inputWrapper}>
+                            <Tag size={15} color="#94a3b8" style={styles.inputIcon} />
+                            <input
+                              type="text"
+                              placeholder="e.g. PP, W1, MAIN"
+                              value={facilityForm.code}
+                              onChange={(e) => setFacilityForm({ ...facilityForm, code: e.target.value.toUpperCase() })}
+                              style={styles.iconFormInput}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={styles.fieldLabel}>
+                            Contact Person (Optional)
+                          </label>
+                          <div style={styles.inputWrapper}>
+                            <User size={15} color="#94a3b8" style={styles.inputIcon} />
+                            <input
+                              type="text"
+                              placeholder="e.g. Ramesh Patel"
+                              value={facilityForm.contactPerson}
+                              onChange={(e) => setFacilityForm({ ...facilityForm, contactPerson: e.target.value })}
+                              style={styles.iconFormInput}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={styles.fieldLabel}>
+                            Phone / Mobile (Optional)
+                          </label>
+                          <div style={styles.inputWrapper}>
+                            <Phone size={15} color="#94a3b8" style={styles.inputIcon} />
+                            <input
+                              type="text"
+                              placeholder="e.g. +91 98765 43210"
+                              value={facilityForm.phone}
+                              onChange={(e) => setFacilityForm({ ...facilityForm, phone: e.target.value })}
+                              style={styles.iconFormInput}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={styles.fieldLabel}>
+                            Full Address / Location (Optional)
+                          </label>
+                          <div style={styles.inputWrapper}>
+                            <MapPin size={15} color="#94a3b8" style={styles.inputIcon} />
+                            <input
+                              type="text"
+                              placeholder="e.g. Plot No. 42, GIDC Industrial Estate, Ring Road, Surat"
+                              value={facilityForm.address}
+                              onChange={(e) => setFacilityForm({ ...facilityForm, address: e.target.value })}
+                              style={styles.iconFormInput}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ gridColumn: 'span 2', marginTop: '0.2rem' }}>
+                          <label style={styles.checkboxBanner}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                              <input
+                                type="checkbox"
+                                checked={facilityForm.isDefault}
+                                onChange={(e) => setFacilityForm({ ...facilityForm, isDefault: e.target.checked })}
+                                style={styles.customCheckbox}
+                              />
+                              <div>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
+                                  Set as Default Storage Facility
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                  Automatically select this warehouse for all new incoming purchase challans and stock inwards
+                                </div>
+                              </div>
+                            </div>
+                            {facilityForm.isDefault && (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#059669', background: '#ecfdf5', padding: '2px 8px', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
+                                Selected as Default
+                              </span>
+                            )}
                           </label>
                         </div>
                       </div>
+
                       <div style={styles.formActions}>
                         {editingId && (
                           <button
@@ -1175,7 +1260,8 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                           </button>
                         )}
                         <button type="submit" style={styles.submitBtn}>
-                          <Save size={14} /> {editingId ? 'Update Facility' : 'Save Facility'}
+                          <Save size={15} />
+                          <span>{editingId ? 'Update Storage Facility' : 'Save Storage Facility'}</span>
                         </button>
                       </div>
                     </form>
@@ -1184,47 +1270,57 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       <table>
                         <thead>
                           <tr>
-                            <th>Facility Name</th>
-                            <th>Code</th>
-                            <th>Address</th>
-                            <th>Contact</th>
-                            <th className="text-center">Default</th>
-                            <th className="text-center">Actions</th>
+                            <th style={{ width: '25%' }}>FACILITY NAME</th>
+                            <th style={{ width: '12%' }}>CODE</th>
+                            <th style={{ width: '28%' }}>ADDRESS</th>
+                            <th style={{ width: '18%' }}>CONTACT</th>
+                            <th className="text-center" style={{ width: '10%' }}>DEFAULT</th>
+                            <th className="text-center" style={{ width: '7%' }}>ACTIONS</th>
                           </tr>
                         </thead>
                         <tbody>
                           {facilities.length === 0 ? (
                             <tr>
-                              <td colSpan="6" className="text-center" style={{ color: '#64748b', padding: '1.5rem' }}>No storage facilities configured.</td>
+                              <td colSpan="6" className="text-center" style={{ color: '#64748b', padding: '2.5rem 1rem' }}>
+                                <Warehouse size={32} color="#cbd5e1" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                                <div style={{ fontWeight: 700, color: '#334155', fontSize: '0.9rem' }}>No storage facilities configured</div>
+                                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Add your first warehouse or godown location above</div>
+                              </td>
                             </tr>
                           ) : (
                             facilities.map((fac) => (
                               <tr key={fac._id || fac.id}>
                                 <td style={{ fontWeight: '700', color: '#0f172a' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                                    <Warehouse size={15} color="#2563eb" />
-                                    <span>{fac.name}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: '7px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', flexShrink: 0 }}>
+                                      <Warehouse size={14} />
+                                    </div>
+                                    <span style={{ fontSize: '0.86rem', color: '#0f172a', fontWeight: 700 }}>{fac.name}</span>
                                   </div>
                                 </td>
                                 <td>
                                   {fac.code ? (
-                                    <span style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                    <span style={{ background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1', padding: '3px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.04em' }}>
                                       {fac.code}
                                     </span>
-                                  ) : '—'}
+                                  ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                                 </td>
-                                <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{fac.address || '—'}</td>
+                                <td style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.4 }}>{fac.address || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                                 <td style={{ fontSize: '0.82rem', color: '#334155' }}>
                                   {fac.contactPerson || fac.phone ? (
-                                    <span>{fac.contactPerson} {fac.phone && `(${fac.phone})`}</span>
-                                  ) : '—'}
+                                    <div>
+                                      {fac.contactPerson && <div style={{ fontWeight: 600, color: '#1e293b' }}>{fac.contactPerson}</div>}
+                                      {fac.phone && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{fac.phone}</div>}
+                                    </div>
+                                  ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                                 </td>
                                 <td className="text-center">
                                   {fac.isDefault ? (
-                                    <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '2px 9px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: '16px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
                                       Default
                                     </span>
-                                  ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                                  ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                                 </td>
                                 <td>
                                   <div style={styles.actionsCell}>
@@ -1268,6 +1364,7 @@ if (typeof document !== 'undefined') {
       .catalog-manager-container {
         background: #ffffff !important;
         color: #0f172a !important;
+        font-family: inherit !important;
       }
       .catalog-manager-container table {
         width: 100% !important;
@@ -1280,9 +1377,10 @@ if (typeof document !== 'undefined') {
       .catalog-manager-container table th {
         background: #f8fafc !important;
         color: #475569 !important;
-        font-weight: 700 !important;
-        font-size: 0.74rem !important;
-        padding: 0.7rem 0.85rem !important;
+        font-weight: 800 !important;
+        font-size: 0.72rem !important;
+        letter-spacing: 0.05em !important;
+        padding: 0.8rem 1rem !important;
         border-bottom: 1.5px solid #e2e8f0 !important;
         text-align: left !important;
       }
@@ -1290,14 +1388,17 @@ if (typeof document !== 'undefined') {
         text-align: center !important;
       }
       .catalog-manager-container table td {
-        padding: 0.7rem 0.85rem !important;
-        font-size: 0.84rem !important;
+        padding: 0.85rem 1rem !important;
+        font-size: 0.85rem !important;
         color: #1e293b !important;
         border-bottom: 1px solid #f1f5f9 !important;
         background: #ffffff !important;
       }
+      .catalog-manager-container table tr:last-child td {
+        border-bottom: none !important;
+      }
       .catalog-manager-container table tr:hover td {
-        background: #f0f7ff !important;
+        background: #f8fbff !important;
       }
       .catalog-manager-container input:focus {
         border-color: #2563eb !important;
@@ -1345,7 +1446,8 @@ const styles = {
     width: '100vw',
     height: '100vh',
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    backdropFilter: 'blur(5px)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
     zIndex: 99999,
     display: 'flex',
     alignItems: 'center',
@@ -1354,15 +1456,15 @@ const styles = {
     boxSizing: 'border-box',
   },
   content: {
-    width: '960px',
+    width: '1000px',
     maxWidth: '96vw',
     maxHeight: '92vh',
     height: 'auto',
     backgroundColor: '#ffffff',
     color: '#0f172a',
-    borderRadius: '18px',
-    border: '1px solid #dbeafe',
-    boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(37, 99, 235, 0.08)',
+    borderRadius: '20px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -1371,30 +1473,32 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '1.1rem 1.4rem',
-    background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)',
-    borderBottom: '1px solid #dbeafe',
+    padding: '1.2rem 1.6rem',
+    background: '#ffffff',
+    borderBottom: '1px solid #f1f5f9',
   },
   headerLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem',
+    gap: '0.85rem',
   },
   headerIconBadge: {
-    width: '38px',
-    height: '38px',
-    borderRadius: '10px',
-    background: '#dbeafe',
-    border: '1px solid #bfdbfe',
+    width: '42px',
+    height: '42px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#1d4ed8',
+    color: '#ffffff',
+    flexShrink: 0,
   },
   title: {
-    fontSize: '1.2rem',
+    fontSize: '1.25rem',
     fontWeight: '800',
-    color: '#1e3a8a',
+    color: '#0f172a',
+    letterSpacing: '-0.02em',
     margin: 0,
   },
   subtitle: {
@@ -1404,13 +1508,13 @@ const styles = {
     fontWeight: '500',
   },
   closeBtn: {
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    borderRadius: '8px',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
     color: '#64748b',
     cursor: 'pointer',
-    width: '32px',
-    height: '32px',
+    width: '34px',
+    height: '34px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1423,13 +1527,13 @@ const styles = {
     minHeight: 0,
   },
   sidebar: {
-    width: '210px',
+    width: '225px',
     display: 'flex',
     flexDirection: 'column',
     gap: '0.35rem',
     background: '#f8fafc',
     borderRight: '1px solid #e2e8f0',
-    padding: '1rem 0.75rem',
+    padding: '1.2rem 0.85rem',
     flexShrink: 0,
   },
   tabBtn: {
@@ -1437,8 +1541,8 @@ const styles = {
     border: 'none',
     display: 'flex',
     alignItems: 'center',
-    gap: '0.65rem',
-    padding: '0.7rem 0.9rem',
+    gap: '0.7rem',
+    padding: '0.68rem 0.9rem',
     width: '100%',
     textAlign: 'left',
     color: '#475569',
@@ -1452,7 +1556,7 @@ const styles = {
     background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     color: '#ffffff',
     fontWeight: '700',
-    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.28)',
+    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.28)',
   },
   mainArea: {
     flex: 1,
@@ -1460,9 +1564,9 @@ const styles = {
     flexDirection: 'column',
     overflowY: 'auto',
     maxHeight: 'calc(92vh - 75px)',
-    padding: '1.25rem 1.4rem',
+    padding: '1.4rem 1.6rem',
     background: '#ffffff',
-    gap: '1rem',
+    gap: '1.1rem',
   },
   tabContent: {
     display: 'flex',
@@ -1471,15 +1575,15 @@ const styles = {
     height: 'auto',
   },
   inlineForm: {
-    background: 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)',
-    border: '1.5px solid #bfdbfe',
-    borderRadius: '14px',
-    padding: '1.15rem 1.25rem',
+    background: '#ffffff',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '1.25rem 1.4rem',
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.85rem',
+    gap: '0.95rem',
     flexShrink: 0,
-    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)',
+    boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
   },
   formTitle: {
     fontSize: '0.85rem',
@@ -1492,17 +1596,66 @@ const styles = {
     alignItems: 'center',
     gap: '0.45rem',
   },
+  fieldLabel: {
+    display: 'block',
+    fontSize: '0.74rem',
+    fontWeight: 700,
+    color: '#334155',
+    marginBottom: '5px',
+    letterSpacing: '-0.01em',
+  },
+  inputWrapper: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: '11px',
+    pointerEvents: 'none',
+  },
+  iconFormInput: {
+    width: '100%',
+    padding: '0.62rem 0.85rem 0.62rem 2.2rem',
+    fontSize: '0.84rem',
+    fontFamily: 'inherit',
+    borderRadius: '10px',
+    border: '1.5px solid #cbd5e1',
+    background: '#ffffff',
+    color: '#0f172a',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'all 0.15s ease',
+  },
+  checkboxBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    background: '#f8fafc',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '0.85rem 1.1rem',
+    cursor: 'pointer',
+    transition: 'border-color 0.15s ease',
+  },
+  customCheckbox: {
+    width: '18px',
+    height: '18px',
+    cursor: 'pointer',
+    accentColor: '#2563eb',
+    flexShrink: 0,
+  },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '0.75rem',
+    gap: '0.85rem',
   },
   formInput: {
     width: '100%',
-    padding: '0.6rem 0.85rem',
-    fontSize: '0.85rem',
+    padding: '0.62rem 0.85rem',
+    fontSize: '0.84rem',
     fontFamily: 'inherit',
-    borderRadius: '8px',
+    borderRadius: '10px',
     border: '1.5px solid #cbd5e1',
     background: '#ffffff',
     color: '#0f172a',
@@ -1513,66 +1666,72 @@ const styles = {
   formActions: {
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: '0.6rem',
-    marginTop: '0.25rem',
+    gap: '0.65rem',
+    marginTop: '0.35rem',
   },
   submitBtn: {
-    padding: '0.6rem 1.25rem',
-    fontSize: '0.84rem',
+    padding: '0.65rem 1.4rem',
+    fontSize: '0.85rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.4rem',
-    borderRadius: '8px',
+    gap: '0.45rem',
+    borderRadius: '10px',
     cursor: 'pointer',
     background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.28)',
+    transition: 'all 0.15s ease',
   },
   cancelBtn: {
-    padding: '0.6rem 1rem',
-    fontSize: '0.82rem',
+    padding: '0.65rem 1.15rem',
+    fontSize: '0.84rem',
     fontWeight: 600,
-    borderRadius: '8px',
+    borderRadius: '10px',
     cursor: 'pointer',
     background: '#ffffff',
     border: '1.5px solid #cbd5e1',
     color: '#475569',
+    transition: 'all 0.15s ease',
   },
   tableWrap: {
     overflowY: 'auto',
-    borderRadius: '12px',
+    borderRadius: '14px',
     border: '1px solid #e2e8f0',
     background: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
   },
   actionsCell: {
     display: 'flex',
-    gap: '0.4rem',
+    gap: '0.45rem',
     justifyContent: 'center',
   },
   editBtn: {
     background: '#eff6ff',
     border: '1px solid #bfdbfe',
     color: '#2563eb',
-    padding: '0.35rem 0.5rem',
-    borderRadius: '6px',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    transition: 'all 0.15s ease',
   },
   trashBtn: {
     background: '#fef2f2',
     border: '1px solid #fecaca',
     color: '#dc2626',
-    padding: '0.35rem 0.5rem',
-    borderRadius: '6px',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    transition: 'all 0.15s ease',
   },
   catalogCtrl: {
     display: 'flex',
@@ -1580,8 +1739,8 @@ const styles = {
     flexShrink: 0,
   },
   syncBtn: {
-    padding: '0.55rem 1.1rem',
-    fontSize: '0.82rem',
+    padding: '0.6rem 1.2rem',
+    fontSize: '0.84rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
@@ -1589,16 +1748,17 @@ const styles = {
     background: '#eff6ff',
     color: '#2563eb',
     border: '1.5px solid #bfdbfe',
-    borderRadius: '8px',
+    borderRadius: '10px',
     cursor: 'pointer',
+    transition: 'all 0.15s ease',
   },
   skuText: {
     fontFamily: 'monospace',
     fontSize: '0.78rem',
     color: '#1d4ed8',
     background: '#eff6ff',
-    padding: '0.15rem 0.4rem',
-    borderRadius: '4px',
+    padding: '0.2rem 0.45rem',
+    borderRadius: '6px',
     border: '1px solid #bfdbfe',
     fontWeight: '700',
   },
@@ -1606,32 +1766,32 @@ const styles = {
     fontSize: '0.72rem',
     color: '#1e40af',
     background: '#eff6ff',
-    padding: '0.1rem 0.35rem',
-    borderRadius: '4px',
+    padding: '0.15rem 0.4rem',
+    borderRadius: '6px',
     border: '1px solid #dbeafe',
     fontWeight: '600',
   },
   error: {
     background: '#fef2f2',
     border: '1px solid #fecaca',
-    borderRadius: '8px',
-    padding: '0.6rem 0.85rem',
+    borderRadius: '10px',
+    padding: '0.65rem 0.95rem',
     color: '#dc2626',
     fontSize: '0.82rem',
     fontWeight: '600',
     flexShrink: 0,
-    margin: '0.5rem 1.4rem 0',
+    margin: '0.5rem 1.6rem 0',
   },
   success: {
     background: '#f0fdf4',
     border: '1px solid #bbf7d0',
-    borderRadius: '8px',
-    padding: '0.6rem 0.85rem',
+    borderRadius: '10px',
+    padding: '0.65rem 0.95rem',
     color: '#16a34a',
     fontSize: '0.82rem',
     fontWeight: '600',
     flexShrink: 0,
-    margin: '0.5rem 1.4rem 0',
+    margin: '0.5rem 1.6rem 0',
   },
   loaderBox: {
     display: 'flex',
