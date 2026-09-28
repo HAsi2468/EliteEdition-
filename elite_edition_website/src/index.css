@@ -34,31 +34,33 @@
   --font-size-body: 0.9375rem;  /* 15px */
   --font-size-title: 1.125rem;  /* 18px */
 
-  /* Palette: Minimal neutral surfaces */
-  --bg-main:        #f8fafc;
-  --bg-card:        #ffffff;
-  --bg-card-hover:  #f1f5f9;
+  /* Palette: Clean White & Professional Blue Surfaces */
+  --bg-main:        #f8fafc;    /* Slate-50 canvas */
+  --bg-card:        #ffffff;    /* Pure White container */
+  --bg-card-hover:  #eff6ff;    /* Soft blue hover */
   --bg-surface:     #f8fafc;
   --bg-input:       #ffffff;
-  --bg-th:          #f8fafc;
+  --bg-th:          #f1f5f9;
   --bg-modal:       #ffffff;
 
-  --text-primary:   #0f172a;
-  --text-secondary: #334155;
-  --text-muted:     #64748b;
+  --text-primary:   #0f172a;    /* Slate-900 high contrast */
+  --text-secondary: #334155;    /* Slate-700 */
+  --text-muted:     #64748b;    /* Slate-500 secondary labels */
   --text-table:     #0f172a;
 
-  --border-color:   #e2e8f0;
+  --border-color:   #e2e8f0;    /* Crisp 1px solid slate-200 */
   --border-light:   #e2e8f0;
-  --border-focus:   #0f172a;
+  --border-focus:   #2563eb;    /* Vibrant Royal Blue focus */
 
-  /* Primary Brand Accent */
-  --primary:        #0f172a;
-  --primary-dark:   #1e293b;
-  --primary-glow:   transparent;
+  /* Brand & Action Blues */
+  --primary:        #2563eb;    /* Professional Royal Blue */
+  --primary-hover:  #1d4ed8;    /* Deep Cobalt Blue 700 */
+  --primary-dark:   #1e40af;    /* Midnight Blue 800 */
+  --primary-subtle: #eff6ff;    /* Ice Blue 50 */
+  --primary-glow:   rgba(37, 99, 235, 0.15);
   --secondary:      #64748b;
 
-  /* Status Colors (Plain text/pills) */
+  /* Status Colors */
   --success:        #10b981;
   --success-bg:     #ecfdf5;
   --success-text:   #065f46;
@@ -79,10 +81,10 @@
   --info-text:      #075985;
   --info-border:    #bae6fd;
 
-  /* Zero Shadows Rule: No heavy shadows or gradients */
-  --shadow-sm:      none;
-  --shadow-md:      none;
-  --shadow-lg:      none;
+  /* Subtle Crisp Shadows */
+  --shadow-sm:      0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md:      0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg:      0 10px 15px -3px rgba(37, 99, 235, 0.08);
   --shadow-glow:    none;
 
   /* Geometry & Radii */
@@ -99,8 +101,9 @@
   --scrollbar-thumb: #cbd5e1;
   --scrollbar-hover: #94a3b8;
 
-  --nav-active-bg:   #f1f5f9;
-  --nav-active-border: #0f172a;
+  --nav-active-bg:     #eff6ff;
+  --nav-active-border: #2563eb;
+  --nav-active-text:   #1d4ed8;
 
   /* Safe Area Tokens */
   --sat: env(safe-area-inset-top, 0px);
@@ -110,38 +113,37 @@
 }
 
 /* ─────────────────────────────────────────────────
-   Reset & Base Layout (100dvh, Safe Areas, No Horizontal Scroll)
+   Reset & Root Viewport Lock (No Scroll Trapping)
 ───────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  max-width: 100%;
 }
 
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+html, body, #root, #app {
   height: 100%;
-  overflow-x: hidden;
+  height: 100dvh; /* Dynamic viewport height to prevent mobile browser URL bar jump */
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  color-scheme: light;
 }
 
 body {
-  font-family: var(--font-family);
-  background-color: var(--bg-main);
-  color: var(--text-primary);
-  min-height: 100dvh;
   line-height: 1.5;
-  overflow-x: hidden;
   background-image: none;
-  -webkit-font-smoothing: antialiased;
-  padding-top: var(--sat);
-  padding-bottom: var(--sab);
-  padding-left: var(--sal);
-  padding-right: var(--sar);
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  color-scheme: light;
 }
 
 /* Skeleton Pulse Shimmer */
@@ -779,27 +781,86 @@ tr:hover td {
 /* ─────────────────────────────────────────────────
    Navigation: Desktop Sidebar & Mobile Topbar/Drawer
 ───────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────
+   Application Shell & Strict Viewport Layout Hierarchy
+───────────────────────────────────────────────── */
+.app-container {
+  height: 100% !important;
+  height: 100dvh !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  background-color: var(--bg-main) !important;
+}
+
+.app-header {
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  flex-shrink: 0 !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  box-sizing: border-box !important;
+  z-index: 100 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 16px !important;
+}
+
+.main-layout-container {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: calc(100dvh - 56px) !important;
+  display: flex !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  gap: 12px !important;
+  padding: 12px 16px !important;
+  box-sizing: border-box !important;
+  background: var(--bg-main) !important;
+}
+
 .sidebar-wrap {
-  width: 220px !important;
-  flex-shrink: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex-shrink: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-sm) !important;
+  -webkit-overflow-scrolling: touch !important;
+  transition: width 150ms ease !important;
+}
+
+.main-layout-container > section,
+.content-area-wrap {
+  flex: 1 !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding-right: 2px;
 }
 
 .nav-link,
 .dept-switch-btn {
   width: 100%;
-  min-height: 44px;
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 8px 12px;
   border-radius: var(--radius);
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--font-size-body);
   font-weight: 500;
   text-align: left;
@@ -814,32 +875,33 @@ tr:hover td {
 .nav-link:hover,
 .dept-switch-btn:hover {
   background: var(--bg-card-hover);
-  color: var(--text-primary);
+  color: var(--primary);
 }
 
 .nav-link.active,
 .dept-switch-btn.active {
-  background: var(--primary) !important;
-  color: #ffffff !important;
-  font-weight: 600;
+  background: var(--nav-active-bg, #eff6ff) !important;
+  color: var(--nav-active-text, #1d4ed8) !important;
+  border-left: 3px solid var(--nav-active-border, #2563eb) !important;
+  font-weight: 700 !important;
 }
 
 .nav-section-header {
   font-size: var(--font-size-meta);
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
-  padding: 10px 12px 4px 12px;
-  margin-top: 8px;
+  padding: 8px 10px 4px 10px;
+  margin-top: 6px;
   border-bottom: 1px solid var(--border-color);
 }
 
 /* Mobile Header & Drawer */
 .mobile-menu-toggle {
   display: none;
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 40px;
+  min-width: 40px;
   background: transparent;
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -860,11 +922,15 @@ tr:hover td {
     display: none !important;
   }
   .app-header {
-    padding: 8px 12px !important;
+    height: 52px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+    padding: 0 12px !important;
   }
-  .app-container {
-    padding: 12px !important;
-    gap: 12px !important;
+  .main-layout-container {
+    height: calc(100dvh - 52px) !important;
+    padding: 8px 10px !important;
+    gap: 0 !important;
   }
 }
 

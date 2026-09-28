@@ -311,5 +311,174 @@ function processSmartLocalNlp(text) {
   };
 }
 
+// POST /v1/ai/calculate-measurement - AI Textile Production Measurement Agent
+router.post('/calculate-measurement', async (req, res) => {
+  try {
+    const {
+      inputMeters = 100,
+      fabricQuality = 'French Crepe',
+      panna = '58"',
+      temp = 205,
+      speed = 80,
+      garmentType = 'Kurti',
+      customPieceMeters = null,
+      costPerMeter = null,
+      userPrompt = ''
+    } = req.body;
+
+    const metersIn = Math.max(0, parseFloat(inputMeters) || 0);
+    const fabricStr = String(fabricQuality || '').trim();
+    const pannaNum = parseInt(String(panna).replace(/\D/g, '')) || 58;
+
+    // 1. Fabric-Specific Shrinkage & Handling Parameters
+    const fLower = fabricStr.toLowerCase();
+    let shrinkagePct = 3.0;
+    let recTemp = '205°C';
+    let recSpeed = '80 m/min';
+    let fabricCategory = 'Polyester Base';
+
+    if (fLower.includes('crepe') || fLower.includes('french')) {
+      shrinkagePct = 3.5;
+      recTemp = '210°C';
+      recSpeed = '80 m/min';
+      fabricCategory = 'Poly Crepe';
+    } else if (fLower.includes('organza')) {
+      shrinkagePct = 1.8;
+      recTemp = '195°C';
+      recSpeed = '80 m/min';
+      fabricCategory = 'Sheer Organza (Anti-Shrink)';
+    } else if (fLower.includes('georgette') || fLower.includes('chiffon')) {
+      shrinkagePct = 4.0;
+      recTemp = '200°C';
+      recSpeed = '80 m/min';
+      fabricCategory = 'Lightweight Georgette';
+    } else if (fLower.includes('satin')) {
+      shrinkagePct = 2.2;
+      recTemp = '205°C';
+      recSpeed = '80 m/min';
+      fabricCategory = 'High-Gloss Satin';
+    } else if (fLower.includes('rayon') || fLower.includes('viscose') || fLower.includes('modal')) {
+      shrinkagePct = 5.2;
+      recTemp = '190°C';
+      recSpeed = '76 m/min';
+      fabricCategory = 'Cellulosic / Poly Rayon';
+    } else if (fLower.includes('linen') || fLower.includes('kohinoor')) {
+      shrinkagePct = 4.5;
+      recTemp = '200°C';
+      recSpeed = '78 m/min';
+      fabricCategory = 'Kohinoor Linen Blend';
+    } else if (fLower.includes('velvet') || fLower.includes('heavy')) {
+      shrinkagePct = 3.0;
+      recTemp = '205°C';
+      recSpeed = '70 m/min';
+      fabricCategory = 'Heavy Velvet Pile';
+    }
+
+    // 2. Mathematical Production Calculations
+    const trimLossPct = 1.5; // Lead-in and tail-end roll trimming
+    const shrinkageMeters = Number(((metersIn * shrinkagePct) / 100).toFixed(2));
+    const trimmingMeters = Number(((metersIn * trimLossPct) / 100).toFixed(2));
+    const totalWastageMeters = Number((shrinkageMeters + trimmingMeters).toFixed(2));
+    const netOutputMeters = Number(Math.max(0, metersIn - totalWastageMeters).toFixed(2));
+    const efficiencyPct = metersIn > 0 ? Number(((netOutputMeters / metersIn) * 100).toFixed(1)) : 0;
+
+    // 3. Garment Yield Calculations (Panna-Adjusted)
+    let pieceLength = 0;
+    if (customPieceMeters && parseFloat(customPieceMeters) > 0) {
+      pieceLength = parseFloat(customPieceMeters);
+    } else {
+      const gLower = String(garmentType || 'Kurti').toLowerCase();
+      if (gLower.includes('kurti')) {
+        pieceLength = pannaNum >= 56 ? 1.75 : pannaNum >= 46 ? 2.00 : 2.25;
+      } else if (gLower.includes('saree')) {
+        pieceLength = 5.50;
+      } else if (gLower.includes('dupatta')) {
+        pieceLength = 2.40;
+      } else if (gLower.includes('gown') || gLower.includes('anarkali')) {
+        pieceLength = pannaNum >= 56 ? 3.00 : 3.75;
+      } else if (gLower.includes('top') || gLower.includes('tunic')) {
+        pieceLength = pannaNum >= 56 ? 1.35 : 1.75;
+      } else if (gLower.includes('co-ord') || gLower.includes('suit')) {
+        pieceLength = pannaNum >= 56 ? 3.20 : 4.00;
+      } else {
+        pieceLength = 2.00;
+      }
+    }
+
+    const expectedPieces = pieceLength > 0 ? Math.floor(netOutputMeters / pieceLength) : 0;
+    const remnantMeters = pieceLength > 0 ? Number((netOutputMeters - (expectedPieces * pieceLength)).toFixed(2)) : 0;
+
+    // Costing (optional)
+    let costing = null;
+    const ratePerMtr = parseFloat(costPerMeter);
+    if (!isNaN(ratePerMtr) && ratePerMtr > 0) {
+      const totalRawCost = Number((metersIn * ratePerMtr).toFixed(2));
+      const effectiveCostPerFreshMtr = netOutputMeters > 0 ? Number((totalRawCost / netOutputMeters).toFixed(2)) : ratePerMtr;
+      const fabricCostPerPiece = expectedPieces > 0 ? Number((totalRawCost / expectedPieces).toFixed(2)) : 0;
+      costing = {
+        ratePerMtr,
+        totalRawCost,
+        effectiveCostPerFreshMtr,
+        fabricCostPerPiece
+      };
+    }
+
+    // 4. AI-Enhanced Engineering Advice & Output Summary
+    let aiAdvice = `For ${fabricStr || 'Poly'} at ${pannaNum}" panna: Thermal sublimation shrinkage is calibrated at ${shrinkagePct}% with a 1.5% edge/tail allowance. Maintaining cylinder pressure and feed tension will optimize output to ${netOutputMeters} fresh meters.`;
+
+    if (genAI) {
+      try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const aiPrompt = `You are a Senior Textile Production Engineer at Elite Digital Prints.
+Inputs:
+- Fabric: ${fabricStr} (${fabricCategory})
+- Width (Panna): ${pannaNum} inches
+- Raw Roll Meters: ${metersIn} meters
+- Calculated Net Fresh Output: ${netOutputMeters} meters (Shrinkage: ${shrinkagePct}%, Trimming: ${trimLossPct}%)
+- Garment Type: ${garmentType} (Fabric per piece: ${pieceLength}m, Yield: ${expectedPieces} pieces, Remnant: ${remnantMeters}m)
+${userPrompt ? `- User Query / Instructions: "${userPrompt}"` : ''}
+
+Provide a concise, professional 2-sentence shop-floor advisory on machine settings (speed/temperature), fabric handling tips to minimize shrinkage, and pattern cutting efficiency. Do not use markdown headers or bullet points.`;
+
+        const result = await model.generateContent(aiPrompt);
+        const text = result?.response?.text();
+        if (text && text.trim()) {
+          aiAdvice = text.trim();
+        }
+      } catch (aiErr) {
+        console.warn('Gemini AI Measurement generation fallback:', aiErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      calculation: {
+        inputMeters: metersIn,
+        fabric: fabricStr,
+        fabricCategory,
+        panna: `${pannaNum}"`,
+        recommendedTemp: recTemp,
+        recommendedSpeed: recSpeed,
+        shrinkagePct,
+        trimLossPct,
+        shrinkageMeters,
+        trimmingMeters,
+        totalWastageMeters,
+        netOutputMeters,
+        efficiencyPct,
+        garmentType,
+        pieceLengthMeters: pieceLength,
+        expectedPieces,
+        remnantMeters,
+        costing,
+        aiAdvice
+      }
+    });
+  } catch (err) {
+    console.error('Error in /v1/ai/calculate-measurement:', err);
+    return res.status(500).json({ error: 'Failed to calculate measurements: ' + err.message });
+  }
+});
+
 module.exports = router;
 

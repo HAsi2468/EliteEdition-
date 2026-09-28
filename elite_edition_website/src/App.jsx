@@ -38,6 +38,7 @@ const DesignerScreen = lazy(() => import('./components/DesignerScreen'));
 
 import EliteModalDialog from './components/EliteModalDialog';
 import AutoUpdateNotification from './components/AutoUpdateNotification';
+import AIMeasurementAgentModal from './components/common/AIMeasurementAgentModal';
 import { matchSkuOrBrandCode } from './utils/skuHelper';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
 import { 
@@ -413,8 +414,10 @@ export default function App() {
   const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
-    return saved === null ? true : saved === 'true';
+    if (saved !== null) return saved === 'true';
+    return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
   });
+  const [showAiMeasurementModal, setShowAiMeasurementModal] = useState(false);
 
   const toggleSidebarCollapse = () => {
     setIsSidebarCollapsed(prev => {
@@ -1533,6 +1536,29 @@ export default function App() {
             )}
           </button>
 
+          <button
+            type="button"
+            onClick={() => setShowAiMeasurementModal(true)}
+            className="btn-secondary"
+            title="AI Fabric Measurement Agent"
+            style={{
+              minHeight: '38px',
+              padding: '6px 12px',
+              fontSize: 'var(--font-size-meta, 0.75rem)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: '#1d4ed8',
+              borderColor: '#bfdbfe',
+              backgroundColor: '#eff6ff',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <Sparkles size={14} color="#2563eb" />
+            <span>AI Measurement</span>
+          </button>
+
           {deferredInstallPrompt && !isStandalone && (
             <button
               onClick={handleInstallClick}
@@ -1848,33 +1874,27 @@ export default function App() {
         {/* Left Navigation Sidebar */}
         <aside
           style={{
-            width: isSidebarCollapsed ? '64px' : '200px',
+            width: isSidebarCollapsed ? '68px' : '230px',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
-            position: 'sticky',
-            top: '62px',
-            alignSelf: 'flex-start',
-            maxHeight: 'calc(100vh - 74px)',
-            overflowY: 'auto',
-            transition: 'width 150ms ease',
-            zIndex: 90
+            transition: 'width 150ms ease'
           }}
           className="sidebar-wrap"
         >
-          <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px', background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+          <div style={{ padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {/* Collapse / Expand Toggle Button Header */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-              padding: '4px 8px',
+              padding: '6px 8px',
               borderBottom: '1px solid var(--border-color)',
               marginBottom: '4px'
             }}>
               {!isSidebarCollapsed && (
-                <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>
                   Menu
                 </span>
               )}
@@ -1913,43 +1933,43 @@ export default function App() {
                       onClick={() => handleNavClick(tabKey)}
                       title={label}
                       style={{
-                        background: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                        background: isActive ? '#eff6ff' : 'transparent',
                         border: 'none',
                         width: '100%',
-                        padding: '0.55rem 0.2rem',
+                        padding: '8px 4px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '3px',
-                        borderRadius: '10px',
-                        color: isActive ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
+                        borderRadius: '6px',
+                        color: isActive ? '#1d4ed8' : '#64748b',
                         cursor: 'pointer',
                         textAlign: 'center',
                         transition: 'all 0.15s ease',
-                        borderLeft: isActive ? '3.5px solid var(--primary, #6366f1)' : '3.5px solid transparent',
+                        borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent',
                         position: 'relative'
                       }}
                       onMouseEnter={e => {
-                        if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                        if (!isActive) e.currentTarget.style.background = '#f8fafc';
                       }}
                       onMouseLeave={e => {
                         if (!isActive) e.currentTarget.style.background = 'transparent';
                       }}
                     >
                       <NavIcon
-                        size={22}
-                        color={customColor || (isActive ? 'var(--primary)' : undefined)}
+                        size={20}
+                        color={customColor || (isActive ? '#2563eb' : '#64748b')}
                         style={{ flexShrink: 0 }}
                       />
                       <span
                         style={{
-                          fontSize: '0.67rem',
-                          fontWeight: isActive ? 800 : 600,
+                          fontSize: '0.66rem',
+                          fontWeight: isActive ? 700 : 500,
                           lineHeight: 1.15,
-                          color: isActive ? 'var(--primary, #6366f1)' : 'var(--text-muted, #94a3b8)',
+                          color: isActive ? '#1d4ed8' : '#64748b',
                           wordBreak: 'break-word',
-                          maxWidth: '72px',
+                          maxWidth: '64px',
                           textAlign: 'center'
                         }}
                       >
@@ -1966,27 +1986,33 @@ export default function App() {
                     onClick={() => handleNavClick(tabKey)}
                     title={label}
                     style={{
-                      background: isActive ? 'var(--nav-active-bg, rgba(99,102,241,0.12))' : 'none',
+                      background: isActive ? '#eff6ff' : 'transparent',
                       border: 'none',
                       width: '100%',
-                      padding: '0.75rem 0.9rem',
+                      padding: '8px 12px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'flex-start',
-                      gap: '0.75rem',
-                      borderRadius: 'var(--radius-sm, 8px)',
-                      color: isActive ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
-                      fontSize: '0.88rem',
+                      gap: '10px',
+                      borderRadius: '6px',
+                      color: isActive ? '#1d4ed8' : '#334155',
+                      fontSize: '0.86rem',
                       fontWeight: isActive ? '700' : '500',
                       cursor: 'pointer',
                       textAlign: 'left',
                       transition: 'all 0.15s ease',
-                      borderLeft: isActive ? '3px solid var(--nav-active-border, #6366f1)' : '3px solid transparent',
+                      borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden'
                     }}
+                    onMouseEnter={e => {
+                      if (!isActive) e.currentTarget.style.background = '#f8fafc';
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive) e.currentTarget.style.background = 'transparent';
+                    }}
                   >
-                    <NavIcon size={18} color={customColor || (isActive ? 'var(--primary)' : undefined)} style={{ flexShrink: 0 }} />
+                    <NavIcon size={17} color={customColor || (isActive ? '#2563eb' : '#64748b')} style={{ flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
                   </button>
                 );
@@ -2198,30 +2224,30 @@ export default function App() {
                   onClick={() => handleNavClick('admin')}
                   title="Admin Panel"
                   style={{
-                    background: activeTab === 'admin' ? 'var(--nav-active-bg, rgba(99,102,241,0.12))' : 'none',
+                    background: activeTab === 'admin' ? '#eff6ff' : 'transparent',
                     border: 'none',
                     width: '100%',
-                    padding: '0.75rem 0.9rem',
+                    padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'flex-start',
-                    gap: '0.75rem',
-                    borderRadius: 'var(--radius-sm, 8px)',
-                    color: activeTab === 'admin' ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
-                    fontSize: '0.88rem',
+                    gap: '10px',
+                    borderRadius: '6px',
+                    color: activeTab === 'admin' ? '#1d4ed8' : '#334155',
+                    fontSize: '0.86rem',
                     fontWeight: activeTab === 'admin' ? '700' : '500',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.15s ease',
-                    borderLeft: activeTab === 'admin' ? '3px solid var(--nav-active-border, #6366f1)' : '3px solid transparent',
-                    borderTop: '1px solid var(--border-light)',
+                    borderLeft: activeTab === 'admin' ? '3px solid #2563eb' : '3px solid transparent',
+                    borderTop: '1px solid var(--border-color)',
                     marginTop: '0.5rem',
                     paddingTop: '0.75rem',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden'
                   }}
                 >
-                  <ShieldAlert size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
+                  <ShieldAlert size={17} color={activeTab === 'admin' ? '#2563eb' : '#64748b'} style={{ flexShrink: 0 }} />
                   <span>Admin Panel</span>
                 </button>
               )
@@ -2837,6 +2863,12 @@ export default function App() {
 
       {/* Global Elite Glassmorphic Modal Dialog */}
       <EliteModalDialog />
+
+      {/* AI Textile Production Measurement Agent Modal */}
+      <AIMeasurementAgentModal
+        isOpen={showAiMeasurementModal}
+        onClose={() => setShowAiMeasurementModal(false)}
+      />
 
       {/* Zero-Hard-Refresh Hot Update Notification */}
       <AutoUpdateNotification />

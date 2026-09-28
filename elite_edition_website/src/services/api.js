@@ -2216,6 +2216,14 @@ export const api = {
     });
   },
 
+  // AI Production Measurement Calculation Agent
+  async calculateAiMeasurement(payload) {
+    return request('/ai/calculate-measurement', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
   // ── Task Management Module (TaskOPad) Endpoints ──
   async getTasks(params = {}) {
     const queryParams = new URLSearchParams();

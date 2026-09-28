@@ -12,6 +12,7 @@ import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import AIMeasurementAgentModal from './common/AIMeasurementAgentModal';
 import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
@@ -139,6 +140,7 @@ export default function FusingDepartment() {
 
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showFusingAiModal, setShowFusingAiModal] = useState(false);
 
   // Form State for Fusing Production & Wastage Entry Modal (Edit Card)
   const [showFormModal, setShowFormModal] = useState(false);
@@ -1209,6 +1211,27 @@ export default function FusingDepartment() {
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
+              onClick={() => setShowFusingAiModal(true)}
+              title="Calculate fabric shrinkage & net meters with AI"
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '5px 12px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#1d4ed8',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <Sparkles size={14} color="#2563eb" />
+              <span>AI Measurement</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setIsFormExpanded(prev => !prev)}
               style={{
                 background: '#f1f5f9',
@@ -2257,17 +2280,50 @@ export default function FusingDepartment() {
 
                     {/* Card Body */}
                     <div className="fusing-card-body">
-                      <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>
-                      
-                      <div className="fusing-card-design-text">
-                        <strong style={{ color: 'var(--ee-fusing-brand-navy)' }}>{c.designName || c.designNo || '—'}</strong>
-                        <span>•</span>
-                        <span>{c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}</span>
-                        {c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done' && (
-                          <span style={{ padding: '1px 5px', borderRadius: 4, background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', fontSize: '0.68rem', fontWeight: 800 }}>
-                            ⚡ Print Ready
-                          </span>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        {(c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo) && (
+                          <div
+                            style={{
+                              width: '56px',
+                              height: '56px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                              background: '#f8fafc',
+                              border: '1px solid var(--ee-fusing-border)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <img
+                              src={c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo}
+                              alt={c.designName || 'Design'}
+                              loading="lazy"
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                aspectRatio: '1 / 1',
+                                display: 'block'
+                              }}
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          </div>
                         )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>
+                          <div className="fusing-card-design-text" style={{ marginTop: '2px' }}>
+                            <strong style={{ color: 'var(--ee-fusing-brand-navy)' }}>{c.designName || c.designNo || '—'}</strong>
+                            <span>•</span>
+                            <span>{c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}</span>
+                            {c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done' && (
+                              <span style={{ padding: '1px 5px', borderRadius: 4, background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', fontSize: '0.68rem', fontWeight: 800 }}>
+                                ⚡ Print Ready
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       {/* Fresh Output vs Wastage Grid */}
@@ -2556,11 +2612,45 @@ export default function FusingDepartment() {
                       </div>
 
                       <div className="fusing-card-body">
-                        <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>
-                        <div className="fusing-card-design-text">
-                          <strong style={{ color: 'var(--ee-fusing-brand-navy)' }}>{c.designName || c.designNo || '—'}</strong>
-                          <span>•</span>
-                          <span>{c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}</span>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                          {(c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo) && (
+                            <div
+                              style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                background: '#f8fafc',
+                                border: '1px solid var(--ee-fusing-border)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <img
+                                src={c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo}
+                                alt={c.designName || 'Design'}
+                                loading="lazy"
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  aspectRatio: '1 / 1',
+                                  display: 'block'
+                                }}
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            </div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>
+                            <div className="fusing-card-design-text" style={{ marginTop: '2px' }}>
+                              <strong style={{ color: 'var(--ee-fusing-brand-navy)' }}>{c.designName || c.designNo || '—'}</strong>
+                              <span>•</span>
+                              <span>{c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}</span>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="fusing-card-stats-row">
@@ -3499,6 +3589,25 @@ export default function FusingDepartment() {
           </div>
         </div>
       )}
+
+      {/* AI Textile Production Measurement Agent Modal */}
+      <AIMeasurementAgentModal
+        isOpen={showFusingAiModal}
+        onClose={() => setShowFusingAiModal(false)}
+        initialData={{
+          fabric: topForm.fabric || 'French Crepe',
+          panna: topForm.panna || '58"',
+          meters: topForm.printedMtr || topForm.fusingMtr || 100
+        }}
+        onApply={(calc) => {
+          setTopForm(prev => ({
+            ...prev,
+            fusingMtr: String(calc.freshMtr),
+            notes: `${prev.notes ? prev.notes + ' | ' : ''}AI Calc: ${calc.shrinkageMtr}m shrink (${calc.efficiencyPct}% yield)`
+          }));
+          triggerPushNotification('📐 AI Measurement Applied', `Set Fresh Output to ${calc.freshMtr}m (${calc.wasteMtr}m wastage).`, 'success');
+        }}
+      />
     </div>
   );
 }
