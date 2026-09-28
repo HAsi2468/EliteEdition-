@@ -17,7 +17,6 @@ import {
   PlusCircle,
   AlertCircle,
   CheckCircle2,
-  RefreshCw,
   Edit3,
   X,
   FileText,
@@ -98,6 +97,14 @@ export default function DigitalPrintCostingScreen({ companyEntity = 'Elite Digit
 
   useEffect(() => {
     fetchCostingReport();
+  }, [fetchCostingReport]);
+
+  useEffect(() => {
+    const handleGlobalRefresh = () => {
+      fetchCostingReport();
+    };
+    window.addEventListener('elite-data-refresh', handleGlobalRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
   }, [fetchCostingReport]);
 
   const handleSaveOverheads = async (e) => {
@@ -287,22 +294,6 @@ export default function DigitalPrintCostingScreen({ companyEntity = 'Elite Digit
             }}
           >
             <Edit3 size={15} /> Fixed Overheads
-          </button>
-
-          <button
-            onClick={fetchCostingReport}
-            title="Refresh Data"
-            style={{
-              padding: '0.5rem 0.75rem',
-              borderRadius: '10px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#2563eb',
-              cursor: 'pointer',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-            }}
-          >
-            <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
           </button>
 
           <button

@@ -1732,28 +1732,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 <List size={14} /> <span>Table</span>
               </button>
             </div>
-
-            <button
-              onClick={() => loadData(false)}
-              disabled={loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 0.85rem',
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                color: '#334155',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              }}
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              <span>Refresh</span>
-            </button>
           </div>
         </div>
       )}
@@ -2153,30 +2131,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               <List size={13} /> <span>Table</span>
             </button>
           </div>
-
-          {/* Refresh Button */}
-          <button
-            type="button"
-            onClick={() => loadData(false)}
-            disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.45rem 0.75rem',
-              background: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              color: '#334155',
-              cursor: 'pointer',
-            }}
-            title="Refresh Data"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
-          </button>
 
           {/* Reset Filters Button */}
           {(datePreset !== 'all' ||

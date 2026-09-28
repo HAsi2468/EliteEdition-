@@ -712,28 +712,6 @@ export default function DesignerModule({ currentUser, isAdmin = false, onNavigat
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => loadData(false)}
-            style={{
-              padding: '0.55rem 0.95rem',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              borderRadius: '8px',
-              background: '#ffffff',
-              color: '#1d4ed8',
-              border: '1px solid #bfdbfe',
-              cursor: 'pointer',
-              boxShadow: '0 1px 3px rgba(37, 99, 235, 0.08)'
-            }}
-            title="Refresh Data"
-          >
-            <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-            <span>Refresh</span>
-          </button>
 
           {onNavigate && (
             <button

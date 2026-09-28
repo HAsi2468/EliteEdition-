@@ -67,6 +67,9 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
 
   useEffect(() => {
     fetchDashboardData();
+    const handleGlobalRefresh = () => fetchDashboardData();
+    window.addEventListener('elite-data-refresh', handleGlobalRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
   }, [fetchDashboardData]);
 
   // Periodic background refresh every 60 seconds
@@ -133,29 +136,6 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
               <option value="Morning">Morning Shift</option>
               <option value="Night">Night Shift</option>
             </select>
-
-            <button
-              type="button"
-              onClick={fetchDashboardData}
-              title={`Last refreshed at ${lastRefreshed.toLocaleTimeString()}`}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd0dd',
-                background: '#ffffff',
-                color: '#3874ff',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-              <span>Refresh</span>
-            </button>
 
             {onNavigateDepartment && (
               <button

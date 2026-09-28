@@ -103,6 +103,15 @@ export default function AdminClientDetails() {
     fetchClients();
   }, [companyCodeFilter, statusFilter]);
 
+  useEffect(() => {
+    const handleGlobalRefresh = () => {
+      fetchParties();
+      fetchClients();
+    };
+    window.addEventListener('elite-data-refresh', handleGlobalRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
+  }, [companyCodeFilter, statusFilter, searchQuery]);
+
   // Handle Search submit
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -376,16 +385,6 @@ export default function AdminClientDetails() {
               <option value="Inactive">Inactive</option>
             </select>
           </div>
-
-          {/* Refresh Button */}
-          <button
-            onClick={() => { fetchParties(); fetchClients(); }}
-            className="btn-secondary"
-            title="Refresh list"
-            style={{ padding: '0.45rem 0.75rem', borderRadius: '8px' }}
-          >
-            <RotateCw size={14} className={loading ? 'spin' : ''} />
-          </button>
 
           {/* Copy Client Portal Link Button */}
           <button

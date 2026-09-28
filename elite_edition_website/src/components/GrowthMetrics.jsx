@@ -23,6 +23,15 @@ export default function GrowthMetrics() {
 
   useEffect(() => { fetchDeadStock(); fetchLostRevenue(); }, []);
 
+  useEffect(() => {
+    const handleGlobalRefresh = () => {
+      fetchDeadStock();
+      fetchLostRevenue();
+    };
+    window.addEventListener('elite-data-refresh', handleGlobalRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
+  }, [thresholdDays]);
+
   const fetchDeadStock = async () => {
     setDeadStockLoading(true);
     try {
@@ -69,10 +78,6 @@ export default function GrowthMetrics() {
               <option value="120">120 Days</option>
             </select>
           </div>
-          <button onClick={fetchDeadStock} disabled={deadStockLoading} className="btn-secondary" style={styles.refreshBtn}>
-            <RefreshCw size={12} className={deadStockLoading ? 'spin-loader' : ''} />
-            <span>Refresh</span>
-          </button>
         </div>
 
         {deadStockData && (
@@ -156,10 +161,6 @@ export default function GrowthMetrics() {
         <div style={styles.sectionHeader}>
           <TrendingDown size={16} color="#ef4444" />
           <h3 style={styles.sectionTitle}>Lost Revenue Estimator (Stockouts)</h3>
-          <button onClick={fetchLostRevenue} disabled={lostRevenueLoading} className="btn-secondary" style={styles.refreshBtn}>
-            <RefreshCw size={12} className={lostRevenueLoading ? 'spin-loader' : ''} />
-            <span>Refresh</span>
-          </button>
         </div>
 
         {lostRevenueData && (

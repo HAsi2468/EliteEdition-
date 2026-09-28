@@ -343,29 +343,6 @@ export default function QADepartment({ department = 'digital_print' }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <button
-              type="button"
-              onClick={fetchData}
-              title="Refresh Inward & QA Data"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 0.9rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                color: '#334155',
-                cursor: 'pointer'
-              }}
-            >
-              <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-              <span>Refresh</span>
-            </button>
-          </div>
         </div>
       </div>
 

@@ -361,7 +361,12 @@ export default function FusingDepartment() {
     fetchData();
     api.getPrintConfig().then(res => setPrintConfig(res)).catch(() => {});
     const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    const handleGlobalRefresh = () => fetchData();
+    window.addEventListener('elite-data-refresh', handleGlobalRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -1855,17 +1860,6 @@ export default function FusingDepartment() {
               </button>
             ))}
           </div>
-
-
-
-          <button
-            type="button"
-            onClick={fetchData}
-            title="Reload Data"
-            style={{ padding: '0.35rem 0.65rem', height: '34px', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'transparent', cursor: 'pointer' }}
-          >
-            <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-          </button>
         </div>
       </div>
 

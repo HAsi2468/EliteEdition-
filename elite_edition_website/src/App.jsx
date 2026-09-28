@@ -1480,6 +1480,7 @@ export default function App() {
           <button
             onClick={() => {
               fetchData();
+              triggerGlobalDataRefresh();
               if (typeof window !== 'undefined' && window.showToast) {
                 window.showToast('🔄 Live data refreshed across all departments', 'info');
               }

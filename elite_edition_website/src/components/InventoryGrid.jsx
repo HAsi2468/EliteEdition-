@@ -2247,10 +2247,6 @@ export default function InventoryGrid({
             </div>
 
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
-              <button onClick={() => fetchInwardData()} style={{ ...styles.refreshBtn, padding: '0.45rem 0.75rem' }} title="Refresh Inward Log">
-                <RefreshCw size={14} className={inwardLoading ? 'spin' : ''} />
-                <span>Refresh</span>
-              </button>
               <button 
                 onClick={handleDownloadInwardPdf} 
                 disabled={downloadingInwardPdf} 
@@ -3145,10 +3141,6 @@ export default function InventoryGrid({
             </div>
 
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
-              <button onClick={() => fetchOutwardData()} style={{ ...styles.refreshBtn, padding: '0.45rem 0.75rem' }} title="Refresh Outward Log">
-                <RefreshCw size={14} className={outwardLoading ? 'spin' : ''} />
-                <span>Refresh</span>
-              </button>
               <button 
                 onClick={handleDownloadOutwardPdf} 
                 disabled={downloadingOutwardPdf} 

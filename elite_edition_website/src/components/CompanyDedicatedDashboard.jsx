@@ -41,6 +41,14 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
     fetchDashboardData();
   }, [companyEntity]);
 
+  useEffect(() => {
+    const handleGlobalRefresh = () => {
+      fetchDashboardData();
+    };
+    window.addEventListener('elite-data-refresh', handleGlobalRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
+  }, [companyEntity]);
+
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
@@ -140,14 +148,6 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
             style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
           >
             <PlusCircle size={15} /> New Tax Invoice
-          </button>
-          <button
-            onClick={fetchDashboardData}
-            className="btn-secondary"
-            style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem' }}
-            title="Refresh Intelligence Data"
-          >
-            <RefreshCw size={15} />
           </button>
         </div>
       </div>

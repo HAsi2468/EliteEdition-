@@ -112,6 +112,9 @@ export default function BusinessConnectionPanel({ currentUser }) {
 
   useEffect(() => {
     fetchConnections();
+    const handleGlobalRefresh = () => fetchConnections();
+    window.addEventListener('elite-data-refresh', handleGlobalRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
   }, [activeType, priorityFilter]);
 
   const handleSearchSubmit = (e) => {
@@ -537,16 +540,6 @@ export default function BusinessConnectionPanel({ currentUser }) {
           >
             <Printer size={15} color="#2563eb" />
             <span>Export PDF</span>
-          </button>
-
-          <button
-            onClick={fetchConnections}
-            disabled={loading}
-            style={styles.inlineRefreshBtn}
-            title="Refresh List"
-          >
-            <RefreshCw size={14} className={loading ? "spin-icon" : ""} />
-            <span>Refresh</span>
           </button>
         </div>
       </div>
