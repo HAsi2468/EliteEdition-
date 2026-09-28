@@ -731,7 +731,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
       </div>
 
       {/* ── Main Profiles Content (Cards or Table + Detail Drawer) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: selectedProfile ? '1fr 380px' : '1fr', gap: '1.25rem', alignItems: 'start' }}>
+      <div className="customer-profiles-main-layout" style={{ display: 'grid', gridTemplateColumns: selectedProfile ? '1fr 380px' : '1fr', gap: '1.25rem', alignItems: 'start' }}>
         {/* Left Column: Profiles List */}
         <div>
           {loading ? (
@@ -1137,6 +1137,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
         {/* ── Right Column: Selected Customer Profile Detail Drawer ── */}
         {selectedProfile && (
           <div
+            className="customer-profile-detail-drawer"
             style={{
               background: '#ffffff',
               borderRadius: '16px',
@@ -1412,6 +1413,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
           onClick={() => !saving && setShowEditModal(false)}
         >
           <div
+            className="modal-content customer-profile-modal-content"
             style={{
               position: 'relative',
               background: '#ffffff',
@@ -1442,7 +1444,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
 
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {/* Row 1: Name & Phone */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                     Customer / Person Name *
@@ -1472,7 +1474,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
               </div>
 
               {/* Row 2: Company & Email */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                     Company / Firm Name
@@ -1500,7 +1502,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
               </div>
 
               {/* Row 3: Customer Type & Status */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                     Customer Category / Type
@@ -1535,7 +1537,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
               </div>
 
               {/* Row 4: City, State, GSTIN */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                     City / Town
@@ -1575,7 +1577,7 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
               </div>
 
               {/* Row 5: Payment Terms & Tags */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                     Payment Terms

@@ -1094,7 +1094,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
           }}
         >
           <div
-            className="glass-panel"
+            className="glass-panel modal-content crm-lead-modal-content"
             style={{
               width: '100%',
               maxWidth: '560px',
@@ -1138,7 +1138,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
                     Customer Name *
@@ -1183,7 +1183,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
                     Company / Firm Name
@@ -1227,7 +1227,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
               </div>
 
               {/* Customer Profile Attributes */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
                     Customer Type (Category)
@@ -1274,7 +1274,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
                     Full Address / Market Location (Optional)
@@ -1317,7 +1317,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
                     Lead Source
@@ -1392,7 +1392,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>
                     Estimated Order Value (₹)

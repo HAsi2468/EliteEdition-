@@ -518,6 +518,7 @@ form,
     padding-top: 0 !important;
     gap: 0.4rem !important;
   }
+}
 
 /* ════ MASTER SINGLE REFRESH BUTTON ════ */
 .master-refresh-btn {
@@ -553,7 +554,6 @@ form,
     border-radius: 12px !important;
     box-shadow: 0 3px 12px rgba(56, 189, 248, 0.3) !important;
   }
-}
 
   /* Slide-over Mobile Drawer */
   .mobile-drawer-overlay {
@@ -605,7 +605,7 @@ form,
     -webkit-overflow-scrolling: touch;
   }
 
-  .btn, button {
+  .btn, .btn-primary, .btn-secondary, button.btn-lg, .submitBtn, .login-btn {
     min-height: 40px;
   }
 
@@ -904,9 +904,14 @@ body:has(.client-portal-container) {
   border-radius: 8px !important;
 }
 
-/* Mobile Phone UI Optimizations (max-width: 768px) */
+/* ═══════════════════════════════════════════════════
+   COMPREHENSIVE PROJECT-WIDE MOBILE PHONE RESPONSIVENESS (< 768px)
+   ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  body {
+  html, body, #root {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100vw !important;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
@@ -915,19 +920,113 @@ body:has(.client-portal-container) {
     padding: 0.5rem 0.75rem !important;
   }
 
-  button, input, select, textarea {
-    font-size: 15px !important;
+  /* Prevent iOS Safari 16px auto-zoom */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 
-  .modal-dialog, .modal-content, [role="dialog"] {
+  /* All Modals & Dialogs on Mobile Devices */
+  .modal-overlay,
+  [class*="modal-overlay"],
+  [class*="ModalOverlay"] {
+    padding: 0.5rem !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .modal-dialog,
+  .modal-content,
+  [role="dialog"],
+  [class*="modal-container"],
+  [class*="modal-content"],
+  .glass-panel[style*="maxHeight: 90vh"] {
+    width: 96vw !important;
     max-width: 96vw !important;
-    margin: 0.5rem auto !important;
+    max-height: 94vh !important;
+    margin: 0 auto !important;
     border-radius: 16px !important;
+    box-sizing: border-box !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
-  /* Improve mobile table horizontal scrolling touch UX */
-  .table-responsive, table {
-    -webkit-overflow-scrolling: touch;
+  /* Auto-collapse multi-column form grids inside modals and panels */
+  .modal-content div[style*="gridTemplateColumns"],
+  [role="dialog"] div[style*="gridTemplateColumns"],
+  form div[style*="gridTemplateColumns"],
+  .glass-panel div[style*="gridTemplateColumns"],
+  .responsive-form-grid,
+  .catalog-manager-form-grid,
+  .crm-container div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .modal-content div[style*="gridColumn"],
+  [role="dialog"] div[style*="gridColumn"],
+  form div[style*="gridColumn"],
+  .responsive-form-grid > div[style*="gridColumn"],
+  .catalog-manager-form-grid > div {
+    grid-column: span 1 !important;
+  }
+
+  /* Horizontal touch scrolling for all tables across the app */
+  .table-responsive,
+  .table-container,
+  [class*="table-wrap"],
+  [class*="tableWrap"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .table-responsive table,
+  .table-container table,
+  [class*="table-wrap"] table,
+  [class*="tableWrap"] table {
+    min-width: 580px !important;
+  }
+
+  /* Ensure small action and icon buttons don't get vertically stretched */
+  button.btn-icon,
+  button.icon-btn,
+  .chat-icon-circle-btn,
+  .chat-icon-btn,
+  button[style*="width: 32px"], button[style*="width:32px"],
+  button[style*="width: 34px"], button[style*="width:34px"],
+  button[style*="width: 36px"], button[style*="width:36px"],
+  button[style*="width: 28px"], button[style*="width:28px"],
+  button[style*="height: 32px"], button[style*="height:32px"],
+  button[style*="height: 34px"], button[style*="height:34px"],
+  button[style*="height: 36px"], button[style*="height:36px"],
+  button[style*="height: 28px"], button[style*="height:28px"],
+  button:has(svg:only-child) {
+    min-height: unset !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* CRM & Customer Profiles layout */
+  .crm-container {
+    padding: 0.5rem !important;
+  }
+  .crm-container > div:first-child {
+    padding: 0.85rem 1rem !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+  .customer-profiles-main-layout {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+  }
+  .customer-profile-detail-drawer {
+    position: static !important;
+    width: 100% !important;
+    padding: 1rem !important;
+    box-sizing: border-box !important;
   }
 }
 

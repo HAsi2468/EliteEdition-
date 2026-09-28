@@ -5522,25 +5522,28 @@ if (typeof document !== 'undefined') {
           overflow: visible !important;
         }
         .inv-sub-tab-bar {
-          display: grid !important;
-          grid-template-columns: repeat(3, 1fr) !important;
+          display: flex !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
           width: 100% !important;
-          gap: 4px !important;
-          padding: 4px !important;
+          gap: 6px !important;
+          padding: 5px !important;
           box-sizing: border-box !important;
-          border-radius: 12px !important;
+          border-radius: 14px !important;
           background: #f1f5f9 !important;
           border: 1px solid #cbd5e1 !important;
         }
         .inv-sub-tab-bar button {
-          width: 100% !important;
+          flex: 1 0 auto !important;
+          min-width: 82px !important;
           justify-content: center !important;
           text-align: center !important;
-          padding: 0.55rem 0.2rem !important;
-          font-size: 0.72rem !important;
+          padding: 0.55rem 0.4rem !important;
+          font-size: 0.74rem !important;
           gap: 0.25rem !important;
           flex-direction: column !important;
           box-sizing: border-box !important;
+          border-radius: 10px !important;
         }
         .inv-row-two-actions {
           display: grid !important;

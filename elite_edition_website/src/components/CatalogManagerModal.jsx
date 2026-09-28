@@ -488,7 +488,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     <div className="modal-overlay" style={styles.overlay} onClick={handleModalClose}>
       <div className="modal-content catalog-manager-container" style={styles.content} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div style={styles.header}>
+        <div className="catalog-manager-header" style={styles.header}>
           <div style={styles.headerLeft}>
             <div style={styles.headerIconBadge}>
               <Warehouse size={22} color="#ffffff" />
@@ -579,7 +579,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
           </nav>
 
           {/* Right Tab Body Content Area */}
-          <div style={styles.mainArea}>
+          <div className="catalog-manager-main-area" style={styles.mainArea}>
             {loading ? (
               <div style={styles.loaderBox}>
                 <RefreshCw className="animate-spin" size={24} color="#2563eb" />
@@ -752,12 +752,12 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                 {/* 1. VENDORS TAB */}
                 {activeTab === 'vendors' && (
                   <div style={styles.tabContent}>
-                    <form onSubmit={handleVendorSubmit} style={styles.inlineForm}>
+                    <form onSubmit={handleVendorSubmit} className="catalog-manager-form" style={styles.inlineForm}>
                       <span style={styles.formTitle}>
                         <Building2 size={16} color="#2563eb" />
                         {editingId ? 'Edit Vendor / Supplier' : 'Add New Vendor / Supplier'}
                       </span>
-                      <div style={styles.formGrid}>
+                      <div className="catalog-manager-form-grid" style={styles.formGrid}>
                         <input
                           type="text"
                           placeholder="Vendor Contact Person *"
@@ -815,7 +815,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       </div>
                     </form>
 
-                    <div className="table-container" style={styles.tableWrap}>
+                    <div className="table-container catalog-manager-table-wrap" style={styles.tableWrap}>
                       <table>
                         <thead>
                           <tr>
@@ -866,12 +866,12 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                 {/* 2. PARTIES TAB */}
                 {activeTab === 'parties' && (
                   <div style={styles.tabContent}>
-                    <form onSubmit={handlePartySubmit} style={styles.inlineForm}>
+                    <form onSubmit={handlePartySubmit} className="catalog-manager-form" style={styles.inlineForm}>
                       <span style={styles.formTitle}>
                         <Users size={16} color="#2563eb" />
                         {editingId ? 'Edit Receiver Party' : 'Add New Receiver Party'}
                       </span>
-                      <div style={styles.formGrid}>
+                      <div className="catalog-manager-form-grid" style={styles.formGrid}>
                         <input
                           type="text"
                           placeholder="Party / Receiver Name *"
@@ -914,7 +914,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       </div>
                     </form>
 
-                    <div className="table-container" style={styles.tableWrap}>
+                    <div className="table-container catalog-manager-table-wrap" style={styles.tableWrap}>
                       <table>
                         <thead>
                           <tr>
@@ -964,12 +964,12 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       </button>
                     </div>
 
-                    <form onSubmit={handleProductSubmit} style={styles.inlineForm}>
+                    <form onSubmit={handleProductSubmit} className="catalog-manager-form" style={styles.inlineForm}>
                       <span style={styles.formTitle}>
                         <ShoppingBag size={16} color="#2563eb" />
                         {editingId ? 'Edit Product' : 'Create New Product'}
                       </span>
-                      <div style={styles.formGrid}>
+                      <div className="catalog-manager-form-grid" style={styles.formGrid}>
                         <input
                           type="text"
                           value={productForm.skuCode}
@@ -1022,7 +1022,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       </div>
                     </form>
 
-                    <div className="table-container" style={styles.tableWrap}>
+                    <div className="table-container catalog-manager-table-wrap" style={styles.tableWrap}>
                       <table>
                         <thead>
                           <tr>
@@ -1075,7 +1075,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                 {/* 4. STOCK OUT LOG TAB */}
                 {activeTab === 'history' && (
                   <div style={styles.tabContent}>
-                    <div className="table-container" style={styles.tableWrap}>
+                    <div className="table-container catalog-manager-table-wrap" style={styles.tableWrap}>
                       <table>
                         <thead>
                           <tr>
@@ -1115,7 +1115,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                 {/* 5. STORAGE FACILITIES TAB */}
                 {activeTab === 'facilities' && (
                   <div style={styles.tabContent}>
-                    <form onSubmit={handleFacilitySubmit} style={styles.inlineForm}>
+                    <form onSubmit={handleFacilitySubmit} className="catalog-manager-form" style={styles.inlineForm}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.25rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                           <div style={{ width: 34, height: 34, borderRadius: '9px', background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
@@ -1137,7 +1137,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                         )}
                       </div>
 
-                      <div style={styles.formGrid}>
+                      <div className="catalog-manager-form-grid" style={styles.formGrid}>
                         <div>
                           <label style={styles.fieldLabel}>
                             Facility / Godown Name *
@@ -1220,7 +1220,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                         </div>
 
                         <div style={{ gridColumn: 'span 2', marginTop: '0.2rem' }}>
-                          <label style={styles.checkboxBanner}>
+                          <label className="catalog-manager-checkbox-banner" style={styles.checkboxBanner}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                               <input
                                 type="checkbox"
@@ -1266,7 +1266,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       </div>
                     </form>
 
-                    <div className="table-container" style={styles.tableWrap}>
+                    <div className="table-container catalog-manager-table-wrap" style={styles.tableWrap}>
                       <table>
                         <thead>
                           <tr>
@@ -1368,6 +1368,7 @@ if (typeof document !== 'undefined') {
       }
       .catalog-manager-container table {
         width: 100% !important;
+        min-width: 580px !important;
         border-collapse: collapse !important;
         background: #ffffff !important;
       }
@@ -1408,14 +1409,22 @@ if (typeof document !== 'undefined') {
         .catalog-manager-container {
           width: 96vw !important;
           max-width: 96vw !important;
-          padding: 0.85rem !important;
           max-height: 94vh !important;
-          border-radius: 12px !important;
+          border-radius: 16px !important;
           box-sizing: border-box !important;
+          overflow: hidden !important;
+        }
+        .catalog-manager-header {
+          padding: 0.85rem 1rem !important;
+        }
+        .catalog-manager-header h2 {
+          font-size: 1.05rem !important;
         }
         .catalog-manager-layout {
           flex-direction: column !important;
-          gap: 0.75rem !important;
+          gap: 0 !important;
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch !important;
         }
         .catalog-manager-sidebar {
           width: 100% !important;
@@ -1424,12 +1433,53 @@ if (typeof document !== 'undefined') {
           -webkit-overflow-scrolling: touch !important;
           border-right: none !important;
           border-bottom: 1px solid #e2e8f0 !important;
-          padding-right: 0 !important;
-          padding-bottom: 0.5rem !important;
+          padding: 0.5rem 0.65rem !important;
+          gap: 0.4rem !important;
+          flex-shrink: 0 !important;
+          background: #f8fafc !important;
+        }
+        .catalog-manager-sidebar > div:first-child {
+          display: none !important;
         }
         .catalog-manager-sidebar button {
           flex: 0 0 auto !important;
+          width: auto !important;
+          padding: 0.45rem 0.8rem !important;
+          font-size: 0.78rem !important;
+          border-radius: 999px !important;
           white-space: nowrap !important;
+        }
+        .catalog-manager-main-area {
+          padding: 0.85rem 0.65rem !important;
+          max-height: none !important;
+          overflow-y: visible !important;
+          gap: 0.85rem !important;
+        }
+        .catalog-manager-form {
+          padding: 1rem 0.85rem !important;
+          border-radius: 12px !important;
+        }
+        .catalog-manager-form-grid {
+          grid-template-columns: 1fr !important;
+          gap: 0.75rem !important;
+        }
+        .catalog-manager-form-grid > div {
+          grid-column: span 1 !important;
+        }
+        .catalog-manager-table-wrap {
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          border-radius: 12px !important;
+        }
+        .catalog-manager-checkbox-banner {
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          gap: 0.5rem !important;
+        }
+        .catalog-manager-container input:not([type="checkbox"]):not([type="radio"]),
+        .catalog-manager-container select,
+        .catalog-manager-container textarea {
+          font-size: 16px !important;
         }
       }
     `;
@@ -1696,7 +1746,9 @@ const styles = {
     transition: 'all 0.15s ease',
   },
   tableWrap: {
+    overflowX: 'auto',
     overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
     borderRadius: '14px',
     border: '1px solid #e2e8f0',
     background: '#ffffff',
