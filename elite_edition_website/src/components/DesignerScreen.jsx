@@ -1436,7 +1436,88 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     if (task.drowDesignStatus) {
       return { label: `Drow: ${task.drowDesignStatus}`, icon: Play, color: '#0284c7', bg: '#f0f9ff', border: '#38bdf8' };
     }
-    return { label: 'Select Status', icon: null, color: '#475569', bg: '#f8fafc', border: '#cbd5e1' };
+    return { label: task.status || 'New / In Queue', icon: Clock, color: '#475569', bg: '#f8fafc', border: '#cbd5e1' };
+  };
+
+  const formatDurationText = (ms) => {
+    if (!ms || ms <= 0) return '< 1m';
+    const totalMinutes = Math.floor(ms / (1000 * 60));
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+    const mins = totalMinutes % 60;
+
+    if (days > 0) {
+      return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+    }
+    if (hours > 0) {
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+    return `${mins || 1}m`;
+  };
+
+  const getTaskStatusTimeInfo = (task) => {
+    const now = new Date();
+    const createdAt = task.createdAt ? new Date(task.createdAt) : null;
+    const history = Array.isArray(task.stageHistory) ? task.stageHistory : [];
+
+    // Filter stage updates (exclude pure comments)
+    const stageEntries = history.filter(
+      (h) => h.category !== 'comment' && h.statusType !== 'Comment' && h.stage !== 'Comment Added'
+    );
+
+    // Calculate time in current status
+    let currentStageStart = createdAt;
+    if (stageEntries.length > 0) {
+      const lastEntry = stageEntries[stageEntries.length - 1];
+      if (lastEntry.updatedAt) {
+        currentStageStart = new Date(lastEntry.updatedAt);
+      }
+    }
+
+    const currentDurationMs = currentStageStart ? Math.max(0, now - currentStageStart) : 0;
+    const currentDurationStr = formatDurationText(currentDurationMs);
+
+    // Total duration from creation
+    const totalDurationMs = createdAt ? Math.max(0, now - createdAt) : 0;
+    const totalDurationStr = formatDurationText(totalDurationMs);
+
+    // Breakdown across stages
+    const stageBreakdown = [];
+    if (stageEntries.length > 0 && createdAt) {
+      let prevTime = createdAt;
+      for (let i = 0; i < stageEntries.length; i++) {
+        const entry = stageEntries[i];
+        const entryTime = entry.updatedAt ? new Date(entry.updatedAt) : prevTime;
+        const durMs = Math.max(0, entryTime - prevTime);
+        const name = entry.stage || 'Stage';
+        stageBreakdown.push({
+          stageName: name,
+          fullLabel: `${entry.statusType ? `${entry.statusType}: ` : ''}${name}`,
+          durationMs: durMs,
+          durationStr: formatDurationText(durMs),
+          isCurrent: false,
+          updatedByName: entry.updatedByName,
+        });
+        prevTime = entryTime;
+      }
+      // Add current active status
+      const currentBadge = getTaskCurrentStatusBadge(task);
+      stageBreakdown.push({
+        stageName: currentBadge.label,
+        fullLabel: currentBadge.label,
+        durationMs: currentDurationMs,
+        durationStr: currentDurationStr,
+        isCurrent: true,
+      });
+    }
+
+    return {
+      currentDurationStr,
+      totalDurationStr,
+      currentDurationMs,
+      totalDurationMs,
+      stageBreakdown,
+    };
   };
 
   const getStatusDropdownOptions = (task) => [
@@ -2493,48 +2574,44 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         </div>
                       </td>
 
-                      {/* Stage / Status Dropdown Menu (5 options, direct update without form) */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', position: 'relative' }}>
+                      {/* Stage / Status & Time Taken (No status update dropdown, shows time duration) */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         {(() => {
                           const currentBadge = getTaskCurrentStatusBadge(task);
-                          const statusOpts = getStatusDropdownOptions(task);
-                          const isOpen = openStatusDropdownId === task._id;
                           const CurrentIcon = currentBadge.icon;
+                          const timeInfo = getTaskStatusTimeInfo(task);
 
                           return (
-                            <div className="status-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => setOpenStatusDropdownId(isOpen ? null : task._id)}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.32rem', alignItems: 'flex-start' }}>
+                              {/* Status Badge + Proof Counters */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <span
                                   style={{
-                                    padding: '0.35rem 0.65rem',
+                                    padding: '0.32rem 0.62rem',
                                     borderRadius: '7px',
                                     fontSize: '0.74rem',
                                     fontWeight: 800,
-                                    cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '0.35rem',
                                     border: `1.5px solid ${currentBadge.border}`,
                                     background: currentBadge.bg,
                                     color: currentBadge.color,
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                    whiteSpace: 'nowrap',
                                   }}
-                                  title="Click to select status action"
+                                  title={`Current Status: ${currentBadge.label}`}
                                 >
                                   {CurrentIcon && <CurrentIcon size={12} />}
                                   <span>{currentBadge.label}</span>
-                                  <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                                </button>
+                                </span>
 
                                 {/* Proof thumbnails / count if available */}
                                 {drowImgs.length > 0 && (
                                   <button
                                     type="button"
                                     onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700 }}
                                     title={`${drowImgs.length} Drow proof image(s)`}
                                   >
                                     🖼️ {drowImgs.length}
@@ -2544,7 +2621,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                   <button
                                     type="button"
                                     onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#db2777', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#db2777', fontSize: '0.68rem', fontWeight: 700 }}
                                     title={`${cmImgs.length} Colour proof image(s)`}
                                   >
                                     🎨 {cmImgs.length}
@@ -2554,7 +2631,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                   <button
                                     type="button"
                                     onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#ea580c', fontSize: '0.68rem', fontWeight: 700 }}
                                     title={`${stage3Imgs.length} Stage 3 proof image(s)`}
                                   >
                                     ⏸️ {stage3Imgs.length}
@@ -2564,7 +2641,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                   <button
                                     type="button"
                                     onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                                    style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#16a34a', fontSize: '0.68rem', fontWeight: 700 }}
                                     title={`${finalImgs.length} Final proof image(s)`}
                                   >
                                     ✨ {finalImgs.length}
@@ -2572,64 +2649,50 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                 )}
                               </div>
 
-                              {/* Floating Dropdown Menu with 5 options */}
-                              {isOpen && (
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    top: 'calc(100% + 4px)',
-                                    left: 0,
-                                    zIndex: 9999,
-                                    background: '#ffffff',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                                    minWidth: '220px',
-                                    padding: '0.35rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.2rem',
-                                  }}
-                                >
-                                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
-                                    Select Stage Status
-                                  </div>
-                                  {statusOpts.map((opt) => {
-                                    const OptIcon = opt.icon;
-                                    return (
-                                      <button
-                                        key={opt.id}
-                                        type="button"
-                                        onClick={() => handleDirectStatusChange(task, opt)}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '0.45rem',
-                                          width: '100%',
-                                          padding: '0.42rem 0.55rem',
-                                          borderRadius: '6px',
-                                          border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
-                                          background: opt.isActive ? opt.bg : 'transparent',
-                                          color: opt.color,
-                                          fontSize: '0.74rem',
-                                          fontWeight: opt.isActive ? 800 : 700,
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          transition: 'background 0.12s ease',
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          if (!opt.isActive) e.currentTarget.style.background = '#f8fafc';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          if (!opt.isActive) e.currentTarget.style.background = 'transparent';
-                                        }}
-                                      >
-                                        <OptIcon size={13} color={opt.color} />
-                                        <span style={{ flex: 1 }}>{opt.label}</span>
-                                        {opt.isActive && <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>✓</span>}
-                                      </button>
-                                    );
-                                  })}
+                              {/* Time Taken in Current Status & Total */}
+                              <div
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  fontSize: '0.67rem',
+                                  fontWeight: 700,
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  color: '#334155',
+                                  padding: '0.18rem 0.45rem',
+                                  borderRadius: '5px',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={`Time in current status: ${timeInfo.currentDurationStr}. Total design task time: ${timeInfo.totalDurationStr}.`}
+                              >
+                                <Clock size={11} color="#2563eb" />
+                                <span style={{ color: '#1e40af', fontWeight: 800 }}>{timeInfo.currentDurationStr} taken</span>
+                                <span style={{ color: '#cbd5e1' }}>•</span>
+                                <span style={{ color: '#64748b' }}>Total: {timeInfo.totalDurationStr}</span>
+                              </div>
+
+                              {/* Stages duration breakdown chips if previous stages exist */}
+                              {timeInfo.stageBreakdown.length > 1 && (
+                                <div style={{ display: 'flex', gap: '0.22rem', flexWrap: 'wrap', maxWidth: '240px' }}>
+                                  {timeInfo.stageBreakdown.map((s, idx) => (
+                                    <span
+                                      key={idx}
+                                      style={{
+                                        fontSize: '0.61rem',
+                                        padding: '1px 5px',
+                                        borderRadius: '4px',
+                                        background: s.isCurrent ? '#eff6ff' : '#f1f5f9',
+                                        border: s.isCurrent ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+                                        color: s.isCurrent ? '#1d4ed8' : '#64748b',
+                                        fontWeight: s.isCurrent ? 800 : 600,
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                      title={`${s.fullLabel}: ${s.durationStr}`}
+                                    >
+                                      {s.stageName.length > 12 ? s.stageName.slice(0, 10) + '…' : s.stageName}: <strong>{s.durationStr}</strong>
+                                    </span>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -2768,30 +2831,32 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         )}
                       </td>
 
-                      {/* Comment Column */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', minWidth: '180px', maxWidth: '260px' }}>
+                      {/* Comment Column (Directly Editable) */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', minWidth: '190px', maxWidth: '270px' }}>
                         {editingCommentTaskId === task._id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                             <textarea
                               value={commentDraft}
                               onChange={(e) => setCommentDraft(e.target.value)}
-                              placeholder="Write a comment..."
+                              placeholder="Write comment... (Enter to save, Shift+Enter for new line)"
                               rows={2}
                               style={{
                                 width: '100%',
                                 fontSize: '0.75rem',
                                 padding: '0.35rem 0.5rem',
                                 borderRadius: '6px',
-                                border: '1.5px solid #3b82f6',
+                                border: '1.5px solid #2563eb',
                                 outline: 'none',
                                 fontFamily: 'inherit',
                                 resize: 'vertical',
                                 background: '#ffffff',
                                 color: '#1e293b',
+                                boxShadow: '0 0 0 2px rgba(37,99,235,0.1)',
                               }}
                               autoFocus
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
                                   handleSaveComment(task._id);
                                 } else if (e.key === 'Escape') {
                                   setEditingCommentTaskId(null);
@@ -2799,7 +2864,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                 }
                               }}
                             />
-                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.62rem', color: '#94a3b8', marginRight: 'auto' }}>↵ Enter to save</span>
                               <button
                                 type="button"
                                 onClick={() => handleSaveComment(task._id)}
@@ -2854,27 +2920,30 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
                           return (
                             <div
-                              onClick={() => setCommentModalTask(task)}
+                              onClick={() => {
+                                setEditingCommentTaskId(task._id);
+                                setCommentDraft(displayText);
+                              }}
                               style={{
                                 cursor: 'pointer',
                                 padding: '0.45rem 0.65rem',
                                 borderRadius: '8px',
                                 background: displayText ? '#f8fafc' : '#fbfcfd',
-                                border: displayText ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
+                                border: displayText ? '1px solid #cbd5e1' : '1.5px dashed #94a3b8',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '0.25rem',
                                 transition: 'all 0.15s ease',
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = '#94a3b8';
-                                e.currentTarget.style.background = '#f1f5f9';
+                                e.currentTarget.style.borderColor = '#2563eb';
+                                e.currentTarget.style.background = '#f0f7ff';
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = displayText ? '#e2e8f0' : '#cbd5e1';
+                                e.currentTarget.style.borderColor = displayText ? '#cbd5e1' : '#94a3b8';
                                 e.currentTarget.style.background = displayText ? '#f8fafc' : '#fbfcfd';
                               }}
-                              title="Click to view complete comments history & thread"
+                              title="Click to edit comment directly"
                             >
                               {displayText ? (
                                 <>
@@ -2891,28 +2960,30 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
                                       {commentsList.length > 1 && (
-                                        <span style={{
-                                          fontSize: '0.62rem',
-                                          fontWeight: 800,
-                                          background: '#eff6ff',
-                                          color: '#2563eb',
-                                          border: '1px solid #bfdbfe',
-                                          borderRadius: '10px',
-                                          padding: '1px 5px',
-                                        }}>
+                                        <span
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCommentModalTask(task);
+                                          }}
+                                          style={{
+                                            fontSize: '0.62rem',
+                                            fontWeight: 800,
+                                            background: '#eff6ff',
+                                            color: '#2563eb',
+                                            border: '1px solid #bfdbfe',
+                                            borderRadius: '10px',
+                                            padding: '1px 5px',
+                                            cursor: 'pointer',
+                                          }}
+                                          title="View complete comments thread"
+                                        >
                                           💬 {commentsList.length}
                                         </span>
                                       )}
                                       <Edit2
                                         size={12}
-                                        color="#94a3b8"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingCommentTaskId(task._id);
-                                          setCommentDraft(displayText);
-                                        }}
-                                        title="Quick edit comment inline"
-                                        style={{ cursor: 'pointer' }}
+                                        color="#2563eb"
+                                        title="Click to edit comment inline"
                                       />
                                     </div>
                                   </div>
@@ -2930,17 +3001,24 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                   >
                                     {displayText}
                                   </div>
-                                  {latestComment?.createdAt && (
-                                    <div style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                                      <span>{new Date(latestComment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                      <span style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.64rem' }}>View history & reply →</span>
-                                    </div>
-                                  )}
+                                  <div style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                                    <span>{latestComment?.createdAt ? new Date(latestComment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCommentModalTask(task);
+                                      }}
+                                      style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.64rem', cursor: 'pointer' }}
+                                      title="Open full discussion thread modal"
+                                    >
+                                      View history & reply →
+                                    </span>
+                                  </div>
                                 </>
                               ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#94a3b8' }}>
-                                  <span style={{ fontSize: '0.75rem', fontStyle: 'italic' }}>+ Add comment...</span>
-                                  <Edit2 size={12} color="#94a3b8" />
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#475569', padding: '0.1rem 0' }}>
+                                  <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#2563eb' }}>+ Click to add comment...</span>
+                                  <Edit2 size={12} color="#2563eb" />
                                 </div>
                               )}
                             </div>
@@ -4040,232 +4118,280 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   </div>
                 </div>
 
-                {/* ── Status Action & Proof Previews ── */}
-                <div
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '0.45rem 0.65rem',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '0.4rem',
-                  }}
-                >
-                  {/* 1-Click Status Dropdown (from Table View) */}
-                    <div className="status-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
+                {/* ── Status & Time Taken Controller (No status update dropdown) ── */}
+                {(() => {
+                  const currentBadge = getTaskCurrentStatusBadge(task);
+                  const CurrentIcon = currentBadge.icon;
+                  const timeInfo = getTaskStatusTimeInfo(task);
+
+                  return (
+                    <div
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '0.45rem 0.65rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <span
+                          style={{
+                            padding: '0.3rem 0.6rem',
+                            borderRadius: '7px',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            border: `1.5px solid ${currentBadge.border}`,
+                            background: currentBadge.bg,
+                            color: currentBadge.color,
+                          }}
+                        >
+                          {CurrentIcon && <CurrentIcon size={12} />}
+                          <span>{currentBadge.label}</span>
+                        </span>
+
+                        {/* Stage Proof Counters */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {drowImgs.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
+                              style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700 }}
+                              title={`${drowImgs.length} Drow proof image(s)`}
+                            >
+                              🖼️ {drowImgs.length}
+                            </button>
+                          )}
+                          {cmImgs.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
+                              style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#db2777', fontSize: '0.68rem', fontWeight: 700 }}
+                              title={`${cmImgs.length} Colour proof image(s)`}
+                            >
+                              🎨 {cmImgs.length}
+                            </button>
+                          )}
+                          {stage3Imgs.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
+                              style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#ea580c', fontSize: '0.68rem', fontWeight: 700 }}
+                              title={`${stage3Imgs.length} Stage 3 proof image(s)`}
+                            >
+                              ⏸️ {stage3Imgs.length}
+                            </button>
+                          )}
+                          {finalImgs.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
+                              style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#16a34a', fontSize: '0.68rem', fontWeight: 700 }}
+                              title={`${finalImgs.length} Final proof image(s)`}
+                            >
+                              ✨ {finalImgs.length}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Time taken */}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          fontSize: '0.66rem',
+                          fontWeight: 700,
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          color: '#334155',
+                          padding: '0.18rem 0.45rem',
+                          borderRadius: '5px',
+                        }}
+                      >
+                        <Clock size={11} color="#2563eb" />
+                        <span style={{ color: '#1e40af', fontWeight: 800 }}>{timeInfo.currentDurationStr} taken</span>
+                        <span style={{ color: '#cbd5e1' }}>•</span>
+                        <span style={{ color: '#64748b' }}>Total: {timeInfo.totalDurationStr}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── Card Comments & Editable Thread Bar ── */}
+                {editingCommentTaskId === task._id ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                    <textarea
+                      value={commentDraft}
+                      onChange={(e) => setCommentDraft(e.target.value)}
+                      placeholder="Write comment... (Enter to save, Shift+Enter for new line)"
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        fontSize: '0.75rem',
+                        padding: '0.35rem 0.5rem',
+                        borderRadius: '6px',
+                        border: '1.5px solid #2563eb',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        background: '#ffffff',
+                        color: '#1e293b',
+                        boxShadow: '0 0 0 2px rgba(37,99,235,0.1)',
+                      }}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSaveComment(task._id);
+                        } else if (e.key === 'Escape') {
+                          setEditingCommentTaskId(null);
+                          setCommentDraft('');
+                        }
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.62rem', color: '#94a3b8', marginRight: 'auto' }}>↵ Enter to save</span>
                       <button
                         type="button"
-                        onClick={() => setOpenStatusDropdownId(isStatusDropdownOpen ? null : task._id)}
+                        onClick={() => handleSaveComment(task._id)}
+                        disabled={savingCommentId === task._id}
                         style={{
-                          padding: '0.35rem 0.65rem',
-                          borderRadius: '7px',
-                          fontSize: '0.74rem',
-                          fontWeight: 800,
+                          padding: '0.25rem 0.55rem',
+                          borderRadius: '5px',
+                          background: '#2563eb',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '0.35rem',
-                          border: `1.5px solid ${currentBadge.border}`,
-                          background: currentBadge.bg,
-                          color: currentBadge.color,
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease',
+                          gap: '3px',
                         }}
-                        title="Click to select status action"
                       >
-                        {CurrentIcon && <CurrentIcon size={12} />}
-                        <span>{currentBadge.label}</span>
-                        <ChevronDown size={12} style={{ transform: isStatusDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                      </button>
-
-                      {/* Floating Dropdown Menu with 5 options */}
-                      {isStatusDropdownOpen && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: 'calc(100% + 4px)',
-                            left: 0,
-                            zIndex: 9999,
-                            background: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '8px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                            minWidth: '220px',
-                            padding: '0.35rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.2rem',
-                          }}
-                        >
-                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
-                            Select Stage Status
-                          </div>
-                          {statusOpts.map((opt) => {
-                            const OptIcon = opt.icon;
-                            return (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => handleDirectStatusChange(task, opt)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.45rem',
-                                  width: '100%',
-                                  padding: '0.42rem 0.55rem',
-                                  borderRadius: '6px',
-                                  border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
-                                  background: opt.isActive ? opt.bg : 'transparent',
-                                  color: opt.color,
-                                  fontSize: '0.74rem',
-                                  fontWeight: opt.isActive ? 800 : 700,
-                                  cursor: 'pointer',
-                                  textAlign: 'left',
-                                  transition: 'background 0.12s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!opt.isActive) e.currentTarget.style.background = '#f8fafc';
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!opt.isActive) e.currentTarget.style.background = 'transparent';
-                                }}
-                              >
-                                <OptIcon size={13} color={opt.color} />
-                                <span style={{ flex: 1 }}>{opt.label}</span>
-                                {opt.isActive && <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>✓</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Stage Proof Counters */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      {drowImgs.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
-                          style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700 }}
-                          title={`${drowImgs.length} Drow proof image(s)`}
-                        >
-                          🖼️ {drowImgs.length}
-                        </button>
-                      )}
-                      {cmImgs.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
-                          style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#db2777', fontSize: '0.68rem', fontWeight: 700 }}
-                          title={`${cmImgs.length} Colour proof image(s)`}
-                        >
-                          🎨 {cmImgs.length}
-                        </button>
-                      )}
-                      {stage3Imgs.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
-                          style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#ea580c', fontSize: '0.68rem', fontWeight: 700 }}
-                          title={`${stage3Imgs.length} Stage 3 proof image(s)`}
-                        >
-                          ⏸️ {stage3Imgs.length}
-                        </button>
-                      )}
-                      {finalImgs.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
-                          style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#16a34a', fontSize: '0.68rem', fontWeight: 700 }}
-                          title={`${finalImgs.length} Final proof image(s)`}
-                        >
-                          ✨ {finalImgs.length}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                {/* ── Card Comments & Thread Bar ── */}
-                <div
-                  onClick={() => setCommentModalTask(task)}
-                  style={{
-                    background: displayText ? '#f8fafc' : '#ffffff',
-                    border: displayText ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
-                    borderRadius: '8px',
-                    padding: '0.45rem 0.65rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '0.5rem',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#94a3b8';
-                    e.currentTarget.style.background = '#f1f5f9';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = displayText ? '#e2e8f0' : '#cbd5e1';
-                    e.currentTarget.style.background = displayText ? '#f8fafc' : '#ffffff';
-                  }}
-                  title="Click to view all comments, author history and add replies"
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '50%',
-                        background: latestComment ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#e2e8f0',
-                        color: latestComment ? '#ffffff' : '#64748b',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {latestComment ? (latestComment.authorName || 'U').charAt(0).toUpperCase() : <MessageSquare size={11} />}
-                    </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: latestComment ? '#1e293b' : '#64748b', whiteSpace: 'nowrap' }}>
-                          {latestComment ? (latestComment.authorName || 'User') : 'Discussion & Notes'}
-                        </span>
-                        {latestComment?.authorRole && (
-                          <span style={{ fontSize: '0.58rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', borderRadius: '3px', padding: '0 4px', whiteSpace: 'nowrap' }}>
-                            {latestComment.authorRole}
-                          </span>
+                        {savingCommentId === task._id ? (
+                          <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <Check size={11} />
                         )}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: displayText ? '#334155' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: displayText ? 'normal' : 'italic' }}>
-                        {displayText || '+ Add comment...'}
-                      </div>
+                        <span>Save</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCommentTaskId(null);
+                          setCommentDraft('');
+                        }}
+                        style={{
+                          padding: '0.25rem 0.45rem',
+                          borderRadius: '5px',
+                          background: '#f1f5f9',
+                          color: '#64748b',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                    {cardComments.length > 0 && (
-                      <span
+                ) : (
+                  <div
+                    onClick={() => {
+                      setEditingCommentTaskId(task._id);
+                      setCommentDraft(displayText);
+                    }}
+                    style={{
+                      background: displayText ? '#f8fafc' : '#ffffff',
+                      border: displayText ? '1px solid #cbd5e1' : '1.5px dashed #94a3b8',
+                      borderRadius: '8px',
+                      padding: '0.45rem 0.65rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#2563eb';
+                      e.currentTarget.style.background = '#f0f7ff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = displayText ? '#cbd5e1' : '#94a3b8';
+                      e.currentTarget.style.background = displayText ? '#f8fafc' : '#ffffff';
+                    }}
+                    title="Click to edit comment directly"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, flex: 1 }}>
+                      <div
                         style={{
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          background: latestComment ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#e2e8f0',
+                          color: latestComment ? '#ffffff' : '#64748b',
                           fontSize: '0.62rem',
                           fontWeight: 800,
-                          background: '#eff6ff',
-                          color: '#2563eb',
-                          border: '1px solid #bfdbfe',
-                          borderRadius: '10px',
-                          padding: '1px 6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
                         }}
                       >
-                        💬 {cardComments.length}
-                      </span>
-                    )}
-                    <Edit2 size={11} color="#94a3b8" />
+                        {latestComment ? (latestComment.authorName || 'U').charAt(0).toUpperCase() : <MessageSquare size={11} />}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: latestComment ? '#1e293b' : '#64748b', whiteSpace: 'nowrap' }}>
+                            {latestComment ? (latestComment.authorName || 'User') : 'Discussion & Notes'}
+                          </span>
+                          {latestComment?.authorRole && (
+                            <span style={{ fontSize: '0.58rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', borderRadius: '3px', padding: '0 4px', whiteSpace: 'nowrap' }}>
+                              {latestComment.authorRole}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: displayText ? '#334155' : '#2563eb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: displayText ? 'normal' : 'italic' }}>
+                          {displayText || '+ Click to add comment...'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                      {cardComments.length > 0 && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCommentModalTask(task);
+                          }}
+                          style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '10px',
+                            padding: '1px 6px',
+                            cursor: 'pointer',
+                          }}
+                          title="Open full discussion thread modal"
+                        >
+                          💬 {cardComments.length}
+                        </span>
+                      )}
+                      <Edit2 size={11} color="#2563eb" />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}
