@@ -2235,7 +2235,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <ScreenGroupRoster screenId={department === 'stitching' ? 'jobcards_stitching_challan' : 'jobcards_fabric'} />
                 </div>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                  Lot Stock Tracking & Rolls Management
+                  Lot Stock & Fabric Inventory Management
                 </p>
               </div>
             </div>
@@ -2246,7 +2246,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 onClick={() => setIsInwardOpen(true)}
                 className="fabric-action-btn inward-btn"
               >
-                <PlusCircle size={15} /> Inward Roll Stock
+                <PlusCircle size={15} /> Inward Fabric
               </button>
               <button
                 onClick={() => setIsCombinedModalOpen(true)}
@@ -2433,7 +2433,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <div style={{ padding: '0.85rem 1.1rem', borderRadius: '10px', background: '#fff5f5', border: '1px solid #fed7d7', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', boxShadow: '0 1px 3px rgba(239,68,68,0.06)' }}>
                       <AlertTriangle size={18} color="#e53e3e" style={{ flexShrink: 0, marginTop: '2px' }} />
                       <div style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', color: '#9b2c2c', lineHeight: 1.5 }}>
-                        <strong style={{ color: '#c53030' }}>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey rolls for upcoming job cards.</span>}
+                        <strong style={{ color: '#c53030' }}>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey fabric for upcoming job cards.</span>}
                       </div>
                     </div>
                   )}
