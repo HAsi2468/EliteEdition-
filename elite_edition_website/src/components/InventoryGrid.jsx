@@ -2251,10 +2251,6 @@ export default function InventoryGrid({
                 <RefreshCw size={14} className={inwardLoading ? 'spin' : ''} />
                 <span>Refresh</span>
               </button>
-              <button onClick={() => setShowVendorManager(true)} style={{ ...styles.vendorBtn, padding: '0.45rem 0.75rem' }} title="Manage Vendors & Suppliers">
-                <Building2 size={14} />
-                <span>Manage Vendors</span>
-              </button>
               <button 
                 onClick={handleDownloadInwardPdf} 
                 disabled={downloadingInwardPdf} 
@@ -3152,10 +3148,6 @@ export default function InventoryGrid({
               <button onClick={() => fetchOutwardData()} style={{ ...styles.refreshBtn, padding: '0.45rem 0.75rem' }} title="Refresh Outward Log">
                 <RefreshCw size={14} className={outwardLoading ? 'spin' : ''} />
                 <span>Refresh</span>
-              </button>
-              <button onClick={() => setShowPartyManager(true)} style={{ ...styles.partyBtn, padding: '0.45rem 0.75rem' }} title="Manage Recipient Parties">
-                <Building2 size={14} />
-                <span>Manage Parties</span>
               </button>
               <button 
                 onClick={handleDownloadOutwardPdf} 
