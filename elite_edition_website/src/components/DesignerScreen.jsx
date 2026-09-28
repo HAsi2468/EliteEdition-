@@ -41,7 +41,8 @@ import {
   ChevronDown,
   MessageSquare,
   Clipboard,
-  Send
+  Send,
+  Building2
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 import DesignImage from './DesignImage';
@@ -3358,46 +3359,123 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               );
             }
 
+            const allParties = Array.isArray(task.parties) && task.parties.length > 0
+              ? task.parties
+              : task.partyName ? task.partyName.split(',').map((s) => s.trim()).filter(Boolean) : (task.party ? [task.party] : []);
+
+            const taskImages = Array.from(
+              new Set([
+                ...(Array.isArray(task.outputImages) ? task.outputImages : []),
+                ...(task.outputImage ? [task.outputImage] : []),
+                ...(Array.isArray(task.finalDesignImages) ? task.finalDesignImages : []),
+                ...(Array.isArray(task.drowDesignImages) ? task.drowDesignImages : []),
+                ...(Array.isArray(task.colourMatchingImages) ? task.colourMatchingImages : []),
+                ...(Array.isArray(task.stage3Images) ? task.stage3Images : []),
+              ])
+            ).filter(Boolean);
+
+            const currentBadge = getTaskCurrentStatusBadge(task);
+            const statusOpts = getStatusDropdownOptions(task);
+            const isStatusDropdownOpen = openStatusDropdownId === task._id;
+            const CurrentIcon = currentBadge.icon;
+
+            const cardComments = Array.isArray(task.comments) ? task.comments : [];
+            const latestComment = cardComments.length > 0 ? cardComments[cardComments.length - 1] : null;
+            const fallbackNote = (!latestComment && task.notes && !task.sampleImage && !task.sampleLink) ? task.notes : '';
+            const displayText = latestComment ? latestComment.text : fallbackNote;
+
             return (
               <div
                 key={task._id}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (dragOverTaskId !== task._id) setDragOverTaskId(task._id);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverTaskId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverTaskId(null);
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleTableMultipleImageUpload(task, e.dataTransfer.files);
+                  }
+                }}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  background: dragOverTaskId === task._id ? '#ecfdf5' : '#ffffff',
+                  border: dragOverTaskId === task._id ? '2px dashed #10b981' : '1px solid #e2e8f0',
                   borderRadius: '16px',
-                  padding: '1.15rem',
+                  padding: '1.1rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.85rem',
+                  gap: '0.75rem',
                   boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   position: 'relative',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04)';
+                  if (dragOverTaskId !== task._id) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.boxShadow = '0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04)';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = '';
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 2px 10px rgba(15, 23, 42, 0.04)';
+                  if (dragOverTaskId !== task._id) {
+                    e.currentTarget.style.transform = '';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(15, 23, 42, 0.04)';
+                  }
                 }}
               >
+                {/* Drag & Drop Overlay Indicator */}
+                {dragOverTaskId === task._id && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(236, 253, 245, 0.95)',
+                      borderRadius: '16px',
+                      zIndex: 10,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      color: '#059669',
+                      fontWeight: 800,
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <Upload size={28} />
+                    <span>Drop images here to upload to {task.designName}!</span>
+                  </div>
+                )}
+
                 {/* ── Workflow Progress Pipeline Stepper ── */}
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     background: '#f8fafc',
-                    padding: '0.45rem 0.65rem',
+                    padding: '0.42rem 0.65rem',
                     borderRadius: '10px',
                     border: '1px solid #e2e8f0',
                   }}
                 >
-                  {/* Step 1: Drawing */}
-                  <div
+                  {/* Step 1: Drow */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
                     style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.3rem',
@@ -3405,7 +3483,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       fontSize: '0.7rem',
                       fontWeight: 800,
                     }}
-                    title={`Stage 1: ${task.drowDesignStatus || 'Pending'}`}
+                    title={`Stage 1 Drow: ${task.drowDesignStatus || 'Pending'}`}
                   >
                     <span
                       style={{
@@ -3425,13 +3503,19 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {progress.s1 === 'done' ? '✓' : '1'}
                     </span>
                     <span>Drow</span>
-                  </div>
+                  </button>
 
-                  <div style={{ flex: 1, height: '2px', background: progress.s1 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 6px', borderRadius: '1px' }} />
+                  <div style={{ flex: 1, height: '2px', background: progress.s1 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 5px', borderRadius: '1px' }} />
 
-                  {/* Step 2: Colour Match */}
-                  <div
+                  {/* Step 2: C.M. */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
                     style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.3rem',
@@ -3439,7 +3523,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       fontSize: '0.7rem',
                       fontWeight: 800,
                     }}
-                    title={`Stage 2: ${task.colourMatchingStatus || 'Pending'}`}
+                    title={`Stage 2 Colour Match: ${task.colourMatchingStatus || 'Pending'}`}
                   >
                     <span
                       style={{
@@ -3459,13 +3543,19 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {progress.s2 === 'done' ? '✓' : '2'}
                     </span>
                     <span>C.M.</span>
-                  </div>
+                  </button>
 
-                  <div style={{ flex: 1, height: '2px', background: progress.s2 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 6px', borderRadius: '1px' }} />
+                  <div style={{ flex: 1, height: '2px', background: progress.s2 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 5px', borderRadius: '1px' }} />
 
                   {/* Step 3: Hold / Continue */}
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
                     style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.3rem',
@@ -3493,13 +3583,19 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {progress.s3 === 'done' ? '✓' : progress.s3 === 'hold' ? '⏸' : '3'}
                     </span>
                     <span>{progress.s3 === 'hold' ? 'Hold' : progress.s3 === 'done' ? 'Continue' : 'Stage 3'}</span>
-                  </div>
+                  </button>
 
-                  <div style={{ flex: 1, height: '2px', background: progress.s3 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 6px', borderRadius: '1px' }} />
+                  <div style={{ flex: 1, height: '2px', background: progress.s3 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 5px', borderRadius: '1px' }} />
 
                   {/* Step 4: Final Approval */}
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
                     style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.3rem',
@@ -3527,147 +3623,145 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {progress.s4 === 'approved' ? '✓' : progress.s4 === 'rejected' ? '✕' : '4'}
                     </span>
                     <span>{progress.s4 === 'approved' ? 'Approved' : progress.s4 === 'rejected' ? 'Reject' : 'Approval'}</span>
+                  </button>
+                </div>
+
+                {/* ── Card Header: Date, Priority & Action Controls ── */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+                    {task.taskNumber && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#3b82f6', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '1px 6px', whiteSpace: 'nowrap' }}>
+                        #{task.taskNumber}
+                      </span>
+                    )}
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
+                      <Calendar size={11} /> {task.date}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        padding: '0.18rem 0.5rem',
+                        borderRadius: '6px',
+                        background: priorityConfig.bg,
+                        color: priorityConfig.color,
+                        border: `1px solid ${priorityConfig.border}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span>{priorityConfig.badge}</span>
+                      <span>{task.priority || 'Medium'}</span>
+                    </span>
+
+                    <button
+                      onClick={() => setHistoryTask(task)}
+                      title="View Complete Stage History"
+                      style={{
+                        padding: '0.25rem 0.45rem',
+                        background: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <History size={12} />
+                      <span>{task.stageHistory?.length || 0}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setCommentModalTask(task)}
+                      title="View & Add Comments"
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '6px',
+                        color: '#1d4ed8',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <MessageSquare size={12} />
+                      <span>{task.comments?.length || (task.notes ? 1 : 0)}</span>
+                    </button>
+
+                    {isUserAdmin && !embedded && (
+                      <>
+                        <button
+                          onClick={() => handleOpenEdit(task)}
+                          title="Edit Task"
+                          style={{
+                            padding: '0.25rem 0.45rem',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            color: '#1d4ed8',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTask(task)}
+                          title="Delete Task"
+                          style={{
+                            padding: '0.25rem 0.45rem',
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '6px',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* ── Card Header ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
-                      {task.taskNumber && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#3b82f6', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '1px 6px', whiteSpace: 'nowrap' }}>
-                          #{task.taskNumber}
-                        </span>
-                      )}
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
-                        <Calendar size={11} /> {task.date}
-                      </span>
-                    </div>
+                {/* ── Design Name Header ── */}
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: '1.25rem',
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    letterSpacing: '-0.01em',
+                  }}
+                  title={task.designName}
+                >
+                  {task.designName}
+                </h3>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '0.18rem 0.5rem',
-                          borderRadius: '6px',
-                          background: priorityConfig.bg,
-                          color: priorityConfig.color,
-                          border: `1px solid ${priorityConfig.border}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.2rem',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        <span>{priorityConfig.badge}</span>
-                        <span>{task.priority || 'Medium'}</span>
-                      </span>
-
-                      <button
-                        onClick={() => setHistoryTask(task)}
-                        title="View Complete Stage History"
-                        style={{
-                          padding: '0.25rem 0.45rem',
-                          background: '#f8fafc',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          color: '#475569',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.2rem',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                        }}
-                      >
-                        <History size={12} />
-                        <span>{task.stageHistory?.length || 0}</span>
-                      </button>
-
-                      <button
-                        onClick={() => setCommentModalTask(task)}
-                        title="View & Add Comments"
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: '#eff6ff',
-                          border: '1px solid #bfdbfe',
-                          borderRadius: '6px',
-                          color: '#1d4ed8',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.2rem',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                        }}
-                      >
-                        <MessageSquare size={12} />
-                        <span>{task.comments?.length || (task.notes ? 1 : 0)}</span>
-                      </button>
-
-                      {isUserAdmin && !embedded && (
-                        <>
-                          <button
-                            onClick={() => handleOpenEdit(task)}
-                            title="Edit Task"
-                            style={{
-                              padding: '0.25rem 0.45rem',
-                              background: '#f8fafc',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              color: '#1d4ed8',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <Edit2 size={12} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTask(task)}
-                            title="Delete Task"
-                            style={{
-                              padding: '0.25rem 0.45rem',
-                              background: '#fef2f2',
-                              border: '1px solid #fecaca',
-                              borderRadius: '6px',
-                              color: '#dc2626',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Design Name - Single Line Bold Header */}
-                  <h3
-                    style={{
-                      margin: '0.15rem 0 0',
-                      fontSize: '1.2rem',
-                      fontWeight: 800,
-                      color: '#0f172a',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      letterSpacing: '-0.01em',
-                    }}
-                    title={task.designName}
-                  >
-                    {task.designName}
-                  </h3>
-                </div>
-
-                {/* ── Metadata Badges (Designers, Fabrics, Colour Matches) ── */}
+                {/* ── Team, Fabric & Party Badges ── */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                   {allDesigners.map((d, i) => (
                     <span
-                      key={i}
+                      key={`des-${i}`}
                       style={{
                         fontSize: '0.72rem',
                         fontWeight: 700,
@@ -3686,7 +3780,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   ))}
                   {allFabrics.map((f, i) => (
                     <span
-                      key={i}
+                      key={`fab-${i}`}
                       style={{
                         fontSize: '0.72rem',
                         fontWeight: 700,
@@ -3705,7 +3799,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   ))}
                   {allColourMatches.map((c, i) => (
                     <span
-                      key={i}
+                      key={`cm-${i}`}
                       style={{
                         fontSize: '0.72rem',
                         fontWeight: 700,
@@ -3722,41 +3816,66 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       <Palette size={11} /> {c}
                     </span>
                   ))}
+                  {allParties.map((p, i) => (
+                    <span
+                      key={`pty-${i}`}
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#7e22ce',
+                        background: '#faf5ff',
+                        border: '1px solid #e9d5ff',
+                        borderRadius: '6px',
+                        padding: '0.18rem 0.5rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                      }}
+                    >
+                      <Building2 size={11} /> {p}
+                    </span>
+                  ))}
                 </div>
 
-                {/* ── Admin Sample Image / Reference Link ── */}
-                {(task.sampleImage || task.sampleLink) && (
-                  <div
-                    style={{
-                      background: '#f8fafc',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      padding: '0.55rem 0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                    }}
-                  >
-                    {task.sampleImage && (
+                {/* ── Media Showcase: Sample Reference + Multiple Uploaded Proofs ── */}
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    padding: '0.65rem 0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                  }}
+                >
+                  {/* Left: Sample Reference */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                    {task.sampleImage ? (
                       <div
                         onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
                         style={{
-                          width: '46px',
-                          height: '46px',
-                          borderRadius: '6px',
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '8px',
                           overflow: 'hidden',
-                          border: '1px solid #cbd5e1',
+                          border: '1.5px solid #cbd5e1',
                           cursor: 'pointer',
                           position: 'relative',
-                          flexShrink: 0,
+                          background: '#ffffff',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
+                          transition: 'transform 0.15s ease',
                         }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                        title="Click to zoom sample image"
                       >
                         <img src={task.sampleImage} alt="Sample" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <div
                           style={{
                             position: 'absolute',
                             inset: 0,
-                            background: 'rgba(0,0,0,0.3)',
+                            background: 'rgba(0,0,0,0.25)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -3766,638 +3885,572 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                           }}
                           className="hover:opacity-100"
                         >
-                          <Eye size={13} />
+                          <Eye size={14} />
                         </div>
                       </div>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                        Admin Reference & Sample
+                    ) : task.sampleLink ? (
+                      <a
+                        href={task.sampleLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '8px',
+                          border: '1px dashed #93c5fd',
+                          background: '#eff6ff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#2563eb',
+                          textDecoration: 'none',
+                          gap: '2px',
+                        }}
+                        title="Open reference link"
+                      >
+                        <ExternalLink size={14} />
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800 }}>Link</span>
+                      </a>
+                    ) : (
+                      <div
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '8px',
+                          border: '1px dashed #cbd5e1',
+                          background: '#ffffff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#94a3b8',
+                          gap: '2px',
+                        }}
+                        title="No sample reference provided"
+                      >
+                        <ImageIcon size={16} />
+                        <span style={{ fontSize: '0.58rem', fontWeight: 700 }}>No Ref</span>
                       </div>
-                      {task.sampleLink && (
-                        <a
-                          href={task.sampleLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            fontSize: '0.74rem',
-                            color: '#2563eb',
-                            fontWeight: 700,
-                            textDecoration: 'none',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            marginTop: '0.15rem',
-                            maxWidth: '100%',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <ExternalLink size={12} /> Open Sample Link / Video
-                        </a>
+                    )}
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Sample Ref</span>
+                  </div>
+
+                  <div style={{ width: '1px', alignSelf: 'stretch', background: '#e2e8f0' }} />
+
+                  {/* Right: Uploaded Images & Proofs (with + Upload button & drag/drop) */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        Uploaded Proofs ({taskImages.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMultipleUploadModalTask(task);
+                          setMultiUploadFiles([]);
+                          setMultiUploadPreviews([]);
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.2rem',
+                          padding: '0.22rem 0.5rem',
+                          borderRadius: '6px',
+                          background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
+                          border: uploadingRowId === task._id ? '1px dashed #6366f1' : '1px dashed #86efac',
+                          color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
+                        }}
+                        title="Click to open image uploader (supports Drag & Drop and Copy/Paste)"
+                      >
+                        {uploadingRowId === task._id ? (
+                          <>
+                            <RefreshCw size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                            <span>{uploadRowProgress}%</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={10} />
+                            <span>+ Upload</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Thumbnails strip */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                      {taskImages.length === 0 ? (
+                        <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                          Drop images or paste to upload
+                        </span>
+                      ) : (
+                        <>
+                          {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
+                            <div
+                              key={`thumb-${imgIdx}`}
+                              onClick={() => handleOpenLightbox(taskImages, imgIdx, `Uploaded Images: ${task.designName}`)}
+                              style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                border: '1px solid #cbd5e1',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                background: '#ffffff',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                flexShrink: 0,
+                              }}
+                              title="Click to view image"
+                            >
+                              <img src={imgUrl} alt={`Proof ${imgIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                          ))}
+
+                          {taskImages.length > 3 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLightbox(taskImages, 3, `Uploaded Images: ${task.designName}`)}
+                              style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '6px',
+                                background: '#f1f5f9',
+                                border: '1px solid #cbd5e1',
+                                color: '#475569',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                              title={`View all ${taskImages.length} images`}
+                            >
+                              +{taskImages.length - 3}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* ── Card Comments & Thread Bar (Unified, No Duplicate Note) ── */}
-                {(() => {
-                  const cardComments = Array.isArray(task.comments) ? task.comments : [];
-                  const latestComment = cardComments.length > 0 ? cardComments[cardComments.length - 1] : null;
-                  const fallbackNote = (!latestComment && task.notes && !task.sampleImage && !task.sampleLink) ? task.notes : '';
-                  const displayText = latestComment ? latestComment.text : fallbackNote;
+                {/* ── Interactive Stage & Status Controller ── */}
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '0.65rem 0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.55rem',
+                  }}
+                >
+                  {/* Top: 1-Click Status Dropdown & Stage Proof Counters */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {/* 1-Click Status Dropdown (from Table View) */}
+                    <div className="status-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenStatusDropdownId(isStatusDropdownOpen ? null : task._id)}
+                        style={{
+                          padding: '0.35rem 0.65rem',
+                          borderRadius: '7px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          border: `1.5px solid ${currentBadge.border}`,
+                          background: currentBadge.bg,
+                          color: currentBadge.color,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title="Click to select status action"
+                      >
+                        {CurrentIcon && <CurrentIcon size={12} />}
+                        <span>{currentBadge.label}</span>
+                        <ChevronDown size={12} style={{ transform: isStatusDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                      </button>
 
-                  return (
-                    <div
-                      onClick={() => setCommentModalTask(task)}
-                      style={{
-                        background: displayText ? '#f8fafc' : '#ffffff',
-                        border: displayText ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
-                        borderRadius: '8px',
-                        padding: '0.45rem 0.65rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.5rem',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#94a3b8';
-                        e.currentTarget.style.background = '#f1f5f9';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = displayText ? '#e2e8f0' : '#cbd5e1';
-                        e.currentTarget.style.background = displayText ? '#f8fafc' : '#ffffff';
-                      }}
-                      title="Click to view all comments, author history and add replies"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, flex: 1 }}>
+                      {/* Floating Dropdown Menu with 5 options */}
+                      {isStatusDropdownOpen && (
                         <div
                           style={{
-                            width: '22px',
-                            height: '22px',
-                            borderRadius: '50%',
-                            background: latestComment ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#e2e8f0',
-                            color: latestComment ? '#ffffff' : '#64748b',
-                            fontSize: '0.62rem',
-                            fontWeight: 800,
+                            position: 'absolute',
+                            top: 'calc(100% + 4px)',
+                            left: 0,
+                            zIndex: 9999,
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                            minWidth: '220px',
+                            padding: '0.35rem',
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
+                            flexDirection: 'column',
+                            gap: '0.2rem',
                           }}
                         >
-                          {latestComment ? (latestComment.authorName || 'U').charAt(0).toUpperCase() : <MessageSquare size={11} />}
-                        </div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: latestComment ? '#1e293b' : '#64748b', whiteSpace: 'nowrap' }}>
-                              {latestComment ? (latestComment.authorName || 'User') : 'Discussion & Notes'}
-                            </span>
-                            {latestComment?.authorRole && (
-                              <span style={{ fontSize: '0.58rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', borderRadius: '3px', padding: '0 4px', whiteSpace: 'nowrap' }}>
-                                {latestComment.authorRole}
-                              </span>
-                            )}
+                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
+                            Select Stage Status
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: displayText ? '#334155' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: displayText ? 'normal' : 'italic' }}>
-                            {displayText || '+ Add comment...'}
-                          </div>
+                          {statusOpts.map((opt) => {
+                            const OptIcon = opt.icon;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => handleDirectStatusChange(task, opt)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.45rem',
+                                  width: '100%',
+                                  padding: '0.42rem 0.55rem',
+                                  borderRadius: '6px',
+                                  border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
+                                  background: opt.isActive ? opt.bg : 'transparent',
+                                  color: opt.color,
+                                  fontSize: '0.74rem',
+                                  fontWeight: opt.isActive ? 800 : 700,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  transition: 'background 0.12s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!opt.isActive) e.currentTarget.style.background = '#f8fafc';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!opt.isActive) e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                <OptIcon size={13} color={opt.color} />
+                                <span style={{ flex: 1 }}>{opt.label}</span>
+                                {opt.isActive && <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>✓</span>}
+                              </button>
+                            );
+                          })}
                         </div>
+                      )}
+                    </div>
+
+                    {/* Stage Proof Counters */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      {drowImgs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
+                          style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700 }}
+                          title={`${drowImgs.length} Drow proof image(s)`}
+                        >
+                          🖼️ {drowImgs.length}
+                        </button>
+                      )}
+                      {cmImgs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
+                          style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#db2777', fontSize: '0.68rem', fontWeight: 700 }}
+                          title={`${cmImgs.length} Colour proof image(s)`}
+                        >
+                          🎨 {cmImgs.length}
+                        </button>
+                      )}
+                      {stage3Imgs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
+                          style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#ea580c', fontSize: '0.68rem', fontWeight: 700 }}
+                          title={`${stage3Imgs.length} Stage 3 proof image(s)`}
+                        >
+                          ⏸️ {stage3Imgs.length}
+                        </button>
+                      )}
+                      {finalImgs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
+                          style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#16a34a', fontSize: '0.68rem', fontWeight: 700 }}
+                          title={`${finalImgs.length} Final proof image(s)`}
+                        >
+                          ✨ {finalImgs.length}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Compact 2x2 Stages Panel */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+                    {/* Stage 1: Drow */}
+                    <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <Clock size={11} color="#2563eb" /> 1. Drow
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
+                          style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
+                          title="Upload Drow Proof"
+                        >
+                          +Proof
+                        </button>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                        {cardComments.length > 0 && (
-                          <span
-                            style={{
-                              fontSize: '0.62rem',
-                              fontWeight: 800,
-                              background: '#eff6ff',
-                              color: '#2563eb',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '10px',
-                              padding: '1px 6px',
-                            }}
-                          >
-                            💬 {cardComments.length}
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        {DROW_STATUS_OPTIONS.map((opt) => {
+                          const isActive = task.drowDesignStatus === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', opt.id)}
+                              style={{
+                                flex: 1,
+                                padding: '0.24rem 0.35rem',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                                background: isActive ? opt.bg : '#ffffff',
+                                color: isActive ? opt.color : '#475569',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                              title={opt.label}
+                            >
+                              {isActive && '✓ '}{opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Stage 2: Colour Match */}
+                    <div style={{ background: '#fdf4f8', border: '1px solid #fbcfe8', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9d174d', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <Palette size={11} color="#db2777" /> 2. C.M.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
+                          style={{ background: 'none', border: 'none', padding: 0, color: '#db2777', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
+                          title="Upload Colour Match Proof"
+                        >
+                          +Proof
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        {COLOUR_MATCHING_OPTIONS.map((opt) => {
+                          const isActive = task.colourMatchingStatus === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', opt.id)}
+                              style={{
+                                flex: 1,
+                                padding: '0.24rem 0.35rem',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                                background: isActive ? opt.bg : '#ffffff',
+                                color: isActive ? opt.color : '#475569',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                              title={opt.label}
+                            >
+                              {isActive && '✓ '}{opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Stage 3: Hold / Continue */}
+                    <div style={{ background: '#fffbf5', border: '1px solid #fed7aa', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <AlertTriangle size={11} color="#ea580c" /> 3. Stage 3
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
+                          style={{ background: 'none', border: 'none', padding: 0, color: '#ea580c', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
+                          title="Upload Stage 3 Proof"
+                        >
+                          +Proof
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        {STAGE_3_OPTIONS.map((opt) => {
+                          const isActive = task.stage3Status === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', opt.id)}
+                              style={{
+                                flex: 1,
+                                padding: '0.24rem 0.35rem',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                                background: isActive ? opt.bg : '#ffffff',
+                                color: isActive ? opt.color : '#475569',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                              title={opt.label}
+                            >
+                              {isActive && '✓ '}{opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Stage 4: Approval */}
+                    <div style={{ background: '#f9fdfa', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <CheckCircle2 size={11} color="#16a34a" /> 4. Approval
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
+                          style={{ background: 'none', border: 'none', padding: 0, color: '#15803d', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
+                          title="Upload Final Proof"
+                        >
+                          +Proof
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        {FINAL_DESIGN_OPTIONS.map((opt) => {
+                          const isActive =
+                            task.finalDesignStatus === opt.id ||
+                            (opt.id === 'Reject' && task.finalDesignStatus?.toLowerCase().startsWith('reject')) ||
+                            (opt.id === 'Approved' && (task.finalDesignStatus === 'APPROVED SAMPLE' || task.finalDesignStatus === 'Approved'));
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', opt.id)}
+                              style={{
+                                flex: 1,
+                                padding: '0.24rem 0.35rem',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                                background: isActive ? opt.bg : '#ffffff',
+                                color: isActive ? opt.color : '#475569',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                              title={opt.label}
+                            >
+                              {isActive && '✓ '}{opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Card Comments & Thread Bar ── */}
+                <div
+                  onClick={() => setCommentModalTask(task)}
+                  style={{
+                    background: displayText ? '#f8fafc' : '#ffffff',
+                    border: displayText ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
+                    borderRadius: '8px',
+                    padding: '0.45rem 0.65rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#94a3b8';
+                    e.currentTarget.style.background = '#f1f5f9';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = displayText ? '#e2e8f0' : '#cbd5e1';
+                    e.currentTarget.style.background = displayText ? '#f8fafc' : '#ffffff';
+                  }}
+                  title="Click to view all comments, author history and add replies"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        background: latestComment ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#e2e8f0',
+                        color: latestComment ? '#ffffff' : '#64748b',
+                        fontSize: '0.62rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {latestComment ? (latestComment.authorName || 'U').charAt(0).toUpperCase() : <MessageSquare size={11} />}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: latestComment ? '#1e293b' : '#64748b', whiteSpace: 'nowrap' }}>
+                          {latestComment ? (latestComment.authorName || 'User') : 'Discussion & Notes'}
+                        </span>
+                        {latestComment?.authorRole && (
+                          <span style={{ fontSize: '0.58rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', borderRadius: '3px', padding: '0 4px', whiteSpace: 'nowrap' }}>
+                            {latestComment.authorRole}
                           </span>
                         )}
-                        <Edit2 size={11} color="#94a3b8" />
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: displayText ? '#334155' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: displayText ? 'normal' : 'italic' }}>
+                        {displayText || '+ Add comment...'}
                       </div>
                     </div>
-                  );
-                })()}
-
-                {/* ── STAGE 1: DROW DESIGN STATUS ─────────────────────────────────── */}
-                <div
-                  style={{
-                    background: '#f8faff',
-                    border: '1px solid #dbeafe',
-                    borderRadius: '10px',
-                    padding: '0.65rem 0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Clock size={13} color="#2563eb" />
-                      <span>1. DROW DESIGN STATUS</span>
-                    </div>
-                    {task.drowDesignStatus ? (
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                    {cardComments.length > 0 && (
                       <span
                         style={{
-                          fontSize: '0.68rem',
+                          fontSize: '0.62rem',
                           fontWeight: 800,
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '6px',
-                          background:
-                            task.drowDesignStatus === 'START WORKING' || task.drowDesignStatus === 'Start Design'
-                              ? '#dbeafe'
-                              : task.drowDesignStatus === 'Final Sample'
-                              ? '#e0e7ff'
-                              : '#fef3c7',
-                          color:
-                            task.drowDesignStatus === 'START WORKING' || task.drowDesignStatus === 'Start Design'
-                              ? '#1e40af'
-                              : task.drowDesignStatus === 'Final Sample'
-                              ? '#3730a3'
-                              : '#92400e',
-                          border: '1px solid rgba(0,0,0,0.06)',
-                        }}
-                      >
-                        {task.drowDesignStatus}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending</span>
-                    )}
-                  </div>
-
-                  {/* Quick Status Buttons */}
-                  {!embedded && (
-                    <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.45rem' }}>
-                      {DROW_STATUS_OPTIONS.map((opt) => {
-                        const isActive = task.drowDesignStatus === opt.id;
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', opt.id)}
-                            style={{
-                              flex: 1,
-                              padding: '0.32rem 0.45rem',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                              background: isActive ? opt.bg : '#ffffff',
-                              color: isActive ? opt.color : '#475569',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.2rem',
-                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            {isActive && <Check size={11} />}
-                            <span>{opt.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Stored Images Gallery for Drow Design */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
-                      {drowImgs.length > 0 ? (
-                        drowImgs.map((imgUrl, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => handleOpenLightbox(drowImgs, idx, `Drow Proof: ${task.designName}`)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '5px',
-                              overflow: 'hidden',
-                              border: '1px solid #bfdbfe',
-                              cursor: 'pointer',
-                              position: 'relative',
-                            }}
-                            title={`Drow Image #${idx + 1}`}
-                          >
-                            <img src={imgUrl} alt={`Drow ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No proofs uploaded</span>
-                      )}
-                    </div>
-
-                    {!embedded && (
-                      <button
-                        onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
-                        style={{
-                          padding: '0.25rem 0.55rem',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          background: '#ffffff',
+                          background: '#eff6ff',
+                          color: '#2563eb',
                           border: '1px solid #bfdbfe',
-                          borderRadius: '5px',
-                          color: '#1d4ed8',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
+                          borderRadius: '10px',
+                          padding: '1px 6px',
                         }}
                       >
-                        <Upload size={11} /> + Proof
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── STAGE 2: COLOUR MATCHING STATUS ────────────────────────────── */}
-                <div
-                  style={{
-                    background: '#fdf4f8',
-                    border: '1px solid #fbcfe8',
-                    borderRadius: '10px',
-                    padding: '0.65rem 0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9d174d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Palette size={13} color="#db2777" />
-                      <span>2. COLOUR MATCHING STATUS</span>
-                    </div>
-                    {task.colourMatchingStatus ? (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '6px',
-                          background:
-                            task.colourMatchingStatus === 'COLOUR PANTON' || task.colourMatchingStatus === 'Start Design'
-                              ? '#fce7f3'
-                              : task.colourMatchingStatus === 'Final Sample'
-                              ? '#e0e7ff'
-                              : '#fef3c7',
-                          color:
-                            task.colourMatchingStatus === 'COLOUR PANTON' || task.colourMatchingStatus === 'Start Design'
-                              ? '#9d174d'
-                              : task.colourMatchingStatus === 'Final Sample'
-                              ? '#3730a3'
-                              : '#92400e',
-                          border: '1px solid rgba(0,0,0,0.06)',
-                        }}
-                      >
-                        {task.colourMatchingStatus}
+                        💬 {cardComments.length}
                       </span>
-                    ) : (
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending</span>
                     )}
-                  </div>
-
-                  {/* Quick Status Buttons */}
-                  {!embedded && (
-                    <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.45rem' }}>
-                      {COLOUR_MATCHING_OPTIONS.map((opt) => {
-                        const isActive = task.colourMatchingStatus === opt.id;
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', opt.id)}
-                            style={{
-                              flex: 1,
-                              padding: '0.32rem 0.45rem',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                              background: isActive ? opt.bg : '#ffffff',
-                              color: isActive ? opt.color : '#475569',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.2rem',
-                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            {isActive && <Check size={11} />}
-                            <span>{opt.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Stored Images Gallery for Colour Matching */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
-                      {cmImgs.length > 0 ? (
-                        cmImgs.map((imgUrl, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => handleOpenLightbox(cmImgs, idx, `Colour Proof: ${task.designName}`)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '5px',
-                              overflow: 'hidden',
-                              border: '1px solid #fbcfe8',
-                              cursor: 'pointer',
-                              position: 'relative',
-                            }}
-                            title={`C.M. Image #${idx + 1}`}
-                          >
-                            <img src={imgUrl} alt={`CM ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No proofs uploaded</span>
-                      )}
-                    </div>
-
-                    {!embedded && (
-                      <button
-                        onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
-                        style={{
-                          padding: '0.25rem 0.55rem',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          background: '#ffffff',
-                          border: '1px solid #fbcfe8',
-                          borderRadius: '5px',
-                          color: '#be185d',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}
-                      >
-                        <Upload size={11} /> + Proof
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── STAGE 3: HOLD / CONTINUE STATUS ────────────────────────────── */}
-                <div
-                  style={{
-                    background: '#fffbf5',
-                    border: '1px solid #fed7aa',
-                    borderRadius: '10px',
-                    padding: '0.65rem 0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <AlertTriangle size={13} color="#ea580c" />
-                      <span>3. HOLD / CONTINUE STATUS</span>
-                    </div>
-                    {task.stage3Status ? (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '6px',
-                          background:
-                            task.stage3Status === 'Continue'
-                              ? '#eff6ff'
-                              : '#fff7ed',
-                          color:
-                            task.stage3Status === 'Continue'
-                              ? '#0284c7'
-                              : '#ea580c',
-                          border: '1px solid rgba(0,0,0,0.06)',
-                        }}
-                      >
-                        {task.stage3Status}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending</span>
-                    )}
-                  </div>
-
-                  {/* Quick Status Buttons */}
-                  {!embedded && (
-                    <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.45rem' }}>
-                      {STAGE_3_OPTIONS.map((opt) => {
-                        const isActive = task.stage3Status === opt.id;
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', opt.id)}
-                            style={{
-                              flex: 1,
-                              padding: '0.32rem 0.45rem',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                              background: isActive ? opt.bg : '#ffffff',
-                              color: isActive ? opt.color : '#475569',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.2rem',
-                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            {isActive && <Check size={11} />}
-                            <span>{opt.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Stored Images Gallery for Stage 3 */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
-                      {stage3Imgs.length > 0 ? (
-                        stage3Imgs.map((imgUrl, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => handleOpenLightbox(stage3Imgs, idx, `Stage 3 Proof: ${task.designName}`)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '5px',
-                              overflow: 'hidden',
-                              border: '1px solid #fed7aa',
-                              cursor: 'pointer',
-                              position: 'relative',
-                            }}
-                            title={`Stage 3 Image #${idx + 1}`}
-                          >
-                            <img src={imgUrl} alt={`Stage 3 ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No proofs uploaded</span>
-                      )}
-                    </div>
-
-                    {!embedded && (
-                      <button
-                        onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
-                        style={{
-                          padding: '0.25rem 0.55rem',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          background: '#ffffff',
-                          border: '1px solid #fed7aa',
-                          borderRadius: '5px',
-                          color: '#c2410c',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}
-                      >
-                        <Upload size={11} /> + Proof
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── STAGE 4: FINAL APPROVAL STATUS ───────────────────────────────── */}
-                <div
-                  style={{
-                    background: '#f9fdfa',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '10px',
-                    padding: '0.65rem 0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <CheckCircle2 size={13} color="#16a34a" />
-                      <span>4. FINAL APPROVAL STATUS</span>
-                    </div>
-                    {task.finalDesignStatus ? (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '6px',
-                          background:
-                            task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                              ? '#dcfce7'
-                              : task.finalDesignStatus === 'Reject' || task.finalDesignStatus.startsWith('REJECT')
-                              ? '#fee2e2'
-                              : '#e0e7ff',
-                          color:
-                            task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
-                              ? '#15803d'
-                              : task.finalDesignStatus === 'Reject' || task.finalDesignStatus.startsWith('REJECT')
-                              ? '#b91c1c'
-                              : '#3730a3',
-                          border: '1px solid rgba(0,0,0,0.06)',
-                        }}
-                      >
-                        {task.finalDesignStatus}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending Review</span>
-                    )}
-                  </div>
-
-                  {/* Action Buttons for Final Design */}
-                  {!embedded && (
-                    <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.45rem' }}>
-                      {FINAL_DESIGN_OPTIONS.map((opt) => {
-                        const isActive =
-                          task.finalDesignStatus === opt.id ||
-                          (opt.id === 'Reject' && task.finalDesignStatus?.toLowerCase().startsWith('reject')) ||
-                          (opt.id === 'Approved' && (task.finalDesignStatus === 'APPROVED SAMPLE' || task.finalDesignStatus === 'Approved'));
-                        const IconComp = opt.icon || CheckCircle2;
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', opt.id)}
-                            style={{
-                              flex: 1,
-                              padding: '0.32rem 0.45rem',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                              background: isActive ? opt.bg : '#ffffff',
-                              color: isActive ? opt.color : '#475569',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.25rem',
-                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <IconComp size={11} color={isActive ? opt.color : '#64748b'} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Stored Images Gallery for Final Design */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
-                      {finalImgs.length > 0 ? (
-                        finalImgs.map((imgUrl, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => handleOpenLightbox(finalImgs, idx, `Final Proof: ${task.designName}`)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '5px',
-                              overflow: 'hidden',
-                              border: '1px solid #bbf7d0',
-                              cursor: 'pointer',
-                              position: 'relative',
-                            }}
-                            title={`Final Image #${idx + 1}`}
-                          >
-                            <img src={imgUrl} alt={`Final ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No final proofs</span>
-                      )}
-                    </div>
-
-                    {!embedded && (
-                      <button
-                        onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
-                        style={{
-                          padding: '0.25rem 0.55rem',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          background: '#ffffff',
-                          border: '1px solid #bbf7d0',
-                          borderRadius: '5px',
-                          color: '#15803d',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}
-                      >
-                        <Upload size={11} /> + Proof
-                      </button>
-                    )}
+                    <Edit2 size={11} color="#94a3b8" />
                   </div>
                 </div>
               </div>
