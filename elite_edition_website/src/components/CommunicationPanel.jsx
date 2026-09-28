@@ -1749,7 +1749,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       const res = await api.getCommunicationUsers(uId);
       if (res.success && res.data) {
         setAllUsers(res.data);
-        setSelectedMemberIds(res.data.map((u) => String(u._id)));
+        // Start with only the current user selected instead of all members
+        const currentIdStr = uId ? String(uId) : null;
+        setSelectedMemberIds(currentIdStr ? [currentIdStr] : []);
       }
     } catch (err) {
       console.error('Failed to fetch users for group creation:', err);
@@ -1787,6 +1789,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         description: newGroupDesc.trim(),
         department: newGroupDept,
         memberIds: selectedMemberIds,
+        members: selectedMemberIds,
         userId: myId
       });
 

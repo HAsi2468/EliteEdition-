@@ -666,41 +666,67 @@ const createOrGetDirectRoom = async (req, res) => {
  */
 const createGroup = async (req, res) => {
   try {
-    const { name, description = '', department = 'General', companyEntity = '', permissionScope = 'general', subscribedModules = [], subscribedActions = [] } = req.body;
+    const {
+      name,
+      description = '',
+      department = 'General',
+      companyEntity = '',
+      permissionScope = 'general',
+      subscribedModules = [],
+      subscribedActions = [],
+      memberIds: requestedMemberIds = [],
+      members: requestedMembers = []
+    } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Group name is required' });
     }
 
-    const allUsers = await User.find({}).lean();
-    const scope = (permissionScope || '').toLowerCase();
-    const targetComp = (companyEntity || '').trim().toLowerCase();
-
-    const matchingUsers = allUsers.filter(u => {
-      if (u.role === 'admin') return true;
-
-      if (targetComp) {
-        const userCompanies = Array.isArray(u.allowedCompanies)
-          ? u.allowedCompanies.map(c => String(c).trim().toLowerCase())
-          : [];
-        if (userCompanies.length > 0 && !userCompanies.includes(targetComp) && !userCompanies.includes('all')) {
-          return false;
-        }
-      }
-
-      if (!u.permissions || !Array.isArray(u.permissions)) return false;
-      if (!scope || scope === 'general' || scope === 'direct_msg') return true;
-
-      return u.permissions.some(p => {
-        const perm = (p || '').toLowerCase();
-        return perm === scope || perm.startsWith(scope) || scope.startsWith(perm);
-      });
-    });
-
     const creatorId = req.user ? req.user._id : (req.body.userId || req.query.userId);
-    let memberIds = matchingUsers.map(u => String(u._id));
-    if (creatorId && !memberIds.includes(String(creatorId))) {
-      memberIds.push(String(creatorId));
+
+    // If caller explicitly selected members, respect that exact member list!
+    const explicitIds = (Array.isArray(requestedMemberIds) && requestedMemberIds.length > 0)
+      ? requestedMemberIds
+      : ((Array.isArray(requestedMembers) && requestedMembers.length > 0) ? requestedMembers : []);
+
+    let finalMemberIds = [];
+
+    if (explicitIds.length > 0) {
+      finalMemberIds = Array.from(new Set(explicitIds.map(id => String(id).trim()))).filter(Boolean);
+      if (creatorId && !finalMemberIds.includes(String(creatorId))) {
+        finalMemberIds.push(String(creatorId));
+      }
+    } else {
+      // Fallback: only if no explicit members were selected, match users by scope/company
+      const allUsers = await User.find({}).lean();
+      const scope = (permissionScope || '').toLowerCase();
+      const targetComp = (companyEntity || '').trim().toLowerCase();
+
+      const matchingUsers = allUsers.filter(u => {
+        if (u.role === 'admin') return true;
+
+        if (targetComp) {
+          const userCompanies = Array.isArray(u.allowedCompanies)
+            ? u.allowedCompanies.map(c => String(c).trim().toLowerCase())
+            : [];
+          if (userCompanies.length > 0 && !userCompanies.includes(targetComp) && !userCompanies.includes('all')) {
+            return false;
+          }
+        }
+
+        if (!u.permissions || !Array.isArray(u.permissions)) return false;
+        if (!scope || scope === 'general' || scope === 'direct_msg') return true;
+
+        return u.permissions.some(p => {
+          const perm = (p || '').toLowerCase();
+          return perm === scope || perm.startsWith(scope) || scope.startsWith(perm);
+        });
+      });
+
+      finalMemberIds = matchingUsers.map(u => String(u._id));
+      if (creatorId && !finalMemberIds.includes(String(creatorId))) {
+        finalMemberIds.push(String(creatorId));
+      }
     }
 
     const room = await ChatRoom.create({
@@ -713,7 +739,7 @@ const createGroup = async (req, res) => {
       isSystemGroup: false,
       subscribedModules: subscribedModules || [],
       subscribedActions: subscribedActions || [],
-      members: memberIds
+      members: finalMemberIds
     });
 
     const populatedRoom = await ChatRoom.findById(room._id).populate('members', 'name email role permissions department allowedCompanies');

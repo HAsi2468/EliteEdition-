@@ -98,6 +98,7 @@ async function syncCommunicationGroups() {
     const allRooms = await ChatRoom.find({ isArchived: { $ne: true } });
     for (const room of allRooms) {
       if (room.type === 'direct') continue; // Don't modify 1-on-1 private DMs
+      if (!room.isSystemGroup) continue; // CRITICAL: NEVER overwrite custom groups created by users/admins! Only sync automated system authority groups!
 
       const scope = (room.permissionScope || '').toLowerCase();
       const roomCompany = (room.companyEntity || '').trim().toLowerCase();
