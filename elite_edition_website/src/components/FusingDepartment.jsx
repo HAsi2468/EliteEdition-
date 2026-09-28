@@ -11,7 +11,8 @@ import { triggerPushNotification, triggerGlobalDataRefresh } from './Notificatio
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
-import DateRangePicker from './DateRangePicker';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
   const hours = new Date().getHours();
@@ -77,13 +78,42 @@ export default function FusingDepartment() {
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Fusing Pending', 'Fusing Done'
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Ready for Fusing', 'Fusing Pending', 'Fusing In Progress', 'Fusing Done', 'Rejected'
   const [filterMachine, setFilterMachine] = useState('');
+  const [filterOperator, setFilterOperator] = useState('');
   const [datePreset, setDatePreset] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
+
+  // Pagination State for INP & Fast Instant Chunking
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Network Resilience State (Offline / Low-Network Shop Floor detection)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Debounce search query (280ms) for INP < 100ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Tab & Form Collapsed State
   const [activeFusingTab, setActiveFusingTab] = useState('entry'); // 'entry' | 'queue'
@@ -842,28 +872,84 @@ export default function FusingDepartment() {
     }
   };
 
-  // Filtered Cards
+  // Unique Operator & Machine Options for Quick Filters
+  const uniqueOperators = useMemo(() => {
+    const set = new Set();
+    cards.forEach(c => {
+      if (c.fusingOperator && String(c.fusingOperator).trim()) {
+        set.add(String(c.fusingOperator).trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [cards]);
+
+  const uniqueMachines = useMemo(() => {
+    const set = new Set(DEFAULT_FUSING_MACHINES);
+    cards.forEach(c => {
+      if (c.fusingMachine && String(c.fusingMachine).trim()) {
+        set.add(String(c.fusingMachine).trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [cards]);
+
+  // Dynamic Date Range calculation from DateRangePicker presets
+  const activeDateRange = useMemo(() => {
+    if (datePreset === 'custom') {
+      return { start: customDateStart, end: customDateEnd };
+    }
+    if (datePreset && datePreset !== 'all') {
+      try {
+        return getDatePresetRange(datePreset) || { start: '', end: '' };
+      } catch (e) {
+        return { start: '', end: '' };
+      }
+    }
+    return { start: dateStart || '', end: dateEnd || '' };
+  }, [datePreset, customDateStart, customDateEnd, dateStart, dateEnd]);
+
+  // Filtered Cards with full debouncing & enterprise status filters
   const filteredCards = useMemo(() => {
     return cards.filter(c => {
-      if (searchQuery && !matchSearchQuery(c, searchQuery, ['jobNo', 'party', 'designName', 'fabric', 'fusingOperator', 'fusingMachine'])) {
+      if (debouncedSearch && !matchSearchQuery(c, debouncedSearch, ['jobNo', 'party', 'designName', 'fabric', 'fusingOperator', 'fusingMachine'])) {
         return false;
       }
       if (statusFilter !== 'All') {
         const curStatus = c.fusingStatus || 'Fusing Pending';
         if (statusFilter === 'Ready for Fusing') {
           if (c.printStatus !== 'Printing Done' || curStatus === 'Fusing Done') return false;
-        } else if (statusFilter === 'Fusing Pending' && curStatus === 'Fusing Done') return false;
-        else if (statusFilter === 'Fusing Done' && curStatus !== 'Fusing Done') return false;
+        } else if (statusFilter === 'Fusing Pending' || statusFilter === 'Pending') {
+          if (curStatus === 'Fusing Done' || curStatus === 'Fusing In Progress' || curStatus === 'Partial Complete') return false;
+        } else if (statusFilter === 'Fusing In Progress' || statusFilter === 'In-Process') {
+          if (curStatus !== 'Fusing In Progress' && curStatus !== 'Partial Complete') return false;
+        } else if (statusFilter === 'Fusing Done' || statusFilter === 'Completed') {
+          if (curStatus !== 'Fusing Done') return false;
+        } else if (statusFilter === 'Rejected') {
+          const waste = parseFloat(c.totalWastageMtr || 0);
+          if (waste <= 0) return false;
+        }
       }
       if (filterMachine && (c.fusingMachine || '') !== filterMachine) {
         return false;
       }
-      if (dateStart && c.fusingDate && c.fusingDate < dateStart) return false;
-      if (dateEnd && c.fusingDate && c.fusingDate > dateEnd) return false;
+      if (filterOperator && (c.fusingOperator || '') !== filterOperator) {
+        return false;
+      }
+      const cDate = c.fusingDate || c.date;
+      if (activeDateRange.start && cDate && cDate < activeDateRange.start) return false;
+      if (activeDateRange.end && cDate && cDate > activeDateRange.end) return false;
 
       return true;
     });
-  }, [cards, searchQuery, statusFilter, filterMachine, dateStart, dateEnd]);
+  }, [cards, debouncedSearch, statusFilter, filterMachine, filterOperator, activeDateRange]);
+
+  // Paginated Chunking for INP < 100ms
+  const paginatedCards = useMemo(() => {
+    const startIdx = (currentPage - 1) * pageSize;
+    return filteredCards.slice(startIdx, startIdx + pageSize);
+  }, [filteredCards, currentPage, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCards.length / pageSize));
 
   // Statistics calculation
   const stats = useMemo(() => {
@@ -982,107 +1068,117 @@ export default function FusingDepartment() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+    <div className="fusing-module-container">
 
-      {/* ── TOP NAVIGATION TABS ── */}
-      <div style={{ display: 'flex', gap: '0.75rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.6rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+      {/* ── FACTORY NETWORK RESILIENCE BANNER ── */}
+      {!isOnline && (
+        <div className="fusing-network-banner" role="alert">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} />
+            <span>Factory Low-Network / Offline Mode: Displaying cached local fusing records.</span>
+          </div>
           <button
             type="button"
-            onClick={() => setActiveFusingTab('entry')}
-            style={{
-              padding: '0.6rem 1.25rem',
-              borderRadius: '10px',
-              fontSize: '0.88rem',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              border: activeFusingTab === 'entry' ? '2px solid #0284c7' : '1px solid #cbd5e1',
-              background: activeFusingTab === 'entry' ? '#e0f2fe' : '#ffffff',
-              color: activeFusingTab === 'entry' ? '#0369a1' : '#64748b',
-              cursor: 'pointer',
-              boxShadow: activeFusingTab === 'entry' ? '0 2px 8px rgba(2, 132, 199, 0.2)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
+            className="fusing-network-retry-btn"
+            onClick={fetchData}
+            aria-label="Retry network connection and sync data"
           >
-            <Flame size={16} color={activeFusingTab === 'entry' ? '#0284c7' : '#64748b'} />
-            <span>⚡ Production Entry & Logs</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveFusingTab('queue')}
-            style={{
-              padding: '0.6rem 1.25rem',
-              borderRadius: '10px',
-              fontSize: '0.88rem',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              border: activeFusingTab === 'queue' ? '2px solid #ea580c' : '1px solid #cbd5e1',
-              background: activeFusingTab === 'queue' ? '#fff7ed' : '#ffffff',
-              color: activeFusingTab === 'queue' ? '#c2410c' : '#64748b',
-              cursor: 'pointer',
-              boxShadow: activeFusingTab === 'queue' ? '0 2px 8px rgba(234, 88, 12, 0.2)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Zap size={16} color={activeFusingTab === 'queue' ? '#ea580c' : '#64748b'} />
-            <span>📥 Ready for Fusing Queue</span>
-            <span style={{
-              marginLeft: 4,
-              padding: '2px 8px',
-              borderRadius: '999px',
-              background: activeFusingTab === 'queue' ? '#ea580c' : '#e2e8f0',
-              color: activeFusingTab === 'queue' ? '#ffffff' : '#475569',
-              fontSize: '0.74rem',
-              fontWeight: 900
-            }}>
-              {eligibleFusingCards.length}
-            </span>
+            <RefreshCw size={14} /> Retry Connection
           </button>
         </div>
+      )}
 
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setShowButterPaperInwardModal(true)}
-            style={{
-              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#ffffff', border: 'none',
-              padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 800,
-              fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-              boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)'
-            }}
-          >
-            <PlusCircle size={15} /> 📦 Inward Butter Paper
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowReportModal(true)}
-            style={{
-              background: '#059669', color: '#ffffff', border: 'none',
-              padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 800,
-              fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-              boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
-            }}
-          >
-            <Zap size={15} /> Generate Report
-          </button>
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            style={{
-              background: '#6d28d9', color: '#ffffff', border: 'none',
-              padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 800,
-              fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
-              boxShadow: '0 3px 10px rgba(109, 40, 217, 0.25)'
-            }}
-          >
-            <Download size={15} /> Download CSV
-          </button>
+      {/* ── ENTERPRISE SCREEN HEADER & BREADCRUMBS ── */}
+      <header className="fusing-header-section">
+        <nav className="fusing-breadcrumbs" aria-label="Breadcrumb navigation">
+          <span>ERP Portal</span>
+          <span>/</span>
+          <span>Elite Prints Operations</span>
+          <span>/</span>
+          <span className="fusing-breadcrumb-active">Jobcards Fusing Log</span>
+        </nav>
+        <div className="fusing-title-row">
+          <div className="fusing-title-group">
+            <div className="fusing-title-icon" aria-hidden="true">
+              <Flame size={24} />
+            </div>
+            <div>
+              <h1 className="fusing-main-title">Jobcards Fusing Log</h1>
+              <p className="fusing-sub-title">Heat press sublimation ledger, machine speed & temperature tracking, roll consumption control</p>
+            </div>
+          </div>
+
+          <div className="fusing-header-actions">
+            <button
+              type="button"
+              className="fusing-btn-secondary"
+              onClick={fetchData}
+              disabled={loading}
+              aria-label="Refresh fusing records"
+              title="Refresh fusing logs data"
+            >
+              <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
+              <span>Refresh</span>
+            </button>
+            <button
+              type="button"
+              className="fusing-btn-accent"
+              onClick={() => setShowButterPaperInwardModal(true)}
+              aria-label="Inward Butter Paper rolls"
+            >
+              <PlusCircle size={15} />
+              <span>Inward Butter Paper</span>
+            </button>
+            <button
+              type="button"
+              className="fusing-btn-secondary"
+              onClick={() => setShowReportModal(true)}
+              aria-label="Generate comprehensive fusing report"
+            >
+              <Zap size={15} />
+              <span>Generate Report</span>
+            </button>
+            <button
+              type="button"
+              className="fusing-btn-primary"
+              onClick={handleExportCSV}
+              aria-label="Download CSV report"
+            >
+              <Download size={15} />
+              <span>Download CSV</span>
+            </button>
+          </div>
         </div>
+      </header>
+
+      {/* ── TOP NAVIGATION SUBTABS ── */}
+      <div className="fusing-subnav-bar" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeFusingTab === 'entry'}
+          className={`fusing-subnav-btn ${activeFusingTab === 'entry' ? 'active' : ''}`}
+          onClick={() => setActiveFusingTab('entry')}
+          aria-label="Production Entry and Logs tab"
+        >
+          <Flame size={16} />
+          <span>⚡ Production Entry & Logs</span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeFusingTab === 'queue'}
+          className={`fusing-subnav-btn ${activeFusingTab === 'queue' ? 'active' : ''}`}
+          onClick={() => setActiveFusingTab('queue')}
+          aria-label="Ready for Fusing Queue tab"
+        >
+          <Zap size={16} />
+          <span>📥 Ready for Fusing Queue</span>
+          <span className="fusing-count-badge">
+            {eligibleFusingCards.length}
+          </span>
+        </button>
       </div>
 
       {/* ── TAB 1: PRODUCTION ENTRY & LOGS ── */}
@@ -1743,344 +1839,573 @@ export default function FusingDepartment() {
         )}
       </div>
 
-      {/* Summary KPI Statistics Bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+      {/* ── ENTERPRISE SUMMARY KPI METRICS GRID ── */}
+      <section className="fusing-metrics-grid" aria-label="Fusing production KPI metrics">
         {/* Today Fresh Output */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1.1rem', borderLeft: '4px solid #2563eb' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Today Fresh Output</span>
-            <Flame size={18} color="#2563eb" />
+        <div className="fusing-metric-card">
+          <div className="fusing-metric-top">
+            <span className="fusing-metric-label">Today Fresh Output</span>
+            <Flame size={18} color="#1E40AF" />
           </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#2563eb', marginTop: 4 }}>
-            {stats.todayFreshMtr.toLocaleString('en-IN')} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>meters</span>
+          <div className="fusing-metric-val" style={{ color: '#1E40AF' }}>
+            {stats.todayFreshMtr.toLocaleString('en-IN')}
+            <span className="fusing-metric-unit">meters</span>
           </div>
+          <div className="fusing-metric-subtitle">Fused & ready for dispatch</div>
         </div>
 
         {/* Total Butter Paper Consumed */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1.1rem', borderLeft: '4px solid #6d28d9' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Butter Paper Consumed</span>
-            <Scale size={18} color="#6d28d9" />
+        <div className="fusing-metric-card accent-purple">
+          <div className="fusing-metric-top">
+            <span className="fusing-metric-label">Butter Paper Used</span>
+            <Scale size={18} color="#7C3AED" />
           </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#6d28d9', marginTop: 4 }}>
-            {stats.totalButterPaperKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>kg</span>
+          <div className="fusing-metric-val" style={{ color: '#7C3AED' }}>
+            {stats.totalButterPaperKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+            <span className="fusing-metric-unit">kg</span>
+          </div>
+          <div className="fusing-metric-subtitle">
+            Stock Balance: {stats.butterPaperBalanceKg >= 0 ? `${stats.butterPaperBalanceKg.toFixed(1)} kg available` : 'Low / Reorder'}
           </div>
         </div>
 
-        {/* Butter Paper Yield Efficiency */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1.1rem', borderLeft: '4px solid #0d9488' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Paper Yield Ratio</span>
-            <Zap size={18} color="#0d9488" />
+        {/* Paper Yield Efficiency */}
+        <div className="fusing-metric-card accent-teal">
+          <div className="fusing-metric-top">
+            <span className="fusing-metric-label">Paper Yield Ratio</span>
+            <Zap size={18} color="#0D9488" />
           </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0d9488', marginTop: 4 }}>
-            {stats.yieldRatio} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>m/kg</span>
+          <div className="fusing-metric-val" style={{ color: '#0D9488' }}>
+            {stats.yieldRatio}
+            <span className="fusing-metric-unit">m/kg</span>
           </div>
-          <div style={{ fontSize: '0.68rem', color: Number(stats.yieldRatio) >= 12 ? '#10b981' : '#f59e0b', marginTop: 2, fontWeight: 700 }}>
+          <div className="fusing-metric-subtitle" style={{ color: Number(stats.yieldRatio) >= 12 ? '#059669' : '#D97706' }}>
             {Number(stats.yieldRatio) >= 12 ? '✓ Optimal Paper Yield' : Number(stats.yieldRatio) > 0 ? '⚠️ High Paper Usage' : 'Awaiting Output'}
           </div>
         </div>
 
-        {/* Fusing Completed */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1.1rem', borderLeft: '4px solid #10b981' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Completed Jobs</span>
-            <CheckCircle2 size={18} color="#10b981" />
+        {/* Completed Jobs */}
+        <div className="fusing-metric-card accent-emerald">
+          <div className="fusing-metric-top">
+            <span className="fusing-metric-label">Completed Jobs</span>
+            <CheckCircle2 size={18} color="#059669" />
           </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#10b981', marginTop: 4 }}>
-            {stats.doneCount} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>cards</span>
+          <div className="fusing-metric-val" style={{ color: '#059669' }}>
+            {stats.doneCount}
+            <span className="fusing-metric-unit">cards</span>
+          </div>
+          <div className="fusing-metric-subtitle">
+            {stats.totalFreshMtr.toLocaleString('en-IN')} total meters fused
           </div>
         </div>
 
-        {/* Pending Jobs */}
-        <div className="glass-panel" style={{ padding: '0.85rem 1.1rem', borderLeft: '4px solid #fbbf24' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Pending Fusing</span>
-            <Clock size={18} color="#fbbf24" />
+        {/* Pending Fusing */}
+        <div className="fusing-metric-card accent-amber">
+          <div className="fusing-metric-top">
+            <span className="fusing-metric-label">Pending Fusing</span>
+            <Clock size={18} color="#D97706" />
           </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f59e0b', marginTop: 4 }}>
-            {stats.pendingCount} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>cards</span>
+          <div className="fusing-metric-val" style={{ color: '#D97706' }}>
+            {stats.pendingCount}
+            <span className="fusing-metric-unit">cards</span>
           </div>
+          <div className="fusing-metric-subtitle">Awaiting heat press run</div>
         </div>
-      </div>
+      </section>
 
-      {/* Filter Toolbar */}
-      <div className="glass-panel" style={{ padding: '0.75rem 1.1rem' }}>
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* ── QUICK FILTERS & SEARCH TOOLBAR ── */}
+      <section className="fusing-filters-wrapper" aria-label="Job card filtering controls">
+        <div className="fusing-filters-main-row">
           
-          {/* Search */}
-          <div style={{ position: 'relative', flex: '1 1 200px' }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          {/* Debounced Search */}
+          <div className="fusing-search-box">
+            <Search size={15} className="fusing-search-icon" aria-hidden="true" />
             <input
               type="text"
+              className="fusing-search-input"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search Job No, Party, Design, Fabric, Operator..."
-              style={{ paddingLeft: 30, width: '100%', fontSize: '0.82rem', height: '34px' }}
+              placeholder="Search Job No, Party, Design, Fabric, Machine, Operator..."
+              aria-label="Search fusing job cards"
             />
           </div>
 
+          {/* Date Range Picker */}
           <DateRangePicker
             preset={datePreset}
-            onChange={({ preset: p }) => setDatePreset(p)}
+            onChange={({ preset: p }) => { setDatePreset(p); setCurrentPage(1); }}
             customStart={customDateStart}
             customEnd={customDateEnd}
             onCustomChange={(s, e) => {
               setCustomDateStart(s);
               setCustomDateEnd(e);
+              setCurrentPage(1);
             }}
           />
 
-          {/* Status Buttons Filter */}
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)', height: '34px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {['All', 'Ready for Fusing', 'Fusing Pending', 'Fusing Done'].map(st => (
+          {/* Machine Filter Dropdown */}
+          <select
+            className="fusing-filter-select"
+            value={filterMachine}
+            onChange={e => { setFilterMachine(e.target.value); setCurrentPage(1); }}
+            aria-label="Filter by Fusing Machine"
+          >
+            <option value="">All Machines ({uniqueMachines.length})</option>
+            {uniqueMachines.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+
+          {/* Operator Filter Dropdown */}
+          <select
+            className="fusing-filter-select"
+            value={filterOperator}
+            onChange={e => { setFilterOperator(e.target.value); setCurrentPage(1); }}
+            aria-label="Filter by Operator"
+          >
+            <option value="">All Operators ({uniqueOperators.length})</option>
+            {uniqueOperators.map(op => (
+              <option key={op} value={op}>{op}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Fast Filter Status Tags */}
+        <div className="fusing-status-tags" role="group" aria-label="Status filter tags">
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--ee-fusing-text-muted)', textTransform: 'uppercase', marginRight: '4px' }}>
+            Status:
+          </span>
+
+          {[
+            { id: 'All', label: 'All Jobs', count: cards.length },
+            { id: 'Ready for Fusing', label: 'Ready for Fusing', count: stats.readyForFusingCount, badgeClass: 'active-amber' },
+            { id: 'Pending', label: 'Pending', count: stats.pendingCount },
+            { id: 'In-Process', label: 'In-Process' },
+            { id: 'Completed', label: 'Completed', count: stats.doneCount, badgeClass: 'active-emerald' },
+            { id: 'Rejected', label: 'Has Wastage / Rejections' }
+          ].map(tag => {
+            const isActive = statusFilter === tag.id || (tag.id === 'Pending' && statusFilter === 'Fusing Pending') || (tag.id === 'In-Process' && statusFilter === 'Fusing In Progress') || (tag.id === 'Completed' && statusFilter === 'Fusing Done');
+            return (
               <button
-                key={st}
+                key={tag.id}
                 type="button"
-                onClick={() => setStatusFilter(st)}
-                style={{
-                  padding: '0.2rem 0.7rem', fontSize: '0.76rem', fontWeight: 800, borderRadius: '4px', border: 'none',
-                  background: statusFilter === st ? (st === 'Fusing Done' ? '#10b981' : st === 'Ready for Fusing' ? 'linear-gradient(135deg, #f59e0b, #ef4444)' : st === 'Fusing Pending' ? '#f59e0b' : '#2563eb') : 'transparent',
-                  color: statusFilter === st ? '#ffffff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.15s', height: '28px',
-                  display: 'flex', alignItems: 'center', gap: '4px'
-                }}
+                className={`fusing-tag-pill ${isActive ? (tag.badgeClass || 'active') : ''}`}
+                onClick={() => { setStatusFilter(tag.id); setCurrentPage(1); }}
+                aria-pressed={isActive}
               >
-                {st === 'Ready for Fusing' && <Flame size={12} color={statusFilter === st ? '#fff' : '#f59e0b'} />}
-                <span>{st}</span>
-                {st === 'Ready for Fusing' && stats.readyForFusingCount > 0 && (
+                {tag.id === 'Ready for Fusing' && <Flame size={13} />}
+                {tag.id === 'Completed' && <CheckCircle2 size={13} />}
+                {tag.id === 'Pending' && <Clock size={13} />}
+                <span>{tag.label}</span>
+                {tag.count !== undefined && (
                   <span style={{
-                    padding: '0 5px', borderRadius: '10px',
-                    background: statusFilter === st ? 'rgba(0,0,0,0.35)' : 'rgba(239,68,68,0.2)',
-                    color: statusFilter === st ? '#fff' : '#ef4444',
-                    fontSize: '0.68rem', fontWeight: 900
+                    fontSize: '0.7rem',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    background: isActive ? 'rgba(255,255,255,0.25)' : '#F1F5F9',
+                    color: isActive ? '#FFFFFF' : '#475569',
+                    fontWeight: 800
                   }}>
-                    {stats.readyForFusingCount}
+                    {tag.count}
                   </span>
                 )}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      {/* Main Fusing Job Cards Table */}
-      <div className="glass-panel" style={{ padding: '1rem', borderRadius: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Flame size={18} color="#2563eb" /> Fusing Production Ledger ({filteredCards.length})
-          </h3>
-        </div>
-
+      {/* ── MAIN FUSING PRODUCTION LEDGER (DUAL VIEW: DESKTOP TABLE & MOBILE CARDS) ── */}
+      <section aria-label="Fusing production job cards ledger">
         {loading && cards.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-            <RefreshCw size={24} className="spin-loader" />
-            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>Loading Fusing Ledger...</p>
+          <div>
+            {/* Zero-CLS Skeleton Rows for Desktop */}
+            <div className="fusing-desktop-table-wrapper" style={{ padding: '1rem' }}>
+              <div className="fusing-skeleton fusing-skeleton-row" />
+              <div className="fusing-skeleton fusing-skeleton-row" />
+              <div className="fusing-skeleton fusing-skeleton-row" />
+              <div className="fusing-skeleton fusing-skeleton-row" />
+              <div className="fusing-skeleton fusing-skeleton-row" />
+            </div>
+            {/* Zero-CLS Skeleton Cards for Mobile */}
+            <div className="fusing-mobile-cards-wrapper">
+              <div className="fusing-skeleton fusing-skeleton-card" />
+              <div className="fusing-skeleton fusing-skeleton-card" />
+              <div className="fusing-skeleton fusing-skeleton-card" />
+            </div>
           </div>
         ) : filteredCards.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-            <Flame size={28} color="#94a3b8" />
-            <p style={{ marginTop: '0.5rem', fontSize: '0.88rem', fontWeight: 600 }}>No job cards matching selected filters.</p>
+          <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
+            <Flame size={32} color="#94A3B8" style={{ margin: '0 auto 8px', display: 'block' }} />
+            <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 800, color: 'var(--ee-fusing-text-primary)' }}>No Fusing Records Found</h3>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ee-fusing-text-muted)' }}>
+              No job cards match the current search keyword or filter selection. Try clearing filters.
+            </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '10px 12px', textAlign: 'left' }}>Job Card #</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left' }}>Party Name</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left' }}>Design &amp; Fabric</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center' }}>Speed &amp; Temp</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center' }}>Butter Paper</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center' }}>Status</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Fresh Output</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Total Wastage</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCards.map((c) => {
-                  const isDone = c.fusingStatus === 'Fusing Done';
-                  const fresh = parseFloat(c.freshMtr || c.fusingMtr) || 0;
-                  const waste = parseFloat(c.totalWastageMtr) || 0;
-                  const butterKg = parseFloat(c.butterPaperWeightKg) || 0;
+          <>
+            {/* 1. DESKTOP HIGH-DENSITY DATA TABLE (>= 1024px) */}
+            <div className="fusing-desktop-table-wrapper">
+              <div className="fusing-table-scroll">
+                <table className="fusing-table" role="table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Job Card #</th>
+                      <th scope="col">Party Name</th>
+                      <th scope="col">Design &amp; Fabric</th>
+                      <th scope="col" style={{ textAlign: 'center' }}>Speed &amp; Temp</th>
+                      <th scope="col" style={{ textAlign: 'center' }}>Butter Paper</th>
+                      <th scope="col" style={{ textAlign: 'center' }}>Status</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>Fresh Output</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>Total Wastage</th>
+                      <th scope="col" className="fusing-sticky-col-header">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedCards.map((c) => {
+                      const isDone = c.fusingStatus === 'Fusing Done';
+                      const isPartial = c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete';
+                      const fresh = parseFloat(c.freshMtr || c.fusingMtr) || 0;
+                      const waste = parseFloat(c.totalWastageMtr) || 0;
+                      const butterKg = parseFloat(c.butterPaperWeightKg) || 0;
+                      const preset = getFabricFusingPreset(c.fabric);
 
-                  return (
-                    <tr key={c._id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
-                      
-                      {/* Job Card No (Clickable to change speed & temp) */}
-                      <td style={{ padding: '10px 12px', fontWeight: 800, color: '#1e293b' }}>
-                        <button
-                          type="button"
-                          onClick={() => openSpeedTempModal(c)}
-                          title="Click to view & update Fusing Machine Speed & Temperature"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            display: 'inline-flex',
-                            flexDirection: 'column',
-                            gap: '2px'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0284c7', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
-                              {c.jobNo || 'JOB'}
-                            </span>
-                            <Gauge size={12} color="#0284c7" />
-                            {c.pass && (
-                              <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#2563eb', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
-                                {c.pass}
+                      return (
+                        <tr key={c._id || c.id}>
+                          {/* Job Card No (Clickable to open speed & temp) */}
+                          <td style={{ fontWeight: 800 }}>
+                            <button
+                              type="button"
+                              onClick={() => openSpeedTempModal(c)}
+                              title="Click to view & update Fusing Machine Speed & Temperature"
+                              aria-label={`Open speed and temperature settings for ${formatJobCardNo(c.jobNo)}`}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                display: 'inline-flex',
+                                flexDirection: 'column',
+                                gap: '2px'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.88rem', fontWeight: 900, color: 'var(--ee-fusing-brand-navy)', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                                  {c.jobNo || 'JOB'}
+                                </span>
+                                <Gauge size={12} color="#1E40AF" />
+                                {c.pass && (
+                                  <span style={{ fontSize: '0.65rem', background: '#EFF6FF', color: '#1E40AF', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                    {c.pass}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--ee-fusing-text-muted)', fontWeight: 500 }}>
+                                {c.fusingDate || c.date || '—'}
+                              </div>
+                            </button>
+                          </td>
+
+                          {/* Party Name */}
+                          <td style={{ fontWeight: 700, color: 'var(--ee-fusing-text-primary)' }}>
+                            {c.party || c.clientName || '—'}
+                          </td>
+
+                          {/* Design & Fabric */}
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 800, color: 'var(--ee-fusing-brand-navy)' }}>
+                                {c.designName || c.designNo || '—'}
                               </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                            {c.fusingDate || c.date || '—'}
-                          </div>
-                        </button>
-                      </td>
-
-                      {/* Party Name */}
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
-                        {c.party || '—'}
-                      </td>
-
-                      {/* Design & Fabric */}
-                      <td style={{ padding: '10px 12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 800, color: '#0284c7' }}>{c.designName || c.designNo || '—'}</span>
-                          {c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done' && (
-                            <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#059669', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
-                              ⚡ Print Ready
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: '#475569', marginTop: 2 }}>
-                          {c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}
-                        </div>
-                        {(() => {
-                          const preset = getFabricFusingPreset(c.fabric);
-                          return (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: 3, padding: '1px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', fontSize: '0.68rem', color: '#d97706', fontWeight: 700 }}>
+                              {c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done' && (
+                                <span style={{ padding: '1px 5px', borderRadius: 4, background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', fontSize: '0.68rem', fontWeight: 800 }}>
+                                  ⚡ Print Ready
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--ee-fusing-text-secondary)', marginTop: 2 }}>
+                              {c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}
+                            </div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: 3, padding: '1px 6px', borderRadius: 4, background: '#FEF3C7', border: '1px solid #FDE68A', fontSize: '0.68rem', color: '#92400E', fontWeight: 700 }}>
                               <Flame size={10} /> Preset: {preset.temp} @ {preset.speed}
                             </div>
-                          );
-                        })()}
-                      </td>
+                          </td>
 
-                      {/* Speed & Temp (Clickable to change) */}
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => openSpeedTempModal(c)}
-                          title="Click to change Fusing Temperature & Speed"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            flexDirection: 'column',
-                            gap: '3px',
-                            alignItems: 'center'
-                          }}
-                        >
-                          <span style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', padding: '2px 7px', borderRadius: '4px', fontWeight: 800, border: '1px solid #fde68a' }}>
-                            <Thermometer size={10} style={{ display: 'inline', marginRight: 2 }} />
-                            {c.fusingTemp || c.temperature || '210°C'}
-                          </span>
-                          <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1e40af', padding: '2px 7px', borderRadius: '4px', fontWeight: 800, border: '1px solid #bfdbfe' }}>
-                            <Gauge size={10} style={{ display: 'inline', marginRight: 2 }} />
-                            {c.fusingSpeed || c.speed || '80'}
-                          </span>
-                        </button>
-                      </td>
+                          {/* Speed & Temp */}
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => openSpeedTempModal(c)}
+                              title="Click to change Fusing Temperature & Speed"
+                              aria-label={`Adjust speed and temperature: current ${c.fusingTemp || preset.temp} at ${c.fusingSpeed || preset.speed}`}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                flexDirection: 'column',
+                                gap: '3px',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <span className="fusing-chip temp">
+                                <Thermometer size={11} style={{ marginRight: 2 }} />
+                                {c.fusingTemp || c.temperature || preset.temp}
+                              </span>
+                              <span className="fusing-chip speed">
+                                <Gauge size={11} style={{ marginRight: 2 }} />
+                                {c.fusingSpeed || c.speed || preset.speed}
+                              </span>
+                            </button>
+                          </td>
 
-                      {/* Butter Paper (YES / NO ONLY) */}
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        {(c.useButterPaper === 'Yes' || butterKg > 0) ? (
-                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', background: '#f0fdf4', padding: '3px 10px', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <CheckCircle2 size={12} color="#16a34a" />
-                            YES
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '3px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <XCircle size={12} color="#94a3b8" />
-                            NO
-                          </span>
-                        )}
-                      </td>
+                          {/* Butter Paper */}
+                          <td style={{ textAlign: 'center' }}>
+                            {(c.useButterPaper === 'Yes' || butterKg > 0) ? (
+                              <span className="fusing-chip butter-yes">
+                                <CheckCircle2 size={12} /> YES {butterKg > 0 ? `(${butterKg}kg)` : ''}
+                              </span>
+                            ) : (
+                              <span className="fusing-chip butter-no">
+                                <XCircle size={12} /> NO
+                              </span>
+                            )}
+                          </td>
 
-                      {/* Status */}
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        {(() => {
-                          const isDone = c.fusingStatus === 'Fusing Done';
-                          const isPartial = c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete';
-                          return (
+                          {/* Status Toggle Button */}
+                          <td style={{ textAlign: 'center' }}>
                             <button
                               type="button"
                               onClick={() => handleQuickToggleStatus(c)}
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '20px',
-                                fontSize: '0.72rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                background: isDone ? '#d1fae5' : (isPartial ? '#e0f2fe' : '#fef3c7'),
-                                color: isDone ? '#047857' : (isPartial ? '#0369a1' : '#b45309'),
-                                border: `1px solid ${isDone ? '#6ee7b7' : (isPartial ? '#7dd3fc' : '#fde68a')}`,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
+                              className={`fusing-badge ${isDone ? 'done' : isPartial ? 'progress' : 'pending'}`}
+                              aria-label={`Toggle status from ${isDone ? 'Completed' : isPartial ? 'In-Progress' : 'Pending'}`}
+                              title="Click to toggle fusing status"
+                              style={{ cursor: 'pointer', border: 'none' }}
                             >
                               {isDone ? <CheckCircle2 size={12} /> : isPartial ? <Clock size={12} /> : <AlertCircle size={12} />}
-                              <span>{isDone ? 'Complete' : (isPartial ? 'Partial' : 'Pending')}</span>
+                              <span>{isDone ? 'Complete' : (isPartial ? 'In-Process' : 'Pending')}</span>
                             </button>
-                          );
-                        })()}
-                      </td>
+                          </td>
 
-                      {/* Fresh Output */}
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#059669', fontSize: '0.9rem' }}>
-                        {fresh > 0 ? `${fresh.toLocaleString('en-IN')} m` : '—'}
-                      </td>
+                          {/* Fresh Output */}
+                          <td style={{ textAlign: 'right', fontWeight: 900, color: '#059669', fontSize: '0.92rem' }}>
+                            {fresh > 0 ? `${fresh.toLocaleString('en-IN')} m` : '—'}
+                          </td>
 
-                      {/* Total Wastage */}
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: waste > 0 ? '#dc2626' : '#94a3b8' }}>
-                        {waste > 0 ? `${waste} m` : '0 m'}
-                      </td>
+                          {/* Total Wastage */}
+                          <td style={{ textAlign: 'right', fontWeight: 800, color: waste > 0 ? '#DC2626' : '#94A3B8' }}>
+                            {waste > 0 ? `${waste} m` : '0 m'}
+                          </td>
 
-                      {/* Actions */}
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          {/* Actions (Sticky Column) */}
+                          <td className="fusing-sticky-col-cell">
+                            <button
+                              type="button"
+                              onClick={() => openFusingModal(c)}
+                              className="fusing-btn-primary"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', minHeight: '32px' }}
+                              aria-label={`Edit fusing production entry for Job ${c.jobNo}`}
+                            >
+                              <Edit2 size={13} /> Edit
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 2. MOBILE SCANNABLE SHOP-FLOOR CARDS (< 1024px) */}
+            <div className="fusing-mobile-cards-wrapper" role="feed" aria-label="Job cards mobile feed">
+              {paginatedCards.map((c) => {
+                const isDone = c.fusingStatus === 'Fusing Done';
+                const isPartial = c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete';
+                const fresh = parseFloat(c.freshMtr || c.fusingMtr) || 0;
+                const waste = parseFloat(c.totalWastageMtr) || 0;
+                const butterKg = parseFloat(c.butterPaperWeightKg) || 0;
+                const preset = getFabricFusingPreset(c.fabric);
+
+                return (
+                  <article key={c._id || c.id} className="fusing-card">
+                    {/* Card Header */}
+                    <div className="fusing-card-header">
+                      <div className="fusing-card-job-badge">
+                        <Flame size={14} />
+                        <span>{formatJobCardNo(c.jobNo)}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--ee-fusing-text-muted)', fontWeight: 600 }}>
+                          {c.fusingDate || c.date || '—'}
+                        </span>
+                        
                         <button
                           type="button"
-                          onClick={() => openFusingModal(c)}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            color: '#2563eb',
-                            borderRadius: '6px',
-                            fontWeight: 800,
-                            fontSize: '0.76rem',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
+                          onClick={() => handleQuickToggleStatus(c)}
+                          className={`fusing-badge ${isDone ? 'done' : isPartial ? 'progress' : 'pending'}`}
+                          style={{ cursor: 'pointer', border: 'none', padding: '6px 10px', fontSize: '0.76rem' }}
+                          aria-label={`Status: ${isDone ? 'Completed' : isPartial ? 'In-Process' : 'Pending'}. Tap to toggle.`}
                         >
-                          <Edit2 size={13} /> Edit
+                          {isDone ? <CheckCircle2 size={13} /> : isPartial ? <Clock size={13} /> : <AlertCircle size={13} />}
+                          <span>{isDone ? 'Complete' : (isPartial ? 'In-Process' : 'Pending')}</span>
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="fusing-card-body">
+                      <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>
+                      
+                      <div className="fusing-card-design-text">
+                        <strong style={{ color: 'var(--ee-fusing-brand-navy)' }}>{c.designName || c.designNo || '—'}</strong>
+                        <span>•</span>
+                        <span>{c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}</span>
+                        {c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done' && (
+                          <span style={{ padding: '1px 5px', borderRadius: 4, background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', fontSize: '0.68rem', fontWeight: 800 }}>
+                            ⚡ Print Ready
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Fresh Output vs Wastage Grid */}
+                      <div className="fusing-card-stats-row">
+                        <div className="fusing-card-stat-item">
+                          <span className="fusing-card-stat-label">Fresh Output</span>
+                          <span className="fusing-card-stat-val fresh">
+                            {fresh > 0 ? `${fresh.toLocaleString('en-IN')} m` : '—'}
+                          </span>
+                        </div>
+                        <div className="fusing-card-stat-item">
+                          <span className="fusing-card-stat-label">Total Wastage</span>
+                          <span className={`fusing-card-stat-val ${waste > 0 ? 'waste' : ''}`}>
+                            {waste > 0 ? `${waste} m` : '0 m'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Meta Chips */}
+                      <div className="fusing-card-meta-chips">
+                        <span className="fusing-chip temp">
+                          <Thermometer size={12} /> {c.fusingTemp || preset.temp}
+                        </span>
+                        <span className="fusing-chip speed">
+                          <Gauge size={12} /> {c.fusingSpeed || preset.speed} m/min
+                        </span>
+                        <span className={`fusing-chip ${c.useButterPaper === 'Yes' || butterKg > 0 ? 'butter-yes' : 'butter-no'}`}>
+                          Butter Paper: {c.useButterPaper === 'Yes' || butterKg > 0 ? `YES (${butterKg || 0}kg)` : 'NO'}
+                        </span>
+                        {c.fusingMachine && (
+                          <span className="fusing-chip">
+                            ⚙️ {c.fusingMachine}
+                          </span>
+                        )}
+                        {c.fusingOperator && (
+                          <span className="fusing-chip">
+                            👤 {c.fusingOperator}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Touch Action Buttons (min 48px touch targets) */}
+                    <div className="fusing-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => openFusingModal(c)}
+                        className="fusing-touch-btn fusing-btn-primary"
+                        aria-label={`Edit Jobcard ${c.jobNo} production log`}
+                      >
+                        <Edit2 size={16} /> Edit Entry
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openSpeedTempModal(c)}
+                        className="fusing-touch-btn fusing-btn-accent"
+                        aria-label={`Adjust Speed and Temperature for Jobcard ${c.jobNo}`}
+                      >
+                        <Gauge size={16} /> Speed &amp; Temp
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            {/* 3. PAGINATION & CHUNKING CONTROLS */}
+            <nav className="fusing-pagination-bar" aria-label="Job cards pagination">
+              <div className="fusing-pagination-info">
+                Showing <strong>{(currentPage - 1) * pageSize + 1}</strong> – <strong>{Math.min(currentPage * pageSize, filteredCards.length)}</strong> of <strong>{filteredCards.length}</strong> Job Cards
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                {/* Page Size Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: 'var(--ee-fusing-text-muted)' }}>
+                  <span>Show:</span>
+                  <select
+                    className="fusing-filter-select"
+                    value={pageSize}
+                    onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                    style={{ minHeight: '34px', padding: '0.2rem 0.5rem' }}
+                    aria-label="Items per page"
+                  >
+                    <option value={25}>25 / page</option>
+                    <option value={50}>50 / page</option>
+                    <option value={100}>100 / page</option>
+                  </select>
+                </div>
+
+                {/* Page Navigation Buttons */}
+                <div className="fusing-pagination-controls">
+                  <button
+                    type="button"
+                    className="fusing-page-btn"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    aria-label="Go to first page"
+                  >
+                    «
+                  </button>
+                  <button
+                    type="button"
+                    className="fusing-page-btn"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    aria-label="Go to previous page"
+                  >
+                    ‹
+                  </button>
+
+                  <span style={{ fontSize: '0.84rem', fontWeight: 800, padding: '0 8px', color: 'var(--ee-fusing-text-primary)' }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="fusing-page-btn"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    aria-label="Go to next page"
+                  >
+                    ›
+                  </button>
+                  <button
+                    type="button"
+                    className="fusing-page-btn"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    aria-label="Go to last page"
+                  >
+                    »
+                  </button>
+                </div>
+              </div>
+            </nav>
+          </>
         )}
-      </div>
+      </section>
       </>
       )}
 
@@ -2088,41 +2413,43 @@ export default function FusingDepartment() {
       {activeFusingTab === 'queue' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Queue Header & Filters Banner */}
-          <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', background: '#ffffff', borderRadius: '14px', border: '1px solid #fed7aa', borderLeft: '5px solid #ea580c' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '1rem' }}>
+          <div className="fusing-header-section" style={{ borderLeft: '4px solid var(--ee-fusing-brand-navy)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Zap size={20} color="#ea580c" />
+                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: 'var(--ee-fusing-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Zap size={20} color="#1E40AF" />
                   Ready for Fusing Queue (Handoff from Printing)
-                </h3>
-                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                  These jobs have completed printing and are awaiting heat press / roll sublimation. Batch identical fabrics together to optimize machine temperature stability.
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--ee-fusing-text-muted)', fontWeight: 500 }}>
+                  Jobs that completed printing and are ready for heat press sublimation. Batch identical fabrics to optimize temperature stability.
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ padding: '0.4rem 0.85rem', borderRadius: '8px', background: '#fff7ed', border: '1px solid #ffedd5', fontSize: '0.82rem', fontWeight: 800, color: '#c2410c' }}>
+                <span className="fusing-badge done" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
                   🔥 <strong>{eligibleFusingCards.length}</strong> Jobs In Queue
-                </div>
+                </span>
               </div>
             </div>
 
             {/* Filter Toolbar */}
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: '1 1 240px' }}>
-                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+              <div className="fusing-search-box" style={{ flex: '1 1 240px' }}>
+                <Search size={15} className="fusing-search-icon" aria-hidden="true" />
                 <input
                   type="text"
+                  className="fusing-search-input"
                   value={queueSearchQuery}
                   onChange={e => setQueueSearchQuery(e.target.value)}
                   placeholder="Filter queue by Job No, Party, Design, Fabric..."
-                  style={{ width: '100%', padding: '0.5rem 0.8rem 0.5rem 2.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                  aria-label="Filter ready for fusing queue"
                 />
               </div>
 
               <select
+                className="fusing-filter-select"
                 value={queueFabricFilter}
                 onChange={e => setQueueFabricFilter(e.target.value)}
-                style={{ padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', background: '#ffffff', cursor: 'pointer' }}
+                aria-label="Filter queue by Fabric"
               >
                 <option value="All">All Fabrics ({eligibleFusingCards.length})</option>
                 {queueFabricsList.map(fab => (
@@ -2132,103 +2459,145 @@ export default function FusingDepartment() {
             </div>
           </div>
 
-          {/* Queue Table */}
-          <div className="glass-panel" style={{ padding: '0', borderRadius: '12px', overflow: 'hidden', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>JOB NO.</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>PARTY</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>DESIGN</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>FABRIC & PANNA</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>TEMP & SPEED PRESET</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>PRINTED MTR</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredQueueCards.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
-                        <Flame size={32} color="#cbd5e1" style={{ margin: '0 auto 8px', display: 'block' }} />
-                        <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>No jobs currently waiting in Fusing Queue</div>
-                        <div style={{ fontSize: '0.8rem', marginTop: 4 }}>Completed prints will automatically flow into this queue for heat processing.</div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredQueueCards.map((c, idx) => {
-                      const pMtr = getCardPrintedMeters(c);
-                      const preset = getFabricFusingPreset(c.fabric);
-                      return (
-                        <tr
-                          key={c._id || c.id || idx}
-                          style={{
-                            borderBottom: '1px solid #f1f5f9',
-                            background: idx % 2 === 0 ? '#ffffff' : '#fafafa',
-                            transition: 'background 0.15s ease'
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#fff7ed'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#fafafa'; }}
-                        >
-                          <td style={{ padding: '0.75rem 1rem', fontWeight: 900, color: '#0369a1' }}>
-                            {formatJobCardNo(c.jobNo)}
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>
-                            {c.party || c.clientName || '—'}
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
-                            {c.designName || c.designNo || '—'}
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem' }}>
-                            <span style={{ fontWeight: 800, color: '#0f172a' }}>{c.fabric || '—'}</span>
-                            <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
-                              {c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                            <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '3px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <Thermometer size={12} /> {preset.temp} @ {preset.speed} m/min
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 900, color: '#16a34a' }}>
-                            {pMtr ? `${pMtr} m` : (c.totalMtr || c.consumption || '—')}
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleTopJobCardSelect(c);
-                                setActiveFusingTab('entry');
-                                setIsFormExpanded(true);
-                                window.scrollTo({ top: 120, behavior: 'smooth' });
-                              }}
-                              style={{
-                                background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '0.45rem 0.95rem',
-                                borderRadius: '8px',
-                                fontSize: '0.78rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                boxShadow: '0 2px 8px rgba(234, 88, 12, 0.25)'
-                              }}
-                            >
-                              <Zap size={14} /> Start Fusing
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+          {/* Dual Layout for Queue */}
+          {filteredQueueCards.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
+              <Flame size={32} color="#94A3B8" style={{ margin: '0 auto 8px', display: 'block' }} />
+              <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 800, color: 'var(--ee-fusing-text-primary)' }}>No Jobs Waiting in Fusing Queue</h3>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ee-fusing-text-muted)' }}>
+                Completed prints will automatically flow into this queue for heat press processing.
+              </p>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Desktop Table for Queue (>= 1024px) */}
+              <div className="fusing-desktop-table-wrapper">
+                <div className="fusing-table-scroll">
+                  <table className="fusing-table" role="table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Job No.</th>
+                        <th scope="col">Party</th>
+                        <th scope="col">Design</th>
+                        <th scope="col">Fabric &amp; Panna</th>
+                        <th scope="col" style={{ textAlign: 'center' }}>Preset Temp &amp; Speed</th>
+                        <th scope="col" style={{ textAlign: 'right' }}>Printed Mtr</th>
+                        <th scope="col" className="fusing-sticky-col-header">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredQueueCards.map((c, idx) => {
+                        const pMtr = getCardPrintedMeters(c);
+                        const preset = getFabricFusingPreset(c.fabric);
+                        return (
+                          <tr key={c._id || c.id || idx}>
+                            <td style={{ fontWeight: 900, color: 'var(--ee-fusing-brand-navy)' }}>
+                              {formatJobCardNo(c.jobNo)}
+                            </td>
+                            <td style={{ fontWeight: 700, color: 'var(--ee-fusing-text-primary)' }}>
+                              {c.party || c.clientName || '—'}
+                            </td>
+                            <td style={{ color: 'var(--ee-fusing-text-secondary)', fontWeight: 600 }}>
+                              {c.designName || c.designNo || '—'}
+                            </td>
+                            <td>
+                              <span style={{ fontWeight: 800, color: 'var(--ee-fusing-text-primary)' }}>{c.fabric || '—'}</span>
+                              <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'var(--ee-fusing-text-muted)', background: '#F1F5F9', padding: '2px 6px', borderRadius: '4px' }}>
+                                {c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span className="fusing-chip temp">
+                                <Thermometer size={12} /> {preset.temp} @ {preset.speed} m/min
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right', fontWeight: 900, color: '#059669', fontSize: '0.92rem' }}>
+                              {pMtr ? `${pMtr} m` : (c.totalMtr || c.consumption || '—')}
+                            </td>
+                            <td className="fusing-sticky-col-cell">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleTopJobCardSelect(c);
+                                  setActiveFusingTab('entry');
+                                  setIsFormExpanded(true);
+                                  window.scrollTo({ top: 120, behavior: 'smooth' });
+                                }}
+                                className="fusing-btn-primary"
+                                style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem', minHeight: '34px' }}
+                                aria-label={`Start fusing for Job ${c.jobNo}`}
+                              >
+                                <Zap size={14} /> Start Fusing
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mobile Cards for Queue (< 1024px) */}
+              <div className="fusing-mobile-cards-wrapper" role="feed" aria-label="Ready for fusing queue mobile cards">
+                {filteredQueueCards.map((c, idx) => {
+                  const pMtr = getCardPrintedMeters(c);
+                  const preset = getFabricFusingPreset(c.fabric);
+                  return (
+                    <article key={c._id || c.id || idx} className="fusing-card">
+                      <div className="fusing-card-header">
+                        <div className="fusing-card-job-badge">
+                          <Flame size={14} />
+                          <span>{formatJobCardNo(c.jobNo)}</span>
+                        </div>
+                        <span className="fusing-badge done">
+                          ⚡ Ready for Fusing
+                        </span>
+                      </div>
+
+                      <div className="fusing-card-body">
+                        <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>
+                        <div className="fusing-card-design-text">
+                          <strong style={{ color: 'var(--ee-fusing-brand-navy)' }}>{c.designName || c.designNo || '—'}</strong>
+                          <span>•</span>
+                          <span>{c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}</span>
+                        </div>
+
+                        <div className="fusing-card-stats-row">
+                          <div className="fusing-card-stat-item">
+                            <span className="fusing-card-stat-label">Printed Quantity</span>
+                            <span className="fusing-card-stat-val fresh">
+                              {pMtr ? `${pMtr} m` : (c.totalMtr || c.consumption || '—')}
+                            </span>
+                          </div>
+                          <div className="fusing-card-stat-item">
+                            <span className="fusing-card-stat-label">Recommended Preset</span>
+                            <span className="fusing-card-stat-val" style={{ fontSize: '0.85rem', color: '#92400E' }}>
+                              {preset.temp} @ {preset.speed}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleTopJobCardSelect(c);
+                          setActiveFusingTab('entry');
+                          setIsFormExpanded(true);
+                          window.scrollTo({ top: 120, behavior: 'smooth' });
+                        }}
+                        className="fusing-touch-btn fusing-btn-primary"
+                        aria-label={`Load Job ${c.jobNo} into Fusing Entry Form`}
+                      >
+                        <Zap size={16} /> Load into Fusing Entry
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
