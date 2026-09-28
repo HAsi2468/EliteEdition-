@@ -2,6 +2,7 @@
    ELITE EDITION ENTERPRISE ERP — MINIMAL DESIGN SYSTEM
    Brand Accent: #0f172a | 8px Grid | Mobile First & Responsive
    ═══════════════════════════════════════════════════ */
+@import './styles/communication.css';
 
 /* Self-Hosted Inter WOFF2 Fonts (Weights 400, 500, 600) */
 @font-face {
@@ -970,6 +971,21 @@ tr:hover td {
   padding: 8px;
   align-items: center;
   justify-content: center;
+}
+
+.dept-switcher-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  max-width: 100% !important;
+}
+
+.dept-switcher-header::-webkit-scrollbar {
+  display: none !important;
 }
 
 @media (max-width: 850px) {

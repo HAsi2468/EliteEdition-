@@ -4,6 +4,7 @@ import { api, getBaseUrl } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import TaskManagerPanel from './TaskManagerPanel';
 import JobCardPdfModal from './JobCardPdfModal';
+import '../styles/communication.css';
 import {
   MessageSquare,
   Activity,
@@ -3145,10 +3146,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           </div>
         </div>
       ) : (
-      <div className="phoenix-chat-layout" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="phoenix-chat-layout" style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         
         {/* ════ LEFT COLUMN: PHOENIX CONVERSATIONS SIDEBAR ════ */}
-        <div className="phoenix-chat-sidebar" style={{ display: (isMobileScreen && activeGroup) ? 'none' : 'flex' }}>
+        <div className="phoenix-chat-sidebar" style={{ display: (isMobileScreen && activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
           
           {/* Phoenix Sidebar Top Bar: Chats title + Presence + Task toggle + Add Chat button */}
           <div style={{ padding: '0.85rem 1rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '1px solid var(--border-light, #e3e6ed)' }}>
@@ -3292,6 +3293,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     <div
                       className="phoenix-avatar-wrap"
                       style={{
+                        width: 40,
+                        height: 40,
+                        minWidth: 40,
+                        minHeight: 40,
+                        maxWidth: 40,
+                        maxHeight: 40,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         background: isDirect
                           ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
                           : `${deptCol}18`,
@@ -3374,7 +3386,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
 
         {/* ════ RIGHT COLUMN: PHOENIX ACTIVE CHAT STREAM ════ */}
-        <div className="phoenix-chat-main" style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex' }}>
+        <div className="phoenix-chat-main" style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
           
           {rosterTab === 'tasks' ? (
             <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
