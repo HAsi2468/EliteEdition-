@@ -1537,28 +1537,6 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setShowAiMeasurementModal(true)}
-                className="btn-icon"
-                title="AI Fabric Measurement Agent"
-                style={{
-                  minWidth: '36px',
-                  minHeight: '36px',
-                  padding: '6px',
-                  borderRadius: '8px',
-                  border: '1px solid #bfdbfe',
-                  background: '#eff6ff',
-                  color: '#2563eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-              >
-                <Sparkles size={18} />
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setShowNotificationDrawer(true)}
                 className="btn-icon"
                 title="Notifications & Alerts"
@@ -1755,29 +1733,6 @@ export default function App() {
                   borderRadius: '4px',
                   border: '1px solid #cbd5e1'
                 }}>⌘K</kbd>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowAiMeasurementModal(true)}
-                className="btn-secondary"
-                title="AI Fabric Measurement Agent"
-                style={{
-                  minHeight: '38px',
-                  padding: '6px 12px',
-                  fontSize: 'var(--font-size-meta, 0.75rem)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: '#1d4ed8',
-                  borderColor: '#bfdbfe',
-                  backgroundColor: '#eff6ff',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                <Sparkles size={14} color="#2563eb" />
-                <span>AI Measurement</span>
               </button>
 
               {deferredInstallPrompt && !isStandalone && (
@@ -3110,21 +3065,16 @@ export default function App() {
         onOpenDeviceHub={() => setShowPermissionsModal(true)}
       />
 
-      {/* Mobile Bottom Navigation (4-5 items, text only, safe-area inset) */}
+      {/* Mobile Bottom Navigation (Company-Specific Quick Screens, text only, safe-area inset) */}
       {isMobile && isAuthenticated && (
         <MobileBottomNav
+          activeDepartment={activeDepartment}
           activeTab={activeTab}
           onSelectTab={(tab) => {
             setActiveTab(tab);
             setMobileMenuOpen(false);
           }}
           onOpenMenu={() => setMobileMenuOpen(true)}
-          badgeCounts={{
-            dashboard: 0,
-            jobcards: 0,
-            ee_invoices: 0,
-            inventory: 0
-          }}
         />
       )}
 

@@ -3149,7 +3149,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       <div className="phoenix-chat-layout" style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         
         {/* ════ LEFT COLUMN: PHOENIX CONVERSATIONS SIDEBAR ════ */}
-        <div className="phoenix-chat-sidebar" style={{ display: (isMobileScreen && activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
+        <div className={`phoenix-chat-sidebar ${(isMobileScreen && activeGroup) ? 'is-mobile-hidden is-hidden' : ''}`} style={{ display: (isMobileScreen && activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
           
           {/* Phoenix Sidebar Top Bar: Chats title + Presence + Task toggle + Add Chat button */}
           <div style={{ padding: '0.85rem 1rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '1px solid var(--border-light, #e3e6ed)' }}>
@@ -3250,7 +3250,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           </div>
 
           {/* Phoenix Conversation Items List */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0.2rem 0.75rem 0.75rem' }}>
+          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0.2rem 0.75rem 0.75rem' }}>
             {loadingGroups ? (
               <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 <RefreshCw size={20} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
@@ -3386,7 +3386,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
 
         {/* ════ RIGHT COLUMN: PHOENIX ACTIVE CHAT STREAM ════ */}
-        <div className="phoenix-chat-main" style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
+        <div className={`phoenix-chat-main ${(isMobileScreen && !activeGroup) ? 'is-mobile-hidden is-hidden' : ''}`} style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
           
           {rosterTab === 'tasks' ? (
             <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
@@ -3815,7 +3815,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 onDragLeave={handleChatDragLeave}
                 onDrop={handleChatDrop}
                 className="phoenix-chat-stream"
-                style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}
+                style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}
               >
                 {/* Drag and Drop Visual Dropzone Overlay */}
                 {isChatDragging && (
@@ -4681,12 +4681,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               className="wa-hover-actions"
                               style={{
                                 position: 'absolute',
-                                top: '2px',
-                                [isMe ? 'left' : 'right']: '-220px',
+                                top: '-24px',
+                                [isMe ? 'right' : 'left']: '4px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '2px',
-                                background: 'rgba(255,255,255,0.95)',
+                                background: 'rgba(255,255,255,0.98)',
                                 backdropFilter: 'blur(6px)',
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '20px',
@@ -4813,19 +4813,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               )}
 
-              {/* Hidden File Input *              {/* Chat Input Form (Phoenix 1:1 Unified Desktop & Mobile) */}
+              {/* Chat Input Form (Compact Modern Single-Row SaaS Bar) */}
               <form
                 onSubmit={handleSendMessage}
-                style={{
-                  padding: isMobileScreen ? '0.65rem 0.85rem' : '0.75rem 1.15rem',
-                  background: 'var(--bg-card, #ffffff)',
-                  borderTop: '1px solid var(--border-light, #e3e6ed)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  flexShrink: 0,
-                  position: 'relative'
-                }}
+                className="phoenix-chat-input-bar"
               >
                 {isRecordingAudio ? (
                   <div style={{
@@ -4835,15 +4826,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     justifyContent: 'space-between',
                     background: slideCancelActive ? '#fef2f2' : '#fee2e2',
                     border: slideCancelActive ? '1.5px dashed #ef4444' : '1px solid #fca5a5',
-                    padding: '0.45rem 0.85rem',
-                    borderRadius: '8px',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '20px',
                     color: '#b91c1c',
-                    fontWeight: 800,
-                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
                     transition: 'all 0.15s ease'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
                       <span>{slideCancelActive ? 'Release to Cancel ✕' : `Recording... ${String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:${String(recordingSeconds % 60).padStart(2, '0')}`}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -4851,32 +4842,193 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <button
                         type="button"
                         onClick={() => stopAudioRecording(true)}
-                        style={{
-                          background: '#3874ff',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '0.3rem 0.75rem',
-                          borderRadius: '6px',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          fontSize: '0.78rem',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
+                        className="phoenix-send-btn-compact"
+                        style={{ width: '30px', height: '30px', minWidth: '30px', minHeight: '30px' }}
                       >
                         <Send size={12} color="#ffffff" strokeWidth={2.5} />
-                        <span>Send Now</span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    {/* Top Row: Clean input / textarea matching Phoenix */}
-                    <div style={{ width: '100%' }}>
+                    {/* Left Actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      {/* More tools / Actions popover (+) button */}
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          className="phoenix-toolbar-icon"
+                          onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
+                          style={{
+                            background: showMobileActionMenu ? '#eff6ff' : 'transparent',
+                            color: showMobileActionMenu ? '#2563eb' : '#64748b',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            minWidth: '32px',
+                            minHeight: '32px'
+                          }}
+                          title="Actions & Tools"
+                        >
+                          <Plus size={18} />
+                        </button>
+
+                        {showMobileActionMenu && (
+                          <>
+                            <div
+                              onClick={() => setShowMobileActionMenu(false)}
+                              style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
+                            />
+                            <div style={{
+                              position: 'absolute',
+                              bottom: 'calc(100% + 8px)',
+                              left: 0,
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '12px',
+                              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                              zIndex: 9999,
+                              padding: '6px',
+                              minWidth: '220px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px'
+                            }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowMobileActionMenu(false);
+                                  if (fileInputRef.current) {
+                                    fileInputRef.current.accept = 'image/*';
+                                    fileInputRef.current.click();
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                  fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <ImageIcon size={15} color="#2563eb" />
+                                <span>Upload Photo</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowMobileActionMenu(false);
+                                  if (fileInputRef.current) {
+                                    fileInputRef.current.accept = 'image/*,.pdf,.doc,.docx,audio/*';
+                                    fileInputRef.current.click();
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                  fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <Paperclip size={15} color="#2563eb" />
+                                <span>Attach Document</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => { setShowMobileActionMenu(false); handleOpenShareModal('jobcard'); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                  fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <Share2 size={15} color="#8b5cf6" />
+                                <span>Quick Share Record</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => { setShowMobileActionMenu(false); setShowPollModal(true); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                  fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <BarChart2 size={15} color="#059669" />
+                                <span>Create Poll</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => { setShowMobileActionMenu(false); handleOpenTaskModalFromChat(); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                  fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <CheckSquare size={15} color="#10b981" />
+                                <span>Create Task</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => { setShowMobileActionMenu(false); setIsUrgent(!isUrgent); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                  background: isUrgent ? '#fee2e2' : 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                  fontSize: '0.8rem', color: isUrgent ? '#dc2626' : '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <AlertTriangle size={15} color="#dc2626" />
+                                <span>{isUrgent ? 'Disable Urgent Alert' : 'Mark as Urgent (SOS)'}</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* On desktop: direct paperclip and emoji buttons */}
+                      {!isMobileScreen && (
+                        <>
+                          <button
+                            type="button"
+                            className="phoenix-toolbar-icon"
+                            onClick={() => {
+                              if (fileInputRef.current) {
+                                fileInputRef.current.accept = 'image/*,.pdf,.doc,.docx,audio/*';
+                                fileInputRef.current.click();
+                              }
+                            }}
+                            title="Attach File"
+                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
+                          >
+                            <Paperclip size={16} />
+                          </button>
+
+                          <button
+                            type="button"
+                            className="phoenix-toolbar-icon"
+                            title="Emoji"
+                            onClick={() => setInputMessage((prev) => prev + ' 😊')}
+                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
+                          >
+                            <Smile size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Center: Compact Text Input Pill */}
+                    <div className="phoenix-chat-input-pill">
+                      {isUrgent && (
+                        <span style={{ fontSize: '0.65rem', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '1px 5px', borderRadius: '4px', marginRight: '6px', flexShrink: 0 }}>
+                          SOS
+                        </span>
+                      )}
                       <textarea
-                        rows={isMobileScreen ? 1 : 2}
-                        placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Type your message..."}
+                        rows={1}
+                        placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Type a message..."}
                         value={inputMessage}
                         onPaste={handlePasteClipboard}
                         onKeyDown={(e) => {
@@ -4893,67 +5045,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           }, 100);
                         }}
                         onChange={handleInputChange}
-                        style={{
-                          width: '100%',
-                          background: 'transparent',
-                          border: 'none',
-                          outline: 'none',
-                          resize: 'none',
-                          fontSize: isMobileScreen ? '16px' : '0.875rem',
-                          color: 'var(--text-primary, #141824)',
-                          padding: '2px 0',
-                          boxSizing: 'border-box',
-                          fontFamily: 'inherit',
-                          lineHeight: 1.45,
-                          maxHeight: '120px'
-                        }}
+                        className="phoenix-chat-textarea"
                       />
                     </div>
 
-                    {/* Bottom Row: Tool icons on left, Phoenix Send button on right */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '6px' : '10px' }}>
-                        {/* Smile / Emoji */}
-                        <button
-                          type="button"
-                          className="phoenix-toolbar-icon"
-                          title="Emoji"
-                          onClick={() => setInputMessage((prev) => prev + ' 😊')}
-                        >
-                          <Smile size={18} />
-                        </button>
-
-                        {/* Image upload */}
-                        <button
-                          type="button"
-                          className="phoenix-toolbar-icon"
-                          onClick={() => {
-                            if (fileInputRef.current) {
-                              fileInputRef.current.accept = 'image/*';
-                              fileInputRef.current.click();
-                            }
-                          }}
-                          title="Upload Image"
-                        >
-                          <ImageIcon size={18} />
-                        </button>
-
-                        {/* Attachment / Paperclip */}
-                        <button
-                          type="button"
-                          className="phoenix-toolbar-icon"
-                          onClick={() => {
-                            if (fileInputRef.current) {
-                              fileInputRef.current.accept = 'image/*,.pdf,.doc,.docx,audio/*';
-                              fileInputRef.current.click();
-                            }
-                          }}
-                          title="Attach Document"
-                        >
-                          <Paperclip size={18} />
-                        </button>
-
-                        {/* Mic Voice Note */}
+                    {/* Right Actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      {/* Push to talk / Voice Note icon if no text */}
+                      {!inputMessage.trim() && !attachedFile && (
                         <button
                           type="button"
                           className="phoenix-toolbar-icon"
@@ -4967,141 +5066,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               startAudioRecording();
                             }
                           }}
-                          title="Voice Note"
+                          title="Voice Note (Hold or tap)"
+                          style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
                         >
-                          <Mic size={18} />
+                          <Mic size={17} />
                         </button>
+                      )}
 
-                        {/* 1-Tap ERP Share */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenShareModal('jobcard')}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '3px 8px',
-                            background: 'rgba(37,99,235,0.08)',
-                            color: '#2563eb',
-                            border: '1px solid rgba(37,99,235,0.2)',
-                            borderRadius: '12px',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                          title="Share ERP Job Cards, Designs, Invoices & Complaints"
-                        >
-                          <Tag size={13} />
-                          <span>ERP</span>
-                        </button>
-
-                        {/* More tools popover (Polls, Tasks, Job Cards, SOS) */}
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            type="button"
-                            className="phoenix-toolbar-icon"
-                            onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
-                            style={{
-                              background: showMobileActionMenu ? 'var(--nav-active-bg, #edf2f9)' : 'transparent',
-                              color: showMobileActionMenu ? '#3874ff' : 'var(--text-muted, #748194)'
-                            }}
-                            title="More Tools"
-                          >
-                            <MoreHorizontal size={18} />
-                          </button>
-
-                          {showMobileActionMenu && (
-                            <>
-                              <div
-                                onClick={() => setShowMobileActionMenu(false)}
-                                style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
-                              />
-                              <div style={{
-                                position: 'absolute',
-                                bottom: 'calc(100% + 8px)',
-                                left: 0,
-                                background: 'var(--bg-card, #ffffff)',
-                                border: '1px solid var(--border-light, #e2e8f0)',
-                                borderRadius: '12px',
-                                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-                                zIndex: 9999,
-                                padding: '6px',
-                                minWidth: '210px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '2px'
-                              }}>
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowMobileActionMenu(false); setIsUrgent(!isUrgent); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: isUrgent ? '#fee2e2' : 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: isUrgent ? '#dc2626' : 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <AlertTriangle size={14} color="#dc2626" />
-                                  <span>{isUrgent ? 'Disable Urgent Alert' : 'Mark as Urgent (SOS)'}</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowMobileActionMenu(false); handleOpenShareModal('jobcard'); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <Share2 size={14} color="#8b5cf6" />
-                                  <span>Quick Share Record</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowMobileActionMenu(false); setShowPollModal(true); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <BarChart2 size={14} color="#059669" />
-                                  <span>Create Poll</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => { setShowMobileActionMenu(false); handleOpenTaskModalFromChat(); }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                  }}
-                                >
-                                  <CheckSquare size={14} color="#10b981" />
-                                  <span>Create Task</span>
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {isUrgent && (
-                          <span style={{ fontSize: '0.65rem', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>
-                            SOS ACTIVE
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Phoenix Send Button */}
+                      {/* Compact Circular Send Button */}
                       <button
                         type="submit"
                         disabled={!inputMessage.trim() && !attachedFile}
-                        className="phoenix-send-btn"
+                        className="phoenix-send-btn-compact"
+                        title="Send Message"
                       >
-                        <span>Send</span>
-                        <Send size={13} style={{ transform: 'rotate(0deg)' }} />
+                        <Send size={15} style={{ marginLeft: '1px' }} />
                       </button>
                     </div>
                   </>

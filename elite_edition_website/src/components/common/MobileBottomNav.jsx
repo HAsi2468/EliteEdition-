@@ -1,29 +1,62 @@
 import React from 'react';
 
 /**
- * Minimal Text-Only Mobile Bottom Navigation
+ * Company-Specific Mobile Bottom Navigation
  * 
  * Rules:
- * - 4-5 items max
- * - Text only, NO decorative icons
- * - Safe area inset support: padding-bottom env(safe-area-inset-bottom)
- * - Minimum 44px tap targets
+ * - Dynamically renders only the quick screens for the current active company.
+ * - Text only, clean typography.
+ * - Safe area inset support: padding-bottom env(safe-area-inset-bottom).
+ * - Minimum 44px tap targets.
  */
 
+const COMPANY_NAV_CONFIG = {
+  digital_print: [
+    { id: 'jobcards_printing_log', label: 'Printing' },
+    { id: 'jobcards_fusing_log', label: 'Fusing' },
+    { id: 'jobcards_fabric', label: 'Fabric' },
+    { id: 'jobcards_billing', label: 'Finance' },
+    { id: '__more__', label: 'More' }
+  ],
+  stitching: [
+    { id: 'es_dashboard', label: 'Dashboard' },
+    { id: 'jobcards_list', label: 'Jobcard' },
+    { id: 'jobcards_catalogue', label: 'Design' },
+    { id: 'jobcards_stitching_challan', label: 'Challan' },
+    { id: '__more__', label: 'More' }
+  ],
+  elite_online: [
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'inventory', label: 'Stock' },
+    { id: 'sales', label: 'Orders' },
+    { id: 'returns', label: 'Returns' },
+    { id: '__more__', label: 'More' }
+  ],
+  elite_edition: [
+    { id: 'ee_dashboard', label: 'Dashboard' },
+    { id: 'ee_invoices', label: 'Finance' },
+    { id: 'ee_complaints', label: 'Complaints' },
+    { id: 'ee_settings', label: 'Settings' },
+    { id: '__more__', label: 'More' }
+  ],
+  elite_fabtex: [
+    { id: 'ef_dashboard', label: 'Dashboard' },
+    { id: 'ef_invoices', label: 'Finance' },
+    { id: 'ef_complaints', label: 'Complaints' },
+    { id: 'ef_settings', label: 'Settings' },
+    { id: '__more__', label: 'More' }
+  ]
+};
+
 export function MobileBottomNav({
-  activeTab = 'jobcards',
+  activeDepartment = 'digital_print',
+  activeTab = 'jobcards_printing_log',
   onSelectTab = () => {},
   onOpenMenu = () => {},
   badgeCounts = {},
   style = {}
 }) {
-  const items = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'jobcards', label: 'Jobs' },
-    { id: 'ee_invoices', label: 'Invoices' },
-    { id: 'inventory', label: 'Stock' },
-    { id: '__more__', label: 'More' }
-  ];
+  const items = COMPANY_NAV_CONFIG[activeDepartment] || COMPANY_NAV_CONFIG.digital_print;
 
   return (
     <nav
@@ -43,12 +76,13 @@ export function MobileBottomNav({
         zIndex: 9000,
         height: 'calc(54px + env(safe-area-inset-bottom, 0px))',
         boxSizing: 'border-box',
+        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.03)',
         ...style
       }}
     >
       {items.map((item) => {
         const isMore = item.id === '__more__';
-        const isActive = !isMore && (activeTab === item.id || (item.id === 'jobcards' && activeTab.startsWith('jobcards')));
+        const isActive = !isMore && (activeTab === item.id);
         const count = badgeCounts[item.id];
 
         return (
@@ -73,12 +107,13 @@ export function MobileBottomNav({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: isActive ? '#0f172a' : '#64748b',
-              fontWeight: isActive ? 600 : 500,
+              color: isActive ? '#1d4ed8' : '#64748b',
+              fontWeight: isActive ? 700 : 500,
               fontSize: '12px',
               position: 'relative',
               outline: 'none',
-              padding: 0
+              padding: 0,
+              transition: 'color 0.15s ease'
             }}
           >
             <span style={{ position: 'relative' }}>
@@ -89,12 +124,13 @@ export function MobileBottomNav({
                     position: 'absolute',
                     top: '-6px',
                     right: '-12px',
-                    backgroundColor: '#0f172a',
+                    backgroundColor: '#2563eb',
                     color: '#ffffff',
                     fontSize: '9px',
                     padding: '1px 4px',
                     borderRadius: '4px',
-                    fontVariantNumeric: 'tabular-nums'
+                    fontVariantNumeric: 'tabular-nums',
+                    fontWeight: 700
                   }}
                 >
                   {count}
@@ -104,10 +140,10 @@ export function MobileBottomNav({
             {isActive && (
               <span
                 style={{
-                  width: '16px',
-                  height: '2px',
-                  backgroundColor: '#0f172a',
-                  borderRadius: '1px',
+                  width: '18px',
+                  height: '2.5px',
+                  backgroundColor: '#2563eb',
+                  borderRadius: '2px',
                   marginTop: '3px'
                 }}
               />

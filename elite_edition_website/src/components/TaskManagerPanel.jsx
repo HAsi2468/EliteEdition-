@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
+import '../styles/taskManager.css';
 import {
   CheckSquare,
   Clock,
@@ -136,6 +137,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   // TaskOPad Scope Tabs State
   const [taskScope, setTaskScope] = useState('all'); // 'all' | 'my_tasks' | 'delegated' | 'today' | 'overdue' | 'completed'
+  const [mobileKanbanCol, setMobileKanbanCol] = useState('all');
 
   // TaskOPad Interactive Calendar State
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -974,206 +976,167 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   }, [isAdmin, activeView]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
+    <div className="task-manager-container">
       
-      {/* ── RESPONSIVE EMBEDDED CSS ── */}
+      {/* ── RESPONSIVE EMBEDDED CSS OVERRIDES ── */}
       <style>{`
         @media (max-width: 768px) {
-          .task-desktop-header { display: none !important; }
-          .task-desktop-scopes { display: none !important; }
-          .task-desktop-filters { display: none !important; }
+          .task-desktop-header-wrap { display: none !important; }
           .task-mobile-control-card { display: flex !important; flex-direction: column !important; }
           .kanban-grid-responsive {
-            grid-template-columns: repeat(5, minmax(84vw, 1fr)) !important;
+            grid-template-columns: repeat(5, minmax(82vw, 1fr)) !important;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
+          }
+          .kanban-grid-responsive.single-col-mode {
+            grid-template-columns: 1fr !important;
+            overflow-x: hidden !important;
           }
           .kanban-col-snap {
             scroll-snap-align: start;
           }
         }
         @media (min-width: 769px) {
-          .task-desktop-header { display: flex !important; }
-          .task-desktop-scopes { display: flex !important; }
-          .task-desktop-filters { display: flex !important; }
+          .task-desktop-header-wrap { display: flex !important; flex-direction: column !important; }
           .task-mobile-control-card { display: none !important; }
+          .task-mobile-col-bar { display: none !important; }
           .kanban-grid-responsive {
             grid-template-columns: repeat(5, minmax(260px, 1fr)) !important;
           }
         }
       `}</style>
 
-      {/* ── DESKTOP: TOP HEADER CONTROL BAR ── */}
-      <div className="glass-panel task-desktop-header" style={{ padding: '0.75rem 1.1rem', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', background: '#ffffff', border: '1px solid var(--border-light)', boxShadow: '0 2px 10px rgba(37,99,235,0.05)', flexWrap: 'wrap', gap: '0.6rem' }}>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-          <div style={{ width: 38, height: 38, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
-            <CheckSquare size={22} />
-          </div>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-              Workforce Task Manager
-            </h2>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>{filteredTasks.length} Tasks Listed</span>
-              {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length > 0 && (
-                <span style={{ color: '#16a34a', background: '#dcfce7', border: '1px solid #86efac', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
-                  ⏱️ {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length} Active Timers
-                </span>
-              )}
+      {/* ── DESKTOP: UNIFIED ENTERPRISE TASK HEADER ── */}
+      <div className="task-unified-header task-desktop-header-wrap">
+        {/* Row 1: Brand / Title + View Switcher + Export + Create */}
+        <div className="task-header-row-top">
+          <div className="task-title-group">
+            <div className="task-title-icon">
+              <CheckSquare size={18} />
             </div>
+            <div>
+              <div className="task-main-title">Workforce Task Manager</div>
+              <div className="task-meta-subtitle">
+                <span>{filteredTasks.length} tasks</span>
+                {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length > 0 && (
+                  <span className="task-active-timer-badge">
+                    ⏱️ {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length} Active Timers
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="task-actions-group">
+            {/* View Switcher Pills */}
+            <div className="task-view-switcher">
+              {viewsList.map((v) => {
+                const IconComp = v.icon;
+                const isActive = activeView === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setActiveView(v.id)}
+                    className={`task-view-tab ${isActive ? 'active' : ''}`}
+                    title={v.label}
+                  >
+                    <IconComp size={13} />
+                    <span>{v.shortLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Export CSV Button */}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="task-btn-secondary"
+              title="Export current tasks to CSV file"
+            >
+              <Download size={13} color="#2563eb" />
+              <span>Export CSV</span>
+            </button>
+
+            {/* Create Task Button */}
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="task-btn-primary"
+            >
+              <Plus size={15} />
+              <span>+ Create Task</span>
+            </button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          
-          {/* View Switcher Pills */}
-          <div style={{ display: 'flex', background: '#f8fafc', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-light)', flexWrap: 'wrap', gap: '2px' }}>
-            {viewsList.map((v) => {
-              const IconComp = v.icon;
+        {/* Row 2: Search + Scopes + Filters */}
+        <div className="task-header-row-bottom">
+          {/* Integrated Search Input */}
+          <div className="task-search-input-wrap">
+            <Search size={14} className="task-search-icon" />
+            <input
+              type="text"
+              placeholder="Search tasks, project @JC-1004, client..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="task-search-input"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="task-search-clear"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Scope Navigation Tabs */}
+          <div className="task-scopes-scroll-wrap">
+            {scopeTabs.map((tab) => {
+              const isActive = taskScope === tab.id;
               return (
                 <button
-                  key={v.id}
-                  onClick={() => setActiveView(v.id)}
-                  style={{
-                    background: activeView === v.id ? '#2563eb' : 'transparent',
-                    color: activeView === v.id ? '#ffffff' : 'var(--text-muted)',
-                    border: 'none',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    padding: '0.35rem 0.65rem',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'all 0.15s'
-                  }}
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setTaskScope(tab.id)}
+                  className={`task-scope-pill ${isActive ? 'active' : ''} ${tab.isAlert ? 'alert' : ''}`}
                 >
-                  <IconComp size={13} />
-                  <span>{v.label}</span>
+                  <span>{tab.icon} {tab.shortLabel}</span>
+                  <span className="task-scope-count">{tab.count}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Export CSV Button */}
-          <button
-            onClick={handleExportCSV}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '0.45rem 0.8rem',
-              borderRadius: '8px',
-              background: '#ffffff',
-              border: '1px solid var(--border-light)',
-              color: 'var(--text-primary)',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              transition: 'all 0.15s ease'
-            }}
-            title="Export current tasks to CSV file"
-          >
-            <Download size={14} color="#2563eb" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
-            onClick={handleOpenCreateModal}
-            className="btn-primary"
-            style={{ fontSize: '0.8rem', padding: '0.45rem 0.95rem', gap: '0.4rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}
-          >
-            <Plus size={15} />
-            <span>+ Create Task</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── DESKTOP: TASKOPAD SCOPE NAVIGATION BAR ── */}
-      <div className="glass-panel task-desktop-scopes" style={{ padding: '0.6rem 0.9rem', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '10px', background: '#ffffff', border: '1px solid var(--border-light)' }}>
-        {scopeTabs.map((tab) => {
-          const isActive = taskScope === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setTaskScope(tab.id)}
-              style={{
-                background: isActive ? '#2563eb' : '#f8fafc',
-                color: isActive ? '#ffffff' : 'var(--text-primary)',
-                border: isActive ? '1px solid #1d4ed8' : '1px solid var(--border-light)',
-                padding: '0.35rem 0.75rem',
-                borderRadius: '20px',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: isActive ? '0 3px 8px rgba(37,99,235,0.25)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
+          {/* Filters: Assignee & Priority */}
+          <div className="task-filter-dropdowns">
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              className="task-select"
             >
-              <span>{tab.icon} {tab.shortLabel}</span>
-              <span
-                style={{
-                  background: isActive ? 'rgba(255,255,255,0.25)' : tab.isAlert ? '#fee2e2' : '#e2e8f0',
-                  color: isActive ? '#ffffff' : tab.isAlert ? '#dc2626' : 'var(--text-muted)',
-                  padding: '1px 6px',
-                  borderRadius: '10px',
-                  fontSize: '0.66rem',
-                  fontWeight: 800
-                }}
-              >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              <option value="all">All Staff</option>
+              {allUsers.map((u) => (
+                <option key={u._id} value={u._id}>{u.name || u.username}</option>
+              ))}
+            </select>
 
-      {/* ── DESKTOP: FILTERING & SEARCH BAR ── */}
-      <div className="glass-panel task-desktop-filters" style={{ padding: '0.6rem 0.9rem', alignItems: 'center', justifyContent: 'space-between', borderRadius: '10px', background: '#ffffff', border: '1px solid var(--border-light)', gap: '0.6rem', flexWrap: 'wrap' }}>
-        
-        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            placeholder="Search tasks by title, project @JC-1004, client, or details..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: '100%', paddingLeft: '32px', fontSize: '0.78rem', height: '32px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-
-          {/* Filter by Assignee */}
-          <select
-            value={assigneeFilter}
-            onChange={(e) => setAssigneeFilter(e.target.value)}
-            style={{ fontSize: '0.75rem', height: '32px', padding: '0 0.5rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600 }}
-          >
-            <option value="all">Filter by Assignee: All Staff</option>
-            {allUsers.map((u) => (
-              <option key={u._id} value={u._id}>{u.name || u.username}</option>
-            ))}
-          </select>
-
-          {/* Priority Filter */}
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            style={{ fontSize: '0.75rem', height: '32px', padding: '0 0.5rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600 }}
-          >
-            <option value="all">All Priorities</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="task-select"
+            >
+              <option value="all">All Priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1577,258 +1540,297 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-            <Sparkles size={28} className="spin-loader" style={{ marginBottom: '0.6rem', color: '#2563eb' }} />
             <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading TaskOPad workforce board...</div>
           </div>
         ) : activeView === 'kanban' ? (
           
           /* ════ VIEW 1: KANBAN BOARD ════ */
-          <div className="kanban-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(260px, 1fr))', gap: '0.75rem', height: '100%', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-            {KANBAN_COLUMNS.map((col) => {
-              const colTasks = filteredTasks.filter((t) => t.status === col.id);
+          <div className="task-kanban-board">
+            {/* Mobile Column Bar Switcher */}
+            <div className="task-mobile-col-bar">
+              <button
+                type="button"
+                className={`task-mobile-col-pill ${mobileKanbanCol === 'all' ? 'active' : ''}`}
+                onClick={() => setMobileKanbanCol('all')}
+              >
+                <span>All Columns</span>
+                <span className="task-mobile-col-count">{filteredTasks.length}</span>
+              </button>
+              {KANBAN_COLUMNS.map((col) => {
+                const count = filteredTasks.filter(t => t.status === col.id).length;
+                return (
+                  <button
+                    key={col.id}
+                    type="button"
+                    className={`task-mobile-col-pill ${mobileKanbanCol === col.id ? 'active' : ''}`}
+                    onClick={() => setMobileKanbanCol(col.id)}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: col.color, display: 'inline-block' }} />
+                    <span>{col.label}</span>
+                    <span className="task-mobile-col-count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-              return (
-                <div
-                  key={col.id}
-                  className="kanban-col-snap"
-                  style={{
-                    background: '#f8fafc',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    maxHeight: '100%',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {/* Column Header */}
+            <div
+              className={`kanban-grid-responsive ${mobileKanbanCol !== 'all' ? 'single-col-mode' : ''}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: mobileKanbanCol !== 'all' ? '1fr' : 'repeat(5, minmax(260px, 1fr))',
+                gap: '0.75rem',
+                height: '100%',
+                overflowX: 'auto',
+                paddingBottom: '0.5rem'
+              }}
+            >
+              {(mobileKanbanCol === 'all' ? KANBAN_COLUMNS : KANBAN_COLUMNS.filter(c => c.id === mobileKanbanCol)).map((col) => {
+                const colTasks = filteredTasks.filter((t) => t.status === col.id);
+
+                return (
                   <div
+                    key={col.id}
+                    className="kanban-col-snap task-kanban-col"
                     style={{
-                      padding: '0.65rem 0.85rem',
-                      borderBottom: '1px solid var(--border-light)',
+                      background: '#f8fafc',
+                      border: '1px solid var(--border-light)',
+                      borderRadius: '12px',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: col.bg
+                      flexDirection: 'column',
+                      maxHeight: '100%',
+                      overflow: 'hidden'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color }} />
-                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                        {col.label}
-                      </h4>
-                    </div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: col.color, background: '#ffffff', padding: '1px 7px', borderRadius: '10px', border: `1px solid ${col.color}30` }}>
-                      {colTasks.length}
-                    </span>
-                  </div>
-
-                  {/* Task Cards Container */}
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {colTasks.length === 0 ? (
-                      <div style={{ padding: '2rem 0.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                        No tasks in {col.label}
+                    {/* Column Header */}
+                    <div
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        borderBottom: '1px solid var(--border-light)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: col.bg
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color }} />
+                        <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {col.label}
+                        </h4>
                       </div>
-                    ) : (
-                      colTasks.map((t) => {
-                        const pri = getPriorityBadge(t.priority);
-                        const completedCheck = (t.checklist || []).filter((c) => c.completed).length;
-                        const totalCheck = (t.checklist || []).length;
-                        const assignerName = getAssignerName(t);
-                        const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: col.color, background: '#ffffff', padding: '1px 7px', borderRadius: '10px', border: `1px solid ${col.color}30` }}>
+                        {colTasks.length}
+                      </span>
+                    </div>
 
-                        return (
-                          <div
-                            key={t._id}
-                            onClick={() => setSelectedTask(t)}
-                            style={{
-                              background: '#ffffff',
-                              border: isOverdue ? '1.5px solid #ef4444' : '1px solid var(--border-light)',
-                              borderRadius: '10px',
-                              padding: '0.75rem',
-                              cursor: 'pointer',
-                              boxShadow: isOverdue ? '0 4px 14px rgba(239,68,68,0.12)' : '0 2px 6px rgba(0,0,0,0.03)',
-                              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.45rem'
-                            }}
-                          >
-                            {/* Badges Row */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: pri.color, background: pri.bg, border: `1px solid ${pri.border}`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                                  {pri.label}
+                    {/* Task Cards Container */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {colTasks.length === 0 ? (
+                        <div style={{ padding: '2rem 0.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                          No tasks in {col.label}
+                        </div>
+                      ) : (
+                        colTasks.map((t) => {
+                          const pri = getPriorityBadge(t.priority);
+                          const completedCheck = (t.checklist || []).filter((c) => c.completed).length;
+                          const totalCheck = (t.checklist || []).length;
+                          const assignerName = getAssignerName(t);
+                          const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
+
+                          return (
+                            <div
+                              key={t._id}
+                              onClick={() => setSelectedTask(t)}
+                              className={`task-card ${isOverdue ? 'overdue' : ''}`}
+                              style={{
+                                background: '#ffffff',
+                                border: isOverdue ? '1.5px solid #ef4444' : '1px solid var(--border-light)',
+                                borderRadius: '10px',
+                                padding: '0.75rem',
+                                cursor: 'pointer',
+                                boxShadow: isOverdue ? '0 4px 14px rgba(239,68,68,0.12)' : '0 2px 6px rgba(0,0,0,0.03)',
+                                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.45rem'
+                              }}
+                            >
+                              {/* Badges Row */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, color: pri.color, background: pri.bg, border: `1px solid ${pri.border}`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                                    {pri.label}
+                                  </span>
+                                  {t.attachments && t.attachments.length > 0 && (
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`${t.attachments.length} attachment(s)`}>
+                                      <Paperclip size={10} />
+                                      <span>{t.attachments.length}</span>
+                                    </span>
+                                  )}
+                                  {t.recurrence && t.recurrence.isRecurring && (
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', border: '1px solid #ddd6fe', padding: '1px 6px', borderRadius: '4px' }}>
+                                      🔄 {t.recurrence.frequency ? t.recurrence.frequency.toUpperCase() : 'RECURRING'}
+                                    </span>
+                                  )}
+                                  {isOverdue && (
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                                      🚨 OVERDUE
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Assigned By Pill */}
+                                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                  By: <strong>{assignerName}</strong>
                                 </span>
-                                {t.attachments && t.attachments.length > 0 && (
-                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`${t.attachments.length} attachment(s)`}>
-                                    <Paperclip size={10} />
-                                    <span>{t.attachments.length}</span>
-                                  </span>
-                                )}
-                                {t.recurrence && t.recurrence.isRecurring && (
-                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', border: '1px solid #ddd6fe', padding: '1px 6px', borderRadius: '4px' }}>
-                                    🔄 {t.recurrence.frequency ? t.recurrence.frequency.toUpperCase() : 'RECURRING'}
-                                  </span>
-                                )}
-                                {isOverdue && (
-                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                                    🚨 OVERDUE
-                                  </span>
-                                )}
                               </div>
-                              
-                              {/* Assigned By Pill */}
-                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
-                                By: <strong>{assignerName}</strong>
-                              </span>
-                            </div>
 
-                            {/* Cover Image if available */}
-                            {(() => {
-                              const coverImg = t.coverImage || t.imageUrl || (t.attachments || []).find(a => (a.fileType && a.fileType.startsWith('image')) || (a.url && a.url.match(/\.(jpeg|jpg|png|webp|gif)/i)))?.url;
-                              return coverImg ? (
-                                <img 
-                                  src={coverImg} 
-                                  alt="" 
-                                  className="kanban-cover-image" 
-                                  style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: '6px', margin: '2px 0 4px' }} 
-                                />
-                              ) : null;
-                            })()}
+                              {/* Cover Image if available */}
+                              {(() => {
+                                const coverImg = t.coverImage || t.imageUrl || (t.attachments || []).find(a => (a.fileType && a.fileType.startsWith('image')) || (a.url && a.url.match(/\.(jpeg|jpg|png|webp|gif)/i)))?.url;
+                                return coverImg ? (
+                                  <img 
+                                    src={coverImg} 
+                                    alt="" 
+                                    className="kanban-cover-image" 
+                                    style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: '6px', margin: '2px 0 4px' }} 
+                                  />
+                                ) : null;
+                              })()}
 
-                            {/* Tag Pills */}
-                            {t.tags && t.tags.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', margin: '2px 0' }}>
-                                {t.tags.map((tag, idx) => (
-                                  <span key={idx} className="kanban-tag-pill feature" style={{ fontSize: '0.62rem' }}>
-                                    #{tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Title & Project Ref */}
-                            <div>
-                              <h5 style={{ margin: '0 0 2px', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                                {t.title}
-                              </h5>
-                              {t.projectRef && (
-                                <div style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                  <ExternalLink size={10} />
-                                  <span>{t.projectRef}</span>
+                              {/* Tag Pills */}
+                              {t.tags && t.tags.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', margin: '2px 0' }}>
+                                  {t.tags.map((tag, idx) => (
+                                    <span key={idx} className="kanban-tag-pill feature" style={{ fontSize: '0.62rem' }}>
+                                      #{tag}
+                                    </span>
+                                  ))}
                                 </div>
                               )}
-                            </div>
 
-                            {/* Assigned To Row */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)' }}>Assigned To:</span>
-                              {(t.assignees || []).length === 0 ? (
-                                <span style={{ fontSize: '0.65rem', color: '#94a3b8', italic: 'true' }}>Unassigned</span>
-                              ) : (
-                                (t.assignees || []).map((a) => (
-                                  <span key={a._id || a} style={{ fontSize: '0.64rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '10px' }}>
-                                    {typeof a === 'object' ? (a.name || a.username) : 'Staff'}
-                                  </span>
-                                ))
-                              )}
-                            </div>
-
-                            {/* Sub-Task Checklist Visual Progress Bar */}
-                            {totalCheck > 0 && (
-                              <div style={{ marginTop: '2px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '2px' }}>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                    <CheckSquare size={11} color={completedCheck === totalCheck ? '#16a34a' : 'var(--primary)'} />
-                                    <span>Checklist</span>
-                                  </span>
-                                  <span>{completedCheck}/{totalCheck} ({Math.round((completedCheck / totalCheck) * 100)}%)</span>
-                                </div>
-                                <div style={{ width: '100%', height: '4px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                                  <div style={{ width: `${(completedCheck / totalCheck) * 100}%`, height: '100%', background: completedCheck === totalCheck ? '#16a34a' : '#2563eb', transition: 'width 0.3s ease' }} />
-                                </div>
+                              {/* Title & Project Ref */}
+                              <div>
+                                <h5 style={{ margin: '0 0 2px', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                                  {t.title}
+                                </h5>
+                                {t.projectRef && (
+                                  <div style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                    <ExternalLink size={10} />
+                                    <span>{t.projectRef}</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
 
-                            {/* Due Date & Time Log Meta */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', paddingTop: '2px' }}>
-                              {t.dueDate ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700, color: isOverdue ? '#ef4444' : 'var(--text-muted)' }}>
-                                  <Calendar size={11} />
-                                  <span>Due: {new Date(t.dueDate).toLocaleDateString()}</span>
-                                </div>
-                              ) : <span />}
+                              {/* Assigned To Row */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)' }}>Assigned To:</span>
+                                {(t.assignees || []).length === 0 ? (
+                                  <span style={{ fontSize: '0.65rem', color: '#94a3b8', italic: 'true' }}>Unassigned</span>
+                                ) : (
+                                  (t.assignees || []).map((a) => (
+                                    <span key={a._id || a} style={{ fontSize: '0.64rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '10px' }}>
+                                      {typeof a === 'object' ? (a.name || a.username) : 'Staff'}
+                                    </span>
+                                  ))
+                                )}
+                              </div>
 
-                              {t.estimatedHours > 0 && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.64rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                                  <Clock size={10} />
-                                  <span>Est: {t.estimatedHours}h</span>
+                              {/* Sub-Task Checklist Visual Progress Bar */}
+                              {totalCheck > 0 && (
+                                <div style={{ marginTop: '2px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '2px' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <CheckSquare size={11} color={completedCheck === totalCheck ? '#16a34a' : 'var(--primary)'} />
+                                      <span>Checklist</span>
+                                    </span>
+                                    <span>{completedCheck}/{totalCheck} ({Math.round((completedCheck / totalCheck) * 100)}%)</span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '4px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${(completedCheck / totalCheck) * 100}%`, height: '100%', background: completedCheck === totalCheck ? '#16a34a' : '#2563eb', transition: 'width 0.3s ease' }} />
+                                  </div>
                                 </div>
                               )}
-                            </div>
 
-                            {/* Footer: One-Tap Quick Advance & Move Select */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
-                              {t.status !== 'Done' ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const nextMap = { 'Backlog': 'To Do', 'To Do': 'In Progress', 'In Progress': 'In Review', 'In Review': 'Done' };
-                                    if (nextMap[t.status]) handleStatusChange(t, nextMap[t.status]);
-                                  }}
-                                  style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', fontSize: '0.64rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                                  title={`Advance to ${t.status === 'In Review' ? 'Done' : 'Next Stage'}`}
+                              {/* Due Date & Time Log Meta */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', paddingTop: '2px' }}>
+                                {t.dueDate ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700, color: isOverdue ? '#ef4444' : 'var(--text-muted)' }}>
+                                    <Calendar size={11} />
+                                    <span>Due: {new Date(t.dueDate).toLocaleDateString()}</span>
+                                  </div>
+                                ) : <span />}
+
+                                {t.estimatedHours > 0 && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.64rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                    <Clock size={10} />
+                                    <span>Est: {t.estimatedHours}h</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Footer: One-Tap Quick Advance & Move Select */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
+                                {t.status !== 'Done' ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const nextMap = { 'Backlog': 'To Do', 'To Do': 'In Progress', 'In Progress': 'In Review', 'In Review': 'Done' };
+                                      if (nextMap[t.status]) handleStatusChange(t, nextMap[t.status]);
+                                    }}
+                                    style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', fontSize: '0.64rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                    title={`Advance to ${t.status === 'In Review' ? 'Done' : 'Next Stage'}`}
+                                  >
+                                    <span>{t.status === 'In Review' ? '✓ Mark Done' : `➔ ${t.status === 'Backlog' ? 'To Do' : t.status === 'To Do' ? 'In Progress' : 'In Review'}`}</span>
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '0.64rem', color: '#16a34a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                    <CheckCircle2 size={12} /> Done
+                                  </span>
+                                )}
+
+                                {/* Status Quick Shift Select */}
+                                <select
+                                  value={t.status}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => handleStatusChange(t, e.target.value)}
+                                  style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border-light)', background: '#ffffff', cursor: 'pointer', fontWeight: 700 }}
                                 >
-                                  <span>{t.status === 'In Review' ? '✓ Mark Done' : `➔ ${t.status === 'Backlog' ? 'To Do' : t.status === 'To Do' ? 'In Progress' : 'In Review'}`}</span>
-                                </button>
-                              ) : (
-                                <span style={{ fontSize: '0.64rem', color: '#16a34a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                  <CheckCircle2 size={12} /> Done
-                                </span>
-                              )}
+                                  {KANBAN_COLUMNS.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.label}</option>
+                                  ))}
+                                </select>
+                              </div>
 
-                              {/* Status Quick Shift Select */}
-                              <select
-                                value={t.status}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => handleStatusChange(t, e.target.value)}
-                                style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border-light)', background: '#ffffff', cursor: 'pointer', fontWeight: 700 }}
-                              >
-                                {KANBAN_COLUMNS.map((c) => (
-                                  <option key={c.id} value={c.id}>{c.label}</option>
-                                ))}
-                              </select>
                             </div>
-
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
         ) : activeView === 'list' ? (
 
           /* ════ VIEW 2: GRID LIST VIEW ════ */
-          <div className="glass-panel" style={{ height: '100%', borderRadius: '12px', overflowY: 'auto', background: '#ffffff' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+          <div className="task-list-table-container">
+            <table className="task-list-table">
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-light)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Task Title</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Status</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Priority</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Due Date</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Subtasks</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Assigned To</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Assigned By</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Project Ref</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Hours Logged</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Actions</th>
+                <tr>
+                  <th>Task Title</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Due Date</th>
+                  <th>Subtasks</th>
+                  <th>Assigned To</th>
+                  <th>Assigned By</th>
+                  <th>Project Ref</th>
+                  <th>Hours Logged</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1851,9 +1853,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                       <tr
                         key={t._id}
                         onClick={() => setSelectedTask(t)}
-                        style={{ borderBottom: '1px solid var(--border-light)', cursor: 'pointer', transition: 'background 0.15s' }}
+                        className="task-list-row"
                       >
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{t.title}</span>
                             {t.attachments && t.attachments.length > 0 && (
@@ -1869,7 +1871,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <td>
                           <select
                             value={t.status}
                             onClick={(e) => e.stopPropagation()}
@@ -1881,12 +1883,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             ))}
                           </select>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <td>
                           <span style={{ fontSize: '0.65rem', fontWeight: 800, color: pri.color, background: pri.bg, padding: '2px 7px', borderRadius: '4px' }}>
                             {pri.label}
                           </span>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>
+                        <td style={{ whiteSpace: 'nowrap' }}>
                           {t.dueDate ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700, color: isOverdue ? '#dc2626' : 'var(--text-primary)' }}>
                               <Calendar size={12} />
@@ -1901,7 +1903,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>No due date</span>
                           )}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', minWidth: 110 }}>
+                        <td style={{ minWidth: 110 }}>
                           {checkTotal > 0 ? (
                             <div>
                               <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }}>
@@ -1915,7 +1917,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>-</span>
                           )}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <td>
                           <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
                             {(t.assignees || []).map((a) => (
                               <span key={a._id || a} style={{ fontSize: '0.65rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>
@@ -1924,16 +1926,16 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             ))}
                           </div>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#475569' }}>
+                        <td style={{ fontWeight: 700, color: '#475569' }}>
                           {assignerName}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', color: '#2563eb', fontWeight: 700 }}>
+                        <td style={{ color: '#2563eb', fontWeight: 700 }}>
                           {t.projectRef || '-'}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600 }}>
+                        <td style={{ fontWeight: 600 }}>
                           {calculateTotalLoggedHours(t.timeLogs)}h {t.estimatedHours ? `/ ${t.estimatedHours}h` : ''}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }}>
                           <button
                             onClick={(e) => handleDeleteTask(t._id, e)}
                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
