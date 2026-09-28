@@ -1,24 +1,83 @@
 {
-  "short_name": "Elite Edition",
-  "name": "Elite Edition - Inventory Dashboard",
-  "description": "Elite Edition Online Mini Dashboard & Inventory Management",
+  "name": "Elite Edition ERP",
+  "short_name": "Elite ERP",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "description": "Elite Edition Enterprise ERP - Digital Printing, Stitching & Fabric Management System",
+  "categories": [
+    "business",
+    "productivity",
+    "finance"
+  ],
   "icons": [
     {
       "src": "/pwa-192x192.png",
-      "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/pwa-512x512.png",
-      "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "start_url": "/",
-  "background_color": "#121212",
-  "theme_color": "#1a1a1a",
-  "display": "standalone",
-  "orientation": "portrait"
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Elite Edition ERP Dashboard & Management Grid"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Elite Edition ERP Mobile View"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open ERP Overview & KPIs",
+      "url": "/?source=pwa#dashboard"
+    },
+    {
+      "name": "Job Cards",
+      "short_name": "Job Cards",
+      "description": "View Printing & Fusing Production Job Cards",
+      "url": "/?source=pwa#jobcards_fusing_log"
+    },
+    {
+      "name": "Invoices",
+      "short_name": "Invoices",
+      "description": "Access GST Billing & Accounts",
+      "url": "/?source=pwa#billing"
+    }
+  ]
 }

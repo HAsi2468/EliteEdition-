@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
-import { Shield, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function Login({ onLoginSuccess, onSwitchToClient }) {
   const [email, setEmail] = useState('admin@elite.com');
@@ -15,15 +14,15 @@ export default function Login({ onLoginSuccess, onSwitchToClient }) {
       setError('Please enter both email and password.');
       return;
     }
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
       await api.login(email, password);
       onLoginSuccess();
     } catch (err) {
-      setError(err.message || 'Login failed. Please verify credentials and server connection.');
+      setError(err.message || 'Login failed. Please verify credentials.');
     } finally {
       setLoading(false);
     }
@@ -31,20 +30,24 @@ export default function Login({ onLoginSuccess, onSwitchToClient }) {
 
   return (
     <div style={styles.container}>
-      <div className="glass-panel" style={styles.card}>
+      <div style={styles.card}>
         <div style={styles.header}>
-          <div style={styles.logoBadge}>
-            <Shield size={24} color="#06b6d4" />
-          </div>
-          <h2 style={styles.title}>Elite Edition</h2>
-          <p style={styles.subtitle}>Enter credentials to access the inventory dashboard</p>
+          <img
+            src="/Logo.png"
+            alt="Elite Edition"
+            style={styles.logo}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          <h1 style={styles.title}>Elite Edition</h1>
         </div>
 
-        {error && <div style={styles.errorContainer}>{error}</div>}
+        {error && <div style={styles.error}>{error}</div>}
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Email Address</label>
+            <label style={styles.label}>Email</label>
             <input
               type="email"
               value={email}
@@ -56,24 +59,24 @@ export default function Login({ onLoginSuccess, onSwitchToClient }) {
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <div style={styles.passwordWrapper}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                style={styles.inputPassword}
-                required
-              />
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Password</label>
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={styles.eyeBtn}
+                style={styles.toggleBtn}
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              style={styles.input}
+              required
+            />
           </div>
 
           <button
@@ -82,36 +85,18 @@ export default function Login({ onLoginSuccess, onSwitchToClient }) {
             disabled={loading}
             style={styles.submitBtn}
           >
-            {loading ? (
-              <span style={styles.spinner}></span>
-            ) : (
-              <>
-                Sign In <ArrowRight size={18} />
-              </>
-            )}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+        <div style={styles.footer}>
           <button
             type="button"
+            className="btn-secondary"
             onClick={onSwitchToClient || (() => { window.location.hash = '#client-login'; })}
-            style={{
-              background: 'rgba(37, 99, 235, 0.12)',
-              border: '1px solid rgba(37, 99, 235, 0.35)',
-              color: '#60a5fa',
-              padding: '0.55rem 1rem',
-              borderRadius: '10px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease'
-            }}
+            style={styles.switchBtn}
           >
-            <span>🏢 Are you a Client / Partner? Client Login →</span>
+            Client Login
           </button>
         </div>
       </div>
@@ -125,153 +110,98 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: '100vh',
-    padding: '1.5rem',
+    padding: '16px',
+    backgroundColor: 'var(--bg-main, #f8fafc)',
   },
   card: {
     width: '100%',
-    maxWidth: '440px',
-    padding: '2.5rem 2rem',
-    borderRadius: 'var(--radius-lg)',
+    maxWidth: '400px',
+    padding: '32px 24px',
+    backgroundColor: '#ffffff',
+    border: '1px solid var(--border-color, #e2e8f0)',
+    borderRadius: '8px',
+    boxShadow: 'none',
   },
   header: {
     textAlign: 'center',
-    marginBottom: '2rem',
+    marginBottom: '24px',
   },
-  logoBadge: {
-    display: 'inline-flex',
-    padding: '0.8rem',
-    borderRadius: '16px',
-    background: 'rgba(6, 182, 212, 0.1)',
-    border: '1px solid rgba(6, 182, 212, 0.2)',
-    marginBottom: '1rem',
+  logo: {
+    height: '40px',
+    width: 'auto',
+    marginBottom: '12px',
+    display: 'inline-block',
   },
   title: {
-    fontSize: '1.6rem',
-    fontWeight: '700',
-    color: 'var(--text-primary)',
-    marginBottom: '0.4rem',
-  },
-  subtitle: {
-    fontSize: '0.85rem',
-    color: 'var(--text-muted)',
-    lineHeight: '1.4',
+    fontSize: 'var(--font-size-title, 1.125rem)',
+    fontWeight: '600',
+    color: 'var(--text-primary, #0f172a)',
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.2rem',
+    gap: '16px',
   },
   inputGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.4rem',
+    gap: '4px',
+  },
+  labelRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   label: {
-    fontSize: '0.8rem',
+    fontSize: 'var(--font-size-meta, 0.75rem)',
     fontWeight: '500',
-    color: '#d1d5db',
-    marginLeft: '2px',
+    color: 'var(--text-primary, #0f172a)',
+    marginBottom: '4px',
+  },
+  toggleBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted, #64748b)',
+    fontSize: 'var(--font-size-meta, 0.75rem)',
+    cursor: 'pointer',
+    padding: '0 4px',
+    minHeight: 'auto',
   },
   input: {
     width: '100%',
-  },
-  passwordWrapper: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  inputPassword: {
-    width: '100%',
-    paddingRight: '2.5rem',
-  },
-  eyeBtn: {
-    position: 'absolute',
-    right: '0.5rem',
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    padding: '0.4rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  divider: {
-    display: 'flex',
-    alignItems: 'center',
-    margin: '0.5rem 0',
-  },
-  dividerText: {
-    fontSize: '0.7rem',
-    textTransform: 'uppercase',
-    color: 'var(--text-muted)',
-    letterSpacing: '0.05em',
-    paddingRight: '10px',
-    fontWeight: '600',
-  },
-  serverSelector: {
-    display: 'flex',
-    background: 'rgba(17, 24, 39, 0.6)',
-    border: '1px solid var(--border-light)',
-    borderRadius: 'var(--radius-sm)',
-    padding: '3px',
-    gap: '4px',
-  },
-  serverBtn: {
-    flex: 1,
-    background: 'none',
-    border: 'none',
-    padding: '0.4rem 0.25rem',
-    fontSize: '0.75rem',
-    color: 'var(--text-muted)',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    textAlign: 'center',
-    fontWeight: '500',
-    display: 'block',
-  },
-  serverBtnActive: {
-    background: 'rgba(255, 255, 255, 0.08)',
-    color: 'var(--text-primary)',
-    fontWeight: '600',
-  },
-  urlIndicator: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.4rem',
-    background: 'rgba(255, 255, 255, 0.02)',
-    border: '1px solid var(--border-light)',
-    padding: '0.5rem',
-    borderRadius: '4px',
-  },
-  urlIndicatorText: {
-    fontSize: '0.75rem',
-    color: 'var(--text-muted)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    minHeight: '44px',
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '1px solid var(--border-color, #e2e8f0)',
+    fontSize: 'var(--font-size-body, 0.875rem)',
+    color: 'var(--text-primary, #0f172a)',
+    backgroundColor: '#ffffff',
   },
   submitBtn: {
     width: '100%',
-    justifyContent: 'center',
-    marginTop: '0.5rem',
+    minHeight: '44px',
+    marginTop: '8px',
+    fontSize: 'var(--font-size-body, 0.875rem)',
+    fontWeight: '500',
   },
-  errorContainer: {
-    background: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
-    borderRadius: 'var(--radius-sm)',
-    padding: '0.75rem',
-    color: '#fca5a5',
-    fontSize: '0.8rem',
-    lineHeight: '1.4',
-    marginBottom: '1rem',
+  error: {
+    backgroundColor: 'var(--danger-bg, #fef2f2)',
+    border: '1px solid var(--danger-border, #fecaca)',
+    borderRadius: '8px',
+    padding: '8px 12px',
+    color: 'var(--danger-text, #991b1b)',
+    fontSize: 'var(--font-size-meta, 0.75rem)',
+    marginBottom: '16px',
   },
-  spinner: {
-    width: '18px',
-    height: '18px',
-    border: '2px solid rgba(255,255,255,0.3)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    animation: 'spin 0.6s linear infinite',
+  footer: {
+    marginTop: '24px',
+    paddingTop: '16px',
+    borderTop: '1px solid var(--border-color, #e2e8f0)',
+    textAlign: 'center',
+  },
+  switchBtn: {
+    width: '100%',
+    minHeight: '44px',
+    fontSize: 'var(--font-size-body, 0.875rem)',
   },
 };

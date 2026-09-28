@@ -40,12 +40,17 @@ const request = async (path, options = {}) => {
     const uName = currUser?.name || currUser?.fullName || currUser?.username || '';
     const uRole = currUser?.role || (currUser?.isAdmin || currUser?.isMainAdmin ? 'admin' : '');
 
+    const activeCompanyId = localStorage.getItem('elite_active_department') || '';
+
     const headers = {
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...(uId ? { 'X-User-Id': uId } : {}),
       ...(uName ? { 'X-User-Name': uName } : {}),
       ...(uRole ? { 'X-User-Role': uRole } : {}),
+      ...(activeCompanyId ? { 'X-Company-Id': activeCompanyId } : {}),
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
       ...options.headers,
     };
     
@@ -57,6 +62,7 @@ const request = async (path, options = {}) => {
     try {
       response = await fetch(`${baseUrl}${path}`, {
         ...options,
+        cache: 'no-store',
         headers,
         signal: options.signal || controller.signal,
       });
@@ -2510,6 +2516,13 @@ export const api = {
     });
     const qs = query.toString();
     return request(`/designer-tasks/stats${qs ? `?${qs}` : ''}`);
+  },
+
+  async globalSearch(q, companyId) {
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    if (companyId) qs.set('companyId', companyId);
+    return request(`/search/global?${qs.toString()}`);
   }
 };
 

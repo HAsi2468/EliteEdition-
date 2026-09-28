@@ -1,5 +1,8 @@
 const { setActivitySocketIo } = require('../utils/activityEvent');
 const { ChatMessage, User, Task, ChatRoom } = require('../db/models');
+const eventBus = require('../services/eventBus.service');
+const { verifyToken } = require('../utils/auth');
+const { normalizeCompanyId, COMPANIES } = require('../config/company.constants');
 
 const getMemberIdString = (m) => {
   if (!m) return '';
@@ -17,22 +20,141 @@ const getOnlineUserIds = () => {
 
 const setupSockets = (io) => {
   setActivitySocketIo(io);
-  // Middleware for Socket Auth can go here
-  // io.use((socket, next) => { ... });
+  eventBus.setSocketIo(io);
+
+  // Authenticate socket connections & enforce strict company isolation
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token ||
+                    socket.handshake.query?.token ||
+                    (socket.handshake.headers.authorization && socket.handshake.headers.authorization.replace(/^Bearer\s+/i, ''));
+
+      if (!token) {
+        socket.user = null;
+        socket.authorizedCompanies = [];
+        return next();
+      }
+
+      const decoded = await verifyToken(token);
+      if (!decoded) {
+        socket.user = null;
+        socket.authorizedCompanies = [];
+        return next();
+      }
+
+      const user = await User.findById(decoded.id || decoded._id).lean();
+      if (!user) {
+        socket.user = null;
+        socket.authorizedCompanies = [];
+        return next();
+      }
+
+      socket.user = user;
+      socket.userId = String(user._id);
+
+      // Determine authorized companies server-side (never trust client)
+      const isSuper = user.isMainAdmin || user.role === 'super_admin' || user.email === 'admin@elite.com';
+      if (isSuper) {
+        socket.authorizedCompanies = COMPANIES.map((c) => c.id);
+      } else {
+        const allowed = new Set();
+        if (user.company_id) {
+          const cid = normalizeCompanyId(user.company_id);
+          if (cid) allowed.add(cid);
+        }
+        if (Array.isArray(user.allowedCompanies)) {
+          user.allowedCompanies.forEach((c) => {
+            const cid = normalizeCompanyId(c);
+            if (cid) allowed.add(cid);
+          });
+        }
+        if (allowed.size === 0) allowed.add('digital_print');
+        socket.authorizedCompanies = Array.from(allowed);
+      }
+
+      next();
+    } catch (err) {
+      console.warn('[Socket Auth] Token verification notice:', err.message);
+      socket.user = null;
+      socket.authorizedCompanies = [];
+      next();
+    }
+  });
 
   io.on('connection', (socket) => {
-    console.log(`User connected to socket: ${socket.id}`);
+    console.log(`User connected to socket: ${socket.id} (user: ${socket.userId || 'anon'})`);
 
-    // Join a specific organization or department room
-    socket.on('join-room', (roomId) => {
-      socket.join(roomId);
-      console.log(`Socket ${socket.id} joined room ${roomId}`);
+    // 1. Join user to their authorized company rooms
+    if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
+      socket.authorizedCompanies.forEach((cid) => {
+        socket.join(`company:${cid}`);
+      });
+    }
+
+    // 2. Join personal room for targeted alerts & direct messages
+    if (socket.userId) {
+      socket.join(`user_${socket.userId}`);
+      activeUsers.set(socket.id, socket.userId);
+      io.emit('presence-sync', getOnlineUserIds());
+    }
+
+    // 3. Switch company room request with server-side permission validation
+    socket.on('switch-company', (companyId) => {
+      const canonical = normalizeCompanyId(companyId);
+      if (!canonical) return;
+
+      const isAllowed = !socket.user ||
+                        (socket.authorizedCompanies && socket.authorizedCompanies.includes(canonical)) ||
+                        socket.user.isMainAdmin ||
+                        socket.user.role === 'super_admin';
+
+      if (isAllowed) {
+        socket.join(`company:${canonical}`);
+        socket.activeCompanyId = canonical;
+      } else {
+        console.warn(`[Socket Security] Denied company switch: ${socket.id} -> ${canonical}`);
+      }
     });
 
-    // Register user to their personal socket channel for direct messaging notifications
+    // 4. Client reconnection resync handler (requests missed events)
+    socket.on('sync-events', ({ sinceEventId, companyId }, callback) => {
+      try {
+        eventBus.metrics.clientReconnects++;
+        const targetCompany = normalizeCompanyId(companyId) || socket.activeCompanyId;
+        const missed = eventBus.getMissedEvents(sinceEventId || 0, targetCompany);
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            events: missed,
+            latestEventId: eventBus.currentEventId
+          });
+        }
+      } catch (err) {
+        if (typeof callback === 'function') {
+          callback({ success: false, error: err.message });
+        }
+      }
+    });
+
+    // 5. Join room with security enforcement (prevent joining arbitrary company rooms)
+    socket.on('join-room', (roomId) => {
+      if (typeof roomId !== 'string') return;
+      if (roomId.startsWith('company:')) {
+        const targetCid = roomId.replace('company:', '');
+        const isAllowed = !socket.user ||
+                          (socket.authorizedCompanies && socket.authorizedCompanies.includes(targetCid)) ||
+                          socket.user?.isMainAdmin;
+        if (!isAllowed) {
+          console.warn(`[Socket Security] Unauthorized room join rejected: ${roomId} for ${socket.id}`);
+          return;
+        }
+      }
+      socket.join(roomId);
+    });
+
+    // Register user to personal channel
     socket.on('register-user', (userId) => {
       socket.join(`user_${userId}`);
-      console.log(`Socket ${socket.id} joined personal room user_${userId}`);
       activeUsers.set(socket.id, userId);
       socket.userId = userId;
       io.emit('presence-sync', getOnlineUserIds());

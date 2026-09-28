@@ -191,60 +191,33 @@ function DashboardStats({ items, sales }) {
       {/* SECTION 1: SALES PERFORMANCE SUMMARY */}
       <div>
         <div style={styles.sectionHeader}>
-          <ShoppingBag size={18} color="var(--primary)" />
           <h2 style={styles.sectionTitle}>Sales Performance</h2>
         </div>
-        <div style={styles.statsGrid}>
+        <div className="stats-grid" style={styles.statsGrid}>
           <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>Sales Revenue</span>
-              <div style={{ ...styles.iconContainer, background: 'rgba(16, 185, 129, 0.1)' }}>
-                <IndianRupee size={20} color="#10b981" />
-              </div>
-            </div>
-            <div style={{ ...styles.cardValue, color: '#10b981' }}>
+            <div style={styles.cardValue}>
               Rs. {totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
-            <div style={styles.cardDesc}>Total revenue from loaded orders</div>
+            <div style={styles.cardTitle}>Sales Revenue</div>
           </div>
 
           <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>Total Orders</span>
-              <div style={{ ...styles.iconContainer, background: 'rgba(6, 182, 212, 0.1)' }}>
-                <ShoppingBag size={20} color="#06b6d4" />
-              </div>
-            </div>
             <div style={styles.cardValue}>{totalOrders}</div>
-            <div style={styles.cardDesc}>Orders synced from system</div>
+            <div style={styles.cardTitle}>Total Orders</div>
           </div>
 
           <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>Avg Order Value</span>
-              <div style={{ ...styles.iconContainer, background: 'rgba(245, 158, 11, 0.1)' }}>
-                <TrendingUp size={20} color="#f59e0b" />
-              </div>
-            </div>
             <div style={styles.cardValue}>
               Rs. {avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
-            <div style={styles.cardDesc}>Average revenue ticket size</div>
+            <div style={styles.cardTitle}>Avg Order Value</div>
           </div>
 
           <div className="glass-panel" style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>Order Statuses</span>
-              <div style={{ ...styles.iconContainer, background: 'rgba(37, 99, 235, 0.1)' }}>
-                <Activity size={20} color="#2563eb" />
-              </div>
-            </div>
             <div style={styles.cardValue}>
-              {deliveredOrders} <span style={styles.qtyTotal}>Delivered</span>
+              {deliveredOrders}
             </div>
-            <div style={styles.cardDesc}>
-              Returns: {returnedOrders} | Cancelled: {cancelledOrders}
-            </div>
+            <div style={styles.cardTitle}>Delivered Orders</div>
           </div>
         </div>
       </div>
@@ -767,41 +740,37 @@ const styles = {
   },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: '1.2rem',
+    gap: '12px',
+    width: '100%',
   },
   card: {
-    padding: '1.25rem 1.5rem',
+    padding: '12px 14px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
   },
   cardHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '0.6rem',
+    marginBottom: '4px',
   },
   cardTitle: {
-    fontSize: '0.8rem',
-    fontWeight: '600',
+    fontSize: 'var(--font-size-meta, 0.75rem)',
+    fontWeight: '500',
     color: 'var(--text-muted)',
     textTransform: 'uppercase',
     letterSpacing: '0.03em',
   },
-  iconContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '32px',
-    height: '32px',
-    borderRadius: '8px',
-  },
   cardValue: {
-    fontSize: '1.6rem',
+    fontSize: '1.4rem',
     fontWeight: '700',
     color: 'var(--text-primary)',
-    marginBottom: '0.2rem',
+    marginBottom: '2px',
+    lineHeight: 1.2,
   },
   qtyTotal: {
-    fontSize: '0.9rem',
+    fontSize: '0.85rem',
     fontWeight: '500',
     color: 'var(--text-muted)',
   },
@@ -811,31 +780,35 @@ const styles = {
   },
   mainGrid: {
     display: 'grid',
-    gridTemplateColumns: '1.2fr 1fr',
-    gap: '1.5rem',
-    alignItems: 'start',
+    gap: '16px',
+    width: '100%',
   },
   chartsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
-    gap: '1.5rem',
+    gap: '16px',
+    width: '100%',
   },
   chartPanel: {
-    padding: '1.5rem',
+    padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    height: '300px',
+    minHeight: '260px',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   chartHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
+    marginBottom: '8px',
   },
   alertPanel: {
-    padding: '1.5rem',
+    padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    height: '300px',
+    minHeight: '260px',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   alertPanelHeader: {
     display: 'flex',

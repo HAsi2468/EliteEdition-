@@ -12,15 +12,44 @@ const setupSockets = require('./sockets');
 
 const server = http.Server(app);
 
-// Initialize Socket.io
+const eventBus = require('./services/eventBus.service');
+
+// Initialize Socket.io with high-resilience mobile & desktop heartbeat and compression
 const io = new Server(server, {
-  pingTimeout: 5000,   // Gracefully disconnect clients taking >5s to respond
-  pingInterval: 10000, // Check heartbeat every 10s
+  pingTimeout: 20000,   // Resilient timeout against cellular handover and background tabs
+  pingInterval: 25000,  // Heartbeat check every 25s
+  transports: ['websocket', 'polling'],
+  perMessageDeflate: {
+    threshold: 1024     // Enable compression for payloads above 1KB
+  },
   cors: {
-    origin: '*', // Allows connections from any origin for now
-    methods: ['GET', 'POST']
+    origin: '*',
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
+
+// Attach event bus
+eventBus.setSocketIo(io);
+
+// Optional Redis adapter attachment for multi-process PM2 cluster synchronization
+if (process.env.REDIS_URL || process.env.REDIS_HOST) {
+  try {
+    const { createAdapter } = require('@socket.io/redis-adapter');
+    const { createClient } = require('redis');
+    const pubClient = createClient({ url: process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || 'localhost'}:6379` });
+    const subClient = pubClient.duplicate();
+    Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+      io.adapter(createAdapter(pubClient, subClient));
+      logger.info('Attached Redis adapter to Socket.IO for multi-instance cluster synchronization');
+    }).catch(err => {
+      logger.warn('Redis adapter connection failed, running with in-process event bus: ' + err.message);
+    });
+  } catch (err) {
+    logger.info('Redis adapter not loaded; running with in-memory event bus');
+  }
+}
+
 setupSockets(io);
 app.set('socketio', io);
 app.set('io', io);

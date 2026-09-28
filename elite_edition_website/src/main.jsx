@@ -28,16 +28,46 @@ if (window.location.hostname === '3.7.174.180' || /^(\d{1,3}\.){3}\d{1,3}$/.test
   window.location.replace('https://erp.eliteedition.in' + window.location.pathname + window.location.search + window.location.hash);
 }
 
-// Register service worker for PWA support only on official domain
-if ('serviceWorker' in navigator && window.location.hostname.includes('eliteedition.in')) {
+// Register service worker for PWA support on official domain and localhost
+const isAllowedPwaHost = window.location.hostname.includes('eliteedition.in') || 
+                         window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+
+if ('serviceWorker' in navigator && isAllowedPwaHost) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then((reg) => {
         console.log('PWA Service Worker registered successfully:', reg.scope);
+
+        // Check if an update is already waiting
+        if (reg.waiting) {
+          window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: { registration: reg } }));
+        }
+
+        // Listen for new service worker being installed
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: { registration: reg } }));
+              }
+            });
+          }
+        });
       })
       .catch((err) => {
         console.error('PWA Service Worker registration failed:', err);
       });
+  });
+
+  // Reload page when new service worker takes control
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
   });
 }
 

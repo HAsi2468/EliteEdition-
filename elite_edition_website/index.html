@@ -23,38 +23,37 @@
       })();
     </script>
     <link rel="icon" type="image/png" href="/Logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    
-    <!-- Critical Preconnects for API & Assets -->
-    <link rel="preconnect" href="https://erp.eliteedition.in" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+    <meta name="apple-mobile-web-app-title" content="Elite ERP" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
-    <!-- High-Priority Preload for Above-the-Fold Brand Logo (LCP Optimization) -->
+    <!-- Self-Hosted Inter WOFF2 Fonts Preload (100% Offline PWA Ready) -->
+    <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-500.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin />
+
+    <!-- High-Priority Preload for Brand Logo -->
     <link rel="preload" as="image" href="/Logo.png" type="image/png" fetchpriority="high" />
 
-    <!-- Google Font 'Outfit' optimized with font-display: swap (Zero Render Blocking) -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" media="print" onload="this.media='all'" />
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" />
-    </noscript>
-
-    <!-- Zero-CLS Critical CSS Placeholder -->
+    <!-- Zero-CLS Critical CSS Placeholder & Light Theme Background -->
     <style>
       html, body {
         margin: 0;
         padding: 0;
-        background-color: #f0f4f8;
+        background-color: #ffffff;
         color: #0f172a;
-        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        overscroll-behavior: contain;
       }
       #root {
-        min-height: 100vh;
-        background-color: #f0f4f8;
+        min-height: 100dvh;
+        background-color: #ffffff;
         display: flex;
         flex-direction: column;
       }
@@ -85,11 +84,6 @@
     <meta name="twitter:title" content="Elite Edition Enterprise ERP" />
     <meta name="twitter:description" content="Next-gen Enterprise Resource Planning for Digital Printing, Fabric Inventory, Job Card Tracking, Stitching & Accounts." />
     <meta name="twitter:image" content="https://erp.eliteedition.in/Logo.png" />
-
-    <!-- PWA & Mobile Optimization -->
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0f172a" />
-    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
 
     <!-- Schema.org JSON-LD Structured Data for Search Engines -->
     <script type="application/ld+json">

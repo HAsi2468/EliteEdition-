@@ -25,6 +25,9 @@ mongoose.connect(config.mongoose.url, {
     logger.error('Connect to mongodb error on initial connection:', error);
   });
 
+const realtimePlugin = require('../plugins/realtimePlugin');
+mongoose.plugin(realtimePlugin);
+
 const db = {
   user: require('./user.model'),
   Product: require('./product.model'),

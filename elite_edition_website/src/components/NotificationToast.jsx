@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info, X, Bell, Trash2, CheckCheck, BellRing, ExternalLink } from 'lucide-react';
 
-export const triggerGlobalDataRefresh = (source = 'all') => {
-  window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source, timestamp: Date.now() } }));
+export const triggerGlobalDataRefresh = (detail = 'all') => {
+  const payload = typeof detail === 'string'
+    ? { source: detail, timestamp: Date.now() }
+    : { ...detail, timestamp: Date.now() };
+  window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: payload }));
 };
 
 export const getNotificationHistory = () => {

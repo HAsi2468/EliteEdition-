@@ -22,6 +22,8 @@ import StitchingSettings from './StitchingSettings';
 import QADepartment from './QADepartment';
 import JobCardStatusDashboard from './JobCardStatusDashboard';
 import DigitalPrintOperationsDashboard from './DigitalPrintOperationsDashboard';
+import StatusPill from './common/StatusPill';
+import JobStageProgressBar from './common/JobStageProgressBar';
 import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
 import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
@@ -132,7 +134,7 @@ const BLANK = {
   status:'Pending',
 };
 
-// ─── WORKFLOW PIPELINE STAGE BADGE ──────────────────────────────────────────
+// ─── WORKFLOW PIPELINE STAGE BADGE (Minimal Text-Only) ──────────────────────
 function WorkflowStageBadge({ card }) {
   if (!card) return null;
   const pStatus = (card.printStatus || '').toLowerCase();
@@ -149,8 +151,8 @@ function WorkflowStageBadge({ card }) {
 
   if (isDispatched) {
     return (
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(16, 185, 129, 0.12)', color:'#10b981', border:'1px solid rgba(16, 185, 129, 0.25)', fontSize:'0.7rem', fontWeight:800 }} title={`Dispatched: ${deliveredMtr}m`}>
-        <span>🚚</span> 4. Dispatched
+      <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:'4px', background:'#ecfdf5', color:'#065f46', border:'1px solid #a7f3d0', fontSize:'11px', fontWeight:600 }} title={`Dispatched: ${deliveredMtr}m`}>
+        4. Dispatched
       </span>
     );
   }
@@ -158,45 +160,30 @@ function WorkflowStageBadge({ card }) {
   if (isFusingDone || fusedMtr > 0) {
     const avail = Math.max(0, fusedMtr - deliveredMtr);
     return (
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(2, 132, 199, 0.12)', color:'#0284c7', border:'1px solid rgba(2, 132, 199, 0.3)', fontSize:'0.7rem', fontWeight:800 }} title={`${fusedMtr}m fused (${avail}m ready for Challan)`}>
-        <span>📦</span> {isPartiallyDispatched ? `Partially Dispatched (${deliveredMtr}m)` : `3. Ready for Challan (${avail}m)`}
+      <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:'4px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', fontSize:'11px', fontWeight:600 }} title={`${fusedMtr}m fused (${avail}m ready for Challan)`}>
+        {isPartiallyDispatched ? `Partially Dispatched (${deliveredMtr}m)` : `3. Ready for Challan (${avail}m)`}
       </span>
     );
   }
 
   if (isPrintDone) {
     return (
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(245, 158, 11, 0.12)', color:'#d97706', border:'1px solid rgba(245, 158, 11, 0.25)', fontSize:'0.7rem', fontWeight:800 }} title="Printing is done. Next stage: Fusing Department">
-        <span>🔥</span> 2. Fusing Pending
+      <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:'4px', background:'#fffbeb', color:'#92400e', border:'1px solid #fde68a', fontSize:'11px', fontWeight:600 }} title="Printing is done. Next stage: Fusing Department">
+        2. Fusing Pending
       </span>
     );
   }
 
   return (
-    <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', padding:'0.18rem 0.5rem', borderRadius:'6px', background:'rgba(99, 102, 241, 0.1)', color:'#6366f1', border:'1px solid rgba(99, 102, 241, 0.2)', fontSize:'0.7rem', fontWeight:800 }} title="Job Card created. Next stage: Printing Log">
-      <span>🖨️</span> 1. Printing Pending
+    <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:'4px', background:'#f8fafc', color:'#475569', border:'1px solid #e2e8f0', fontSize:'11px', fontWeight:600 }} title="Job Card created. Next stage: Printing Log">
+      1. Printing Pending
     </span>
   );
 }
 
-// ─── STATUS badge ────────────────────────────────────────────────────────────
+// ─── STATUS badge (Standardized Text-Only StatusPill) ───────────────────────
 function StatusBadge({ status }) {
-  const cfg = {
-    Pending:      { bg:'rgba(245,158,11,0.12)',  color:'#fbbf24', border:'rgba(245,158,11,0.25)' },
-    'In Progress':{ bg:'rgba(56,189,248,0.12)',  color:'#38bdf8', border:'rgba(56,189,248,0.25)' },
-    Printing:     { bg:'rgba(56,189,248,0.12)',  color:'#38bdf8', border:'rgba(56,189,248,0.25)' },
-    Fusing:       { bg:'rgba(249,115,22,0.12)',  color:'#fb923c', border:'rgba(249,115,22,0.25)' },
-    Delivery:     { bg:'rgba(168,85,247,0.12)',  color:'#c084fc', border:'rgba(168,85,247,0.25)' },
-    Done:         { bg:'rgba(52,211,153,0.12)',   color:'#34d399', border:'rgba(52,211,153,0.25)' },
-  };
-  const s = cfg[status] || cfg['Pending'];
-  return (
-    <span style={{ display:'inline-flex', alignItems:'center', padding:'0.2rem 0.6rem',
-      fontSize:'0.7rem', fontWeight:700, borderRadius:'999px', textTransform:'uppercase',
-      background:s.bg, color:s.color, border:`1px solid ${s.border}` }}>
-      {status}
-    </span>
-  );
+  return <StatusPill status={status} />;
 }
 
 async function resolveImageToDataUrl(candidates) {
@@ -2921,10 +2908,19 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                          <WorkflowStageBadge card={c} />
-                          <StatusBadge status={c.status} />
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', minWidth: '160px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <WorkflowStageBadge card={c} />
+                            <StatusBadge status={c.status} />
+                          </div>
+                          <JobStageProgressBar
+                            currentStage={
+                              c.currentStage ||
+                              c.workflowStage ||
+                              (c.deliveryStatus === 'Done' ? 'Dispatch' : c.fusingStatus === 'Done' ? 'Finish' : c.printStatus === 'Done' ? 'Print' : 'Design')
+                            }
+                          />
                         </div>
                       </td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
@@ -3007,7 +3003,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                       {c.emergencyNotes && c.emergencyNotes.trim() && (
                         <span style={{ padding:'0.15rem 0.55rem', borderRadius:6, fontSize:'0.65rem', fontWeight:800,
                           background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
-                          🔥 URGENT
+                          URGENT
                         </span>
                       )}
                     </div>
@@ -3015,6 +3011,17 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                       <WorkflowStageBadge card={c} />
                       <StatusBadge status={c.status}/>
                     </div>
+                  </div>
+
+                  {/* Thin Job-Stage Progress Bar */}
+                  <div style={{ margin: '8px 0 10px 0' }}>
+                    <JobStageProgressBar
+                      currentStage={
+                        c.currentStage ||
+                        c.workflowStage ||
+                        (c.deliveryStatus === 'Done' ? 'Dispatch' : c.fusingStatus === 'Done' ? 'Finish' : c.printStatus === 'Done' ? 'Print' : 'Design')
+                      }
+                    />
                   </div>
 
                   {/* Info grid */}

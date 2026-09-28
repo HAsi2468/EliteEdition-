@@ -157,63 +157,95 @@ export default function SalesGrid() {
     setTimeout(() => fetchOrders(), 0);
   };
 
+  const [showFilters, setShowFilters] = useState(false);
+
   return (
     <div className="glass-panel" style={styles.panel}>
-      {/* Search Header Form */}
+      {/* Search Header Form: Single Full-Width Search Field with Collapsible Filters */}
       <form onSubmit={handleSearchSubmit} style={styles.formHeader}>
-        <div style={styles.filtersRow}>
-          <div style={styles.searchBox}>
-            <Search size={15} color="var(--text-muted)" style={styles.searchIcon} />
+        <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
             <input
               type="text"
               value={skuSearch}
               onChange={(e) => setSkuSearch(e.target.value)}
-              placeholder="Search SKU..."
-              style={styles.searchInput}
+              placeholder="Search SKU or orders..."
+              style={{
+                width: '100%',
+                minHeight: '44px',
+                padding: '10px 14px',
+                fontSize: '16px',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border-color)',
+                boxSizing: 'border-box'
+              }}
             />
           </div>
-
-          <div style={styles.searchBox}>
-            <Search size={15} color="var(--text-muted)" style={styles.searchIcon} />
-            <input
-              type="text"
-              value={citySearch}
-              onChange={(e) => setCitySearch(e.target.value)}
-              placeholder="Search City..."
-              style={styles.searchInput}
-            />
-          </div>
-
-          <div style={styles.filterSelectWrap}>
-            <SlidersHorizontal size={13} color="var(--text-muted)" />
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              style={styles.selectInput}
-            >
-              <option value="All">All Statuses</option>
-              <option value="DELIVERED">Delivered</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="RETURNED">Returned</option>
-              <option value="SHIPPED">Shipped</option>
-              <option value="IN_TRANSIT">In Transit</option>
-            </select>
-          </div>
-
-          <div style={styles.btnRow}>
-            <button type="submit" className="btn-primary" style={styles.actionBtn}>
-              Search
-            </button>
-            <button 
-              type="button" 
-              onClick={handleClearFilters} 
-              className="btn-secondary" 
-              style={styles.actionBtn}
-            >
-              Reset
-            </button>
-          </div>
+          <button 
+            type="button" 
+            onClick={() => setShowFilters(!showFilters)} 
+            className="btn-secondary"
+            style={{ minHeight: '44px', padding: '10px 14px' }}
+          >
+            {showFilters ? 'Hide Filters' : 'Filters'}
+          </button>
+          <button type="submit" className="btn-primary" style={{ minHeight: '44px', padding: '10px 16px' }}>
+            Search
+          </button>
         </div>
+
+        {/* Collapsible Filter Panel */}
+        {showFilters && (
+          <div style={{
+            marginTop: '10px',
+            padding: '12px',
+            background: 'var(--bg-main)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '12px',
+            alignItems: 'flex-end'
+          }}>
+            <div>
+              <label style={{ fontSize: 'var(--font-size-meta)', marginBottom: '4px', display: 'block' }}>Destination City</label>
+              <input
+                type="text"
+                value={citySearch}
+                onChange={(e) => setCitySearch(e.target.value)}
+                placeholder="e.g. Surat, Mumbai"
+                style={{ minHeight: '44px', fontSize: '16px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 'var(--font-size-meta)', marginBottom: '4px', display: 'block' }}>Order Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                style={{ minHeight: '44px', fontSize: '16px' }}
+              >
+                <option value="All">All Statuses</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="RETURNED">Returned</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="IN_TRANSIT">In Transit</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                type="button" 
+                onClick={handleClearFilters} 
+                className="btn-secondary" 
+                style={{ minHeight: '44px', flex: 1 }}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
       </form>
 
       {error && <div style={styles.error}>{error}</div>}
@@ -322,37 +354,50 @@ export default function SalesGrid() {
         )}
       </div>
 
-      {/* Infinite Scroll & Pagination */}
-      <InfiniteScrollPagination
-        hasMore={page < totalPages}
-        loading={loading && orders.length === 0}
-        loadingMore={loadingMore}
-        onLoadMore={loadMore}
-        page={page}
-        pages={totalPages}
-        total={total}
-        currentCount={orders.length}
-        itemName="sales orders"
-        onPrevPage={() => {
-          const prevPage = Math.max(1, page - 1);
-          fetchOrders(false, prevPage);
-        }}
-        onNextPage={() => {
-          if (page < totalPages) {
-            loadMore();
-          }
-        }}
-      />
+      {/* Simple Previous / Next Pagination Bar */}
+      <div className="pagination-bar">
+        <span style={{ fontSize: 'var(--font-size-meta)', color: 'var(--text-muted)' }}>
+          Page {page} of {totalPages} ({total} orders)
+        </span>
+        <div className="pagination-controls">
+          <button 
+            type="button"
+            onClick={() => {
+              const prevPage = Math.max(1, page - 1);
+              fetchOrders(false, prevPage);
+            }} 
+            disabled={page <= 1 || loading} 
+            className="btn-secondary"
+            style={{ minHeight: '44px', padding: '8px 16px' }}
+          >
+            Previous
+          </button>
+          <button 
+            type="button"
+            onClick={() => {
+              const nextPage = Math.min(totalPages, page + 1);
+              fetchOrders(false, nextPage);
+            }} 
+            disabled={page >= totalPages || loading} 
+            className="btn-secondary"
+            style={{ minHeight: '44px', padding: '8px 16px' }}
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 const styles = {
   panel: {
-    padding: '1.5rem',
+    padding: '12px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.2rem',
+    gap: '12px',
+    width: '100%',
+    boxSizing: 'border-box',
     minHeight: '450px',
   },
   formHeader: {
