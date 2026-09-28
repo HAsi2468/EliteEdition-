@@ -62,7 +62,9 @@ function realtimePlugin(schema) {
   // Pre-save to check if this is an insert (new doc)
   schema.pre('save', function (next) {
     this.$wasNew = this.isNew;
-    next();
+    if (typeof next === 'function') {
+      next();
+    }
   });
 
   // Post-save hook: emitted after document is saved to MongoDB

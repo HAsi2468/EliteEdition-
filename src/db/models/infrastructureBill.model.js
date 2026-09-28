@@ -40,7 +40,9 @@ const infrastructureBillSchema = new mongoose.Schema(
 // Pre-save hook to calculate totalAmount automatically
 infrastructureBillSchema.pre('save', function (next) {
   this.totalAmount = (this.awsAmount || 0) + (this.mongoDbAmount || 0);
-  next();
+  if (typeof next === 'function') {
+    next();
+  }
 });
 
 const InfrastructureBill = mongoose.model('InfrastructureBill', infrastructureBillSchema);
