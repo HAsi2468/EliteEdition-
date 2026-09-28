@@ -2092,18 +2092,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       });
     }
     const item = lotMap.get(lotNoKey);
-    if (t.fabricQuality && !item.fabricQuality) item.fabricQuality = t.fabricQuality;
-    if (t.panna && !item.panna) item.panna = t.panna;
-    if (t.vendorName && !item.vendorName) item.vendorName = t.vendorName;
-
     const qty = Number(t.qty || 0);
+
     if (t.type === 'INWARD') {
       item.totalInward += qty;
-      if (t.challanNo && !item.vendorChallanNo) item.vendorChallanNo = t.challanNo;
+      if (t.challanNo) item.vendorChallanNo = t.challanNo;
+      if (t.vendorName) item.vendorName = t.vendorName;
+      if (t.fabricQuality) item.fabricQuality = t.fabricQuality;
+      // Inward transaction defines the physical roll's true Panna width
+      if (t.panna) item.panna = t.panna;
       item.inwardTxs.push(t);
     } else if (t.type === 'OUTWARD') {
       item.totalOutward += qty;
       item.outwardTxs.push(t);
+      if (t.fabricQuality && !item.fabricQuality) item.fabricQuality = t.fabricQuality;
+      if (t.panna && !item.panna) item.panna = t.panna;
+      if (t.vendorName && !item.vendorName) item.vendorName = t.vendorName;
     }
 
     if (t.date) {
@@ -2722,7 +2726,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             {lot.fabricQuality || 'Unspecified Fabric'}
                           </div>
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', marginTop: '2px' }}>
-                            <span>Panna: <strong>{lot.panna}"</strong></span>
+                            <span>Panna: <strong>{String(lot.panna || '').replace(/['"]/g, '')}"</strong></span>
                             {lot.vendorName && <span>Vendor: <strong>{lot.vendorName}</strong></span>}
                             {lot.vendorChallanNo && <span>Vendor Ch: <strong>{lot.vendorChallanNo}</strong></span>}
                           </div>

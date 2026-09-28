@@ -358,14 +358,29 @@ const getLotStock = async (req, res) => {
 
     const pipeline = [
       { $match: matchStage },
-      { $sort: { date: 1, type: -1 } },
+      { $sort: { date: 1 } },
       {
         $group: {
           _id: '$lotNo',
-          fabricQuality: { $first: '$fabricQuality' },
-          panna: { $first: '$panna' },
+          fabricQuality: {
+            $ifNull: [
+              { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$fabricQuality', null] } },
+              { $first: '$fabricQuality' }
+            ]
+          },
+          panna: {
+            $ifNull: [
+              { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$panna', null] } },
+              { $first: '$panna' }
+            ]
+          },
           vendorName: { $max: '$vendorName' },
-          vendorChallanNo: { $max: '$challanNo' },
+          vendorChallanNo: {
+            $ifNull: [
+              { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$challanNo', null] } },
+              { $first: '$challanNo' }
+            ]
+          },
           totalInward: {
             $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
           },
