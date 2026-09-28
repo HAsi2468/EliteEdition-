@@ -1446,19 +1446,20 @@ export default function App() {
             return (
               <button 
                 onClick={() => setShowCompanyQuickSheet(true)}
-                className="btn-secondary"
+                className="btn-secondary mobile-company-pill"
                 style={{
-                  minHeight: '44px',
-                  padding: '8px 12px',
-                  fontSize: 'var(--font-size-body, 0.9375rem)',
+                  minHeight: '38px',
+                  padding: '6px 12px',
+                  fontSize: 'var(--font-size-body, 0.88rem)',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
                 title="Switch company"
+                type="button"
               >
-                <span>{activeTab === 'workspace' ? 'Workspace' : (activeComp?.name || 'Elite Online')}</span>
+                <span>{['workspace', 'communication', 'task_management'].includes(activeTab) ? 'Communication' : (activeComp?.name || 'Elite Online')}</span>
                 <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', color: 'var(--text-muted)' }}>▾</span>
               </button>
             );
@@ -1472,40 +1473,43 @@ export default function App() {
               if (company.id === 'digital_print' && !hasDigitalPrintAccess) return null;
               if (company.id === 'stitching' && !hasStitchingAccess) return null;
 
-              const isActive = activeDepartment === company.id && activeTab !== 'workspace';
+              const isCommActive = ['communication', 'workspace', 'task_management'].includes(activeTab);
+              const isActive = activeDepartment === company.id && !isCommActive;
 
               return (
                 <button
                   key={company.id}
                   onClick={() => handleSwitchDepartment(company.id)}
-                  className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{
-                    minHeight: '38px',
-                    padding: '6px 12px',
-                    fontSize: 'var(--font-size-meta, 0.75rem)',
-                    fontWeight: isActive ? 600 : 400
-                  }}
+                  className={`dept-switcher-btn ${isActive ? 'active' : ''}`}
                   title={`Switch to ${company.name}`}
+                  type="button"
                 >
-                  {company.name}
+                  <span>{company.name}</span>
                 </button>
               );
             })}
 
             {hasWorkspaceAccess && (
-              <button
-                onClick={() => { setActiveTab('communication'); setMobileMenuOpen(false); }}
-                className={`btn ${activeTab === 'communication' || activeTab === 'workspace' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  minHeight: '38px',
-                  padding: '6px 12px',
-                  fontSize: 'var(--font-size-meta, 0.75rem)',
-                  fontWeight: (activeTab === 'communication' || activeTab === 'workspace') ? 600 : 400
-                }}
-                title="Inter-Department Communication"
-              >
-                Communication {chatUnreadCount > 0 ? `(${chatUnreadCount})` : ''}
-              </button>
+              <>
+                <div className="dept-switcher-divider" />
+                <button
+                  onClick={() => {
+                    setActiveTab('communication');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`dept-switcher-btn comm-btn ${['communication', 'workspace', 'task_management'].includes(activeTab) ? 'active' : ''}`}
+                  title="Inter-Department Communication & Workforce Chat"
+                  type="button"
+                >
+                  <MessageSquare size={13} style={{ flexShrink: 0 }} />
+                  <span>Communication</span>
+                  {chatUnreadCount > 0 && (
+                    <span className="dept-switcher-badge">
+                      {chatUnreadCount}
+                    </span>
+                  )}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -2446,7 +2450,7 @@ export default function App() {
             </div>
           }>
 
-          {activeTab === 'dashboard' ? (
+          {['communication', 'workspace', 'task_management'].includes(activeTab) ? null : activeTab === 'dashboard' ? (
             <DashboardStats items={items} sales={sales} />
           ) : activeTab === 'elite_online' ? (
             <ReportsCenter department="elite-online" />
@@ -2527,12 +2531,6 @@ export default function App() {
             <DigitalPrintExpenseModule companyEntity="Elite Online" />
           ) : activeTab === 'expense_dashboard' || activeTab === 'expense_create' || activeTab === 'expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Digital Print" autoOpenCreate={activeTab === 'expense_create'} />
-          ) : activeDepartment === 'elite_edition' ? (
-            <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
-          ) : activeDepartment === 'elite_fabtex' ? (
-            <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
-          ) : activeDepartment === 'stitching' ? (
-            <GarmentJobCardDashboard />
           ) : activeTab === 'unicommerce' ? (
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
@@ -2541,7 +2539,13 @@ export default function App() {
             <DesignerScreen currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} onNavigate={(t) => setActiveTab(t)} />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
-          ) : ['communication', 'workspace', 'task_management'].includes(activeTab) ? null : (
+          ) : activeDepartment === 'elite_edition' ? (
+            <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeDepartment === 'elite_fabtex' ? (
+            <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeDepartment === 'stitching' ? (
+            <GarmentJobCardDashboard />
+          ) : (
             <div style={styles.noAccessContainer}>
               <ShieldAlert size={48} color="var(--primary)" />
               <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Access Restricted</h3>
