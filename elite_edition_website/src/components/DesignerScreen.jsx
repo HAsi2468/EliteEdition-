@@ -4040,21 +4040,21 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   </div>
                 </div>
 
-                {/* ── Interactive Stage & Status Controller ── */}
+                {/* ── Status Action & Proof Previews ── */}
                 <div
                   style={{
                     background: '#ffffff',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: '0.65rem 0.75rem',
+                    borderRadius: '10px',
+                    padding: '0.45rem 0.65rem',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.55rem',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '0.4rem',
                   }}
                 >
-                  {/* Top: 1-Click Status Dropdown & Stage Proof Counters */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    {/* 1-Click Status Dropdown (from Table View) */}
+                  {/* 1-Click Status Dropdown (from Table View) */}
                     <div className="status-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
                       <button
                         type="button"
@@ -4187,193 +4187,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       )}
                     </div>
                   </div>
-
-                  {/* Compact 2x2 Stages Panel */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
-                    {/* Stage 1: Drow */}
-                    <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <Clock size={11} color="#2563eb" /> 1. Drow
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
-                          style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
-                          title="Upload Drow Proof"
-                        >
-                          +Proof
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        {DROW_STATUS_OPTIONS.map((opt) => {
-                          const isActive = task.drowDesignStatus === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', opt.id)}
-                              style={{
-                                flex: 1,
-                                padding: '0.24rem 0.35rem',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                                background: isActive ? opt.bg : '#ffffff',
-                                color: isActive ? opt.color : '#475569',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                              title={opt.label}
-                            >
-                              {isActive && '✓ '}{opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Stage 2: Colour Match */}
-                    <div style={{ background: '#fdf4f8', border: '1px solid #fbcfe8', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9d174d', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <Palette size={11} color="#db2777" /> 2. C.M.
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
-                          style={{ background: 'none', border: 'none', padding: 0, color: '#db2777', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
-                          title="Upload Colour Match Proof"
-                        >
-                          +Proof
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        {COLOUR_MATCHING_OPTIONS.map((opt) => {
-                          const isActive = task.colourMatchingStatus === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', opt.id)}
-                              style={{
-                                flex: 1,
-                                padding: '0.24rem 0.35rem',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                                background: isActive ? opt.bg : '#ffffff',
-                                color: isActive ? opt.color : '#475569',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                              title={opt.label}
-                            >
-                              {isActive && '✓ '}{opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Stage 3: Hold / Continue */}
-                    <div style={{ background: '#fffbf5', border: '1px solid #fed7aa', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <AlertTriangle size={11} color="#ea580c" /> 3. Stage 3
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
-                          style={{ background: 'none', border: 'none', padding: 0, color: '#ea580c', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
-                          title="Upload Stage 3 Proof"
-                        >
-                          +Proof
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        {STAGE_3_OPTIONS.map((opt) => {
-                          const isActive = task.stage3Status === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', opt.id)}
-                              style={{
-                                flex: 1,
-                                padding: '0.24rem 0.35rem',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                                background: isActive ? opt.bg : '#ffffff',
-                                color: isActive ? opt.color : '#475569',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                              title={opt.label}
-                            >
-                              {isActive && '✓ '}{opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Stage 4: Approval */}
-                    <div style={{ background: '#f9fdfa', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.45rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <CheckCircle2 size={11} color="#16a34a" /> 4. Approval
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
-                          style={{ background: 'none', border: 'none', padding: 0, color: '#15803d', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
-                          title="Upload Final Proof"
-                        >
-                          +Proof
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        {FINAL_DESIGN_OPTIONS.map((opt) => {
-                          const isActive =
-                            task.finalDesignStatus === opt.id ||
-                            (opt.id === 'Reject' && task.finalDesignStatus?.toLowerCase().startsWith('reject')) ||
-                            (opt.id === 'Approved' && (task.finalDesignStatus === 'APPROVED SAMPLE' || task.finalDesignStatus === 'Approved'));
-                          return (
-                            <button
-                              key={opt.id}
-                              onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', opt.id)}
-                              style={{
-                                flex: 1,
-                                padding: '0.24rem 0.35rem',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
-                                background: isActive ? opt.bg : '#ffffff',
-                                color: isActive ? opt.color : '#475569',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                              title={opt.label}
-                            >
-                              {isActive && '✓ '}{opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
                 {/* ── Card Comments & Thread Bar ── */}
                 <div
