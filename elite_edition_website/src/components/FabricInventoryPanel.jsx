@@ -699,6 +699,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [isOutwardOpen, setIsOutwardOpen] = useState(false);
   const [isManagerOpen, setIsManagerOpen] = useState(false);
 
+  // Inward TP (Roll-wise Details) state
+  const [inwardTpModalTransaction, setInwardTpModalTransaction] = useState(null);
+  const [inwardTpRows, setInwardTpRows] = useState([]);
+  const [syncInwardQty, setSyncInwardQty] = useState(false);
+  const [inwardBulkPasteOpen, setInwardBulkPasteOpen] = useState(false);
+  const [inwardBulkPasteText, setInwardBulkPasteText] = useState('');
+  const [inwardTpSaving, setInwardTpSaving] = useState(false);
+
   // Form states
   const [inwardForm, setInwardForm] = useState({
     challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct', date: new Date().toISOString().split('T')[0], notes: ''
@@ -1085,6 +1093,133 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct', date: new Date().toISOString().split('T')[0], notes: '' });
   };
 
+  // ── Inward TP / Roll-wise Details Handlers ──
+  const openInwardTpModal = (t) => {
+    setInwardTpModalTransaction(t);
+    const existingTps = Array.isArray(t.tpDetails) && t.tpDetails.length > 0
+      ? t.tpDetails.map((r, i) => ({
+          id: Date.now() + i + Math.random(),
+          tpNo: r.tpNo || (i + 1),
+          tpMeter: r.tpMeter != null ? String(r.tpMeter) : '',
+          notes: r.notes || ''
+        }))
+      : Array.from({ length: 5 }, (_, i) => ({
+          id: Date.now() + i + Math.random(),
+          tpNo: i + 1,
+          tpMeter: '',
+          notes: ''
+        }));
+    setInwardTpRows(existingTps);
+    setSyncInwardQty(false);
+    setInwardBulkPasteOpen(false);
+    setInwardBulkPasteText('');
+  };
+
+  const closeInwardTpModal = () => {
+    setInwardTpModalTransaction(null);
+    setInwardTpRows([]);
+    setInwardBulkPasteOpen(false);
+    setInwardBulkPasteText('');
+    setInwardTpSaving(false);
+  };
+
+  const addInwardTpRows = (count = 1) => {
+    setInwardTpRows(prev => {
+      const currentLen = prev.length;
+      const newRows = Array.from({ length: count }, (_, idx) => ({
+        id: Date.now() + idx + Math.random(),
+        tpNo: currentLen + idx + 1,
+        tpMeter: '',
+        notes: ''
+      }));
+      return [...prev, ...newRows];
+    });
+  };
+
+  const removeInwardTpRow = (index) => {
+    setInwardTpRows(prev => {
+      const filtered = prev.filter((_, i) => i !== index);
+      return filtered.map((row, i) => ({
+        ...row,
+        tpNo: i + 1
+      }));
+    });
+  };
+
+  const updateInwardTpRow = (index, field, value) => {
+    setInwardTpRows(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const applyInwardBulkPaste = () => {
+    if (!inwardBulkPasteText.trim()) return;
+    const rawTokens = inwardBulkPasteText
+      .split(/[\n,\t\r\s]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    const parsedMeters = rawTokens
+      .map(v => parseFloat(v))
+      .filter(v => !isNaN(v) && v > 0);
+    if (parsedMeters.length === 0) {
+      triggerEliteAlert('Bulk Paste', 'No valid meter numbers found. Please paste numbers separated by commas, spaces, or line breaks.', 'warning');
+      return;
+    }
+    setInwardTpRows(prev => {
+      const nonEmpty = prev.filter(r => r.tpMeter !== '' && parseFloat(r.tpMeter) > 0);
+      const startTpNo = nonEmpty.length + 1;
+      const pastedRows = parsedMeters.map((m, idx) => ({
+        id: Date.now() + idx + Math.random(),
+        tpNo: startTpNo + idx,
+        tpMeter: String(m),
+        notes: ''
+      }));
+      return [...nonEmpty, ...pastedRows];
+    });
+    setInwardBulkPasteText('');
+    setInwardBulkPasteOpen(false);
+    triggerEliteAlert('Success', `Imported ${parsedMeters.length} TP roll values!`, 'success');
+  };
+
+  const handleSaveInwardTps = async () => {
+    if (!inwardTpModalTransaction) return;
+    setInwardTpSaving(true);
+    try {
+      const validRows = inwardTpRows.filter(r => r.tpMeter !== '' && !isNaN(parseFloat(r.tpMeter)));
+      const cleanedTps = validRows.map((r, idx) => ({
+        tpNo: Number(r.tpNo) || idx + 1,
+        tpMeter: parseFloat(r.tpMeter),
+        notes: r.notes ? r.notes.trim() : ''
+      }));
+      const sumMeters = cleanedTps.reduce((acc, r) => acc + (r.tpMeter || 0), 0);
+      const totalTpCount = cleanedTps.length;
+
+      const payload = {
+        tpDetails: cleanedTps,
+        totalTp: totalTpCount
+      };
+
+      if (syncInwardQty && sumMeters > 0) {
+        payload.qty = Number(sumMeters.toFixed(2));
+      }
+
+      await api.updateFabricTransaction(inwardTpModalTransaction._id, payload);
+      triggerPushNotification(
+        '📦 TP Details Saved',
+        `Lot #${inwardTpModalTransaction.lotNo}: ${totalTpCount} TPs (${sumMeters.toFixed(2)} Mtr) recorded.${syncInwardQty ? ' Total Qty updated.' : ''}`,
+        'success'
+      );
+      closeInwardTpModal();
+      fetchData(true);
+    } catch (err) {
+      triggerEliteAlert('Error', 'Failed to save TP details: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setInwardTpSaving(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -1110,7 +1245,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // ── Modal scroll lock & smooth reset helper ──
   useEffect(() => {
-    if (isChallanOpen || isInwardOpen || isOutwardOpen || isSaFormOpen || isTransferFormOpen) {
+    if (isChallanOpen || isInwardOpen || isOutwardOpen || isSaFormOpen || isTransferFormOpen || !!inwardTpModalTransaction) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -1118,7 +1253,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isChallanOpen, isInwardOpen, isOutwardOpen, isSaFormOpen, isTransferFormOpen]);
+  }, [isChallanOpen, isInwardOpen, isOutwardOpen, isSaFormOpen, isTransferFormOpen, inwardTpModalTransaction]);
 
   useEffect(() => {
     const handleOpenModal = (event) => {
@@ -3342,10 +3477,57 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       <td>{t.vendorName}</td>
                       <td>{t.fabricQuality}</td>
                       <td>{t.panna || '-'}</td>
-                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>+{Number(t.qty || 0).toFixed(2)}</td>
+                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>
+                        <div>+{Number(t.qty || 0).toFixed(2)}</div>
+                        {Array.isArray(t.tpDetails) && t.tpDetails.length > 0 && (
+                          <div
+                            onClick={() => openInwardTpModal(t)}
+                            title="Click to view/edit TP details"
+                            style={{
+                              fontSize: '0.69rem',
+                              color: '#0284c7',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              marginTop: '2px',
+                              background: '#f0f9ff',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              border: '1px solid #bae6fd',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Layers size={11} /> {t.tpDetails.length} TPs ({t.tpDetails.reduce((a, b) => a + (Number(b.tpMeter) || 0), 0).toFixed(1)}m)
+                          </div>
+                        )}
+                      </td>
                       <td>{t.shortagePct != null ? `${t.shortagePct}%` : '-'}</td>
                       <td>{t.notes}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          title={Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `TP Details (${t.tpDetails.length} Rolls / TPs)` : "Add TP Details (Roll-wise meters)"}
+                          style={{
+                            color: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? '#0369a1' : '#0284c7',
+                            background: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.12)' : 'rgba(2, 132, 199, 0.05)',
+                            border: `1px solid ${Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.35)' : 'rgba(2, 132, 199, 0.2)'}`,
+                            borderRadius: '6px',
+                            marginRight: '0.45rem',
+                            padding: '3px 8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.74rem',
+                            fontWeight: 700
+                          }}
+                          onClick={() => openInwardTpModal(t)}
+                        >
+                          <Layers size={13} />
+                          <span>{Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `${t.tpDetails.length} TP` : '+ TP'}</span>
+                        </button>
                         {isAdmin && (
                           <button
                             className="btn-icon"
@@ -5591,6 +5773,275 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           </div>
         </div>
       )}
+
+      {/* ── Inward TP Details Modal ── */}
+      {inwardTpModalTransaction && (() => {
+        const validTps = inwardTpRows.filter(r => r.tpMeter !== '' && !isNaN(parseFloat(r.tpMeter)));
+        const totalTpMeters = validTps.reduce((acc, r) => acc + parseFloat(r.tpMeter), 0);
+        const lotQty = Number(inwardTpModalTransaction.qty) || 0;
+        const diffMtr = totalTpMeters - lotQty;
+        const isBalanced = Math.abs(diffMtr) < 0.01;
+
+        return (
+          <div className="inward-tp-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeInwardTpModal(); }}>
+            <div className="inward-tp-modal-box" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="inward-tp-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                      Lot #{inwardTpModalTransaction.lotNo} — TP Details (Rolls)
+                    </h3>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      Add or edit roll-wise meter breakdown for this inward lot
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeInwardTpModal}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px', borderRadius: '6px' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Meta Banner */}
+              <div className="inward-tp-meta-banner">
+                <div>
+                  <span style={{ color: '#64748b' }}>Quality: </span>
+                  <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.fabricQuality}</strong>
+                </div>
+                {inwardTpModalTransaction.panna && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Panna: </span>
+                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.panna}"</strong>
+                  </div>
+                )}
+                {inwardTpModalTransaction.challanNo && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Challan: </span>
+                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.challanNo}</strong>
+                  </div>
+                )}
+                {inwardTpModalTransaction.vendorName && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Vendor: </span>
+                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.vendorName}</strong>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: '#64748b' }}>Inward Qty: </span>
+                  <strong style={{ color: '#16a34a' }}>{lotQty.toFixed(2)} Mtr</strong>
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: '#64748b' }}>TP Total:</span>
+                  <strong style={{ color: '#0284c7', fontSize: '0.9rem' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
+                  {validTps.length > 0 && (
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 7px',
+                      borderRadius: '12px',
+                      background: isBalanced ? '#dcfce7' : (diffMtr > 0 ? '#fef9c3' : '#fee2e2'),
+                      color: isBalanced ? '#15803d' : (diffMtr > 0 ? '#a16207' : '#b91c1c'),
+                      border: `1px solid ${isBalanced ? '#bbf7d0' : (diffMtr > 0 ? '#fde047' : '#fecaca')}`
+                    }}>
+                      {isBalanced ? '✓ Balanced' : `Diff: ${diffMtr > 0 ? '+' : ''}${diffMtr.toFixed(2)}m`}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Tools Bar */}
+              <div className="inward-tp-tools-bar">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => addInwardTpRows(1)}
+                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={13} /> +1 TP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addInwardTpRows(5)}
+                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+                  >
+                    +5 TPs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addInwardTpRows(10)}
+                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+                  >
+                    +10 TPs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInwardBulkPasteOpen(!inwardBulkPasteOpen)}
+                    style={{ background: inwardBulkPasteOpen ? '#e0f2fe' : '#f0fdf4', border: `1px solid ${inwardBulkPasteOpen ? '#7dd3fc' : '#86efac'}`, color: inwardBulkPasteOpen ? '#0369a1' : '#15803d', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    ⚡ Bulk Paste
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    {validTps.length} entered ({inwardTpRows.length} rows)
+                  </span>
+                  {inwardTpRows.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setInwardTpRows([])}
+                      style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.74rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Bulk Paste Box (Collapsible) */}
+              {inwardBulkPasteOpen && (
+                <div style={{ padding: '0.75rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                    Paste roll meter numbers separated by commas, spaces, or lines (e.g., 95.5, 102.3, 88.0):
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={inwardBulkPasteText}
+                    onChange={e => setInwardBulkPasteText(e.target.value)}
+                    placeholder="98.50, 104.20, 89.00, 112.50..."
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setInwardBulkPasteOpen(false); setInwardBulkPasteText(''); }}
+                      style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 12px', fontSize: '0.76rem', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applyInwardBulkPaste}
+                      style={{ background: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '4px 14px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Apply Values
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Table Column Headers */}
+              <div className="inward-tp-table-header">
+                <div>TP #</div>
+                <div>Meter (Mtr) *</div>
+                <div>Roll No / Remarks</div>
+                <div style={{ textAlign: 'center' }}>Del</div>
+              </div>
+
+              {/* Rows List */}
+              <div className="inward-tp-list">
+                {inwardTpRows.map((row, idx) => (
+                  <div key={row.id || idx} className="inward-tp-row">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', borderRadius: '6px', height: '34px', fontSize: '0.8rem', fontWeight: 700, color: '#475569', border: '1px solid #e2e8f0' }}>
+                      #{row.tpNo || idx + 1}
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={row.tpMeter}
+                        onChange={e => updateInwardTpRow(idx, 'tpMeter', e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (idx === inwardTpRows.length - 1) {
+                              addInwardTpRows(1);
+                            }
+                          }
+                        }}
+                        style={{ width: '100%', height: '34px', padding: '0 0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600, color: '#0f172a', background: '#ffffff', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="e.g. Roll A-1 / Mill tag"
+                        value={row.notes}
+                        onChange={e => updateInwardTpRow(idx, 'notes', e.target.value)}
+                        style={{ width: '100%', height: '34px', padding: '0 0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', color: '#334155', background: '#ffffff', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => removeInwardTpRow(idx)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}
+                        title="Remove row"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {inwardTpRows.length === 0 && (
+                  <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                    No TP rows added. Click "+1 TP" or "+5 TPs" above to begin entering roll meters.
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="inward-tp-footer">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: '#334155', cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={syncInwardQty}
+                      onChange={e => setSyncInwardQty(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#0284c7' }}
+                    />
+                    <span>
+                      Sync Lot Inward Quantity to match sum of TP meters (<strong>{totalTpMeters.toFixed(2)} Mtr</strong>)
+                    </span>
+                  </label>
+                  <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                    Valid TPs: <strong style={{ color: '#0f172a' }}>{validTps.length}</strong> | Total: <strong style={{ color: '#0284c7' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={closeInwardTpModal}
+                    disabled={inwardTpSaving}
+                    style={{ padding: '0.55rem 1.25rem', borderRadius: '8px', fontSize: '0.85rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleSaveInwardTps}
+                    disabled={inwardTpSaving}
+                    style={{ padding: '0.55rem 1.5rem', borderRadius: '8px', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Check size={16} />
+                    {inwardTpSaving ? 'Saving...' : 'Save TP Details'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Outward Modal ── */}
       {isOutwardOpen && (

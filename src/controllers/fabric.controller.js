@@ -97,6 +97,16 @@ const createInward = async (req, res) => {
     );
     const nextLotNo = lastLotTx && lastLotTx.lotNo ? Number(lastLotTx.lotNo) + 1 : 1;
 
+    const parsedTpDetails = Array.isArray(req.body.tpDetails)
+      ? req.body.tpDetails
+          .filter(r => r.tpMeter !== '' && r.tpMeter != null)
+          .map((r, idx) => ({
+            tpNo: Number(r.tpNo) || idx + 1,
+            tpMeter: parseFloat(r.tpMeter) || 0,
+            notes: r.notes || '',
+          }))
+      : [];
+
     const transaction = new FabricTransaction({
       type: 'INWARD',
       challanNo,
@@ -111,6 +121,8 @@ const createInward = async (req, res) => {
       shortageMtr: parsedMtr,
       shortageMode: sMode,
       department: department || 'digital_print',
+      tpDetails: parsedTpDetails,
+      totalTp: parsedTpDetails.filter(r => r.tpMeter > 0).length,
     });
 
     await transaction.save();
@@ -933,15 +945,33 @@ const updateTransaction = async (req, res) => {
     if (vendorName !== undefined) transaction.vendorName = vendorName;
     if (fabricQuality !== undefined) transaction.fabricQuality = fabricQuality;
     if (panna !== undefined) transaction.panna = panna;
-    if (qty !== undefined) transaction.qty = qty;
+    if (qty !== undefined) transaction.qty = Number(qty);
     if (date !== undefined) transaction.date = new Date(date);
     if (notes !== undefined) transaction.notes = notes;
     if (jobNo !== undefined) transaction.jobNo = jobNo;
     if (partyName !== undefined) transaction.partyName = partyName;
     if (lotNo !== undefined) transaction.lotNo = lotNo ? Number(lotNo) : undefined;
     if (shortagePct !== undefined) transaction.shortagePct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
+    if (req.body.shortageMtr !== undefined) transaction.shortageMtr = req.body.shortageMtr !== '' && req.body.shortageMtr != null ? parseFloat(req.body.shortageMtr) : null;
+    if (req.body.shortageMode !== undefined) transaction.shortageMode = req.body.shortageMode;
+    if (req.body.tpDetails !== undefined) {
+      transaction.tpDetails = Array.isArray(req.body.tpDetails)
+        ? req.body.tpDetails
+            .filter(r => r.tpMeter !== '' && r.tpMeter != null)
+            .map((r, idx) => ({
+              tpNo: Number(r.tpNo) || idx + 1,
+              tpMeter: parseFloat(r.tpMeter) || 0,
+              notes: r.notes || '',
+            }))
+        : [];
+      transaction.totalTp = transaction.tpDetails.filter(r => parseFloat(r.tpMeter) > 0).length;
+    }
+    if (req.body.totalTp !== undefined) {
+      transaction.totalTp = Number(req.body.totalTp) || 0;
+    }
 
     await transaction.save();
+    emitSocketEvent(req, 'fabric-updated', { type: 'transaction-updated', data: transaction });
     res.status(200).json({ success: true, data: transaction });
   } catch (error) {
     console.error('Error updating fabric transaction:', error);

@@ -34,6 +34,20 @@ const fabricTransactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    tpDetails: {
+      type: [
+        {
+          tpNo: { type: Number, required: true },
+          tpMeter: { type: Number, default: 0 },
+          notes: { type: String, trim: true, default: '' },
+        },
+      ],
+      default: [],
+    },
+    totalTp: {
+      type: Number,
+      default: 0,
+    },
     // OUTWARD specific fields
     jobNo: {
       type: String,
