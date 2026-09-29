@@ -2312,8 +2312,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     <div className="ent-screen-container">
 
       {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
-      <div className="ent-screen-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
           <div className="ent-header-title-wrap">
             <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#7c3aed,#3b82f6)' }}>
               <FileText size={18} color="#fff" />

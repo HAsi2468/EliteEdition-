@@ -1166,10 +1166,10 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     <div className="ent-screen-container">
       
       {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
-      <div className="ent-screen-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
+      <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
         
         {/* Top Header Row: Title & Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
           
           {/* Left Title & Icon */}
           <div className="ent-header-title-wrap">

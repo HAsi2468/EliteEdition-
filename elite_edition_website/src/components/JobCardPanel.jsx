@@ -24,7 +24,7 @@ import JobCardStatusDashboard from './JobCardStatusDashboard';
 import DigitalPrintOperationsDashboard from './DigitalPrintOperationsDashboard';
 import StatusPill from './common/StatusPill';
 import JobStageProgressBar from './common/JobStageProgressBar';
-import { SmartActionGroup } from './common/SmartActionGroup';
+import { SmartActionGroup, SmartIconButton } from './common/SmartActionGroup';
 import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
 import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
@@ -2890,11 +2890,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                             <StatusBadge status={c.status} />
                           </div>
                           <JobStageProgressBar
-                            currentStage={
-                              c.currentStage ||
-                              c.workflowStage ||
-                              (c.deliveryStatus === 'Done' ? 'Dispatch' : c.fusingStatus === 'Done' ? 'Finish' : c.printStatus === 'Done' ? 'Print' : 'Design')
-                            }
+                            card={c}
+                            department={department}
                           />
                         </div>
                       </td>
@@ -3026,11 +3023,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                   {/* Thin Job-Stage Progress Bar */}
                   <div style={{ margin: '8px 0 10px 0' }}>
                     <JobStageProgressBar
-                      currentStage={
-                        c.currentStage ||
-                        c.workflowStage ||
-                        (c.deliveryStatus === 'Done' ? 'Dispatch' : c.fusingStatus === 'Done' ? 'Finish' : c.printStatus === 'Done' ? 'Print' : 'Design')
-                      }
+                      card={c}
+                      department={department}
                     />
                   </div>
 

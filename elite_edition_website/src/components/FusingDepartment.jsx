@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import {
   Flame, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
-  X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, FileSpreadsheet,
+  X, Download, Eye, Layers3, Activity, Tag, FileText, FileSpreadsheet,
   AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle, ChevronDown,
   ChevronUp, PlayCircle, Filter, ArrowRight
 } from 'lucide-react';
@@ -12,7 +12,6 @@ import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
-import AIMeasurementAgentModal from './common/AIMeasurementAgentModal';
 import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
@@ -140,7 +139,6 @@ export default function FusingDepartment() {
 
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false);
-  const [showFusingAiModal, setShowFusingAiModal] = useState(false);
 
   // Form State for Fusing Production & Wastage Entry Modal (Edit Card)
   const [showFormModal, setShowFormModal] = useState(false);
@@ -1201,27 +1199,7 @@ export default function FusingDepartment() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setShowFusingAiModal(true)}
-              title="Calculate fabric shrinkage & net meters with AI"
-              style={{
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '6px',
-                padding: '5px 12px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                color: '#1d4ed8',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-            >
-              <Sparkles size={14} color="#2563eb" />
-              <span>AI Measurement</span>
-            </button>
+
             <button
               type="button"
               onClick={() => setIsFormExpanded(prev => !prev)}
@@ -3582,24 +3560,6 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* AI Textile Production Measurement Agent Modal */}
-      <AIMeasurementAgentModal
-        isOpen={showFusingAiModal}
-        onClose={() => setShowFusingAiModal(false)}
-        initialData={{
-          fabric: topForm.fabric || 'French Crepe',
-          panna: topForm.panna || '58"',
-          meters: topForm.printedMtr || topForm.fusingMtr || 100
-        }}
-        onApply={(calc) => {
-          setTopForm(prev => ({
-            ...prev,
-            fusingMtr: String(calc.freshMtr),
-            notes: `${prev.notes ? prev.notes + ' | ' : ''}AI Calc: ${calc.shrinkageMtr}m shrink (${calc.efficiencyPct}% yield)`
-          }));
-          triggerPushNotification('📐 AI Measurement Applied', `Set Fresh Output to ${calc.freshMtr}m (${calc.wasteMtr}m wastage).`, 'success');
-        }}
-      />
     </div>
   );
 }

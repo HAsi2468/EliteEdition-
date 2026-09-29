@@ -1638,15 +1638,31 @@ tr:hover td {
 
 .ent-screen-header {
   display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  flex-wrap: wrap !important;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem !important;
   padding: 0.8rem 1.2rem !important;
   background: #ffffff !important;
   border-radius: 12px !important;
   border: 1px solid var(--border-light, #e2e8f0) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* When header contains subtabs or has column direction, stretch items across full 100% width */
+.ent-screen-header.has-subtabs,
+.ent-screen-header[style*="column"] {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+}
+
+.ent-screen-header.has-subtabs > div,
+.ent-screen-header[style*="column"] > div {
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .ent-header-title-wrap {
@@ -1741,6 +1757,8 @@ tr:hover td {
   -webkit-overflow-scrolling: touch !important;
   padding-bottom: 2px !important;
   border-bottom: 1px solid var(--border-light, #e2e8f0) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .ent-tab-btn {

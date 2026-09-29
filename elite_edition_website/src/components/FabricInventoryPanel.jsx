@@ -2219,8 +2219,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     <div className="fabric-container">
       {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
       {!onlyChallan && (
-        <div className="ent-screen-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
             <div className="ent-header-title-wrap">
               <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#0284c7,#2563eb)' }}>
                 <Database size={18} color="#fff" />
@@ -5155,7 +5155,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Shortage ({challanForm.shortageMode === 'mtr' ? 'Meters' : '%'})
                     </label>
-                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', width: '100%' }}>
                       <input
                         type="number"
                         step="0.01"
@@ -5169,7 +5169,19 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             setChallanForm({ ...challanForm, shortagePct: val, shortageMtr: '' });
                           }
                         }}
-                        style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                        style={{
+                          flex: '1 1 auto',
+                          minWidth: '80px',
+                          width: '100%',
+                          padding: '0.5rem 0.6rem',
+                          fontSize: '0.85rem',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          boxSizing: 'border-box'
+                        }}
                         placeholder={challanForm.shortageMode === 'mtr' ? "e.g. 5 mtr" : "Shortage %"}
                       />
                       <select
@@ -5178,7 +5190,23 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           const newMode = e.target.value;
                           setChallanForm(prev => ({ ...prev, shortageMode: newMode }));
                         }}
-                        style={{ padding: '0.45rem 0.4rem', fontSize: '0.8rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
+                        style={{
+                          flex: '0 0 68px',
+                          width: '68px !important',
+                          minWidth: '68px',
+                          maxWidth: '68px',
+                          height: '38px',
+                          padding: '0.4rem 0.25rem',
+                          fontSize: '0.85rem',
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          color: '#0f172a',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          textAlign: 'center'
+                        }}
                       >
                         <option value="pct">%</option>
                         <option value="mtr">mtr</option>

@@ -41,7 +41,6 @@ import { triggerEliteAlert, triggerEliteConfirm } from './services/dialogService
 import PdfPreviewModal from './components/PdfPreviewModal';
 import PrintOptionsModal from './components/PrintOptionsModal';
 import AutoUpdateNotification from './components/AutoUpdateNotification';
-import AIMeasurementAgentModal from './components/common/AIMeasurementAgentModal';
 import { matchSkuOrBrandCode } from './utils/skuHelper';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
 import { 
@@ -455,7 +454,6 @@ export default function App() {
     if (saved !== null) return saved === 'true';
     return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
   });
-  const [showAiMeasurementModal, setShowAiMeasurementModal] = useState(false);
   const [mobileHeaderMoreOpen, setMobileHeaderMoreOpen] = useState(false);
 
   const toggleSidebarCollapse = () => {
@@ -3158,11 +3156,6 @@ export default function App() {
       {/* Global Print Setup & Media Options Modal */}
       <PrintOptionsModal />
 
-      {/* AI Textile Production Measurement Agent Modal */}
-      <AIMeasurementAgentModal
-        isOpen={showAiMeasurementModal}
-        onClose={() => setShowAiMeasurementModal(false)}
-      />
 
       {/* Zero-Hard-Refresh Hot Update Notification */}
       <AutoUpdateNotification />
