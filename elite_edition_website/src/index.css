@@ -1111,12 +1111,14 @@ tr:hover td {
   flex: 1 1 0% !important;
   min-width: 0 !important;
   min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
+  /* Explicit calc so scroll-container height is always finite regardless of
+     how the browser resolves height:100% inside a flex row. */
+  height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 24px) !important;
+  max-height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 24px) !important;
   overflow-y: auto !important;
-  overflow-x: auto !important;
+  overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior: auto !important;
+  overscroll-behavior-y: auto !important;
   padding-right: 2px;
 }
 
@@ -1380,6 +1382,13 @@ tr:hover td {
     height: calc(100dvh - 52px - env(safe-area-inset-top, 0px)) !important;
     padding: 8px 10px !important;
     gap: 0 !important;
+  }
+  /* Mobile: re-calc explicit height for the inner scroll container
+     (header 52px + padding 8px top + 8px bottom = 68px total overhead) */
+  .main-layout-container > section,
+  .content-area-wrap {
+    height: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - 16px) !important;
+    max-height: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - 16px) !important;
   }
 }
 
