@@ -1459,53 +1459,63 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       key={d._id}
                       className="glass-panel"
                       style={{
-                        padding: '1rem',
+                        padding: '1.1rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.8rem',
-                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                        position: 'relative'
+                        gap: '0.75rem',
+                        borderRadius: '16px',
+                        background: 'var(--bg-card, #ffffff)',
+                        border: '1px solid var(--border-color, #e2e8f0)',
+                        boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease'
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(15,23,42,0.08)';
+                        e.currentTarget.style.borderColor = '#bfdbfe';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = '';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.04)';
+                        e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
+                      }}
                     >
-                      {/* Category badge */}
-                      {d.category && (
-                        <span style={{
-                          position: 'absolute', top: 16, left: 16,
-                          background: 'rgba(139,92,246,0.25)', color: '#a78bfa',
-                          fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px',
-                          textTransform: 'uppercase', letterSpacing: '0.02em', zIndex: 2
-                        }}>
-                          {d.category}
-                        </span>
-                      )}
+                      {/* Top Header: Category & Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        {d.category ? (
+                          <span style={{
+                            background: 'rgba(139,92,246,0.12)', color: '#7c3aed',
+                            fontSize: '0.67rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px',
+                            border: '1px solid rgba(139,92,246,0.25)',
+                            textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap'
+                          }}>
+                            {d.category}
+                          </span>
+                        ) : <span />}
 
-                      {/* Status badge */}
-                      <span style={{
-                        position: 'absolute', top: 16, right: 16,
-                        background: d.status === 'Active' ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
-                        color: d.status === 'Active' ? '#34d399' : 'var(--text-muted)',
-                        fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                        border: d.status === 'Active' ? '1px solid rgba(52,211,153,0.3)' : '1px solid var(--border-light)',
-                        zIndex: 2
-                      }}>
-                        {d.status}
-                      </span>
+                        <span style={{
+                          background: d.status === 'Active' ? '#ecfdf5' : '#f1f5f9',
+                          color: d.status === 'Active' ? '#059669' : 'var(--text-muted, #64748b)',
+                          fontSize: '0.67rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px',
+                          border: d.status === 'Active' ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {d.status}
+                        </span>
+                      </div>
 
                       {/* Main Image View */}
                       <div
                         style={{
                           height: '180px',
                           background: '#04070d',
-                          borderRadius: 'var(--radius-sm)',
+                          borderRadius: '10px',
                           overflow: 'hidden',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           position: 'relative',
-                          border: '1px solid var(--border-light)',
-                          marginTop: '1.25rem'
+                          border: '1px solid var(--border-light, #e2e8f0)'
                         }}
                       >
                         <DesignImage

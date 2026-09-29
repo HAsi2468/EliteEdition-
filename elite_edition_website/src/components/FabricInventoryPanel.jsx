@@ -189,6 +189,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [customChallanDateEnd, setCustomChallanDateEnd] = useState('');
   const [isChallanOpen, setIsChallanOpen] = useState(false);
   const [editingChallan, setEditingChallan] = useState(null);
+  const [challanMobileTab, setChallanMobileTab] = useState('info'); // 'info' | 'tp'
   const [challanLotLoading, setChallanLotLoading] = useState(false);
   const [challanDeleteTarget, setChallanDeleteTarget] = useState(null);
   const [viewChallanModal, setViewChallanModal] = useState(null);
@@ -1148,6 +1149,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const closeChallanModal = () => {
     setIsChallanOpen(false);
     setEditingChallan(null);
+    setChallanMobileTab('info');
     resetChallanForm();
     document.body.style.overflow = '';
 
@@ -1530,6 +1532,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       const defaultLot = lots[0] || '';
       return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot }] };
     });
+    setChallanMobileTab('tp');
   };
 
   const removeTpRow = (index) => {
@@ -4659,46 +4662,71 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         </div>
       )}
 
-      {/* ── Challan Form Modal (Wide Ergonomic 2-Column Layout — WHITE THEME) ── */}
+      {/* ── Challan Form Modal (Responsive 2-Column Desktop + Mobile Tabbed Flow — WHITE THEME) ── */}
       {isChallanOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ width: '1020px', maxWidth: '98vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0, borderRadius: '14px', background: '#ffffff', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
+        <div className="challan-modal-overlay">
+          <div className="challan-modal-box">
 
-            {/* Modal Header Bar - White Theme */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderBottom: '1px solid #e2e8f0' }}>
+            {/* Modal Header Bar */}
+            <div className="challan-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.1)', border: '1px solid rgba(2, 132, 199, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.1)', border: '1px solid rgba(2, 132, 199, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a', lineHeight: 1.2 }}>
                     {editingChallan ? `Edit Fabric Challan EDP-${editingChallan.challanNo}` : 'New Fabric Challan Dispatch'}
                   </h2>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Enter challan metadata & TP meter values</span>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Enter challan metadata &amp; TP meter values</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closeChallanModal}
-                style={{ background: '#e2e8f0', border: 'none', color: '#475569', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                style={{ background: '#e2e8f0', border: 'none', color: '#475569', borderRadius: '50%', width: '32px', height: '32px', minWidth: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Form Body - 2 Columns */}
-            <form onSubmit={handleChallanSubmit} style={{ display: 'flex', flex: 1, overflow: 'hidden', margin: 0 }}>
+            {/* Mobile Tab Switcher (Visible on Mobile/Tablet <= 860px) */}
+            <div className="challan-mobile-tabs-bar">
+              <button
+                type="button"
+                className={`challan-mobile-tab-btn ${challanMobileTab === 'info' ? 'active' : ''}`}
+                onClick={() => setChallanMobileTab('info')}
+              >
+                <FileText size={15} />
+                <span>1. Challan Info</span>
+              </button>
+              <button
+                type="button"
+                className={`challan-mobile-tab-btn ${challanMobileTab === 'tp' ? 'active' : ''}`}
+                onClick={() => setChallanMobileTab('tp')}
+              >
+                <Layers size={15} />
+                <span>2. TP Meters</span>
+                {challanTotalTp > 0 && (
+                  <span className="challan-tab-badge">
+                    {challanTotalTp}
+                  </span>
+                )}
+              </button>
+            </div>
 
-              {/* LEFT COLUMN: Metadata, Job & Lot Details (White Theme) */}
-              <div style={{ flex: '1 1 480px', minWidth: '420px', padding: '1.25rem 1.5rem', overflowY: 'auto', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.9rem', background: '#f8fafc' }}>
+            {/* Modal Form Body */}
+            <form onSubmit={handleChallanSubmit} className="challan-modal-form">
+
+              {/* LEFT COLUMN: Metadata, Job & Lot Details */}
+              <div className={`challan-col-left ${challanMobileTab !== 'info' ? 'tab-hidden' : ''}`}>
 
                 {/* Section Header: Basic & Party */}
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 120px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Date</label>
                     <input type="date" required value={challanForm.date} onChange={e => setChallanForm({ ...challanForm, date: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} />
                   </div>
-                  <div style={{ flex: 1.5 }}>
+                  <div style={{ flex: '1.8 1 180px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Party Name</label>
                     <input type="text" list="challan-parties" value={challanForm.partyName} onChange={e => setChallanForm({ ...challanForm, partyName: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Select or type party..." />
                     <datalist id="challan-parties">
@@ -4807,8 +4835,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             onClick={() => toggleChallanJobPill(j.jobNo)}
                             title={isReady ? `Ready for delivery: ${avail.toFixed(1)}m available fused fabric` : !pDone ? 'Printing Pending' : 'Fusing Pending'}
                             style={{
-                              padding: '0.18rem 0.5rem',
-                              fontSize: '0.7rem',
+                              padding: '0.22rem 0.55rem',
+                              fontSize: '0.72rem',
                               borderRadius: '10px',
                               border: `1px solid ${pillBorder}`,
                               background: pillBg,
@@ -4834,8 +4862,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 </div>
 
                 {/* Design Name/No, Colour & Panna */}
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <div style={{ flex: 1.4 }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 180px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Design No / Name
                     </label>
@@ -4847,7 +4875,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       placeholder="e.g. ED-709, Floral Design..."
                     />
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1.2 1 120px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Colour / Matching
                     </label>
@@ -4859,7 +4887,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       placeholder="e.g. Red, Blue, Matching 1..."
                     />
                   </div>
-                  <div style={{ width: '85px' }}>
+                  <div style={{ flex: '0 0 85px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Panna
                     </label>
@@ -4874,8 +4902,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 </div>
 
                 {/* Bill To & Ship To */}
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 140px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Bill To</label>
                     <select
                       value={challanForm.billTo}
@@ -4888,7 +4916,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       ))}
                     </select>
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 140px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Ship To</label>
                     <select
                       value={challanForm.shipTo}
@@ -4958,8 +4986,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 handleChallanLotChange(newLotStr);
                               }}
                               style={{
-                                padding: '0.15rem 0.45rem',
-                                fontSize: '0.68rem',
+                                padding: '0.18rem 0.5rem',
+                                fontSize: '0.7rem',
                                 borderRadius: '10px',
                                 border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
                                 background: isSelected ? '#0284c7' : '#ffffff',
@@ -5023,7 +5051,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         return (
                           <>
                             {/* Top Header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '4px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: '1rem' }}>📊</span>
                                 <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
@@ -5072,7 +5100,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             </div>
 
                             {/* Status Footer Metrics */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700, flexWrap: 'wrap', gap: '4px' }}>
                               <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {isOver ? (
                                   <>⚠️ <span>{realPct}% Allocated — EXCEEDED AVAILABLE STOCK!</span></>
@@ -5099,12 +5127,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 </div>
 
                 {/* Vendor Challan, Delivery By, PCS */}
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <div style={{ flex: 1.2 }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1.2 1 120px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Vendor Challan</label>
                     <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Vendor Challan #" />
                   </div>
-                  <div style={{ flex: 1.2 }}>
+                  <div style={{ flex: '1.2 1 120px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Delivery By</label>
                     <input
                       type="text"
@@ -5120,15 +5148,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       ))}
                     </datalist>
                   </div>
-                  <div style={{ flex: 0.8 }}>
+                  <div style={{ flex: '0.8 1 70px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>PCS</label>
                     <input type="number" min="0" value={challanForm.pcs} onChange={e => setChallanForm({ ...challanForm, pcs: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Pcs" />
                   </div>
                 </div>
 
                 {/* Fabric Name & Shortage */}
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <div style={{ flex: 2 }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 180px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Fabric Quality</label>
                     <input
                       type="text"
@@ -5151,7 +5179,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       {fabricsList.map((f, i) => <option key={i} value={f} />)}
                     </datalist>
                   </div>
-                  <div style={{ flex: 1.2 }}>
+                  <div style={{ flex: '1.2 1 150px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
                       Shortage ({challanForm.shortageMode === 'mtr' ? 'Meters' : '%'})
                     </label>
@@ -5171,7 +5199,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         }}
                         style={{
                           flex: '1 1 auto',
-                          minWidth: '80px',
+                          minWidth: '70px',
                           width: '100%',
                           padding: '0.5rem 0.6rem',
                           fontSize: '0.85rem',
@@ -5192,7 +5220,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         }}
                         style={{
                           flex: '0 0 68px',
-                          width: '68px !important',
+                          width: '68px',
                           minWidth: '68px',
                           maxWidth: '68px',
                           height: '38px',
@@ -5220,27 +5248,72 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Notes</label>
                   <input type="text" value={challanForm.notes} onChange={e => setChallanForm({ ...challanForm, notes: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Optional challan notes…" />
                 </div>
+
+                {/* Mobile Tab 1 Navigation Bar (Next: TP Meters) */}
+                <div className="challan-mobile-next-bar">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={closeChallanModal}
+                    style={{
+                      flex: 1,
+                      padding: '0.65rem 0.75rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      background: '#e2e8f0',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChallanMobileTab('tp')}
+                    style={{
+                      flex: 2,
+                      padding: '0.65rem 0.9rem',
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                      color: '#ffffff',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      border: 'none',
+                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>Next: TP Meters ({challanTotalTp} TPs)</span>
+                    <ArrowRightLeft size={14} />
+                  </button>
+                </div>
+
               </div>
 
-              {/* RIGHT COLUMN: Dedicated TP Meters Entry & Immediate Action Bar (White Theme) */}
-              <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
+              {/* RIGHT COLUMN: Dedicated TP Meters Entry & Immediate Action Bar */}
+              <div className={`challan-col-right ${challanMobileTab !== 'tp' ? 'tab-hidden' : ''}`}>
 
                 {/* Right Top Header: TP Section Title & Summary Banner */}
-                <div style={{ padding: '1rem 1.25rem', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="challan-tp-header">
                   <div>
                     <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP METERS VALUES</span>
                     <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700 }}>Manual Lot No &amp; TP meters entry per row</div>
                   </div>
-                  <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0284c7' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
+                  <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
                     <PlusCircle size={14} /> Add TP Row
                   </button>
                 </div>
 
                 {/* TP Meters Entry Scrollable Area */}
-                <div style={{ flex: 1, padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#ffffff' }}>
+                <div className="challan-tp-list">
 
-                  {/* Table Column Headers */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '65px 150px 1fr 36px', gap: '0.5rem', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', paddingLeft: '0.25rem', marginBottom: '0.2rem' }}>
+                  {/* Table Column Headers (Desktop only) */}
+                  <div className="challan-tp-grid-header">
                     <span>TP No</span>
                     <span>Assigned Lot</span>
                     <span>TP Meters (mtr)</span>
@@ -5255,11 +5328,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     return challanForm.tpDetails.map((row, idx) => {
                       const isCustom = row.isCustomLot;
                       return (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '65px 150px 1fr 36px', gap: '0.5rem', alignItems: 'center' }}>
-                          <div style={{ width: '100%', padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#0369a1', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div key={idx} className="challan-tp-row">
+                          <div className="challan-tp-badge" style={{ padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#0369a1', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             TP {row.tpNo}
                           </div>
-                          <div style={{ position: 'relative', width: '100%' }}>
+                          <div className="challan-tp-lot-container" style={{ position: 'relative', width: '100%' }}>
                             {!isCustom ? (
                               <select
                                 value={row.lotNo || currentLots[0] || ''}
@@ -5368,17 +5441,19 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                               </div>
                             )}
                           </div>
-                          <input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            autoFocus={idx === 0}
-                            value={row.tpMeter}
-                            onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
-                            style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', background: '#ffffff', border: '2px solid #0284c7', borderRadius: '6px', boxSizing: 'border-box' }}
-                            placeholder="Enter TP meters…"
-                          />
-                          <button type="button" onClick={() => removeTpRow(idx)} style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', height: '36px', width: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
+                          <div className="challan-tp-meter-wrapper" style={{ position: 'relative', width: '100%' }}>
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              autoFocus={idx === 0}
+                              value={row.tpMeter}
+                              onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', background: '#ffffff', border: '2px solid #0284c7', borderRadius: '6px', boxSizing: 'border-box' }}
+                              placeholder="Enter TP meters…"
+                            />
+                          </div>
+                          <button type="button" className="challan-tp-remove-btn" onClick={() => removeTpRow(idx)} style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', height: '36px', width: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
                             <X size={16} />
                           </button>
                         </div>
@@ -5387,27 +5462,45 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   })()}
                 </div>
 
-                {/* Right Bottom Footer: Live Total & STICKY SAVE / CANCEL BUTTONS (ALWAYS VISIBLE!) */}
-                <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {/* Right Bottom Footer: Live Total & STICKY SAVE / CANCEL BUTTONS */}
+                <div className="challan-tp-footer">
 
                   {/* Total Summary Row */}
                   <div style={{ display: 'flex', gap: '1rem', padding: '0.6rem 1rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
                     <div style={{ flex: 1 }}>
                       <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total TPs</span>
-                      <div style={{ fontWeight: 900, fontSize: '1.3rem', color: '#0284c7' }}>{challanTotalTp} Rows</div>
+                      <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#0284c7' }}>{challanTotalTp} Rows</div>
                     </div>
                     <div style={{ flex: 1.5, textAlign: 'right' }}>
                       <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total Meters</span>
-                      <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#059669' }}>{challanTotalMtr.toFixed(2)} mtr</div>
+                      <div style={{ fontWeight: 900, fontSize: '1.35rem', color: '#059669' }}>{challanTotalMtr.toFixed(2)} mtr</div>
                     </div>
                   </div>
 
                   {/* Action Buttons Bar */}
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700, background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1' }} onClick={closeChallanModal}>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary challan-mobile-back-btn"
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        background: '#f1f5f9',
+                        color: '#475569',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      onClick={() => setChallanMobileTab('info')}
+                    >
+                      ⬅ Info
+                    </button>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700, background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '8px' }} onClick={closeChallanModal}>
                       Cancel
                     </button>
-                    <button type="submit" className="btn-primary" style={{ flex: 1.8, padding: '0.65rem 1rem', fontSize: '0.95rem', fontWeight: 900, background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#ffffff', border: 'none', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)' }}>
+                    <button type="submit" className="btn-primary" style={{ flex: 1.8, padding: '0.65rem 1rem', fontSize: '0.95rem', fontWeight: 900, background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#ffffff', border: 'none', borderRadius: '8px', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)', cursor: 'pointer' }}>
                       {editingChallan ? '💾 Save Changes' : '🚀 Save Challan'}
                     </button>
                   </div>
