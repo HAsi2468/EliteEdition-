@@ -223,8 +223,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Stock Adjustment (SA) state
   const [stockAdjustments, setStockAdjustments] = useState([]);
   const [saSearch, setSaSearch] = useState('');
+  const [saDatePreset, setSaDatePreset] = useState('all');
   const [saDateStart, setSaDateStart] = useState('');
   const [saDateEnd, setSaDateEnd] = useState('');
+  const [customSaDateStart, setCustomSaDateStart] = useState('');
+  const [customSaDateEnd, setCustomSaDateEnd] = useState('');
   const [isSaFormOpen, setIsSaFormOpen] = useState(false);
   const [saDeleteTarget, setSaDeleteTarget] = useState(null);
   const [saAvailableLots, setSaAvailableLots] = useState([]);
@@ -246,8 +249,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [selectedChallanHistory, setSelectedChallanHistory] = useState(null);
   const [lotTransfers, setLotTransfers] = useState([]);
   const [transferSearch, setTransferSearch] = useState('');
+  const [transferDatePreset, setTransferDatePreset] = useState('all');
   const [transferDateStart, setTransferDateStart] = useState('');
   const [transferDateEnd, setTransferDateEnd] = useState('');
+  const [customTransferDateStart, setCustomTransferDateStart] = useState('');
+  const [customTransferDateEnd, setCustomTransferDateEnd] = useState('');
   const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
   const [transferForm, setTransferForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -621,13 +627,19 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [inwardSearch, setInwardSearch] = useState('');
   const [outwardSearch, setOutwardSearch] = useState('');
 
+  const [inwardDatePreset, setInwardDatePreset] = useState('all');
   const [inwardDateStart, setInwardDateStart] = useState('');
   const [inwardDateEnd, setInwardDateEnd] = useState('');
+  const [customInwardDateStart, setCustomInwardDateStart] = useState('');
+  const [customInwardDateEnd, setCustomInwardDateEnd] = useState('');
   const [inwardSortBy, setInwardSortBy] = useState('date');
   const [inwardSortOrder, setInwardSortOrder] = useState('desc');
 
+  const [outwardDatePreset, setOutwardDatePreset] = useState('all');
   const [outwardDateStart, setOutwardDateStart] = useState('');
   const [outwardDateEnd, setOutwardDateEnd] = useState('');
+  const [customOutwardDateStart, setCustomOutwardDateStart] = useState('');
+  const [customOutwardDateEnd, setCustomOutwardDateEnd] = useState('');
   const [outwardSortBy, setOutwardSortBy] = useState('date');
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
 
@@ -3091,19 +3103,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2.2rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
                 />
               </div>
-              <input
-                type="date"
-                value={transferDateStart}
-                onChange={e => setTransferDateStart(e.target.value)}
-                style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-                title="From Date"
-              />
-              <input
-                type="date"
-                value={transferDateEnd}
-                onChange={e => setTransferDateEnd(e.target.value)}
-                style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-                title="To Date"
+              <DateRangePicker
+                preset={transferDatePreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setTransferDatePreset(p);
+                  setTransferDateStart(ds || '');
+                  setTransferDateEnd(de || '');
+                }}
+                customStart={customTransferDateStart}
+                customEnd={customTransferDateEnd}
+                onCustomChange={(s, e) => {
+                  setCustomTransferDateStart(s);
+                  setCustomTransferDateEnd(e);
+                  setTransferDateStart(s);
+                  setTransferDateEnd(e);
+                }}
               />
             </div>
 
@@ -3206,24 +3220,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     style={{ ...inputStyle, width: '200px', paddingLeft: '1.8rem' }}
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                  <input
-                    type="date"
-                    value={inwardDateStart}
-                    onChange={e => setInwardDateStart(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                  <input
-                    type="date"
-                    value={inwardDateEnd}
-                    onChange={e => setInwardDateEnd(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
+                <DateRangePicker
+                  preset={inwardDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setInwardDatePreset(p);
+                    setInwardDateStart(ds || '');
+                    setInwardDateEnd(de || '');
+                  }}
+                  customStart={customInwardDateStart}
+                  customEnd={customInwardDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomInwardDateStart(s);
+                    setCustomInwardDateEnd(e);
+                    setInwardDateStart(s);
+                    setInwardDateEnd(e);
+                  }}
+                />
 
                 <button className="btn-primary" onClick={() => { fetchData(); setEditingTransaction(null); setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', date: new Date().toISOString().split('T')[0], notes: '' }); setIsInwardOpen(true); }}>
                   <PlusCircle size={16} /> New Inward
@@ -3380,24 +3392,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     style={{ ...inputStyle, width: '200px', paddingLeft: '1.8rem' }}
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                  <input
-                    type="date"
-                    value={outwardDateStart}
-                    onChange={e => setOutwardDateStart(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                  <input
-                    type="date"
-                    value={outwardDateEnd}
-                    onChange={e => setOutwardDateEnd(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
+                <DateRangePicker
+                  preset={outwardDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setOutwardDatePreset(p);
+                    setOutwardDateStart(ds || '');
+                    setOutwardDateEnd(de || '');
+                  }}
+                  customStart={customOutwardDateStart}
+                  customEnd={customOutwardDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomOutwardDateStart(s);
+                    setCustomOutwardDateEnd(e);
+                    setOutwardDateStart(s);
+                    setOutwardDateEnd(e);
+                  }}
+                />
 
                 <button className="btn-primary" onClick={() => { fetchData(); setOutwardForm({ jobNo: '', challanNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: '' }); setIsOutwardOpen(true); }} style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}>
                   <PlusCircle size={16} /> New Outward
@@ -3787,14 +3797,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       style={{ ...inputStyle, width: '220px', paddingLeft: '1.8rem' }}
                     />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                    <input type="date" value={saDateStart} onChange={e => setSaDateStart(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.3rem' }} />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                    <input type="date" value={saDateEnd} onChange={e => setSaDateEnd(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.3rem' }} />
-                  </div>
+                  <DateRangePicker
+                    preset={saDatePreset}
+                    onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                      setSaDatePreset(p);
+                      setSaDateStart(ds || '');
+                      setSaDateEnd(de || '');
+                    }}
+                    customStart={customSaDateStart}
+                    customEnd={customSaDateEnd}
+                    onCustomChange={(s, e) => {
+                      setCustomSaDateStart(s);
+                      setCustomSaDateEnd(e);
+                      setSaDateStart(s);
+                      setSaDateEnd(e);
+                    }}
+                  />
                 </>
               )}
 
@@ -5612,14 +5630,47 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <FileDown size={20} /> Download Fabric Ledger PDF
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Date From</label>
-                  <input type="date" value={pdfFilter.dateStart} onChange={e => setPdfFilter({ ...pdfFilter, dateStart: e.target.value })} style={inputStyle} />
+              <div>
+                <label style={{ ...labelStyle, marginBottom: '0.4rem' }}>Quick Date Range</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'this_week', label: 'This Week' },
+                    { id: 'this_month', label: 'This Month' },
+                    { id: 'last_30_days', label: 'Last 30 Days' },
+                    { id: 'all', label: 'All Time' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        const { dateStart, dateEnd } = getDatePresetRange(p.id);
+                        setPdfFilter(prev => ({ ...prev, dateStart: dateStart || '', dateEnd: dateEnd || '' }));
+                      }}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-light, #cbd5e1)',
+                        background: 'rgba(255,255,255,0.06)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Date To</label>
-                  <input type="date" value={pdfFilter.dateEnd} onChange={e => setPdfFilter({ ...pdfFilter, dateEnd: e.target.value })} style={inputStyle} />
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Date From</label>
+                    <input type="date" value={pdfFilter.dateStart} onChange={e => setPdfFilter({ ...pdfFilter, dateStart: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Date To</label>
+                    <input type="date" value={pdfFilter.dateEnd} onChange={e => setPdfFilter({ ...pdfFilter, dateEnd: e.target.value })} style={inputStyle} />
+                  </div>
                 </div>
               </div>
               <div>
@@ -5679,24 +5730,58 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.35rem' }}>Date Start</label>
-                  <input
-                    type="date"
-                    value={combinedDateStart}
-                    onChange={e => setCombinedDateStart(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
-                  />
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.35rem' }}>Quick Date Range</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'this_week', label: 'This Week' },
+                    { id: 'this_month', label: 'This Month' },
+                    { id: 'last_30_days', label: 'Last 30 Days' },
+                    { id: 'all', label: 'All Time' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        const { dateStart, dateEnd } = getDatePresetRange(p.id);
+                        setCombinedDateStart(dateStart || '');
+                        setCombinedDateEnd(dateEnd || '');
+                      }}
+                      style={{
+                        padding: '0.25rem 0.6rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        border: '1px solid #bfdbfe',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.35rem' }}>Date End</label>
-                  <input
-                    type="date"
-                    value={combinedDateEnd}
-                    onChange={e => setCombinedDateEnd(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>Date Start</label>
+                    <input
+                      type="date"
+                      value={combinedDateStart}
+                      onChange={e => setCombinedDateStart(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>Date End</label>
+                    <input
+                      type="date"
+                      value={combinedDateEnd}
+                      onChange={e => setCombinedDateEnd(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -2564,33 +2564,71 @@ export default function JobPrintingLog() {
               flexDirection: 'column',
               gap: '1rem'
             }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8' }}>FROM DATE <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input
-                    type="date"
-                    value={reportStartDate}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setReportStartDate(val);
-                      setDateStart(val);
-                    }}
-                    style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
-                  />
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.4rem' }}>QUICK RANGE PRESET</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'yesterday', label: 'Yesterday' },
+                    { id: 'this_week', label: 'This Week' },
+                    { id: 'this_month', label: 'This Month' },
+                    { id: 'last_30_days', label: 'Last 30 Days' },
+                    { id: 'all', label: 'All Time' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        const { dateStart: ds, dateEnd: de } = getDatePresetRange(p.id);
+                        setReportStartDate(ds || '');
+                        setReportEndDate(de || '');
+                        setDateStart(ds || '');
+                        setDateEnd(de || '');
+                      }}
+                      style={{
+                        padding: '0.28rem 0.65rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-light, #334155)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
 
-                <div>
-                  <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#a78bfa' }}>TO DATE <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input
-                    type="date"
-                    value={reportEndDate}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setReportEndDate(val);
-                      setDateEnd(val);
-                    }}
-                    style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ ...labelStyle, fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8' }}>FROM DATE <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input
+                      type="date"
+                      value={reportStartDate}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setReportStartDate(val);
+                        setDateStart(val);
+                      }}
+                      style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ ...labelStyle, fontSize: '0.72rem', fontWeight: 800, color: '#a78bfa' }}>TO DATE <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input
+                      type="date"
+                      value={reportEndDate}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setReportEndDate(val);
+                        setDateEnd(val);
+                      }}
+                      style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
+                    />
+                  </div>
                 </div>
               </div>
 

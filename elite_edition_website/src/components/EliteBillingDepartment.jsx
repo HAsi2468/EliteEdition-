@@ -4573,14 +4573,57 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               </div>
 
               {ledgerPreset === 'custom' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginTop: '0.3rem' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.85rem',
+                  marginTop: '0.4rem',
+                  padding: '0.85rem 1rem',
+                  background: 'rgba(2, 132, 199, 0.04)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(2, 132, 199, 0.2)'
+                }}>
                   <div>
-                    <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From Date</label>
-                    <input type="date" value={ledgerDateStart} onChange={e => setLedgerDateStart(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontSize: '0.8rem' }} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#0369a1', fontWeight: 700, marginBottom: '0.3rem' }}>
+                      <Calendar size={13} /> FROM DATE
+                    </label>
+                    <input
+                      type="date"
+                      value={ledgerDateStart}
+                      onChange={e => setLedgerDateStart(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        background: '#ffffff',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        boxSizing: 'border-box'
+                      }}
+                    />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To Date</label>
-                    <input type="date" value={ledgerDateEnd} onChange={e => setLedgerDateEnd(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontSize: '0.8rem' }} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#0369a1', fontWeight: 700, marginBottom: '0.3rem' }}>
+                      <Calendar size={13} /> TO DATE
+                    </label>
+                    <input
+                      type="date"
+                      value={ledgerDateEnd}
+                      onChange={e => setLedgerDateEnd(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        background: '#ffffff',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        boxSizing: 'border-box'
+                      }}
+                    />
                   </div>
                 </div>
               )}

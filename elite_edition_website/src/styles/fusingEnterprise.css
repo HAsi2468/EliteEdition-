@@ -361,19 +361,19 @@
 .fusing-filters-main-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .fusing-search-box {
   position: relative;
-  flex: 1 1 240px;
-  min-width: 220px;
+  flex: 1 1 200px;
+  min-width: 180px;
 }
 
 .fusing-search-icon {
   position: absolute;
-  left: 12px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--ee-fusing-text-muted);
@@ -382,14 +382,15 @@
 
 .fusing-search-input {
   width: 100%;
-  padding: 0.55rem 0.85rem 0.55rem 2.35rem;
+  padding: 0.4rem 0.75rem 0.4rem 2.1rem !important;
   border-radius: 8px;
   border: 1px solid var(--ee-fusing-border);
   background: #FFFFFF;
   color: var(--ee-fusing-text-primary);
-  font-size: 0.85rem;
+  font-size: 0.82rem !important;
   font-weight: 500;
-  min-height: 40px;
+  min-height: 36px !important;
+  height: 36px !important;
   box-sizing: border-box;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -401,15 +402,21 @@
 }
 
 .fusing-filter-select {
-  padding: 0.55rem 0.85rem;
+  width: auto !important;
+  min-width: 140px;
+  max-width: 180px;
+  flex: 0 1 auto;
+  padding: 0.4rem 0.75rem !important;
   border-radius: 8px;
   border: 1px solid var(--ee-fusing-border);
   background: #FFFFFF;
   color: var(--ee-fusing-text-primary);
-  font-size: 0.84rem;
+  font-size: 0.82rem !important;
   font-weight: 600;
-  min-height: 40px;
+  min-height: 36px !important;
+  height: 36px !important;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .fusing-filter-select:focus {
@@ -910,22 +917,29 @@
   }
 
   .fusing-filters-main-row {
-    flex-direction: column !important;
-    align-items: stretch !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
     gap: 8px !important;
   }
 
   .fusing-search-box {
     width: 100% !important;
     min-width: 0 !important;
-    flex: none !important;
+    flex: 1 1 100% !important;
   }
 
-  .fusing-search-input,
-  .fusing-filter-select {
-    font-size: 16px !important;
-    min-height: 44px !important;
+  .fusing-search-input {
+    font-size: 15px !important;
+    min-height: 40px !important;
     width: 100% !important;
+  }
+
+  .fusing-filter-select {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-width: 120px !important;
+    max-width: 100% !important;
+    font-size: 14px !important;
+    min-height: 38px !important;
   }
 
   .fusing-subnav-bar {
