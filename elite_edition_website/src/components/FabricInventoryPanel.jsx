@@ -1672,8 +1672,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const removeTpRow = (index) => {
     setChallanForm(prev => {
-      const tpDetails = prev.tpDetails.filter((_, i) => i !== index);
-      return { ...prev, tpDetails };
+      const filtered = prev.tpDetails.filter((_, i) => i !== index);
+      const reindexed = filtered.map((r, i) => ({ ...r, tpNo: i + 1 }));
+      return { ...prev, tpDetails: reindexed };
     });
   };
 
@@ -1773,8 +1774,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         adminOverride: forceAdminOverride || (isAdmin && needsOverride),
         tpDetails: challanForm.tpDetails
           .filter(r => r.tpMeter !== '' && r.tpMeter != null)
-          .map(r => ({
-            tpNo: Number(r.tpNo),
+          .map((r, i) => ({
+            tpNo: i + 1,
             tpMeter: parseFloat(r.tpMeter) || 0,
             lotNo: r.lotNo || (challanForm.lotNo ? String(challanForm.lotNo).split(/[,\s&]+/)[0] : '') || ''
           })),
@@ -1814,7 +1815,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const startEditChallan = (c) => {
     setEditingChallan(c);
     const tpRows = c.tpDetails && c.tpDetails.length > 0
-      ? c.tpDetails.map(r => ({ tpNo: r.tpNo, tpMeter: String(r.tpMeter), lotNo: r.lotNo || '' }))
+      ? c.tpDetails.map((r, idx) => ({ tpNo: idx + 1, tpMeter: String(r.tpMeter != null ? r.tpMeter : ''), lotNo: r.lotNo || '' }))
       : emptyTpRows();
     setChallanForm({
       date: c.date ? new Date(c.date).toISOString().split('T')[0] : '',
@@ -4790,40 +4791,126 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               {viewChallanModal.pcs && <div><span style={{ color: '#64748b', fontWeight: 600 }}>PCS:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.pcs} pcs</strong></div>}
             </div>
 
-            {/* TP Details List */}
-            {viewChallanModal.tpDetails && viewChallanModal.tpDetails.length > 0 && (
-              <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  TP / Roll Breakdown ({viewChallanModal.tpDetails.length} Rolls)
-                </div>
-                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#eff6ff', borderBottom: '1px solid #bfdbfe', textAlign: 'left', color: '#1e40af' }}>
-                        <th style={{ padding: '0.5rem 0.75rem', fontWeight: '700' }}>TP #</th>
-                        <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontWeight: '700' }}>Meters (mtr)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {viewChallanModal.tpDetails.map((tp, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                          <td style={{ padding: '0.45rem 0.75rem', fontWeight: '600', color: '#334155' }}>TP-{tp.tpNo || (idx + 1)}</td>
-                          <td style={{ padding: '0.45rem 0.75rem', textAlign: 'right', fontWeight: '700', color: '#16a34a' }}>{Number(tp.tpMeter || 0).toFixed(2)} mtr</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* TP Details List - Full Breakdown with Assigned Lot & Percentage */}
+            {viewChallanModal.tpDetails && viewChallanModal.tpDetails.length > 0 && (() => {
+              const activeTps = viewChallanModal.tpDetails.filter(tp => (parseFloat(tp.tpMeter) || 0) > 0);
+              const displayList = activeTps.length > 0 ? activeTps : viewChallanModal.tpDetails;
+              const totalRolls = displayList.length;
+              const sumMtr = displayList.reduce((acc, r) => acc + (parseFloat(r.tpMeter) || 0), 0) || parseFloat(viewChallanModal.totalMtr || 0);
 
-            {/* Summary Totals - Light Blue Theme */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.1rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af' }}>Total Outward Quantity:</span>
-              <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1d4ed8' }}>
-                {parseFloat(viewChallanModal.totalMtr || 0).toFixed(2)} mtr ({viewChallanModal.totalTp || 0} Rolls)
-              </span>
-            </div>
+              return (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>📦 TP / Roll Breakdown</span>
+                      <span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                        {totalRolls} Rolls
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+                      Avg: {totalRolls > 0 ? (sumMtr / totalRolls).toFixed(1) : 0} m/roll
+                    </span>
+                  </div>
+
+                  <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1.5px solid #bfdbfe', borderRadius: '10px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+                    <table style={{ width: '100%', fontSize: '0.84rem', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#eff6ff', borderBottom: '1.5px solid #bfdbfe', textAlign: 'left', color: '#1e40af', position: 'sticky', top: 0, zIndex: 2 }}>
+                          <th style={{ padding: '0.6rem 0.85rem', fontWeight: '800', width: '22%' }}>TP #</th>
+                          <th style={{ padding: '0.6rem 0.85rem', fontWeight: '800', width: '32%' }}>Assigned Lot</th>
+                          <th style={{ padding: '0.6rem 0.85rem', textAlign: 'right', fontWeight: '800', width: '28%' }}>Meters</th>
+                          <th style={{ padding: '0.6rem 0.85rem', textAlign: 'right', fontWeight: '800', width: '18%' }}>Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayList.map((tp, idx) => {
+                          const mtrVal = parseFloat(tp.tpMeter) || 0;
+                          const sharePct = sumMtr > 0 ? ((mtrVal / sumMtr) * 100).toFixed(1) : '0.0';
+                          const assignedLot = tp.lotNo || viewChallanModal.lotNo || '—';
+
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', transition: 'background 0.15s ease' }}>
+                              <td style={{ padding: '0.55rem 0.85rem' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  background: '#e0f2fe',
+                                  border: '1px solid #bae6fd',
+                                  color: '#0369a1',
+                                  fontWeight: 800,
+                                  fontSize: '0.8rem'
+                                }}>
+                                  TP-{idx + 1}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.55rem 0.85rem', fontWeight: '700', color: '#334155' }}>
+                                {assignedLot !== '—' ? (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '2px 7px',
+                                    borderRadius: '5px',
+                                    background: '#f1f5f9',
+                                    border: '1px solid #cbd5e1',
+                                    color: '#0f172a',
+                                    fontSize: '0.76rem',
+                                    fontWeight: 700
+                                  }}>
+                                    Lot #{String(assignedLot).replace(/^#/, '')}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#94a3b8' }}>—</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '0.55rem 0.85rem', textAlign: 'right', fontWeight: '800', color: '#16a34a', fontSize: '0.88rem' }}>
+                                {mtrVal.toFixed(2)} mtr
+                              </td>
+                              <td style={{ padding: '0.55rem 0.85rem', textAlign: 'right', color: '#64748b', fontSize: '0.78rem', fontWeight: 600 }}>
+                                {sharePct}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0', fontWeight: 800 }}>
+                          <td colSpan={2} style={{ padding: '0.6rem 0.85rem', color: '#1e40af' }}>
+                            Total Breakdown ({totalRolls} Rolls)
+                          </td>
+                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'right', color: '#16a34a', fontSize: '0.92rem' }}>
+                            {sumMtr.toFixed(2)} mtr
+                          </td>
+                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'right', color: '#64748b', fontSize: '0.8rem' }}>
+                            100%
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Summary Totals - Light Blue Theme (Accurate Dynamic Rolls & Meters) */}
+            {(() => {
+              const activeTps = (viewChallanModal.tpDetails || []).filter(tp => (parseFloat(tp.tpMeter) || 0) > 0);
+              const computedRolls = activeTps.length > 0 ? activeTps.length : (viewChallanModal.totalTp || 0);
+              const computedMtr = activeTps.length > 0
+                ? activeTps.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0)
+                : parseFloat(viewChallanModal.totalMtr || 0);
+
+              return (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.1rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', marginBottom: '1.25rem' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af' }}>Total Outward Quantity:</span>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1d4ed8' }}>
+                    {computedMtr.toFixed(2)} mtr ({computedRolls} Rolls)
+                  </span>
+                </div>
+              );
+            })()}
 
             {/* Action Buttons - White & Blue Theme */}
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -5512,7 +5599,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       return (
                         <div key={idx} className="challan-tp-row">
                           <div className="challan-tp-badge" style={{ padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#0369a1', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            TP {row.tpNo}
+                            TP {idx + 1}
                           </div>
                           <div className="challan-tp-lot-container" style={{ position: 'relative', width: '100%' }}>
                             {!isCustom ? (

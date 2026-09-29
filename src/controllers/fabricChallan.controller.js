@@ -271,8 +271,14 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
 
   const finalLotNoStr = Array.from(usedLotsSet).join(', ') || rawLotNoStr || '';
 
+  // Enforce sequential tpNo starting from 1 (1..N) across all active rolls
+  const resequencedDetails = sanitizedDetails.map((tp, idx) => ({
+    ...tp,
+    tpNo: idx + 1
+  }));
+
   return {
-    sanitizedDetails,
+    sanitizedDetails: resequencedDetails,
     finalLotNoStr,
     lotGroups
   };
@@ -1261,7 +1267,7 @@ const downloadChallanPdf = async (req, res) => {
           const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
 
           doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-            .text(String(tp.tpNo), x, y + 7, { width: tpColWidth * 0.35, align: 'center' });
+            .text(String(tp.tpNo || (i + 1)), x, y + 7, { width: tpColWidth * 0.35, align: 'center' });
           
           doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica')
             .text(val, x + tpColWidth * 0.35, y + 7, { width: tpColWidth * 0.65, align: 'center' });
@@ -1681,7 +1687,7 @@ const downloadBulkChallansPdf = async (req, res) => {
             const item = activeTps[tpIndex];
             const mtrVal = parseFloat(item.tpMeter) || 0;
             doc.fillColor('#1e293b').fontSize(8.5).font('Helvetica')
-              .text(`T.P. ${item.tpNo || (tpIndex + 1)}`, colStartX + 6, rowY + 5, { width: subColW - 10, align: 'center' });
+              .text(`T.P. ${tpIndex + 1}`, colStartX + 6, rowY + 5, { width: subColW - 10, align: 'center' });
             doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
               .text(`${mtrVal.toFixed(1)} m`, colStartX + subColW + 6, rowY + 5, { width: subColW - 12, align: 'right' });
           }
