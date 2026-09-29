@@ -4526,7 +4526,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           )}
 
           {/* Table Container */}
-          <div className="table-responsive-wrapper" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+          <div className="table-responsive-wrapper" style={{ padding: 0, border: '1px solid var(--border-light)' }}>
             <div className="table-responsive" style={{ width: '100%' }}>
               {(() => {
                 const displayedChallans = challans;

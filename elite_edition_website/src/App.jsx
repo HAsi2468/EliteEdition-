@@ -3295,8 +3295,7 @@ const styles = {
   mainLayout: {
     display: 'flex',
     width: '100%',
-    gap: '1.5rem',
-    alignItems: 'flex-start',
+    /* gap is overridden by CSS class gap: 12px !important */
   },
   sidebar: {
     width: '260px',

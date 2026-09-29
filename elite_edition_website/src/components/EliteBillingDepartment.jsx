@@ -3927,7 +3927,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {/* ── VIEW PURCHASE ENTRY DETAILS MODAL ────────────────────────── */}
       {viewPurchaseModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
             <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ShoppingBag size={20} /> Purchase Inward Details — {viewPurchaseModal.purchaseNo}

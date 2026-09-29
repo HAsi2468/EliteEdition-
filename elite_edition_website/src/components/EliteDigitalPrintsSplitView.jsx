@@ -251,7 +251,7 @@ export default function EliteDigitalPrintsSplitView({ initialJobCard = null }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '1.25rem', height: 'calc(100vh - 120px)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '1.25rem', minHeight: 'calc(100dvh - 120px)' }}>
       
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* LEFT PANEL: ELITE DIGITAL PRINTS JOB BILLING & PROOFING ENGINE (60%) */}
