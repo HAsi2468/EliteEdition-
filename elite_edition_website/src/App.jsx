@@ -2161,7 +2161,7 @@ export default function App() {
       )}
 
       {/* Main Layout */}
-      <main style={styles.mainLayout} className="main-layout-container">
+      <main style={styles.mainLayout} className={`main-layout-container ${['communication', 'workspace', 'task_management'].includes(activeTab) ? 'is-comm-active' : ''}`}>
         
         {/* Left Navigation Sidebar */}
         <aside
@@ -2352,7 +2352,6 @@ export default function App() {
               if (activeDepartment === 'elite_edition') {
                 return (
                   <>
-                    {renderSectionHeader('Elite Edition Modules', Building)}
                     {renderNavItem('ee_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
                     {renderNavItem('ee_invoices', 'Finance', Receipt, null, 'Finance')}
                     {renderNavItem('ee_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
@@ -2364,7 +2363,6 @@ export default function App() {
               if (activeDepartment === 'elite_fabtex') {
                 return (
                   <>
-                    {renderSectionHeader('Elite Fabtex Modules', Building)}
                     {renderNavItem('ef_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
                     {renderNavItem('ef_invoices', 'Finance', Receipt, null, 'Finance')}
                     {renderNavItem('ef_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
@@ -2376,7 +2374,6 @@ export default function App() {
               if (activeDepartment === 'stitching') {
                 return (
                   <>
-                    {renderSectionHeader('Elite Stitching Modules', Scissors)}
                     {renderNavItem('es_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) &&
                       renderNavItem('jobcards_list', 'Jobcard', FileText, null, 'Jobcard')
@@ -2398,7 +2395,6 @@ export default function App() {
               if (activeDepartment === 'digital_print') {
                 return (
                   <>
-                    {renderSectionHeader('Digital Print Modules', Printer)}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) &&
                       renderNavItem('jobcards', 'Prints Dashboard & Reports', BarChart3, null, 'Dashboard')
                     }
@@ -2451,7 +2447,6 @@ export default function App() {
 
               return (
                 <>
-                  {renderSectionHeader('Elite Online Modules', Store)}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) &&
                     renderNavItem('dashboard', 'Dashboard Overview', LayoutDashboard, null, 'Dashboard')
                   }
@@ -2549,15 +2544,30 @@ export default function App() {
         </aside>
 
         {/* Right Content Panel */}
-        <section style={styles.contentArea}>
+        <section
+          style={{
+            ...styles.contentArea,
+            ...(['communication', 'workspace', 'task_management'].includes(activeTab) ? {
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              minHeight: 0,
+              maxHeight: '100%',
+              overflow: 'hidden',
+              padding: 0
+            } : {})
+          }}
+          className={['communication', 'workspace', 'task_management'].includes(activeTab) ? 'content-area-comm' : 'content-area-wrap'}
+        >
           {error && <div style={styles.globalError}>{error}</div>}
 
-          <ErrorBoundary>
-          <PullToRefresh onRefresh={async () => { await fetchData(); triggerGlobalDataRefresh(); }}>
-          <Suspense fallback={<DashboardSkeleton />}>
+          {!['communication', 'workspace', 'task_management'].includes(activeTab) && (
+            <ErrorBoundary>
+            <PullToRefresh onRefresh={async () => { await fetchData(); triggerGlobalDataRefresh(); }}>
+            <Suspense fallback={<DashboardSkeleton />}>
 
-          {['communication', 'workspace', 'task_management'].includes(activeTab) ? null : activeTab === 'dashboard' ? (
-            <DashboardStats items={items} sales={sales} />
+            {activeTab === 'dashboard' ? (
+              <DashboardStats items={items} sales={sales} />
           ) : activeTab === 'elite_online' ? (
             <ReportsCenter department="elite-online" />
           ) : activeTab === 'inventory' ? (
@@ -2663,6 +2673,7 @@ export default function App() {
           </Suspense>
           </PullToRefresh>
           </ErrorBoundary>
+          )}
 
           {/* Persistent CommunicationPanel (Chat & Task Manager - preserved across tab navigation) */}
           <div style={{ display: (activeTab === 'communication' || activeTab === 'task_management' || activeTab === 'workspace') ? 'flex' : 'none', flex: 1, minHeight: 0, height: '100%', flexDirection: 'column' }}>
@@ -3175,7 +3186,7 @@ export default function App() {
       />
 
       {/* Mobile Bottom Navigation (Company-Specific Quick Screens, text only, safe-area inset) */}
-      {isMobile && isAuthenticated && (
+      {isMobile && isAuthenticated && !['communication', 'workspace', 'task_management'].includes(activeTab) && (
         <MobileBottomNav
           activeDepartment={activeDepartment}
           activeTab={activeTab}

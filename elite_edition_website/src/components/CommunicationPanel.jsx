@@ -3118,9 +3118,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         width: '100%',
         flex: 1,
         minHeight: 0,
-        height: isMobileScreen && activeGroup
-          ? (viewportHeight ? `${viewportHeight}px` : '100dvh')
-          : '100%',
+        height: '100%',
+        maxHeight: '100%',
         padding: isMobileScreen ? 0 : '0.85rem',
         boxSizing: 'border-box',
         overflow: 'hidden',
