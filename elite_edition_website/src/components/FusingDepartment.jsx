@@ -1090,23 +1090,15 @@ export default function FusingDepartment() {
         </div>
       )}
 
-      {/* ── ENTERPRISE SCREEN HEADER & BREADCRUMBS ── */}
+      {/* ── SCREEN HEADER (Clean & Minimal) ── */}
       <header className="fusing-header-section">
-        <nav className="fusing-breadcrumbs" aria-label="Breadcrumb navigation">
-          <span>ERP Portal</span>
-          <span>/</span>
-          <span>Elite Prints Operations</span>
-          <span>/</span>
-          <span className="fusing-breadcrumb-active">Jobcards Fusing Log</span>
-        </nav>
         <div className="fusing-title-row">
           <div className="fusing-title-group">
             <div className="fusing-title-icon" aria-hidden="true">
-              <Flame size={24} />
+              <Flame size={20} />
             </div>
             <div>
               <h1 className="fusing-main-title">Jobcards Fusing Log</h1>
-              <p className="fusing-sub-title">Heat press sublimation ledger, machine speed & temperature tracking, roll consumption control</p>
             </div>
           </div>
 
@@ -1119,7 +1111,7 @@ export default function FusingDepartment() {
               aria-label="Refresh fusing records"
               title="Refresh fusing logs data"
             >
-              <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
+              <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
               <span>Refresh</span>
             </button>
             <button
@@ -1128,7 +1120,7 @@ export default function FusingDepartment() {
               onClick={() => setShowButterPaperInwardModal(true)}
               aria-label="Inward Butter Paper rolls"
             >
-              <PlusCircle size={15} />
+              <PlusCircle size={14} />
               <span>Inward Butter Paper</span>
             </button>
             <button
@@ -1137,8 +1129,8 @@ export default function FusingDepartment() {
               onClick={() => setShowReportModal(true)}
               aria-label="Generate comprehensive fusing report"
             >
-              <Zap size={15} />
-              <span>Generate Report</span>
+              <Zap size={14} />
+              <span>Report</span>
             </button>
             <button
               type="button"
@@ -1146,14 +1138,14 @@ export default function FusingDepartment() {
               onClick={handleExportCSV}
               aria-label="Download CSV report"
             >
-              <Download size={15} />
-              <span>Download CSV</span>
+              <Download size={14} />
+              <span>Export CSV</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── TOP NAVIGATION SUBTABS ── */}
+      {/* ── NAVIGATION SUBTABS ── */}
       <div className="fusing-subnav-bar" role="tablist">
         <button
           type="button"
@@ -1161,10 +1153,10 @@ export default function FusingDepartment() {
           aria-selected={activeFusingTab === 'entry'}
           className={`fusing-subnav-btn ${activeFusingTab === 'entry' ? 'active' : ''}`}
           onClick={() => setActiveFusingTab('entry')}
-          aria-label="Production Entry and Logs tab"
+          aria-label="Production Logs tab"
         >
-          <Flame size={16} />
-          <span>⚡ Production Entry & Logs</span>
+          <Flame size={15} />
+          <span>Production Logs</span>
         </button>
 
         <button
@@ -1175,8 +1167,8 @@ export default function FusingDepartment() {
           onClick={() => setActiveFusingTab('queue')}
           aria-label="Ready for Fusing Queue tab"
         >
-          <Zap size={16} />
-          <span>📥 Ready for Fusing Queue</span>
+          <Clock size={15} />
+          <span>Ready Queue</span>
           <span className="fusing-count-badge">
             {eligibleFusingCards.length}
           </span>
@@ -1327,7 +1319,7 @@ export default function FusingDepartment() {
 
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                <Clock size={12} color="#16a34a" /> ON TIME
+                <Clock size={12} color="#16a34a" /> START TIME
               </label>
               <input
                 type="time"
@@ -1339,7 +1331,7 @@ export default function FusingDepartment() {
 
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                <Clock size={12} color="#dc2626" /> OFF TIME
+                <Clock size={12} color="#dc2626" /> END TIME
               </label>
               <input
                 type="time"
@@ -1377,8 +1369,8 @@ export default function FusingDepartment() {
                     }}
                     title="Toggle between only Ready for Fusing jobs vs All Job Cards"
                   >
-                    <span>{showAllCardsFilter ? '🔍 Showing: All Cards' : `⚡ Filter: Ready for Fusing (${eligibleFusingCards.length})`}</span>
-                    <span style={{ textDecoration: 'underline', opacity: 0.8 }}>({showAllCardsFilter ? 'Switch to Ready' : 'Show All'})</span>
+                    <span>{showAllCardsFilter ? '🔍 Showing All Cards' : `⚡ Ready Queue (${eligibleFusingCards.length})`}</span>
+                    <span style={{ textDecoration: 'underline', opacity: 0.8 }}>({showAllCardsFilter ? 'Show Ready' : 'Show All'})</span>
                   </button>
                 </div>
 
@@ -1388,7 +1380,7 @@ export default function FusingDepartment() {
                   <input
                     type="text"
                     required
-                    placeholder="Search Job No. (e.g. 3135), Party or Design..."
+                    placeholder="Search Job No, Party, Design..."
                     value={jobSearchText}
                     onFocus={() => setShowJobDropdown(true)}
                     onChange={e => {
@@ -1662,8 +1654,8 @@ export default function FusingDepartment() {
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="Yes">✓ YES (Used Butter Paper)</option>
-                  <option value="No">✕ NO (No Butter Paper)</option>
+                  <option value="Yes">✓ Yes</option>
+                  <option value="No">✕ No</option>
                 </select>
               </div>
 
@@ -1732,7 +1724,7 @@ export default function FusingDepartment() {
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.92rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
                 >
                   {pannaOptions.map(p => (
-                    <option key={p} value={p}>{p} Panna</option>
+                    <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
               </div>

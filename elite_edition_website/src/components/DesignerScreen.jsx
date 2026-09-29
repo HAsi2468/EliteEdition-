@@ -1703,68 +1703,29 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     <div style={{ padding: embedded ? '0' : '1rem', maxWidth: '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
       {/* ─── Top Header Bar (Only visible in standalone mode) ─────────── */}
       {!embedded && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            marginBottom: '1.25rem',
-            paddingBottom: '1rem',
-            borderBottom: '1px solid #e2e8f0',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 4px 14px rgba(29, 78, 216, 0.3)',
-                flexShrink: 0,
-              }}
-            >
-              <Palette size={22} />
+        <div className="ent-screen-header" style={{ marginBottom: '1rem' }}>
+          <div className="ent-header-title-wrap">
+            <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)' }}>
+              <Palette size={18} color="#ffffff" />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-                <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                  Designer Screen
-                </h1>
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    background: '#eff6ff',
-                    color: '#1d4ed8',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '12px',
-                    padding: '0.15rem 0.6rem',
-                  }}
-                >
-                  {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
-                </span>
-              </div>
-              <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
-                Live Design Workflow • Cloudflare R2 Proofs • Drawing & Colour Matching Studio
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <h1 className="ent-header-title">
+                Designer Screen
+              </h1>
+              <span className="ent-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
+              </span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="ent-header-actions">
             {/* View Mode Toggle (Cards / Table) */}
             <div
               style={{
                 display: 'inline-flex',
                 background: '#f1f5f9',
-                padding: '3px',
-                borderRadius: '10px',
+                padding: '2px',
+                borderRadius: '8px',
                 border: '1px solid #cbd5e1',
               }}
             >
@@ -1775,8 +1736,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.35rem',
-                  padding: '0.4rem 0.75rem',
-                  borderRadius: '7px',
+                  padding: '0.35rem 0.7rem',
+                  borderRadius: '6px',
                   border: 'none',
                   fontSize: '0.78rem',
                   fontWeight: 800,
@@ -1788,7 +1749,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 }}
                 title="Cards Grid View"
               >
-                <LayoutGrid size={14} /> <span>Cards</span>
+                <LayoutGrid size={13} /> <span>Cards</span>
               </button>
               <button
                 type="button"
@@ -1797,8 +1758,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.35rem',
-                  padding: '0.4rem 0.75rem',
-                  borderRadius: '7px',
+                  padding: '0.35rem 0.7rem',
+                  borderRadius: '6px',
                   border: 'none',
                   fontSize: '0.78rem',
                   fontWeight: 800,
@@ -1810,7 +1771,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 }}
                 title="High-Density Table View"
               >
-                <List size={14} /> <span>Table</span>
+                <List size={13} /> <span>Table</span>
               </button>
             </div>
           </div>

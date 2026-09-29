@@ -622,73 +622,73 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       {canViewDashboard ? (
         <>
-          {/* Summary KPI Cards - 6 Cards in 1 Horizontal Line */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
+          {/* Summary KPI Cards - Standard Enterprise Grid */}
+          <div className="ent-stat-grid">
             {/* Cash IN */}
-            <div className="glass-panel" style={{ padding: '0.75rem 0.85rem', borderLeft: '4px solid #10b981' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Cash IN</span>
-                <TrendingUp size={15} color="#10b981" />
+                <TrendingUp size={14} color="#10b981" />
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#10b981', marginTop: 3 }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#10b981', marginTop: 2 }}>
                 ₹{(cashInAmount || 0).toLocaleString('en-IN')}
               </div>
             </div>
 
             {/* Bank IN */}
-            <div className="glass-panel" style={{ padding: '0.75rem 0.85rem', borderLeft: '4px solid #06b6d4' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #06b6d4' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Bank IN</span>
-                <CreditCard size={15} color="#06b6d4" />
+                <CreditCard size={14} color="#06b6d4" />
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0891b2', marginTop: 3 }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0891b2', marginTop: 2 }}>
                 ₹{(bankInAmount || 0).toLocaleString('en-IN')}
               </div>
             </div>
 
             {/* Cash Expense OUT */}
-            <div className="glass-panel" style={{ padding: '0.75rem 0.85rem', borderLeft: '4px solid #ef4444' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Cash Expense</span>
-                <TrendingDown size={15} color="#ef4444" />
+                <TrendingDown size={14} color="#ef4444" />
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#dc2626', marginTop: 3 }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#dc2626', marginTop: 2 }}>
                 ₹{(cashOutAmount || 0).toLocaleString('en-IN')}
               </div>
             </div>
 
             {/* Bank Expense OUT */}
-            <div className="glass-panel" style={{ padding: '0.75rem 0.85rem', borderLeft: '4px solid #6366f1' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #6366f1' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Bank Expense</span>
-                <CreditCard size={15} color="#6366f1" />
+                <CreditCard size={14} color="#6366f1" />
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#4f46e5', marginTop: 3 }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#4f46e5', marginTop: 2 }}>
                 ₹{(bankOutAmount || 0).toLocaleString('en-IN')}
               </div>
             </div>
 
             {/* Net Balance */}
-            <div className="glass-panel" style={{ padding: '0.75rem 0.85rem', borderLeft: `4px solid ${summary.netBalance >= 0 ? '#2563eb' : '#d97706'}` }}>
+            <div className="ent-stat-card" style={{ borderLeft: `4px solid ${summary.netBalance >= 0 ? '#2563eb' : '#d97706'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Net Balance</span>
-                <Wallet size={15} color={summary.netBalance >= 0 ? '#2563eb' : '#d97706'} />
+                <Wallet size={14} color={summary.netBalance >= 0 ? '#2563eb' : '#d97706'} />
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: summary.netBalance >= 0 ? '#2563eb' : '#d97706', marginTop: 3 }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: summary.netBalance >= 0 ? '#2563eb' : '#d97706', marginTop: 2 }}>
                 ₹{(summary.netBalance || 0).toLocaleString('en-IN')}
               </div>
             </div>
 
             {/* Total Vouchers Count */}
-            <div className="glass-panel" style={{ padding: '0.75rem 0.85rem', borderLeft: '4px solid #8b5cf6' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Total Txns</span>
-                <FileText size={15} color="#8b5cf6" />
+                <FileText size={14} color="#8b5cf6" />
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 3 }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>
                 {summary.totalVouchers || 0}
               </div>
             </div>

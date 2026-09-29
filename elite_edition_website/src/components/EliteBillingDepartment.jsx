@@ -2309,28 +2309,23 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="ent-screen-container">
 
-      {/* ── TOP BANNER ──────────────────────────────────────────────────────── */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#7c3aed,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <FileText size={20} color="#fff" />
+      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
+      <div className="ent-screen-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div className="ent-header-title-wrap">
+            <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#7c3aed,#3b82f6)' }}>
+              <FileText size={18} color="#fff" />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Billing & Invoicing</h2>
-                <ScreenGroupRoster screenId="jobcards_billing" />
-              </div>
-              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                GST Invoicing & Cloud Accounting System
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <h2 className="ent-header-title">Billing & Invoicing</h2>
+              <ScreenGroupRoster screenId="jobcards_billing" />
             </div>
           </div>
 
-          {/* Consolidated Quick Action Menu */}
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          {/* Quick Action Menu */}
+          <div className="ent-header-actions">
             <QuickActionMenu
               onNewInvoice={() => handleOpenCreateTab()}
               onNewChallan={handleOpenCreateChallan}
@@ -2343,40 +2338,38 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           </div>
         </div>
 
-        {/* Sub-Tabs Non-Wrapping Swipe Track */}
-        <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem' }}>
-          <div className="subtabs-scroll-track">
-            {[
-              { id: 'challans', label: '🚚 Challan' },
-              { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
-              { id: 'costing', label: '📊 Costing' },
-              { id: 'purchase', label: '🛒 Purchase Invoices' },
-              ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice' }] : []),
-              { id: 'expense', label: '💰 Expenses & Ledger' },
-              { id: 'customers', label: `👥 Customers (${customers.length})` },
-              { id: 'items', label: `📦 Item (${itemsList.length})` }
-            ].map(t => {
-              const isActive = activeTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id)}
-                  className={`subtab-chip ${isActive ? 'active' : ''}`}
-                >
-                  <span>{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
+        {/* Sub-Tabs Bar */}
+        <div className="ent-tab-bar">
+          {[
+            { id: 'challans', label: 'Challan' },
+            { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
+            { id: 'costing', label: 'Costing' },
+            { id: 'purchase', label: 'Purchases' },
+            ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
+            { id: 'expense', label: 'Expenses & Ledger' },
+            { id: 'customers', label: `Customers (${customers.length})` },
+            { id: 'items', label: `Items (${itemsList.length})` }
+          ].map(t => {
+            const isActive = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`ent-tab-btn ${isActive ? 'active' : ''}`}
+              >
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* ── DATE FILTER & KPI CARDS BAR (Displayed on Invoices Directory) ──────── */}
       {activeTab === 'invoices' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.2rem 0.1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-              <Calendar size={17} color="#4f46e5" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+              <Calendar size={15} color="#4f46e5" />
               <span>Reporting Period:</span>
               <span style={{ fontSize: '0.78rem', color: '#4f46e5', fontWeight: 700 }}>({activeRange.labelText})</span>
             </div>
@@ -2394,29 +2387,29 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           </div>
 
           {/* KPI CARDS GRID */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #3b82f6' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{fmtINR(periodStats.totalInvoiced)}</div>
-              <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: 4 }}>{periodStats.totalInvoices} Invoices Generated</div>
+          <div className="ent-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{fmtINR(periodStats.totalInvoiced)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#3b82f6', marginTop: 2 }}>{periodStats.totalInvoices} Invoices</div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #10b981' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received (Paid)</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>{fmtINR(periodStats.totalPaid)}</div>
-              <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: 4 }}>{periodStats.paidCount} Fully Paid Invoices</div>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#34d399', marginTop: 2 }}>{fmtINR(periodStats.totalPaid)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#10b981', marginTop: 2 }}>{periodStats.paidCount} Paid Invoices</div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #f59e0b' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Receivables</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
-              <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: 4 }}>{periodStats.unpaidCount} Pending / Partial</div>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Balance</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24', marginTop: 2 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#f59e0b', marginTop: 2 }}>{periodStats.unpaidCount} Pending / Partial</div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #ef4444' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>{periodStats.overdueCount}</div>
-              <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: 4 }}>Payment Date Passed</div>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f87171', marginTop: 2 }}>{periodStats.overdueCount}</div>
+              <div style={{ fontSize: '0.68rem', color: '#ef4444', marginTop: 2 }}>Payment Passed</div>
             </div>
           </div>
         </div>

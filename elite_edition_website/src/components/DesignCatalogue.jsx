@@ -1163,63 +1163,41 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+    <div className="ent-screen-container">
       
-      {/* ══ UNIFIED HEADER GLASS PANEL ══ */}
-      <div className="glass-panel" style={{ padding: '1.1rem 1.35rem 0.85rem 1.35rem', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '0.85rem', boxShadow: 'var(--shadow-md)' }}>
+      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
+      <div className="ent-screen-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
         
-        {/* Top Header Row: Title & Subtitle + Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+        {/* Top Header Row: Title & Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
           
           {/* Left Title & Icon */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12,
-              background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
-              color: '#fff', flexShrink: 0
-            }}>
-              <Image size={22} />
+          <div className="ent-header-title-wrap">
+            <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)' }}>
+              <Image size={18} color="#fff" />
             </div>
-            <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <h2 className="ent-header-title">
                 {activeSubTab === 'sample' || activeSubTab === 'sample_design'
-                  ? (department === 'stitching' ? 'Elite Stitching — Sample Design Screen' : 'Sample Design Screen')
-                  : (department === 'stitching' ? 'Elite Stitching — Design Room' : 'Design Catalog')}
+                  ? (department === 'stitching' ? 'Stitching Sample Designs' : 'Sample Designs')
+                  : (department === 'stitching' ? 'Stitching Design Room' : 'Design Catalog')}
               </h2>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0', fontWeight: 500 }}>
-                {activeSubTab === 'sample' || activeSubTab === 'sample_design'
-                  ? 'Live sample designs reference proofs, assigned designers, colour matching & fabric specifications'
-                  : (department === 'stitching' ? 'Store & display master designs for Stitching department' : 'Store & display master designs') + ` — ${total} total designs`}
-              </p>
+              <span className="ent-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                {total} Designs
+              </span>
             </div>
           </div>
 
           {/* Right Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <div className="ent-header-actions">
             {activeSubTab === 'sample' || activeSubTab === 'sample_design' ? (
               <button
                 type="button"
-                className="btn btn-primary"
+                className="ent-btn ent-btn-primary"
                 onClick={() => designerScreenRef.current?.openCreateModal?.()}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '0.5rem 1.05rem',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                  color: '#ffffff',
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                }}
               >
-                <Plus size={15} />
-                <span>+ New Sample Design</span>
+                <Plus size={14} />
+                <span>New Sample Design</span>
               </button>
             ) : (
               <>
@@ -1227,27 +1205,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                   type="button"
                   onClick={handleBulkAutoDetectColors}
                   disabled={bulkDetecting}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                    color: '#ffffff',
-                    cursor: bulkDetecting ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    boxShadow: '0 3px 10px rgba(124, 58, 237, 0.25)',
-                    transition: 'all 0.15s ease',
-                    opacity: bulkDetecting ? 0.6 : 1
-                  }}
+                  className="ent-btn ent-btn-secondary"
+                  style={{ opacity: bulkDetecting ? 0.6 : 1 }}
                 >
                   {bulkDetecting ? (
                     <><RefreshCw size={14} className="spin-loader" /> Processing...</>
                   ) : (
-                    <><span style={{ fontSize: '0.9rem' }}>🎨</span> Auto-set All Colours</>
+                    <><Sparkles size={14} color="#8b5cf6" /> Auto-set Colours</>
                   )}
                 </button>
 
@@ -1255,44 +1219,18 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                   <button
                     type="button"
                     onClick={() => setShowPKDImportModal(true)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      fontSize: '0.8rem',
-                      fontWeight: 800,
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: '#ffffff',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      boxShadow: '0 3px 10px rgba(16, 185, 129, 0.25)'
-                    }}
+                    className="ent-btn ent-btn-secondary"
                   >
-                    📥 Import PKD Orders
+                    Import PKD
                   </button>
                 )}
 
                 <button
                   type="button"
                   onClick={openNew}
-                  style={{
-                    padding: '0.5rem 1.15rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    boxShadow: '0 3px 12px rgba(37, 99, 235, 0.3)'
-                  }}
+                  className="ent-btn ent-btn-primary"
                 >
-                  <PlusCircle size={15} />
+                  <PlusCircle size={14} />
                   <span>New Design</span>
                 </button>
               </>
@@ -1300,76 +1238,34 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           </div>
         </div>
 
-        {/* Divider Line */}
-        <div style={{ height: '1px', background: 'var(--border-light)', width: '100%', margin: '0.2rem 0' }} />
-
-        {/* Bottom Sub-Tab Navigation Bar */}
+        {/* Sub-Tab Navigation Bar */}
         {department !== 'stitching' && (
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="ent-tab-bar">
             <button
               type="button"
               onClick={() => setActiveSubTab('sample')}
-              style={{
-                padding: '0.45rem 1rem',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                borderRadius: '8px',
-                border: (activeSubTab === 'sample' || activeSubTab === 'sample_design') ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
-                background: (activeSubTab === 'sample' || activeSubTab === 'sample_design') ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
-                color: (activeSubTab === 'sample' || activeSubTab === 'sample_design') ? '#1d4ed8' : 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                transition: 'all 0.15s ease'
-              }}
+              className={`ent-tab-btn ${(activeSubTab === 'sample' || activeSubTab === 'sample_design') ? 'active' : ''}`}
             >
-              <Sparkles size={15} />
+              <Sparkles size={14} />
               <span>Sample Design</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveSubTab('catalogue')}
-              style={{
-                padding: '0.45rem 1rem',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                borderRadius: '8px',
-                border: activeSubTab === 'catalogue' ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
-                background: activeSubTab === 'catalogue' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
-                color: activeSubTab === 'catalogue' ? '#1d4ed8' : 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                transition: 'all 0.15s ease'
-              }}
+              className={`ent-tab-btn ${activeSubTab === 'catalogue' ? 'active' : ''}`}
             >
-              <BookOpen size={15} />
+              <BookOpen size={14} />
               <span>Design Catalog</span>
             </button>
             
             <button
               type="button"
               onClick={() => setActiveSubTab('master')}
-              style={{
-                padding: '0.45rem 1rem',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                borderRadius: '8px',
-                border: activeSubTab === 'master' ? '1.5px solid #6366f1' : '1px solid var(--border-light)',
-                background: activeSubTab === 'master' ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-card, #ffffff)',
-                color: activeSubTab === 'master' ? '#4f46e5' : 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                transition: 'all 0.15s ease'
-              }}
+              className={`ent-tab-btn ${activeSubTab === 'master' ? 'active' : ''}`}
             >
-              <Layers size={15} />
-              <span>Design Master Details (100 Pic)</span>
+              <Layers size={14} />
+              <span>Design Master (100 Pic)</span>
             </button>
           </div>
         )}

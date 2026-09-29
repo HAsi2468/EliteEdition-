@@ -99,29 +99,19 @@
 }
 
 /* Breadcrumb & Screen Header */
+/* Breadcrumb & Screen Header (Clean Minimalist) */
 .fusing-header-section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
   background: var(--ee-fusing-bg-card);
-  padding: 1.25rem 1.5rem;
+  padding: 0.85rem 1.25rem;
   border-radius: 12px;
   border: 1px solid var(--ee-fusing-border);
   box-shadow: var(--ee-fusing-shadow-sm);
 }
 
 .fusing-breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ee-fusing-text-muted);
-}
-
-.fusing-breadcrumb-active {
-  color: var(--ee-fusing-brand-navy);
-  font-weight: 700;
+  display: none;
 }
 
 .fusing-title-row {
@@ -129,19 +119,19 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .fusing-title-group {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
 .fusing-title-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   background: var(--ee-fusing-accent-ice);
   border: 1px solid var(--ee-fusing-accent-border);
   display: flex;
@@ -153,48 +143,41 @@
 
 .fusing-main-title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 800;
   color: var(--ee-fusing-text-primary);
   letter-spacing: -0.01em;
 }
 
-.fusing-sub-title {
-  margin: 2px 0 0;
-  font-size: 0.82rem;
-  color: var(--ee-fusing-text-muted);
-  font-weight: 500;
-}
-
 .fusing-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
-/* Primary Enterprise Action Buttons */
+/* Primary Enterprise Action Buttons (Compact & Minimal) */
 .fusing-btn-primary {
   background-color: var(--ee-fusing-brand-navy);
   color: #FFFFFF;
   border: 1px solid transparent;
-  padding: 0.55rem 1.15rem;
-  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  border-radius: 7px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   cursor: pointer;
   transition: all 0.15s ease;
-  min-height: 40px;
-  box-shadow: 0 2px 6px rgba(30, 64, 175, 0.2);
+  min-height: 34px;
+  box-shadow: 0 1px 3px rgba(30, 64, 175, 0.18);
 }
 
 .fusing-btn-primary:hover {
   background-color: var(--ee-fusing-brand-hover);
-  box-shadow: 0 4px 10px rgba(30, 64, 175, 0.3);
+  box-shadow: 0 3px 8px rgba(30, 64, 175, 0.25);
 }
 
 .fusing-btn-primary:active {
@@ -205,17 +188,17 @@
   background-color: #FFFFFF;
   color: var(--ee-fusing-text-secondary);
   border: 1px solid var(--ee-fusing-border);
-  padding: 0.55rem 1rem;
-  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  border-radius: 7px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   cursor: pointer;
   transition: all 0.15s ease;
-  min-height: 40px;
+  min-height: 34px;
 }
 
 .fusing-btn-secondary:hover {
@@ -228,17 +211,17 @@
   background-color: var(--ee-fusing-accent-ice);
   color: var(--ee-fusing-brand-navy);
   border: 1px solid var(--ee-fusing-accent-border);
-  padding: 0.55rem 1rem;
-  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  border-radius: 7px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   cursor: pointer;
   transition: all 0.15s ease;
-  min-height: 40px;
+  min-height: 34px;
 }
 
 .fusing-btn-accent:hover {

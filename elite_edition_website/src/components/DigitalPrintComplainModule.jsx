@@ -803,69 +803,49 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
   const canCreateComplaint = isAdmin || perms.includes('complaint_create') || perms.includes('jobcards_complain') || perms.includes('jobcards');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem' }}>
+    <div className="ent-screen-container">
       
-      {/* Minimal White Card Header with Entry Button Top Right */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: 'linear-gradient(135deg, #f43f5e, #fb923c)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}>
-              <AlertTriangle size={20} color="#fff" />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                Quality Complaints
-              </h2>
-              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                Defect Reporting & Complaint Resolution Logs
-              </p>
-            </div>
+      {/* ── UNIFIED ENTERPRISE HEADER ── */}
+      <div className="ent-screen-header">
+        <div className="ent-header-title-wrap">
+          <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #f43f5e, #fb923c)' }}>
+            <AlertTriangle size={18} color="#fff" />
           </div>
+          <div>
+            <h2 className="ent-header-title">
+              Quality Complaints
+            </h2>
+          </div>
+        </div>
 
-          {/* Entry Buttons Top in Header */}
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {canCreateComplaint && (
-              <button
-                onClick={handleOpenNew}
-                style={{
-                  padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
-                  border: 'none', background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: '#fff',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
-                }}
-              >
-                <PlusCircle size={15} /> New Complaint Ticket
-              </button>
-            )}
-            {canViewDashboard && (
-              <button
-                onClick={handleExportPDF}
-                style={{
-                  padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
-                  border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
-                }}
-              >
-                <FileText size={15} color="#e11d48" /> Export PDF
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={handleClearAllComplaints}
-                style={{
-                  padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
-                  border: '1px solid #fecdd3', background: '#fff1f2', color: '#e11d48',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
-                }}
-                title="Clear all test complaints and reset data"
-              >
-                <Trash2 size={15} color="#e11d48" /> Clear All Tickets
-              </button>
-            )}
-          </div>
+        {/* Action Buttons */}
+        <div className="ent-header-actions">
+          {canCreateComplaint && (
+            <button
+              onClick={handleOpenNew}
+              className="ent-btn ent-btn-primary"
+              style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+            >
+              <PlusCircle size={14} /> New Ticket
+            </button>
+          )}
+          {canViewDashboard && (
+            <button
+              onClick={handleExportPDF}
+              className="ent-btn ent-btn-secondary"
+            >
+              <FileText size={14} color="#e11d48" /> Export PDF
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handleClearAllComplaints}
+              className="ent-btn ent-btn-danger"
+              title="Clear all test complaints and reset data"
+            >
+              <Trash2 size={14} /> Clear Tickets
+            </button>
+          )}
         </div>
       </div>
 
@@ -873,50 +853,47 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
       {canViewDashboard ? (
         <>
           {/* KPI Analytical Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.85rem' }}>
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #60a5fa' }}>
+          <div className="ent-stat-grid">
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #60a5fa' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Total Complaints</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{analytics.total || 0}</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{analytics.total || 0}</div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #eab308' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #eab308' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Open</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#eab308', marginTop: 2 }}>{analytics.open || 0}</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#eab308', marginTop: 2 }}>{analytics.open || 0}</div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f97316' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #f97316' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Hold</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f97316', marginTop: 2 }}>{analytics.hold || 0}</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#f97316', marginTop: 2 }}>{analytics.hold || 0}</div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #4ade80' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #4ade80' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Close</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#4ade80', marginTop: 2 }}>{analytics.close || 0}</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#4ade80', marginTop: 2 }}>{analytics.close || 0}</div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #c084fc' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #c084fc' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Feedback</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#c084fc', marginTop: 2 }}>{analytics.feedback || 0}</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#c084fc', marginTop: 2 }}>{analytics.feedback || 0}</div>
             </div>
 
             {/* Complaint Rate (%) */}
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f43f5e' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Complaint Rate (%)</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f43f5e', marginTop: 2 }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #f43f5e' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Rate (%)</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#f43f5e', marginTop: 2 }}>
                 {analytics.complaintRate || '0.00'}%
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Tickets / Dispatched</div>
             </div>
 
             {/* Resolution SLA / TAT */}
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #38bdf8' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Resolution SLA/TAT</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #38bdf8' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Resolution TAT</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
                 {analytics.avgTatFormatted || 'N/A'}
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Avg Open to Close Time</div>
             </div>
-
           </div>
 
           {/* Filter Toolbar */}

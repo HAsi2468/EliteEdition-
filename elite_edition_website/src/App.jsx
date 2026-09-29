@@ -1524,6 +1524,17 @@ export default function App() {
               const isCommActive = ['communication', 'workspace', 'task_management'].includes(activeTab);
               const isActive = activeDepartment === company.id && !isCommActive;
 
+              const renderCompanyIcon = () => {
+                switch (company.id) {
+                  case 'elite_online': return <Store size={13} style={{ flexShrink: 0 }} />;
+                  case 'digital_print': return <Printer size={13} style={{ flexShrink: 0 }} />;
+                  case 'stitching': return <Scissors size={13} style={{ flexShrink: 0 }} />;
+                  case 'elite_edition': return <Building size={13} style={{ flexShrink: 0 }} />;
+                  case 'elite_fabtex': return <Layers size={13} style={{ flexShrink: 0 }} />;
+                  default: return null;
+                }
+              };
+
               return (
                 <button
                   key={company.id}
@@ -1532,6 +1543,7 @@ export default function App() {
                   title={`Switch to ${company.name}`}
                   type="button"
                 >
+                  {renderCompanyIcon()}
                   <span>{company.name}</span>
                 </button>
               );
@@ -1767,15 +1779,16 @@ export default function App() {
                 className="btn-secondary"
                 title="Global Search (Ctrl/Cmd+K)"
                 style={{
-                  minHeight: '38px',
-                  padding: '6px 12px',
+                  minHeight: '34px',
+                  padding: '5px 10px',
                   fontSize: 'var(--font-size-meta, 0.75rem)',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
                   cursor: 'pointer'
                 }}
               >
+                <Search size={14} style={{ flexShrink: 0 }} />
                 <span>Search</span>
                 <kbd style={{
                   fontSize: '10px',
@@ -1792,7 +1805,7 @@ export default function App() {
                   onClick={handleInstallClick}
                   className="btn-primary"
                   title="Install Elite ERP App"
-                  style={{ minHeight: '38px', padding: '6px 14px', fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 600 }}
+                  style={{ minHeight: '34px', padding: '5px 12px', fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 600 }}
                 >
                   Install App
                 </button>
@@ -1802,9 +1815,30 @@ export default function App() {
                 onClick={() => setShowNotificationDrawer(true)}
                 className="btn-secondary"
                 title="Notifications & Alerts"
-                style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
+                style={{
+                  minHeight: '34px',
+                  padding: '5px 10px',
+                  fontSize: 'var(--font-size-meta, 0.75rem)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
               >
-                Alerts {unreadNotifCount > 0 ? `(${unreadNotifCount})` : ''}
+                <Bell size={14} style={{ flexShrink: 0 }} />
+                <span>Alerts</span>
+                {unreadNotifCount > 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    lineHeight: 1
+                  }}>
+                    {unreadNotifCount}
+                  </span>
+                )}
               </button>
 
               <button
@@ -1817,29 +1851,59 @@ export default function App() {
                 }}
                 className="btn-secondary"
                 title="Refresh data"
-                style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
+                style={{
+                  minHeight: '34px',
+                  padding: '5px 10px',
+                  fontSize: 'var(--font-size-meta, 0.75rem)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                <RefreshCw size={13} className={loading ? 'spin-loader' : ''} style={{ flexShrink: 0 }} />
+                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
               </button>
 
               {currentUser && (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
-                  paddingLeft: '8px'
+                  gap: '10px',
+                  paddingLeft: '6px',
+                  borderLeft: '1px solid #e2e8f0'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: 'var(--font-size-body, 0.875rem)', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>{currentUser.name}</span>
-                    <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', color: 'var(--text-muted)' }}>{currentUser.role || 'user'}</span>
+                    <span style={{
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {(currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') && <span>👑</span>}
+                      {currentUser.name}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                      {(currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') ? 'Main Admin' : (currentUser.role || 'user')}
+                    </span>
                   </div>
                   <button
                     onClick={handleLogout}
                     className="btn-secondary"
                     title="Sign Out"
-                    style={{ minHeight: '38px', padding: '6px 12px', fontSize: 'var(--font-size-meta, 0.75rem)' }}
+                    style={{
+                      minHeight: '34px',
+                      padding: '5px 10px',
+                      fontSize: 'var(--font-size-meta, 0.75rem)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
                   >
-                    Sign Out
+                    <LogOut size={13} style={{ flexShrink: 0 }} />
+                    <span>Sign Out</span>
                   </button>
                 </div>
               )}

@@ -2205,46 +2205,41 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   return (
     <div className="fabric-container">
-      {/* Minimal White Card Header with Entry Buttons Top Right & Sub-Tabs */}
+      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
       {!onlyChallan && (
-        <div className="fabric-header-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#0284c7,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 6px rgba(2,132,199,0.3)' }}>
-                <Database size={20} color="#fff" />
+        <div className="ent-screen-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div className="ent-header-title-wrap">
+              <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#0284c7,#2563eb)' }}>
+                <Database size={18} color="#fff" />
               </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                    {department === 'stitching' ? 'Elite Stitching Fabric' : 'Fabric Management'}
-                  </h2>
-                  <ScreenGroupRoster screenId={department === 'stitching' ? 'jobcards_stitching_challan' : 'jobcards_fabric'} />
-                </div>
-                <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                  Lot Stock & Fabric Inventory Management
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h2 className="ent-header-title">
+                  {department === 'stitching' ? 'Elite Stitching Fabric' : 'Fabric Management'}
+                </h2>
+                <ScreenGroupRoster screenId={department === 'stitching' ? 'jobcards_stitching_challan' : 'jobcards_fabric'} />
               </div>
             </div>
 
-            {/* Entry Buttons Top in Header */}
-            <div className="fabric-header-actions">
+            {/* Header Action Buttons */}
+            <div className="ent-header-actions">
               <button
                 onClick={() => setIsInwardOpen(true)}
-                className="fabric-action-btn inward-btn"
+                className="ent-btn ent-btn-primary"
               >
-                <PlusCircle size={15} /> Inward Fabric
+                <PlusCircle size={14} /> Inward Fabric
               </button>
               <button
                 onClick={() => setIsCombinedModalOpen(true)}
-                className="fabric-action-btn report-btn"
+                className="ent-btn ent-btn-secondary"
               >
-                <FileDown size={15} /> PDF Report
+                <FileDown size={14} /> PDF Report
               </button>
             </div>
           </div>
 
-          {/* Sub-Tabs Bar - Horizontal Swipe Track without squishing */}
-          <div className="fabric-subtabs-track subtabs-scroll-track">
+          {/* Sub-Tabs Bar */}
+          <div className="ent-tab-bar">
             {tabs.map(tab => {
               const TabIcon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -2252,7 +2247,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`fabric-tab-chip subtab-chip ${isActive ? 'active' : ''}`}
+                  className={`ent-tab-btn ${isActive ? 'active' : ''}`}
                 >
                   {TabIcon && <TabIcon size={14} />}
                   <span>{tab.label}</span>

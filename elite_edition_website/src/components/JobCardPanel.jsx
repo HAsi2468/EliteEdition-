@@ -2552,61 +2552,53 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
         department === 'stitching' ? <GarmentJobCardDashboard /> : <DigitalPrintOperationsDashboard onNavigateDepartment={(tab) => setOverrideSubTab(tab)} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-          {/* Header banner */}
-          <div className="glass-panel" style={{ padding: '1.1rem 1.35rem 0.85rem 1.35rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: 'var(--shadow-md)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#38bdf8,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 14px rgba(37,99,235,0.3)', color: '#fff' }}>
-                  <FileText size={22} />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
-                      {department === 'stitching' ? 'Stitching Job Cards' : 'Job Cards & Production'}
-                    </h2>
-                  </div>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0', fontWeight: 500 }}>
-                    Production &amp; Stage Tracking — <strong style={{ color: 'var(--primary)' }}>{total}</strong> Total Cards • <strong style={{ color: '#34d399' }}>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr
-                  </p>
-                </div>
+          {/* Enterprise Header Banner */}
+          <div className="ent-screen-header">
+            <div className="ent-header-title-wrap">
+              <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+                <FileText size={18} />
               </div>
-
-              {/* Entry Buttons Top in Header */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={openNew}
-                  style={{ padding: '0.5rem 1.15rem', borderRadius: '8px', background: 'linear-gradient(135deg,#38bdf8,#2563eb)', color: '#fff', fontSize: '0.8rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 3px 12px rgba(37,99,235,0.3)' }}
-                >
-                  <PlusCircle size={15} /> New Job Card
-                </button>
+              <div>
+                <h2 className="ent-header-title">
+                  {department === 'stitching' ? 'Stitching Job Cards' : 'Job Cards & Production'}
+                </h2>
+                <p className="ent-header-meta">
+                  <strong style={{ color: 'var(--primary)' }}>{total}</strong> Total Cards • <strong style={{ color: '#059669' }}>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr
+                </p>
               </div>
             </div>
 
-            {/* Divider Line */}
-            <div style={{ height: '1px', background: 'var(--border-light)', width: '100%', margin: '0.6rem 0 0.4rem 0' }} />
-
-            {/* Sub-Tab Navigation Bar */}
-            <div className="subtabs-scroll-track" style={{ margin: '0.4rem 0 0 0' }}>
+            {/* Header Actions */}
+            <div className="ent-header-actions">
               <button
                 type="button"
-                onClick={() => setOverrideSubTab('list')}
-                className={`subtab-chip ${(effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'active' : ''}`}
+                className="ent-btn ent-btn-primary"
+                onClick={openNew}
               >
-                <FileText size={15} />
-                <span>📋 Production Cards</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setOverrideSubTab('tracking')}
-                className={`subtab-chip ${effectiveSubTab === 'tracking' ? 'active' : ''}`}
-              >
-                <RefreshCw size={15} />
-                <span>🔄 Job Card Tracking</span>
+                <PlusCircle size={14} /> <span>New Job Card</span>
               </button>
             </div>
+          </div>
+
+          {/* Sub-Tab Navigation Bar */}
+          <div className="ent-tab-bar" style={{ margin: '0 0 0.2rem 0' }}>
+            <button
+              type="button"
+              onClick={() => setOverrideSubTab('list')}
+              className={`ent-tab-btn ${(effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'active' : ''}`}
+            >
+              <FileText size={14} />
+              <span>Production Cards</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setOverrideSubTab('tracking')}
+              className={`ent-tab-btn ${effectiveSubTab === 'tracking' ? 'active' : ''}`}
+            >
+              <RefreshCw size={14} />
+              <span>Tracking</span>
+            </button>
           </div>
 
           {effectiveSubTab === 'tracking' ? (
