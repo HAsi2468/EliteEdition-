@@ -3280,7 +3280,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   <div
                     style={{
                       height: '180px',
-                      background: '#04070d',
+                      background: '#f8fafc',
                       borderRadius: 'var(--radius-sm)',
                       overflow: 'hidden',
                       display: 'flex',

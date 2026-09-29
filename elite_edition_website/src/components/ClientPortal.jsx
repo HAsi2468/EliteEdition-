@@ -2944,49 +2944,49 @@ const styles = {
     overflowY: 'auto'
   },
   orderModalContainer: {
-    background: '#0f172a',
+    background: '#ffffff',
     borderRadius: '16px',
     width: '100%',
     maxWidth: '880px',
     maxHeight: '90vh',
     overflowY: 'auto',
     padding: '1.5rem',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08)',
-    border: '1px solid #334155',
-    color: '#f8fafc'
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    border: '1px solid #e2e8f0',
+    color: '#0f172a'
   },
   orderModalHeader: {
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: '1rem',
-    borderBottom: '1px solid #1e293b',
+    borderBottom: '1px solid #e2e8f0',
     paddingBottom: '0.85rem'
   },
   orderModalTitle: {
     margin: 0,
     fontSize: '1.25rem',
-    fontWeight: 700,
-    color: '#f8fafc'
+    fontWeight: 800,
+    color: '#0f172a'
   },
   orderModalSubtitle: {
     margin: '4px 0 0 0',
     fontSize: '0.8rem',
-    color: '#94a3b8'
+    color: '#64748b'
   },
   partyBadgePill: {
     fontSize: '0.72rem',
     fontWeight: 700,
-    color: '#fbbf24',
-    background: 'rgba(245, 158, 11, 0.15)',
-    border: '1px solid rgba(245, 158, 11, 0.35)',
+    color: '#0284c7',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
     padding: '3px 9px',
     borderRadius: '6px'
   },
   modalCloseBtn: {
-    background: '#1e293b',
-    border: '1px solid #334155',
-    color: '#94a3b8',
+    background: '#f1f5f9',
+    border: '1px solid #e2e8f0',
+    color: '#64748b',
     cursor: 'pointer',
     padding: '6px',
     borderRadius: '8px',
@@ -2997,9 +2997,9 @@ const styles = {
   },
   orderEntriesTableWrapper: {
     overflowX: 'auto',
-    border: '1px solid #334155',
+    border: '1px solid #e2e8f0',
     borderRadius: '10px',
-    background: '#0f172a'
+    background: '#ffffff'
   },
   orderEntriesTable: {
     width: '100%',
@@ -3011,10 +3011,10 @@ const styles = {
     width: '100%',
     padding: '0.55rem 0.75rem',
     borderRadius: '8px',
-    border: '1px solid #334155',
+    border: '1px solid #cbd5e1',
     fontSize: '0.84rem',
-    color: '#f8fafc',
-    background: '#1e293b',
+    color: '#0f172a',
+    background: '#ffffff',
     outline: 'none',
     boxSizing: 'border-box'
   },
@@ -3022,17 +3022,17 @@ const styles = {
     width: '100%',
     padding: '0.55rem 0.75rem',
     borderRadius: '8px',
-    border: '1px solid #334155',
+    border: '1px solid #cbd5e1',
     fontSize: '0.84rem',
-    color: '#f8fafc',
+    color: '#0f172a',
     outline: 'none',
-    background: '#1e293b',
+    background: '#ffffff',
     boxSizing: 'border-box'
   },
   rowDeleteBtn: {
-    background: 'rgba(239, 68, 68, 0.15)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#f87171',
+    background: 'rgba(239, 68, 68, 0.1)',
+    border: '1px solid rgba(239, 68, 68, 0.25)',
+    color: '#ef4444',
     borderRadius: '6px',
     padding: '6px 9px',
     cursor: 'pointer',
@@ -3048,9 +3048,9 @@ const styles = {
     gap: '6px',
     padding: '0.55rem 1rem',
     borderRadius: '8px',
-    background: 'rgba(16, 185, 129, 0.08)',
-    border: '1.5px dashed #10b981',
-    color: '#34d399',
+    background: 'rgba(37, 99, 235, 0.06)',
+    border: '1.5px dashed #2563eb',
+    color: '#2563eb',
     fontSize: '0.84rem',
     fontWeight: 700,
     cursor: 'pointer',
@@ -3062,7 +3062,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: '1.25rem',
-    borderTop: '1px solid #1e293b',
+    borderTop: '1px solid #e2e8f0',
     paddingTop: '1rem',
     flexWrap: 'wrap',
     gap: '1rem'
@@ -3070,9 +3070,9 @@ const styles = {
   cancelBtn: {
     padding: '0.6rem 1.2rem',
     borderRadius: '8px',
-    background: '#1e293b',
-    border: '1px solid #334155',
-    color: '#cbd5e1',
+    background: '#f1f5f9',
+    border: '1px solid #cbd5e1',
+    color: '#475569',
     fontSize: '0.85rem',
     fontWeight: 600,
     cursor: 'pointer',

@@ -474,52 +474,52 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           padding: '1rem'
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-            border: `1px solid ${accentColor}50`,
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '560px',
             padding: '1.75rem',
-            color: '#f8fafc',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
+            color: '#0f172a',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <UserPlus size={18} color={accentColor} />
                 {editingUser ? `Edit Staff User: ${editingUser.name}` : `Create New Staff for ${companyEntity}`}
               </h3>
-              <button onClick={() => setShowUserModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setShowUserModal(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>Staff Name *</label>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Staff Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Ramesh Sharma"
                   value={userFormData.name}
                   onChange={e => setUserFormData(f => ({ ...f, name: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>Email Address *</label>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Email Address *</label>
                 <input
                   type="email"
                   required
                   placeholder="e.g. ramesh@elite.com"
                   value={userFormData.email}
                   onChange={e => setUserFormData(f => ({ ...f, email: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
                   Password {editingUser ? '(Leave blank to keep existing password)' : '*'}
                 </label>
                 <input
@@ -527,16 +527,16 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                   placeholder={editingUser ? '••••••••' : 'Enter password'}
                   value={userFormData.password}
                   onChange={e => setUserFormData(f => ({ ...f, password: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>Staff Role & Authorization</label>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Staff Role & Authorization</label>
                 <select
                   value={userFormData.role}
                   onChange={e => setUserFormData(f => ({ ...f, role: e.target.value, permissions: e.target.value === 'admin' ? AVAILABLE_SCREENS.map(s => s.id) : f.permissions }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600 }}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', fontWeight: 600 }}
                 >
                   <option value="user">👤 Standard User (Selected Permissions Only)</option>
                   <option value="admin">🛡️ Company Admin (Full Access to {companyEntity})</option>
@@ -546,14 +546,14 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
               {/* Screen Permissions selector for standard users */}
               {userFormData.role !== 'admin' && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
                     Permitted Screens ({userFormData.permissions.length} selected)
                   </label>
-                  <div style={{ maxHeight: '160px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '0.5rem' }}>
+                  <div style={{ maxHeight: '160px', overflowY: 'auto', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.5rem' }}>
                     {AVAILABLE_SCREENS.map(scr => {
                       const isChecked = userFormData.permissions.includes(scr.id);
                       return (
-                        <label key={scr.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.78rem', color: isChecked ? '#38bdf8' : '#94a3b8' }}>
+                        <label key={scr.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.78rem', color: isChecked ? '#0284c7' : '#475569', fontWeight: isChecked ? 600 : 400 }}>
                           <input
                             type="checkbox"
                             checked={isChecked}
@@ -579,7 +579,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                 <button type="button" onClick={() => setShowUserModal(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={userSubmitLoading} className="btn-primary" style={{ padding: '0.5rem 1.5rem', background: accentColor, borderColor: accentColor }}>
+                <button type="submit" disabled={userSubmitLoading} className="btn-primary" style={{ padding: '0.55rem 1.5rem', background: 'linear-gradient(135deg, #0284c7, #2563eb)', borderColor: '#0284c7', color: '#fff', fontWeight: 700, borderRadius: '8px' }}>
                   {userSubmitLoading ? 'Saving...' : editingUser ? 'Update Staff Account' : 'Create Staff Account'}
                 </button>
               </div>
@@ -604,7 +604,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                 height: '85px',
                 borderRadius: '12px',
                 border: `2px dashed ${form.companyLogo ? accentColor : 'var(--border-light)'}`,
-                background: 'rgba(0,0,0,0.25)',
+                background: '#f8fafc',
                 display: 'flex',
                 alignItems: 'center',
                 justify: 'center',

@@ -120,7 +120,7 @@ export default function DesignImage({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#04070d',
+        background: '#f8fafc',
         ...style
       }}
       onClick={handleClick}
@@ -131,7 +131,7 @@ export default function DesignImage({
           style={{
             position: 'absolute',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 100%)',
+            background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
             backgroundSize: '200% 100%',
             animation: 'shimmer 1.5s infinite',
             zIndex: 1

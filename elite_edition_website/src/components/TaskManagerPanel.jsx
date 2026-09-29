@@ -981,10 +981,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       {/* ── RESPONSIVE EMBEDDED CSS OVERRIDES ── */}
       <style>{`
         @media (max-width: 768px) {
+          .task-manager-container { padding: 6px 8px !important; gap: 8px !important; }
           .task-desktop-header-wrap { display: none !important; }
           .task-mobile-control-card { display: flex !important; flex-direction: column !important; }
           .kanban-grid-responsive {
-            grid-template-columns: repeat(5, minmax(82vw, 1fr)) !important;
+            grid-template-columns: repeat(5, minmax(84vw, 1fr)) !important;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
           }
@@ -1552,8 +1553,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 type="button"
                 className={`task-mobile-col-pill ${mobileKanbanCol === 'all' ? 'active' : ''}`}
                 onClick={() => setMobileKanbanCol('all')}
+                title="Show all columns"
               >
-                <span>All Columns</span>
+                <span>All</span>
                 <span className="task-mobile-col-count">{filteredTasks.length}</span>
               </button>
               {KANBAN_COLUMNS.map((col) => {
@@ -1564,8 +1566,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     type="button"
                     className={`task-mobile-col-pill ${mobileKanbanCol === col.id ? 'active' : ''}`}
                     onClick={() => setMobileKanbanCol(col.id)}
+                    title={`View ${col.label} column`}
                   >
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: col.color, display: 'inline-block' }} />
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: col.color, display: 'inline-block', flexShrink: 0 }} />
                     <span>{col.label}</span>
                     <span className="task-mobile-col-count">{count}</span>
                   </button>
@@ -1770,7 +1773,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                               </div>
 
                               {/* Footer: One-Tap Quick Advance & Move Select */}
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginTop: '4px', paddingTop: '0.45rem', borderTop: '1px solid var(--border-light)' }}>
                                 {t.status !== 'Done' ? (
                                   <button
                                     type="button"
@@ -1779,14 +1782,29 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                       const nextMap = { 'Backlog': 'To Do', 'To Do': 'In Progress', 'In Progress': 'In Review', 'In Review': 'Done' };
                                       if (nextMap[t.status]) handleStatusChange(t, nextMap[t.status]);
                                     }}
-                                    style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', fontSize: '0.64rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                    style={{
+                                      background: '#eff6ff',
+                                      border: '1px solid #bfdbfe',
+                                      color: '#2563eb',
+                                      fontSize: '0.67rem',
+                                      fontWeight: 800,
+                                      padding: '3px 8px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      whiteSpace: 'nowrap',
+                                      flexShrink: 0,
+                                      height: '26px'
+                                    }}
                                     title={`Advance to ${t.status === 'In Review' ? 'Done' : 'Next Stage'}`}
                                   >
                                     <span>{t.status === 'In Review' ? '✓ Mark Done' : `➔ ${t.status === 'Backlog' ? 'To Do' : t.status === 'To Do' ? 'In Progress' : 'In Review'}`}</span>
                                   </button>
                                 ) : (
-                                  <span style={{ fontSize: '0.64rem', color: '#16a34a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                    <CheckCircle2 size={12} /> Done
+                                  <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <CheckCircle2 size={13} /> Done
                                   </span>
                                 )}
 
@@ -1795,7 +1813,18 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                   value={t.status}
                                   onClick={(e) => e.stopPropagation()}
                                   onChange={(e) => handleStatusChange(t, e.target.value)}
-                                  style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border-light)', background: '#ffffff', cursor: 'pointer', fontWeight: 700 }}
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                    border: '1px solid var(--border-light)',
+                                    background: '#ffffff',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    height: '26px',
+                                    maxWidth: '120px',
+                                    flexShrink: 0
+                                  }}
                                 >
                                   {KANBAN_COLUMNS.map((c) => (
                                     <option key={c.id} value={c.id}>{c.label}</option>
@@ -2516,9 +2545,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', background: '#ffffff' }}>
             
-            <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff' }}>
+            <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <CheckSquare size={20} color="#38bdf8" />
+                <CheckSquare size={20} color="#ffffff" />
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
                   Create &amp; Assign New Task
                 </h3>

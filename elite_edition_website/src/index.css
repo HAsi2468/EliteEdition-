@@ -188,12 +188,24 @@ input[type="number"],
   position: relative;
 }
 
-/* Prevent pull-to-refresh accidental reloads & rubber-band horizontal wobble */
+/* Smooth, non-trapping scrolling across devices */
 html, body, #root, .app-container, .main-content, .workspace-container {
-  overscroll-behavior-y: contain;
-  overscroll-behavior-x: none;
   max-width: 100vw !important;
-  overflow-x: hidden !important;
+  overscroll-behavior-x: auto;
+}
+
+@media (max-width: 768px) {
+  html, body, #root, .app-container {
+    overscroll-behavior-y: contain;
+    overflow-x: hidden;
+  }
+}
+
+@media (min-width: 769px) {
+  html, body, #root, .app-container {
+    overscroll-behavior-y: auto !important;
+    overscroll-behavior-x: auto !important;
+  }
 }
 
 /* Global Touch Action Manipulation: remove 300ms mobile touch delay */
@@ -509,7 +521,8 @@ input::placeholder, textarea::placeholder {
   background-color: var(--bg-card);
   background-size: 36px 100%, 36px 100%, 14px 100%, 14px 100%;
   background-attachment: local, local, scroll, scroll;
-  overflow: hidden;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 .table-container,
@@ -525,7 +538,7 @@ input::placeholder, textarea::placeholder {
   max-width: 100%;
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior-x: contain !important;
+  overscroll-behavior-x: auto !important;
   scroll-behavior: smooth;
   will-change: scroll-position;
 }
@@ -1095,13 +1108,15 @@ tr:hover td {
 
 .main-layout-container > section,
 .content-area-wrap {
-  flex: 1 !important;
+  flex: 1 1 0% !important;
   min-width: 0 !important;
+  min-height: 0 !important;
   height: 100% !important;
   max-height: 100% !important;
   overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
   -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: auto !important;
   padding-right: 2px;
 }
 
@@ -1537,12 +1552,8 @@ tr:hover td {
     display: none;
   }
 
-  /* Prevent any nested wide flex from breaking viewport */
-  .inv-stat-card,
-  [style*="minWidth: '820px'"],
-  [style*="minWidth: '920px'"],
-  [style*="minWidth: '950px'"],
-  [style*="minWidth: '980px'"] {
+  /* Prevent nested cards from breaking viewport while keeping tables scrollable */
+  .inv-stat-card {
     max-width: 100%;
   }
 }

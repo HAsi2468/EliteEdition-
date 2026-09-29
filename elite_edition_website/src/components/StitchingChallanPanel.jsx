@@ -938,35 +938,35 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            width: '100%', maxWidth: '600px', background: '#0f172a', border: '1px solid rgba(56, 189, 248, 0.3)',
-            borderRadius: '14px', padding: '1.25rem', color: '#f8fafc', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
+            width: '100%', maxWidth: '600px', background: '#ffffff', border: '1px solid #e2e8f0',
+            borderRadius: '14px', padding: '1.25rem', color: '#0f172a', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Clock size={18} /> Stitching Challan #{selectedStitchingHistory.challanNo} — Staff Audit Log
                 </h3>
-                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
                   Staff member attribution for this stitching delivery transaction.
                 </p>
               </div>
-              <button className="btn-icon" onClick={() => setSelectedStitchingHistory(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button className="btn-icon" onClick={() => setSelectedStitchingHistory(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ padding: '1.25rem', borderRadius: '10px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>Created By (Staff):</span>
-                <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.18)', color: '#a78bfa', fontWeight: 800, fontSize: '0.85rem', border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Created By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: 800, fontSize: '0.85rem', border: '1px solid #bfdbfe' }}>
                   {selectedStitchingHistory.createdByName || selectedStitchingHistory.createdBy || 'HASI'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
-                <div>Party: <strong style={{ color: '#f8fafc' }}>{selectedStitchingHistory.partyName || 'Client'}</strong></div>
-                <div>Total Pieces: <strong style={{ color: '#34d399' }}>{selectedStitchingHistory.totalPcs || 0} Pcs</strong></div>
-                <div>Challan Date: <strong style={{ color: '#f8fafc' }}>{formatDateDDMMYYYY(selectedStitchingHistory.date)}</strong></div>
-                {selectedStitchingHistory.notes && <div>Notes: <strong style={{ color: '#f8fafc' }}>{selectedStitchingHistory.notes}</strong></div>}
+              <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Party: <strong style={{ color: '#0f172a' }}>{selectedStitchingHistory.partyName || 'Client'}</strong></div>
+                <div>Total Pieces: <strong style={{ color: '#16a34a' }}>{selectedStitchingHistory.totalPcs || 0} Pcs</strong></div>
+                <div>Challan Date: <strong style={{ color: '#0f172a' }}>{formatDateDDMMYYYY(selectedStitchingHistory.date)}</strong></div>
+                {selectedStitchingHistory.notes && <div>Notes: <strong style={{ color: '#0f172a' }}>{selectedStitchingHistory.notes}</strong></div>}
               </div>
             </div>
           </div>

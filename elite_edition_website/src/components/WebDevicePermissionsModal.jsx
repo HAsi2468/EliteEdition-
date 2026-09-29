@@ -182,13 +182,13 @@ export default function WebDevicePermissionsModal({ isOpen, onClose, currentUser
         </div>
 
         {/* Master Action Banner */}
-        <div style={{ padding: '1rem 1.5rem', background: 'linear-gradient(90deg, #1e293b 0%, #0f172a 100%)', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+        <div style={{ padding: '1rem 1.5rem', background: 'linear-gradient(90deg, #1e40af 0%, #2563eb 100%)', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
           <div>
             <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={16} color="#38bdf8" />
+              <Sparkles size={16} color="#93c5fd" />
               <span>1-Click Full Permission Activation</span>
             </div>
-            <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.74rem', color: '#dbeafe', marginTop: '2px' }}>
               Authorizes all Web APIs for Barcode Scanning, Voice Notes, GPS geotagging & PWA Offline mode.
             </div>
           </div>

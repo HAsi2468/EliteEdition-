@@ -391,7 +391,7 @@ export default function CameraBarcodeScanner({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0.5rem 0.85rem',
-          background: 'linear-gradient(135deg, #064e3b 0%, #0f172a 100%)',
+          background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
           borderTop: '2px solid #10b981'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
@@ -494,26 +494,26 @@ export default function CameraBarcodeScanner({
 
 const styles = {
   scannerWrapper: {
-    background: '#0f172a',
+    background: '#ffffff',
     borderRadius: '12px',
-    border: '1px solid rgba(16, 185, 129, 0.4)',
+    border: '1.5px solid #2563eb',
     overflow: 'hidden',
     marginBottom: '0.5rem',
-    boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.4), 0 0 15px rgba(16, 185, 129, 0.15)',
+    boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.15)',
     touchAction: 'pan-y',
   },
   topHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '0.4rem 0.75rem',
-    background: '#1e293b',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    padding: '0.45rem 0.75rem',
+    background: 'linear-gradient(135deg, #1e40af, #2563eb)',
+    borderBottom: '1px solid #bfdbfe',
   },
   headerTitle: {
     fontSize: '0.8rem',
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#ffffff',
   },
   statusBadge: {
     fontSize: '0.65rem',

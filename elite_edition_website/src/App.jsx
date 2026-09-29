@@ -3374,6 +3374,7 @@ const styles = {
   contentArea: {
     flex: 1,
     minWidth: 0, // prevents grid blowout
+    minHeight: 0,
   },
   globalError: {
     background: 'rgba(239, 68, 68, 0.1)',

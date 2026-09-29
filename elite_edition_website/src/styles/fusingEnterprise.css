@@ -526,12 +526,12 @@
   }
 
   .fusing-table-scroll {
-    overflow-x: auto;
+    overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-x: contain;
+    overscroll-behavior-x: auto;
     will-change: scroll-position;
     scroll-behavior: smooth;
-    max-height: calc(100vh - 280px);
+    max-height: none;
     position: relative;
     scrollbar-width: thin;
     scrollbar-color: #CBD5E1 #F1F5F9;

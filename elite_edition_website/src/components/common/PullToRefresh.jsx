@@ -17,40 +17,61 @@ export function PullToRefresh({ onRefresh, children, className = '', style = {} 
 
   const containerRef = useRef(null);
   const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
   const isEligibleForPull = useRef(false);
 
   const PULL_THRESHOLD = 70; // px
   const MAX_PULL = 110; // px
 
-  const handleTouchStart = (e) => {
-    if (isRefreshing) return;
-    const el = containerRef.current;
-    const scrollTop = el ? el.scrollTop : window.scrollY;
+  // Detect whether device supports touch input
+  const isTouchSupported = typeof window !== 'undefined' && (
+    'ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)
+  );
 
-    // Only allow pull-down if user is at the very top
+  const getScrollTop = () => {
+    if (!containerRef.current) return window.scrollY || 0;
+    // Find closest scrollable ancestor
+    const scrollParent = containerRef.current.closest('.content-area-wrap, section, .app-container') || containerRef.current.parentElement;
+    if (scrollParent && scrollParent.scrollTop !== undefined) {
+      return scrollParent.scrollTop;
+    }
+    return containerRef.current.scrollTop || window.scrollY || 0;
+  };
+
+  const handleTouchStart = (e) => {
+    if (isRefreshing || !e.touches || e.touches.length === 0) return;
+    const scrollTop = getScrollTop();
+
+    // Only allow pull-down if user is at the very top of the scrollable container
     if (scrollTop <= 2) {
       isEligibleForPull.current = true;
       touchStartY.current = e.touches[0].clientY;
+      touchStartX.current = e.touches[0].clientX;
     } else {
       isEligibleForPull.current = false;
     }
   };
 
   const handleTouchMove = (e) => {
-    if (!isEligibleForPull.current || isRefreshing) return;
+    if (!isEligibleForPull.current || isRefreshing || !e.touches || e.touches.length === 0) return;
     const currentY = e.touches[0].clientY;
-    const diff = currentY - touchStartY.current;
+    const currentX = e.touches[0].clientX;
+    const diffY = currentY - touchStartY.current;
+    const diffX = Math.abs(currentX - touchStartX.current);
 
-    if (diff > 0) {
+    // If gesture is horizontal (e.g. scrolling table left/right), yield immediately
+    if (diffX > Math.abs(diffY)) {
+      isEligibleForPull.current = false;
+      setPullDistance(0);
+      setIsPulling(false);
+      return;
+    }
+
+    if (diffY > 0) {
       // Damped pull resistance curve
-      const resistance = Math.min(MAX_PULL, Math.pow(diff, 0.85) * 1.8);
+      const resistance = Math.min(MAX_PULL, Math.pow(diffY, 0.85) * 1.8);
       setPullDistance(resistance);
       setIsPulling(true);
-
-      // Prevent native rubber-band bounce when pulling down
-      if (diff > 8 && e.cancelable) {
-        // e.preventDefault();
-      }
     } else {
       setPullDistance(0);
       setIsPulling(false);
@@ -90,6 +111,24 @@ export function PullToRefresh({ onRefresh, children, className = '', style = {} 
   const progress = Math.min(1, pullDistance / PULL_THRESHOLD);
   const isTriggerable = pullDistance >= PULL_THRESHOLD;
 
+  // On PC desktop without touch, render transparently to avoid scroll traps
+  if (!isTouchSupported) {
+    return (
+      <div
+        ref={containerRef}
+        className={`pull-to-refresh-container ${className}`}
+        style={{
+          position: 'relative',
+          width: '100%',
+          minHeight: '100%',
+          ...style
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -101,7 +140,7 @@ export function PullToRefresh({ onRefresh, children, className = '', style = {} 
         position: 'relative',
         width: '100%',
         minHeight: '100%',
-        overscrollBehaviorY: 'contain',
+        overscrollBehaviorY: isPulling ? 'contain' : 'auto',
         WebkitOverflowScrolling: 'touch',
         ...style
       }}
@@ -164,7 +203,9 @@ export function PullToRefresh({ onRefresh, children, className = '', style = {} 
       <div
         style={{
           transform: pullDistance > 0 ? `translateY(${Math.min(54, pullDistance * 0.6)}px)` : 'none',
-          transition: isPulling ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+          transition: isPulling ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          minHeight: '100%',
+          width: '100%'
         }}
       >
         {children}

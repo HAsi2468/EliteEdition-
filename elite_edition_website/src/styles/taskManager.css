@@ -492,38 +492,48 @@
 /* ─── MOBILE COLUMN SELECTOR BAR (< 768px) ─── */
 .task-mobile-col-bar {
   display: flex !important;
+  flex-wrap: nowrap !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 8px !important;
   overflow-x: auto !important;
-  padding: 6px 4px !important;
+  padding: 6px 8px !important;
   background: #ffffff !important;
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   border: 1px solid #e2e8f0 !important;
   margin-bottom: 8px !important;
   flex-shrink: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
   -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  overscroll-behavior-x: contain !important;
 }
 
 .task-mobile-col-bar::-webkit-scrollbar {
   display: none !important;
   height: 0px !important;
+  width: 0px !important;
 }
 
 .task-mobile-col-pill {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 5px !important;
-  padding: 5px 11px !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  gap: 6px !important;
+  padding: 6px 13px !important;
   border-radius: 20px !important;
   border: 1px solid #e2e8f0 !important;
   background: #f8fafc !important;
   color: #475569 !important;
-  font-size: 0.72rem !important;
+  font-size: 0.76rem !important;
   font-weight: 700 !important;
   white-space: nowrap !important;
   cursor: pointer !important;
   transition: all 0.15s ease !important;
   touch-action: manipulation !important;
+  height: 32px !important;
+  box-sizing: border-box !important;
 }
 
 .task-mobile-col-pill:hover {
@@ -534,9 +544,9 @@
 .task-mobile-col-pill.active {
   background: #eff6ff !important;
   color: #1d4ed8 !important;
-  border-color: #93c5fd !important;
+  border-color: #3b82f6 !important;
   font-weight: 800 !important;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.12) !important;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.15) !important;
 }
 
 .task-mobile-col-count {
@@ -546,6 +556,14 @@
   border-radius: 10px !important;
   background: #e2e8f0 !important;
   color: #475569 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  box-sizing: border-box !important;
+  margin-left: 2px !important;
+  flex-shrink: 0 !important;
 }
 
 .task-mobile-col-pill.active .task-mobile-col-count {

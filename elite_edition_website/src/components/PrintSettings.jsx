@@ -215,7 +215,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
   }
 
   const renderSection = (title, field, value, setter, list) => (
-    <div style={{ flex: '1 1 calc(50% - 1rem)', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+    <div style={{ flex: '1 1 calc(50% - 1rem)', background: '#ffffff', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
       <h4 style={{ color: 'var(--text-primary)', fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <Tag size={16} color="var(--primary)" /> {title}
       </h4>
@@ -232,6 +232,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
           className="btn-primary" 
           onClick={() => handleAdd(field, value, setter)}
           disabled={actionLoading || !value.trim()}
+          style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}
         >
           <Plus size={16} /> Add
         </button>
@@ -244,8 +245,8 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
           list?.map((item, idx) => {
             const itemLabel = (typeof item === 'object' && item !== null) ? (item.name || item.title || item.label || JSON.stringify(item)) : String(item);
             return (
-              <div key={itemLabel + '_' + idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
-                <span style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>{itemLabel}</span>
+              <div key={itemLabel + '_' + idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <span style={{ color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 600 }}>{itemLabel}</span>
                 <button 
                   onClick={() => handleRemove(field, itemLabel)}
                   style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}
@@ -271,7 +272,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '1.25rem 1.5rem',
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: '#ffffff',
           borderBottom: isExpanded ? '1px solid var(--border-light)' : 'none',
           cursor: 'pointer',
           userSelect: 'none',
@@ -281,8 +282,8 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
           borderBottomLeftRadius: isExpanded ? 0 : 'var(--radius-lg)',
           borderBottomRightRadius: isExpanded ? 0 : 'var(--radius-lg)',
         }}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
+        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+        onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
       >
         <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <Settings size={18} color={iconColor} /> {title}
@@ -293,9 +294,9 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
           gap: '6px',
           padding: '4px 12px',
           borderRadius: '20px',
-          background: isExpanded ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.06)',
-          border: `1px solid ${isExpanded ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.1)'}`,
-          color: isExpanded ? '#3b82f6' : 'var(--text-muted)',
+          background: isExpanded ? '#eff6ff' : '#f1f5f9',
+          border: `1px solid ${isExpanded ? '#bfdbfe' : '#e2e8f0'}`,
+          color: isExpanded ? '#2563eb' : 'var(--text-muted)',
           fontSize: '0.78rem',
           fontWeight: 700
         }}>
@@ -403,7 +404,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
               <h4 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '1rem', fontWeight: 700 }}>Machine Profiles</h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
                 {config?.machines?.map(machine => (
-                  <div key={machine.name} style={{ flex: '1 1 calc(50% - 1rem)', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+                  <div key={machine.name} style={{ flex: '1 1 calc(50% - 1rem)', background: '#ffffff', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
                     <h5 style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
                       <Tag size={14} color="#3b82f6" /> {machine.name} Profiles
                     </h5>
@@ -420,6 +421,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
                         className="btn-primary" 
                         onClick={() => handleAddMachineProfile(machine.name)}
                         disabled={actionLoading || !(newMachineProfiles[machine.name] || '').trim()}
+                        style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}
                       >
                         <Plus size={16} /> Add
                       </button>
@@ -430,8 +432,8 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No profiles added yet.</div>
                       ) : (
                         machine.profiles?.map(item => (
-                          <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
-                            <span style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>{item}</span>
+                          <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <span style={{ color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 600 }}>{item}</span>
                             <button 
                               onClick={() => handleRemoveMachineProfile(machine.name, item)}
                               style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}
@@ -490,7 +492,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
       </div>
 
       {/* Vendors Section */}
-      <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)' }}>
+      <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: '#ffffff', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)' }}>
         <button className="btn-secondary" onClick={() => setIsVendorManagerOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Settings size={16} /> Manage Vendors
         </button>
@@ -522,7 +524,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
                   }
                   if (!Array.isArray(subList)) subList = [];
                   return (
-                    <div key={catName} style={{ flex: '1 1 calc(50% - 1rem)', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+                    <div key={catName} style={{ flex: '1 1 calc(50% - 1rem)', background: '#ffffff', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
                       <h5 style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
                         <Tag size={14} color="#f43f5e" /> Sub-Categories for "{catName}"
                       </h5>
@@ -539,6 +541,7 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
                           className="btn-primary" 
                           onClick={() => handleAddComplaintSubCategory(catName)}
                           disabled={actionLoading || !(newComplaintSubCategory[catName] || '').trim()}
+                          style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}
                         >
                           <Plus size={16} /> Add
                         </button>
@@ -549,8 +552,8 @@ export default function PrintSettings({ expenseOnly = false, companyEntity = 'El
                           <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No sub-categories added yet.</div>
                         ) : (
                           subList.map(item => (
-                            <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
-                              <span style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>{item}</span>
+                            <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                              <span style={{ color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 600 }}>{item}</span>
                               <button 
                                 onClick={() => handleRemoveComplaintSubCategory(catName, item)}
                                 style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}

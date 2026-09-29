@@ -287,21 +287,21 @@ export default function AdminClientDetails() {
 
       {/* Top Stat Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#fff', borderRadius: '12px' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Clients</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#38bdf8', marginTop: '4px' }}>{clients.length}</div>
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', border: '1px solid #bfdbfe', color: '#0f172a', borderRadius: '12px', boxShadow: '0 4px 12px rgba(37,99,235,0.06)' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Clients</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e40af', marginTop: '4px' }}>{clients.length}</div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', color: '#fff', borderRadius: '12px' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Accounts</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', border: '1px solid #bbf7d0', color: '#0f172a', borderRadius: '12px', boxShadow: '0 4px 12px rgba(16,185,129,0.06)' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Accounts</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
             {clients.filter((c) => c.status === 'Active').length}
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: 'linear-gradient(135deg, #312e81 0%, #1e1b4b 100%)', color: '#fff', borderRadius: '12px' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#c7d2fe', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parties Configured in Settings</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#a5b4fc', marginTop: '4px' }}>
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', border: '1px solid #e0e7ff', color: '#0f172a', borderRadius: '12px', boxShadow: '0 4px 12px rgba(99,102,241,0.06)' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parties Configured in Settings</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#3730a3', marginTop: '4px' }}>
             {partyOptions.length}
           </div>
         </div>
@@ -649,9 +649,9 @@ export default function AdminClientDetails() {
           <div className="glass-panel" style={{ width: '100%', maxWidth: 580, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#ffffff', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
             
             {/* Modal Header */}
-            <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff' }}>
+            <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Users size={20} color="#38bdf8" />
+                <Users size={20} color="#ffffff" />
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
                   {editingClient ? 'Edit Client Details' : 'Add New Client'}
                 </h3>

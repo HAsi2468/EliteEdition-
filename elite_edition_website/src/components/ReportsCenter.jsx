@@ -509,7 +509,7 @@ export default function ReportsCenter({ department }) {
               onClick={handleDownloadPdf} 
               disabled={loading || downloading} 
               className="btn-primary" 
-              style={{ ...styles.actionBtn, background: 'var(--primary)', color: '#000' }}
+              style={{ ...styles.actionBtn, background: 'var(--primary)', color: '#ffffff' }}
             >
               <Download size={14} className={downloading ? 'spin-loader' : ''} />
               <span>{downloading ? 'Generating PDF...' : 'Download PDF'}</span>
@@ -1038,12 +1038,12 @@ export default function ReportsCenter({ department }) {
                   <div className="table-container" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
-                        <tr style={{ background: '#0f172a', borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
-                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800 }}>Fabric Quality</th>
-                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'right' }}>Current Stock</th>
-                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'right' }}>7-Day Forecasted Demand</th>
-                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'right' }}>30-Day Forecasted Demand</th>
-                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'center' }}>Safety Status</th>
+                        <tr style={{ background: '#f1f5f9', borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#0f172a', fontWeight: 800 }}>Fabric Quality</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#0f172a', fontWeight: 800, textAlign: 'right' }}>Current Stock</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#0f172a', fontWeight: 800, textAlign: 'right' }}>7-Day Forecasted Demand</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#0f172a', fontWeight: 800, textAlign: 'right' }}>30-Day Forecasted Demand</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#0f172a', fontWeight: 800, textAlign: 'center' }}>Safety Status</th>
                         </tr>
                       </thead>
                       <tbody>

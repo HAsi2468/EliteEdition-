@@ -1856,15 +1856,15 @@ export default function JobPrintingLog() {
                       right: 0,
                       maxHeight: '230px',
                       overflowY: 'auto',
-                      background: 'var(--panel-bg, #1e293b)',
-                      border: '1px solid var(--border-color, #334155)',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
                       borderRadius: '8px',
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
                       zIndex: 1000,
                       marginTop: '4px'
                     }}
                   >
-                    <div style={{ padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid #334155' }}>
+                    <div style={{ padding: '6px 12px', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                       SELECT FROM ACTIVE JOBCARDS ({filteredJobSuggestions.length}):
                     </div>
                     {filteredJobSuggestions.map(c => {
@@ -1878,23 +1878,23 @@ export default function JobPrintingLog() {
                           }}
                           style={{
                             padding: '8px 12px',
-                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            borderBottom: '1px solid #f1f5f9',
                             cursor: 'pointer',
                             display: 'flex',
                             justify: 'space-between',
                             alignItems: 'center',
                             transition: 'background 0.15s ease'
                           }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)'}
+                          onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
                           <div>
-                            <div style={{ fontWeight: 800, color: '#38bdf8', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontWeight: 800, color: '#0284c7', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>JobCard #{c.jobNo}</span>
-                              {c.partyName && <span style={{ color: '#94a3b8', fontWeight: 500, fontSize: '0.78rem' }}>({c.partyName})</span>}
+                              {c.partyName && <span style={{ color: '#64748b', fontWeight: 500, fontSize: '0.78rem' }}>({c.partyName})</span>}
                             </div>
                             {c.designName && (
-                              <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: 1 }}>
+                              <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 1 }}>
                                 Design: {c.designName}
                               </div>
                             )}
@@ -3140,26 +3140,26 @@ export default function JobPrintingLog() {
               maxWidth: 620,
               padding: '1.5rem',
               borderRadius: 14,
-              border: '1px solid rgba(56, 189, 248, 0.35)',
-              background: 'linear-gradient(180deg, #111827 0%, #0f172a 100%)',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.7), 0 0 20px rgba(56,189,248,0.15)'
+              border: '1px solid #e2e8f0',
+              background: '#ffffff',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.15)'
             }}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.85rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.85rem', borderBottom: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
                   <Edit2 size={18} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     Edit Print Log Entry
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(56,189,248,0.2)', color: '#38bdf8' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
                       #{editModalLog.jobNo}
                     </span>
                   </h3>
-                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 3 }}>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 3 }}>
                     {editModalLog.matchedJob?.party ? `Client: ${editModalLog.matchedJob.party} • ` : ''}
                     {editModalLog.matchedJob?.designName ? `Design: ${editModalLog.matchedJob.designName} • ` : ''}
                     Total Job Mtr: {editModalLog.matchedJob?.totalMtr || editModalLog.matchedJob?.consumption || '—'}
@@ -3348,10 +3348,10 @@ const inputStyle = {
   width: '100%',
   padding: '0.48rem 0.65rem',
   fontSize: '0.82rem',
-  background: 'var(--bg-input, #161b26)',
-  border: '1px solid var(--border-light, #2d3748)',
+  background: 'var(--bg-input, #ffffff)',
+  border: '1px solid var(--border-light, #cbd5e1)',
   borderRadius: '6px',
-  color: 'var(--text-primary, #f7fafc)',
+  color: 'var(--text-primary, #0f172a)',
   boxSizing: 'border-box'
 };
 

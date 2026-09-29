@@ -1151,7 +1151,7 @@ function ImageField({ label, name, form, onChange, index, value, placeholder = "
                 src={directUrl}
                 alt={`Image ${index || ''} preview`}
                 referrerPolicy="no-referrer"
-                style={{ height: '70px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', background: '#000' }}
+                style={{ height: '70px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', background: '#f8fafc' }}
                 onError={handleImgError}
               />
               <div style={{ position: 'absolute', top: 4, right: 4, fontSize: '0.6rem',
@@ -3878,47 +3878,47 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            width: '100%', maxWidth: '640px', background: '#0f172a', border: '1px solid rgba(56, 189, 248, 0.3)',
-            borderRadius: '14px', padding: '1.25rem', color: '#f8fafc', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
+            width: '100%', maxWidth: '640px', background: '#ffffff', border: '1px solid #e2e8f0',
+            borderRadius: '14px', padding: '1.25rem', color: '#0f172a', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Clock size={20} /> Job Card #{historyModalCard.jobNo} — Staff Audit History
                 </h3>
-                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
                   Complete timeline of every staff member who created or edited this Job Card.
                 </p>
               </div>
-              <button className="btn-icon" onClick={() => setHistoryModalCard(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button className="btn-icon" onClick={() => setHistoryModalCard(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
             <div style={{ maxHeight: '420px', overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {(!historyModalCard.auditTrail || historyModalCard.auditTrail.length === 0) ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>Created By: <span style={{ color: '#a78bfa' }}>{historyModalCard.createdByName || historyModalCard.createdBy || 'Staff User'}</span></div>
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Created By: <span style={{ color: '#2563eb' }}>{historyModalCard.createdByName || historyModalCard.createdBy || 'Staff User'}</span></div>
                   {historyModalCard.updatedByName && (
-                    <div style={{ marginTop: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Last Updated By: <span style={{ color: '#38bdf8' }}>{historyModalCard.updatedByName}</span></div>
+                    <div style={{ marginTop: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Last Updated By: <span style={{ color: '#0284c7' }}>{historyModalCard.updatedByName}</span></div>
                   )}
-                  <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#64748b' }}>No detailed field changes recorded prior to system upgrade.</div>
+                  <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#94a3b8' }}>No detailed field changes recorded prior to system upgrade.</div>
                 </div>
               ) : (
                 historyModalCard.auditTrail.map((entry, idx) => (
-                  <div key={idx} style={{ padding: '0.85rem 1rem', borderRadius: '10px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div key={idx} style={{ padding: '0.85rem 1rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.88rem', color: entry.action === 'CREATE' ? '#34d399' : '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.88rem', color: entry.action === 'CREATE' ? '#16a34a' : '#0284c7', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>👤 {entry.performedByName || entry.performedBy || 'Staff User'}</span>
-                        <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: entry.action === 'CREATE' ? 'rgba(52,211,153,0.15)' : 'rgba(56,189,248,0.15)', color: entry.action === 'CREATE' ? '#34d399' : '#38bdf8', border: `1px solid ${entry.action === 'CREATE' ? 'rgba(52,211,153,0.3)' : 'rgba(56,189,248,0.3)'}` }}>
+                        <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: entry.action === 'CREATE' ? '#dcfce7' : '#e0f2fe', color: entry.action === 'CREATE' ? '#15803d' : '#0369a1', border: `1px solid ${entry.action === 'CREATE' ? '#bbf7d0' : '#bae6fd'}` }}>
                           {entry.action}
                         </span>
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                         {new Date(entry.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: '#f1f5f9', fontWeight: 600, background: 'rgba(15, 23, 42, 0.6)', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 600, background: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                       {entry.details || entry.changesSummary || 'Updated Job Card'}
                     </div>
                   </div>

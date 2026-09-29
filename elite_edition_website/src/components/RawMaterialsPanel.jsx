@@ -1242,8 +1242,8 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                background: '#1e293b',
-                color: '#ffffff',
+                background: '#f1f5f9',
+                color: '#0f172a',
                 borderBottom: '1px solid var(--border-light)'
               };
 

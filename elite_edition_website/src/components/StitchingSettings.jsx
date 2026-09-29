@@ -87,7 +87,7 @@ export default function StitchingSettings() {
   }
 
   const renderSection = (title, field, value, setter, list = [], icon = <Tag size={16} color="var(--primary)" />) => (
-    <div style={{ flex: '1 1 calc(50% - 1rem)', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+    <div style={{ flex: '1 1 calc(50% - 1rem)', background: '#ffffff', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
       <h4 style={{ color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
         {icon} {title}
       </h4>
@@ -104,7 +104,7 @@ export default function StitchingSettings() {
           className="btn-primary" 
           onClick={() => handleAdd(field, value, setter)}
           disabled={actionLoading || !value.trim()}
-          style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)' }}
+          style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}
         >
           <Plus size={16} /> Add
         </button>
@@ -115,11 +115,11 @@ export default function StitchingSettings() {
           <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', padding: '0.5rem' }}>No options added yet. Type above and click Add!</div>
         ) : (
           list.map(item => (
-            <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.25)', padding: '0.55rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+            <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '0.55rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
               <span style={{ color: 'var(--text-primary)', fontSize: '0.88rem', fontWeight: 600 }}>{item}</span>
               <button 
                 onClick={() => handleRemove(field, item)}
-                style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center' }}
+                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center' }}
                 disabled={actionLoading}
                 title="Remove item"
               >
@@ -132,7 +132,7 @@ export default function StitchingSettings() {
     </div>
   );
 
-  const renderSectionHeader = (title, key, iconColor = '#7c3aed') => {
+  const renderSectionHeader = (title, key, iconColor = '#2563eb') => {
     const isExpanded = expandedSections[key];
     return (
       <div 
@@ -142,7 +142,7 @@ export default function StitchingSettings() {
           justify: 'space-between',
           alignItems: 'center',
           padding: '1.25rem 1.5rem',
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: '#ffffff',
           borderBottom: isExpanded ? '1px solid var(--border-light)' : 'none',
           cursor: 'pointer',
           userSelect: 'none',
@@ -152,8 +152,8 @@ export default function StitchingSettings() {
           borderBottomLeftRadius: isExpanded ? 0 : 'var(--radius-lg)',
           borderBottomRightRadius: isExpanded ? 0 : 'var(--radius-lg)',
         }}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
+        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+        onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
       >
         <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <Settings size={18} color={iconColor} /> {title}
@@ -164,9 +164,9 @@ export default function StitchingSettings() {
           gap: '6px',
           padding: '4px 12px',
           borderRadius: '20px',
-          background: isExpanded ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.06)',
-          border: `1px solid ${isExpanded ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.1)'}`,
-          color: isExpanded ? '#a78bfa' : 'var(--text-muted)',
+          background: isExpanded ? '#eff6ff' : '#f1f5f9',
+          border: `1px solid ${isExpanded ? '#bfdbfe' : '#e2e8f0'}`,
+          color: isExpanded ? '#2563eb' : 'var(--text-muted)',
           fontSize: '0.78rem',
           fontWeight: 700
         }}>

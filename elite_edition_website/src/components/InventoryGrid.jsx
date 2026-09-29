@@ -3930,7 +3930,7 @@ export default function InventoryGrid({
             </div>
 
             <div style={{ padding: '0.85rem 1.25rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setViewingItem(null)} style={{ padding: '0.5rem 1.2rem', background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+              <button onClick={() => setViewingItem(null)} style={{ padding: '0.5rem 1.2rem', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
                 Close
               </button>
             </div>
@@ -4897,9 +4897,9 @@ const styles = {
     flexShrink: 0,
   },
   subTabButton: (active, type) => {
-    let activeBg = 'linear-gradient(135deg, #1e293b, #0f172a)';
+    let activeBg = 'linear-gradient(135deg, #1e40af, #2563eb)';
     let activeColor = '#ffffff';
-    let activeShadow = '0 4px 12px rgba(15, 23, 42, 0.25)';
+    let activeShadow = '0 4px 12px rgba(37, 99, 235, 0.25)';
 
     if (type === 'inward') {
       activeBg = 'linear-gradient(135deg, #10b981, #059669)';

@@ -299,10 +299,10 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
             left: 0,
             right: 0,
             zIndex: 9999,
-            background: 'var(--bg-modal, #1e293b)',
-            border: '1px solid var(--border-light, #334155)',
+            background: '#ffffff',
+            border: '1px solid var(--border-light, #e2e8f0)',
             borderRadius: 'var(--radius-md, 8px)',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -1508,7 +1508,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       <div
                         style={{
                           height: '180px',
-                          background: '#04070d',
+                          background: '#f8fafc',
                           borderRadius: '10px',
                           overflow: 'hidden',
                           display: 'flex',
@@ -1856,9 +1856,9 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                         }}
                         style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', fontSize: '0.7rem', fontWeight: 700, padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
                       >
-                        <option value="" style={{ background: '#1e293b', color: '#fff' }}>+ Select Size to Set Rate...</option>
+                        <option value="" style={{ background: '#ffffff', color: '#0f172a' }}>+ Select Size to Set Rate...</option>
                         {(printConfig.sizes?.length ? printConfig.sizes : ['XS (34)', 'S (36)', 'M (38)', 'L (40)', 'XL (42)', '2XL (44)', '3XL (46)', '4XL (48)', '5XL (50)', '6XL (52)', 'FREE SIZE', 'UNSTITCHED']).map(sz => (
-                          <option key={sz} value={sz} style={{ background: '#1e293b', color: '#fff' }}>{sz}</option>
+                          <option key={sz} value={sz} style={{ background: '#ffffff', color: '#0f172a' }}>{sz}</option>
                         ))}
                       </select>
 

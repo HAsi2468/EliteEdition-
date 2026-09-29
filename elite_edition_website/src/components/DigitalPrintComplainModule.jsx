@@ -704,7 +704,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
           .meta-info { font-size: 11px; color: #64748b; text-align: right; }
           
           table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
-          th { background: #0f172a; color: #fff; text-transform: uppercase; font-size: 10px; font-weight: 800; padding: 8px 10px; text-align: left; }
+          th { background: #2563eb; color: #fff; text-transform: uppercase; font-size: 10px; font-weight: 800; padding: 8px 10px; text-align: left; }
           td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; color: #334155; }
           tr:nth-child(even) { background: #f8fafc; }
           
@@ -1026,7 +1026,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                         }}
                       >
                         {statusOptions.map(st => (
-                          <option key={st} value={st} style={{ background: '#1e293b', color: '#fff' }}>
+                          <option key={st} value={st} style={{ background: '#ffffff', color: '#0f172a' }}>
                             {st}
                           </option>
                         ))}
@@ -1524,7 +1524,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                     {formVal.photoUrls.map((url, idx) => {
                       const isImage = url.match(/\.(jpeg|jpg|png|webp|gif|svg)($|\?)/i) || !url.match(/\.(pdf|doc|docx|xls|xlsx|zip)($|\?)/i);
                       return (
-                        <div key={idx} style={{ position: 'relative', width: 70, height: 70, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-light)', background: '#000' }}>
+                        <div key={idx} style={{ position: 'relative', width: 70, height: 70, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-light)', background: '#f8fafc' }}>
                           {isImage ? (
                             <img src={url} alt="Attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
