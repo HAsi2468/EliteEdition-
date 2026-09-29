@@ -20,10 +20,7 @@
 }
 
 .fabric-content-panel {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: auto;
+  width: 100%;
   padding: 1.25rem;
   border-radius: 14px;
 }
