@@ -100,9 +100,9 @@ export default function FusingDepartment() {
       const step = typeof pageSize === 'number' ? pageSize : 25;
       const curP = Math.max(1, Math.ceil(prev / step));
       const pageVal = typeof newPageOrUpdater === 'function' ? newPageOrUpdater(curP) : newPageOrUpdater;
-      return Math.min(filteredCards.length, Math.max(step, pageVal * step));
+      return Math.max(step, pageVal * step);
     });
-  }, [pageSize, filteredCards.length]);
+  }, [pageSize]);
 
   // Network Resilience State (Offline / Low-Network Shop Floor detection)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
