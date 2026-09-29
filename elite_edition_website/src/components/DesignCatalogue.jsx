@@ -679,8 +679,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     (effectiveUser?.role || '').toLowerCase() === 'master' ||
     (effectiveUser?.username || '').toLowerCase() === 'admin' ||
     (effectiveUser?.username || '').toLowerCase() === 'master' ||
-    (effectiveUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com' ||
-    (effectiveUser?.email || '').toLowerCase() === 'admin@elite.com'
+    (effectiveUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com'
   );
 
   useEffect(() => {

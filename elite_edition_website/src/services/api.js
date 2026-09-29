@@ -71,6 +71,12 @@ const request = async (path, options = {}) => {
     } catch (err) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
+        if (options.signal?.aborted) {
+          const cancelErr = new Error('Request canceled by navigation or search filter change');
+          cancelErr.name = 'AbortError';
+          cancelErr.isCanceled = true;
+          throw cancelErr;
+        }
         throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s.`);
       }
 

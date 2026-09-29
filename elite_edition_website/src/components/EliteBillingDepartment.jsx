@@ -15,6 +15,7 @@ import DateRangePicker from './DateRangePicker';
 import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 import QuickActionMenu from './common/QuickActionMenu';
+import { SmartActionGroup } from './common/SmartActionGroup';
 import * as XLSX from 'xlsx';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
@@ -2515,7 +2516,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           )}
 
           {/* Invoices Table */}
-          <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
+          <div className="table-responsive-wrapper" style={{ margin: '0 0 1rem 0' }}>
+            <div className="table-responsive" style={{ padding: 0 }}>
             {(() => {
               const displayedInvoices = periodInvoices
                 .filter(inv => matchSearchQuery(inv, search, [
@@ -2659,104 +2661,135 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                                 {inv.createdByName || inv.createdBy || 'HASI'}
                               </span>
                             </td>
-                            <td style={{ padding: '0.5rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                              <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
-                                {/* 4-Color Signed Invoice Action Button */}
-                                {(() => {
-                                  const sc = inv.signedCopy;
-                                  const status = sc?.status;
-                                  const isApproved = status === 'APPROVED';
-                                  const isPending = status === 'PENDING' || status === 'IN_PROCESS' || status === 'UPLOADED';
-                                  const isRejected = status === 'REJECTED';
+                            <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              {(() => {
+                                const sc = inv.signedCopy;
+                                const status = sc?.status;
+                                const isApproved = status === 'APPROVED';
+                                const isPending = status === 'PENDING' || status === 'IN_PROCESS' || status === 'UPLOADED';
+                                const isRejected = status === 'REJECTED';
 
-                                  let iconColor = '#94a3b8'; // Gray (Not uploaded)
-                                  let bgColor = 'rgba(148, 163, 184, 0.12)';
-                                  let borderColor = 'rgba(148, 163, 184, 0.3)';
-                                  let titleText = 'Signed Copy: Not Uploaded (Click to upload)';
-                                  let IconComp = FileText;
+                                let signedIconColor = '#94a3b8';
+                                let signedBgColor = 'rgba(148, 163, 184, 0.12)';
+                                let signedBorderColor = 'rgba(148, 163, 184, 0.3)';
+                                let signedTitle = 'Signed Copy: Not Uploaded (Click to upload)';
+                                let SignedIcon = FileText;
 
-                                  if (isApproved) {
-                                    iconColor = '#10b981'; // Green (Approved by Admin)
-                                    bgColor = 'rgba(16, 185, 129, 0.14)';
-                                    borderColor = 'rgba(16, 185, 129, 0.35)';
-                                    titleText = `Signed Copy: Approved by Admin (${sc?.images?.length || 1} pages). Click to view.`;
-                                    IconComp = CheckCircle;
-                                  } else if (isRejected) {
-                                    iconColor = '#ef4444'; // Red (Rejected)
-                                    bgColor = 'rgba(239, 68, 68, 0.14)';
-                                    borderColor = 'rgba(239, 68, 68, 0.35)';
-                                    titleText = `Signed Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
-                                    IconComp = AlertCircle;
-                                  } else if (isPending) {
-                                    iconColor = '#f59e0b'; // Yellow (In Process / Pending Review)
-                                    bgColor = 'rgba(245, 158, 11, 0.14)';
-                                    borderColor = 'rgba(245, 158, 11, 0.35)';
-                                    titleText = `Signed Copy: In Process / Pending Admin Review (${sc?.images?.length || 1} pages). Click to view.`;
-                                    IconComp = Clock;
+                                if (isApproved) {
+                                  signedIconColor = '#10b981';
+                                  signedBgColor = 'rgba(16, 185, 129, 0.14)';
+                                  signedBorderColor = 'rgba(16, 185, 129, 0.35)';
+                                  signedTitle = `Signed Copy: Approved by Admin (${sc?.images?.length || 1} pages). Click to view.`;
+                                  SignedIcon = CheckCircle;
+                                } else if (isRejected) {
+                                  signedIconColor = '#ef4444';
+                                  signedBgColor = 'rgba(239, 68, 68, 0.14)';
+                                  signedBorderColor = 'rgba(239, 68, 68, 0.35)';
+                                  signedTitle = `Signed Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
+                                  SignedIcon = AlertCircle;
+                                } else if (isPending) {
+                                  signedIconColor = '#f59e0b';
+                                  signedBgColor = 'rgba(245, 158, 11, 0.14)';
+                                  signedBorderColor = 'rgba(245, 158, 11, 0.35)';
+                                  signedTitle = `Signed Copy: In Process / Pending Admin Review (${sc?.images?.length || 1} pages). Click to view.`;
+                                  SignedIcon = Clock;
+                                }
+
+                                const invoiceActions = [
+                                  {
+                                    id: 'signed_copy',
+                                    icon: SignedIcon,
+                                    label: 'Signed Copy',
+                                    tooltip: signedTitle,
+                                    color: signedIconColor,
+                                    bgColor: signedBgColor,
+                                    borderColor: signedBorderColor,
+                                    onClick: () => {
+                                      if (isApproved || isPending) {
+                                        setSignedPreviewTarget({
+                                          _id: inv._id,
+                                          docType: 'invoice',
+                                          docNumber: inv.invoiceNo,
+                                          partyName: inv.customer?.businessName || inv.customer?.name,
+                                          signedCopy: inv.signedCopy
+                                        });
+                                      } else {
+                                        setSignedUploadTarget({
+                                          id: inv._id,
+                                          docType: 'invoice',
+                                          docNumber: inv.invoiceNo,
+                                          partyName: inv.customer?.businessName || inv.customer?.name,
+                                          existingSignedCopy: isRejected ? inv.signedCopy : null
+                                        });
+                                      }
+                                    },
+                                    isPrimary: true
+                                  },
+                                  {
+                                    id: 'pdf',
+                                    icon: Download,
+                                    label: 'Download PDF',
+                                    tooltip: 'Download Tax Invoice PDF',
+                                    variant: 'purple',
+                                    color: '#a78bfa',
+                                    onClick: () => openPdfDialog(inv),
+                                    isPrimary: true
+                                  },
+                                  {
+                                    id: 'view',
+                                    icon: Eye,
+                                    label: 'View Details',
+                                    tooltip: 'View Invoice Details',
+                                    variant: 'default',
+                                    color: '#38bdf8',
+                                    onClick: () => setViewInvoiceModal(inv),
+                                    isPrimary: false
+                                  },
+                                  ...(inv.balanceDue > 0 ? [
+                                    {
+                                      id: 'payment',
+                                      icon: CreditCard,
+                                      label: 'Record Payment',
+                                      tooltip: `Record Payment (Due: ₹${inv.balanceDue})`,
+                                      variant: 'success',
+                                      color: '#34d399',
+                                      onClick: () => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); },
+                                      isPrimary: false
+                                    }
+                                  ] : []),
+                                  {
+                                    id: 'history',
+                                    icon: Clock,
+                                    label: 'Audit History',
+                                    tooltip: 'View Audit History & Staff Log',
+                                    variant: 'warning',
+                                    color: '#fbbf24',
+                                    onClick: () => setSelectedInvoiceHistory(inv),
+                                    isPrimary: false
+                                  },
+                                  {
+                                    id: 'edit',
+                                    icon: Edit2,
+                                    label: 'Edit',
+                                    tooltip: 'Edit Invoice',
+                                    variant: 'primary',
+                                    onClick: () => handleOpenCreateTab(inv),
+                                    isPrimary: false
+                                  },
+                                  {
+                                    id: 'delete',
+                                    icon: Trash2,
+                                    label: 'Delete',
+                                    tooltip: 'Delete Invoice',
+                                    variant: 'danger',
+                                    color: '#f87171',
+                                    onClick: () => handleDeleteInvoice(inv._id, inv.invoiceNo),
+                                    isPrimary: false
                                   }
+                                ];
 
-                                  return (
-                                    <button
-                                      type="button"
-                                      className="btn-icon"
-                                      title={titleText}
-                                      onClick={() => {
-                                        if (isApproved || isPending) {
-                                          setSignedPreviewTarget({
-                                            _id: inv._id,
-                                            docType: 'invoice',
-                                            docNumber: inv.invoiceNo,
-                                            partyName: inv.customer?.businessName || inv.customer?.name,
-                                            signedCopy: inv.signedCopy
-                                          });
-                                        } else {
-                                          setSignedUploadTarget({
-                                            id: inv._id,
-                                            docType: 'invoice',
-                                            docNumber: inv.invoiceNo,
-                                            partyName: inv.customer?.businessName || inv.customer?.name,
-                                            existingSignedCopy: isRejected ? inv.signedCopy : null
-                                          });
-                                        }
-                                      }}
-                                      style={{
-                                        color: iconColor,
-                                        background: bgColor,
-                                        border: `1px solid ${borderColor}`,
-                                        borderRadius: 6,
-                                        padding: '0.3rem',
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'all 0.15s ease'
-                                      }}
-                                    >
-                                      <IconComp size={14} />
-                                    </button>
-                                  );
-                                })()}
-                                <button onClick={() => setViewInvoiceModal(inv)} className="btn-icon" title="View Tax Invoice Details">
-                                  <Eye size={14} color="#38bdf8" />
-                                </button>
-                                <button onClick={() => setSelectedInvoiceHistory(inv)} className="btn-icon" title="View Audit History">
-                                  <Clock size={14} color="#fbbf24" />
-                                </button>
-                                <button onClick={() => openPdfDialog(inv)} className="btn-icon" title="Download GST PDF">
-                                  <Download size={14} color="#a78bfa" />
-                                </button>
-                                {inv.balanceDue > 0 && (
-                                  <button onClick={() => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }} className="btn-icon" title="Record Payment">
-                                    <CreditCard size={14} color="#34d399" />
-                                  </button>
-                                )}
-                                <button onClick={() => handleOpenCreateTab(inv)} className="btn-icon" title="Edit Invoice">
-                                  <Edit2 size={14} />
-                                </button>
-                                <button onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNo)} className="btn-icon" title="Delete Invoice">
-                                  <Trash2 size={14} color="#f87171" />
-                                </button>
-                              </div>
+                                return <SmartActionGroup actions={invoiceActions} maxInlineMobile={2} align="center" />;
+                              })()}
                             </td>
                           </tr>
                         );
@@ -2767,6 +2800,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           );
         })()}
       </div>
+    </div>
         </div>
       )}
 

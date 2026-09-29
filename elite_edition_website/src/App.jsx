@@ -3165,6 +3165,8 @@ const styles = {
     gap: '12px',
     minHeight: '100dvh',
     width: '100%',
+    maxWidth: '100vw',
+    overflowX: 'hidden',
     boxSizing: 'border-box',
   },
   header: {

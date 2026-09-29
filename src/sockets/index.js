@@ -53,7 +53,7 @@ const setupSockets = (io) => {
       socket.userId = String(user._id);
 
       // Determine authorized companies server-side (never trust client)
-      const isSuper = user.isMainAdmin || user.role === 'super_admin' || user.email === 'admin@elite.com';
+      const isSuper = user.isMainAdmin || user.role === 'super_admin' || user.email === 'harshitsidapara2468@gmail.com';
       if (isSuper) {
         socket.authorizedCompanies = COMPANIES.map((c) => c.id);
       } else {

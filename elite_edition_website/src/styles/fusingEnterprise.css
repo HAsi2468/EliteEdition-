@@ -516,7 +516,15 @@
 @media (min-width: 1024px) {
   .fusing-desktop-table-wrapper {
     display: block !important;
-    background: var(--ee-fusing-bg-card);
+    background:
+      linear-gradient(to right, #ffffff 25%, rgba(255, 255, 255, 0)),
+      linear-gradient(to right, rgba(255, 255, 255, 0), #ffffff 75%) 100% 0,
+      radial-gradient(farthest-side at 0 50%, rgba(15, 23, 42, 0.16), rgba(0, 0, 0, 0)),
+      radial-gradient(farthest-side at 100% 50%, rgba(15, 23, 42, 0.16), rgba(0, 0, 0, 0)) 100% 0;
+    background-repeat: no-repeat;
+    background-color: var(--ee-fusing-bg-card);
+    background-size: 36px 100%, 36px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
     border: 1px solid var(--ee-fusing-border);
     border-radius: 12px;
     box-shadow: var(--ee-fusing-shadow-sm);
@@ -529,8 +537,14 @@
 
   .fusing-table-scroll {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    will-change: scroll-position;
+    scroll-behavior: smooth;
     max-height: calc(100vh - 280px);
     position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: #CBD5E1 #F1F5F9;
   }
 
   .fusing-table {

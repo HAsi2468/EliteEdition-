@@ -14,7 +14,7 @@ function isUserSuperAdmin(user) {
   if (!user) return false;
   if (user.isMainAdmin === true) return true;
   if (user.role === 'super_admin') return true;
-  if (user.email === 'admin@elite.com' || user.email === 'harshitsidapara2468@gmail.com') return true;
+  if (user.email === 'harshitsidapara2468@gmail.com') return true;
   if (Array.isArray(user.allowedCompanies) && user.allowedCompanies.length >= 5) return true;
   return false;
 }

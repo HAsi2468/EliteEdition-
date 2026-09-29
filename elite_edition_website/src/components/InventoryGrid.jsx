@@ -1877,8 +1877,8 @@ export default function InventoryGrid({
           </div>
 
           {/* Main Inventory Overview Data Table */}
-          <div style={styles.tablePanel}>
-            <div style={{ overflowX: 'auto' }}>
+          <div style={styles.tablePanel} className="table-responsive-wrapper">
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
               {filteredOverviewItems.length === 0 ? (
                 <div style={styles.emptyState}>
                   <span style={{ fontSize: '2.8rem' }}>📦</span>

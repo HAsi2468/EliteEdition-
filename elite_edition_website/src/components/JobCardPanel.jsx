@@ -24,6 +24,7 @@ import JobCardStatusDashboard from './JobCardStatusDashboard';
 import DigitalPrintOperationsDashboard from './DigitalPrintOperationsDashboard';
 import StatusPill from './common/StatusPill';
 import JobStageProgressBar from './common/JobStageProgressBar';
+import { SmartActionGroup } from './common/SmartActionGroup';
 import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
 import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
@@ -841,6 +842,7 @@ function Field({ label, name, form, onChange, type='text', options, half, readOn
             <>
               <input 
                 type={type} 
+                inputMode={type === 'number' ? (name.toLowerCase().includes('mtr') || name.toLowerCase().includes('price') || name.toLowerCase().includes('panna') ? 'decimal' : 'numeric') : undefined}
                 name={name} 
                 value={form[name]} 
                 onChange={onChange} 
@@ -862,7 +864,13 @@ function Field({ label, name, form, onChange, type='text', options, half, readOn
               </datalist>
             </>
           ) : (
-            <input type={type} name={name} value={form[name]} onChange={onChange} readOnly={readOnly}
+            <input 
+              type={type} 
+              inputMode={type === 'number' ? (name.toLowerCase().includes('mtr') || name.toLowerCase().includes('price') || name.toLowerCase().includes('panna') ? 'decimal' : 'numeric') : undefined}
+              name={name} 
+              value={form[name]} 
+              onChange={onChange} 
+              readOnly={readOnly}
               style={{ padding:'0.5rem 0.7rem', fontSize:'0.85rem', width: '100%',
                 borderColor: highlight ? 'var(--primary)' : undefined,
                 background: readOnly ? 'rgba(56,189,248,0.04)' : undefined,
@@ -1982,7 +1990,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
           </div>
 
         {/* Footer */}
-        <div style={{ padding:'1rem 1.5rem', borderTop:'1px solid var(--border-light)',
+        <div className="modal-footer-sticky" style={{ padding:'1rem 1.5rem', borderTop:'1px solid var(--border-light)',
           display:'flex', gap:'0.75rem', justifyContent:'flex-end', flexShrink:0 }}>
           <button type="button" onClick={onClose} className="btn-secondary" style={{ padding:'0.55rem 1.2rem' }}>Cancel</button>
           <button type="submit" className="btn-primary" style={{ padding:'0.55rem 1.4rem' }} disabled={saving}>
@@ -2782,7 +2790,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
           )}
 
           {viewMode === 'list' ? (
-            <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
+            <div className="table-responsive-wrapper" style={{ margin: '0 0 1rem 0' }}>
+              <div className="table-responsive" style={{ padding: 0 }}>
               {(() => {
                 const displayedCards = cards.filter(c => matchSearchQuery(c, debouncedSearch, ['jobNo', 'party', 'designNo', 'designName', 'machineName', 'billNo', 'partyChallan', 'ourChallanNo', 'lotNo', 'fabric']));
                 return (
@@ -2897,54 +2906,88 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                           />
                         </div>
                       </td>
-                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                          <button onClick={() => handleSendToBilling(c)} className="btn-icon" title="Create Invoice / Send to Billing" style={{ padding: '0.3rem', color: '#a78bfa' }}><Receipt size={13} /></button>
-                          <button onClick={() => triggerJobCardPrint(c)} className="btn-icon" title="Print / Save PDF" style={{ padding: '0.3rem', color: '#10b981' }}><Printer size={13} /></button>
-                          <button onClick={() => setPreviewCard(c)} className="btn-icon" title="Preview" style={{ padding: '0.3rem' }}><Eye size={13} /></button>
-                          <button onClick={() => setHistoryModalCard(c)} className="btn-icon" title="View Audit History & Staff Log" style={{ padding: '0.3rem', color: '#fbbf24' }}><Clock size={13} /></button>
-                          <button onClick={() => openEdit(c)} className="btn-icon" title="Edit" style={{ padding: '0.3rem' }}><Edit2 size={13} /></button>
-                          <button 
-                            onClick={() => handleOpenShareModal(c)} 
-                            title="Share to Chat" 
-                            style={{
-                              padding: '0.3rem',
-                              border: 'none',
-                              background: 'transparent',
+                      <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center' }}>
+                        {(() => {
+                          const pStatus = (c.printStatus || '').toLowerCase();
+                          const isPrintDone = pStatus.includes('done') || parseFloat(c.printMtr || 0) > 0;
+                          const fStatus = (c.fusingStatus || '').toLowerCase();
+                          const fusedMtr = parseFloat(c.fusingMtr || c.freshMtr || 0);
+                          const isFusingDone = fStatus.includes('done');
+                          const isReadyForChallan = isPrintDone && (isFusingDone || fusedMtr > 0);
+
+                          const rowActions = [
+                            {
+                              id: 'challan',
+                              icon: Receipt,
+                              label: 'Billing / Challan',
+                              tooltip: isReadyForChallan ? 'Send to Billing / Create Challan' : 'Billing (Pending Finish)',
+                              variant: isReadyForChallan ? 'purple' : 'default',
+                              color: isReadyForChallan ? '#8b5cf6' : '#94a3b8',
+                              onClick: () => handleSendToBilling(c),
+                              isPrimary: true
+                            },
+                            {
+                              id: 'print',
+                              icon: Printer,
+                              label: 'Print / PDF',
+                              tooltip: 'Print or Save PDF',
+                              variant: 'success',
+                              color: '#10b981',
+                              onClick: () => triggerJobCardPrint(c),
+                              isPrimary: true
+                            },
+                            {
+                              id: 'preview',
+                              icon: Eye,
+                              label: 'Preview',
+                              tooltip: 'Quick Preview Job Card',
+                              variant: 'default',
+                              onClick: () => setPreviewCard(c),
+                              isPrimary: false
+                            },
+                            {
+                              id: 'history',
+                              icon: Clock,
+                              label: 'Audit Log',
+                              tooltip: 'View Staff History & Mistakes Log',
+                              variant: 'warning',
+                              color: '#fbbf24',
+                              onClick: () => setHistoryModalCard(c),
+                              isPrimary: false
+                            },
+                            {
+                              id: 'edit',
+                              icon: Edit2,
+                              label: 'Edit',
+                              tooltip: 'Edit Job Card',
+                              variant: 'primary',
+                              onClick: () => openEdit(c),
+                              isPrimary: false
+                            },
+                            {
+                              id: 'share',
+                              icon: Send,
+                              label: 'Share',
+                              tooltip: 'Share Job Card to Chat',
+                              variant: 'default',
                               color: '#60a5fa',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: 'var(--radius-xs)',
-                              transition: 'all 0.15s'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(96,165,250,0.1)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                          >
-                            <Send size={13} />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(c._id, c.jobNo)} 
-                            title="Delete" 
-                            style={{
-                              padding: '0.3rem',
-                              border: 'none',
-                              background: 'transparent',
+                              onClick: () => handleOpenShareModal(c),
+                              isPrimary: false
+                            },
+                            {
+                              id: 'delete',
+                              icon: Trash2,
+                              label: 'Delete',
+                              tooltip: 'Delete Job Card',
+                              variant: 'danger',
                               color: '#f87171',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: 'var(--radius-xs)',
-                              transition: 'all 0.15s'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                              onClick: () => handleDelete(c._id, c.jobNo),
+                              isPrimary: false
+                            }
+                          ];
+
+                          return <SmartActionGroup actions={rowActions} maxInlineMobile={2} align="center" />;
+                        })()}
                       </td>
                     </tr>
                   ))}
@@ -2953,6 +2996,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
             );
           })()}
         </div>
+      </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))', gap:'1rem' }}>
               {cards.map(c => (
@@ -3017,8 +3061,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                     ))}
                   </div>
 
-                  {/* Actions */}
-                  <div style={{ display:'flex', gap:'0.45rem', borderTop:'1px solid var(--border-light)', paddingTop:'0.7rem', flexWrap:'wrap' }}>
+                  {/* Smart Icon Actions */}
+                  <div style={{ borderTop:'1px solid var(--border-light)', paddingTop:'0.7rem' }}>
                     {(() => {
                       const pStatus = (c.printStatus || '').toLowerCase();
                       const isPrintDone = pStatus.includes('done') || parseFloat(c.printMtr || 0) > 0;
@@ -3026,48 +3070,81 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                       const fusedMtr = parseFloat(c.fusingMtr || c.freshMtr || 0);
                       const isFusingDone = fStatus.includes('done');
                       const isReadyForChallan = isPrintDone && (isFusingDone || fusedMtr > 0);
-                      return (
-                        <button onClick={()=>handleSendToBilling(c)} className="btn-secondary"
-                          style={{
-                            flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center',
-                            color: isReadyForChallan ? '#4f46e5' : '#64748b',
-                            borderColor: isReadyForChallan ? '#c7d2fe' : '#e2e8f0',
-                            background: isReadyForChallan ? '#eff6ff' : '#f8fafc',
-                            fontWeight: 700
-                          }}
-                          title={isReadyForChallan ? 'Create Delivery Challan' : (!isPrintDone ? 'Printing Pending' : 'Fusing Pending')}>
-                          <FileText size={13}/> Challan {isReadyForChallan ? '✓' : ''}
-                        </button>
-                      );
+
+                      const cardActions = [
+                        {
+                          id: 'challan',
+                          icon: FileText,
+                          label: isReadyForChallan ? 'Challan ✓' : 'Challan',
+                          tooltip: isReadyForChallan ? 'Create Delivery Challan' : 'Printing or Fusing in Progress',
+                          variant: isReadyForChallan ? 'purple' : 'default',
+                          color: isReadyForChallan ? '#4f46e5' : '#64748b',
+                          onClick: () => handleSendToBilling(c),
+                          isPrimary: true
+                        },
+                        {
+                          id: 'print',
+                          icon: Printer,
+                          label: 'Print / PDF',
+                          tooltip: 'Print or Save PDF',
+                          variant: 'success',
+                          color: '#059669',
+                          onClick: () => triggerJobCardPrint(c),
+                          isPrimary: true
+                        },
+                        {
+                          id: 'edit',
+                          icon: Edit2,
+                          label: 'Edit',
+                          tooltip: 'Edit Job Card',
+                          variant: 'primary',
+                          color: '#2563eb',
+                          onClick: () => openEdit(c),
+                          isPrimary: true
+                        },
+                        {
+                          id: 'preview',
+                          icon: Eye,
+                          label: 'Preview',
+                          tooltip: 'Full Preview',
+                          variant: 'default',
+                          onClick: () => setPreviewCard(c),
+                          isPrimary: false
+                        },
+                        {
+                          id: 'history',
+                          icon: Clock,
+                          label: 'Audit Log',
+                          tooltip: 'Audit History & Log',
+                          variant: 'warning',
+                          color: '#d97706',
+                          onClick: () => setHistoryModalCard(c),
+                          isPrimary: false
+                        },
+                        {
+                          id: 'share',
+                          icon: Send,
+                          label: 'Share',
+                          tooltip: 'Share Job Card',
+                          variant: 'default',
+                          color: '#2563eb',
+                          onClick: () => handleOpenShareModal(c),
+                          isPrimary: false
+                        },
+                        {
+                          id: 'delete',
+                          icon: Trash2,
+                          label: 'Delete',
+                          tooltip: 'Delete Job Card',
+                          variant: 'danger',
+                          color: '#dc2626',
+                          onClick: () => handleDelete(c._id, c.jobNo),
+                          isPrimary: false
+                        }
+                      ];
+
+                      return <SmartActionGroup actions={cardActions} maxInlineMobile={3} align="right" />;
                     })()}
-                    <button onClick={()=>triggerJobCardPrint(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5', fontWeight: 700 }}
-                      title="Print / Save PDF">
-                      <Printer size={13}/> Print / PDF
-                    </button>
-                    <button onClick={()=>setPreviewCard(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', fontWeight: 600 }}>
-                      <Eye size={13}/> Preview
-                    </button>
-                    <button onClick={()=>setHistoryModalCard(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#d97706', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 700 }}
-                      title="View Audit History & Mistakes Log">
-                      <Clock size={13}/> History
-                    </button>
-                    <button onClick={()=>openEdit(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', fontWeight: 600 }}>
-                      <Edit2 size={13}/> Edit
-                    </button>
-                    <button onClick={()=>handleOpenShareModal(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', fontWeight: 700 }}
-                      title="Share Job Card to Chat">
-                      <Send size={13}/> Share
-                    </button>
-                    <button onClick={()=>handleDelete(c._id, c.jobNo)} className="btn-secondary"
-                      style={{ padding:'0.42rem 0.6rem', fontSize:'0.78rem', justifyContent:'center', color: '#dc2626', borderColor: '#fecaca', background: '#fef2f2', fontWeight: 700 }}
-                      title="Delete Job Card">
-                      <Trash2 size={13}/>
-                    </button>
                   </div>
                 </div>
               ))}

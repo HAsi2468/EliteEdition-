@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { api } from '../services/api';
 
 export default function Login({ onLoginSuccess, onSwitchToClient }) {
-  const [email, setEmail] = useState('admin@elite.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('harshitsidapara2468@gmail.com');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

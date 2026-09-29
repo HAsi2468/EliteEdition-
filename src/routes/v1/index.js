@@ -69,5 +69,6 @@ router.use('/customer-profiles', require('./customerProfile.route'));
 router.use('/company', require('./company.route'));
 router.use('/events', require('./event.route'));
 router.use('/search', require('./search.route'));
+router.use('/job-cards', require('./jobCardCompletion.route'));
 
 module.exports = router;

@@ -18,6 +18,7 @@ import {
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock, Truck, Calendar
 } from 'lucide-react';
 import '../styles/fabricEnterprise.css';
+import { SmartActionGroup } from './common/SmartActionGroup';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
@@ -4326,8 +4327,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           )}
 
           {/* Table Container */}
-          <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-light)' }}>
-            <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
+          <div className="table-responsive-wrapper" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+            <div className="table-responsive" style={{ width: '100%' }}>
               {(() => {
                 const displayedChallans = challans;
 
@@ -4475,28 +4476,64 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
                           <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap', fontSize: '0.88rem' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
                           <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', alignItems: 'center' }}>
-                              <button className="btn-icon" title="View Challan" style={{ color: '#38bdf8', padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setViewChallanModal(ch)}>
-                                <Eye size={14} />
-                              </button>
-                              <button className="btn-icon" title="Download PDF" style={{ color: '#34d399', padding: '0.3rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
-                                <FileDown size={14} />
-                              </button>
-                              <button className="btn-secondary" title="Create Tax Bill" style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
-                                <Receipt size={13} /> Bill
-                              </button>
+                            {(() => {
+                              const challanActions = [
+                                {
+                                  id: 'view',
+                                  icon: Eye,
+                                  label: 'View',
+                                  tooltip: 'View Delivery Challan',
+                                  variant: 'default',
+                                  color: '#38bdf8',
+                                  onClick: () => setViewChallanModal(ch),
+                                  isPrimary: true
+                                },
+                                {
+                                  id: 'bill',
+                                  icon: Receipt,
+                                  label: 'Create Bill',
+                                  tooltip: 'Create Tax Invoice / Bill',
+                                  variant: 'purple',
+                                  color: '#a78bfa',
+                                  onClick: () => handleCreateBillFromChallan(ch),
+                                  isPrimary: true
+                                },
+                                {
+                                  id: 'download',
+                                  icon: FileDown,
+                                  label: 'Download PDF',
+                                  tooltip: 'Download Challan PDF',
+                                  variant: 'success',
+                                  color: '#34d399',
+                                  onClick: () => handleDownloadChallanPdf(ch._id, ch.challanNo),
+                                  isPrimary: false
+                                },
+                                ...(ch.status !== 'INVOICED' ? [
+                                  {
+                                    id: 'edit',
+                                    icon: Edit,
+                                    label: 'Edit',
+                                    tooltip: 'Edit Challan',
+                                    variant: 'primary',
+                                    color: 'var(--primary)',
+                                    onClick: () => startEditChallan(ch),
+                                    isPrimary: false
+                                  },
+                                  {
+                                    id: 'delete',
+                                    icon: Trash2,
+                                    label: 'Delete',
+                                    tooltip: 'Delete Challan',
+                                    variant: 'danger',
+                                    color: '#f87171',
+                                    onClick: () => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` }),
+                                    isPrimary: false
+                                  }
+                                ] : [])
+                              ];
 
-                              {ch.status !== 'INVOICED' && (
-                                <>
-                                  <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', padding: '0.3rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => startEditChallan(ch)}>
-                                    <Edit size={14} />
-                                  </button>
-                                  <button className="btn-icon" title="Delete Challan" style={{ color: '#f87171', padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
-                                    <Trash2 size={14} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                              return <SmartActionGroup actions={challanActions} maxInlineMobile={2} align="center" />;
+                            })()}
                           </td>
                         </tr>
                       ))}
