@@ -1128,8 +1128,7 @@ tr:hover td {
 }
 
 .content-area-comm,
-.main-layout-container > section.content-area-comm,
-.main-layout-container > section:has(.phoenix-chat-layout) {
+.main-layout-container > section.content-area-comm {
   overflow: hidden !important;
   padding: 0 !important;
   display: flex !important;
@@ -1138,8 +1137,7 @@ tr:hover td {
   max-height: 100% !important;
 }
 
-.main-layout-container.is-comm-active,
-.main-layout-container:has(.phoenix-chat-layout) {
+.main-layout-container.is-comm-active {
   padding: 0 !important;
   gap: 0 !important;
   overflow: hidden !important;
