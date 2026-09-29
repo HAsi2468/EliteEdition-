@@ -354,38 +354,22 @@ export default function SalesGrid() {
         )}
       </div>
 
-      {/* Simple Previous / Next Pagination Bar */}
-      <div className="pagination-bar">
-        <span style={{ fontSize: 'var(--font-size-meta)', color: 'var(--text-muted)' }}>
-          Page {page} of {totalPages} ({total} orders)
-        </span>
-        <div className="pagination-controls">
-          <button 
-            type="button"
-            onClick={() => {
-              const prevPage = Math.max(1, page - 1);
-              fetchOrders(false, prevPage);
-            }} 
-            disabled={page <= 1 || loading} 
-            className="btn-secondary"
-            style={{ minHeight: '44px', padding: '8px 16px' }}
-          >
-            Previous
-          </button>
-          <button 
-            type="button"
-            onClick={() => {
-              const nextPage = Math.min(totalPages, page + 1);
-              fetchOrders(false, nextPage);
-            }} 
-            disabled={page >= totalPages || loading} 
-            className="btn-secondary"
-            style={{ minHeight: '44px', padding: '8px 16px' }}
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      {/* Infinite Scroll & Modern Pagination Bar */}
+      <InfiniteScrollPagination
+        hasMore={page < totalPages}
+        loading={loading && orders.length === 0}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
+        page={page}
+        pages={totalPages}
+        total={total}
+        currentCount={orders.length}
+        itemName="sales orders"
+        onFirstPage={() => fetchOrders(false, 1)}
+        onPreviousPage={() => fetchOrders(false, Math.max(1, page - 1))}
+        onNextPage={() => fetchOrders(false, Math.min(totalPages, page + 1))}
+        onLastPage={() => fetchOrders(false, totalPages)}
+      />
     </div>
   );
 }

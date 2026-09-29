@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import {
   Flame, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
@@ -12,6 +12,7 @@ import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import InfiniteScrollPagination from './InfiniteScrollPagination';
 import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
@@ -88,9 +89,20 @@ export default function FusingDepartment() {
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
 
-  // Pagination State for INP & Fast Instant Chunking
-  const [currentPage, setCurrentPage] = useState(1);
+  // Infinite Scroll & Chunking State for INP & Smooth Viewport
   const [pageSize, setPageSize] = useState(25);
+  const [visibleCount, setVisibleCount] = useState(25);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Backward-compatible setter for any legacy page actions
+  const setCurrentPage = useCallback((newPageOrUpdater) => {
+    setVisibleCount(prev => {
+      const step = typeof pageSize === 'number' ? pageSize : 25;
+      const curP = Math.max(1, Math.ceil(prev / step));
+      const pageVal = typeof newPageOrUpdater === 'function' ? newPageOrUpdater(curP) : newPageOrUpdater;
+      return Math.min(filteredCards.length, Math.max(step, pageVal * step));
+    });
+  }, [pageSize, filteredCards.length]);
 
   // Network Resilience State (Offline / Low-Network Shop Floor detection)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -943,13 +955,28 @@ export default function FusingDepartment() {
     });
   }, [cards, debouncedSearch, statusFilter, filterMachine, filterOperator, activeDateRange]);
 
-  // Paginated Chunking for INP < 100ms
+  // Paginated Chunking / Infinite Accumulation for INP < 100ms
   const paginatedCards = useMemo(() => {
-    const startIdx = (currentPage - 1) * pageSize;
-    return filteredCards.slice(startIdx, startIdx + pageSize);
-  }, [filteredCards, currentPage, pageSize]);
+    if (pageSize === 'all') return filteredCards;
+    return filteredCards.slice(0, visibleCount);
+  }, [filteredCards, visibleCount, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCards.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredCards.length / (pageSize === 'all' ? Math.max(1, filteredCards.length) : (typeof pageSize === 'number' ? pageSize : 25))));
+  const currentPage = Math.min(totalPages, Math.max(1, Math.ceil(paginatedCards.length / (pageSize === 'all' ? Math.max(1, filteredCards.length) : (typeof pageSize === 'number' ? pageSize : 25)))));
+
+  const handleLoadMore = useCallback(() => {
+    if (paginatedCards.length >= filteredCards.length || loadingMore) return;
+    setLoadingMore(true);
+    setTimeout(() => {
+      setVisibleCount(v => Math.min(filteredCards.length, v + (typeof pageSize === 'number' ? pageSize : 25)));
+      setLoadingMore(false);
+    }, 120);
+  }, [paginatedCards.length, filteredCards.length, loadingMore, pageSize]);
+
+  // Auto-reset visible chunk when filters or search change
+  useEffect(() => {
+    setVisibleCount(pageSize === 'all' ? filteredCards.length : (typeof pageSize === 'number' ? pageSize : 25));
+  }, [debouncedSearch, statusFilter, filterMachine, filterOperator, activeDateRange, pageSize]);
 
   // Statistics calculation
   const stats = useMemo(() => {
@@ -2360,75 +2387,29 @@ export default function FusingDepartment() {
               })}
             </div>
 
-            {/* 3. PAGINATION & CHUNKING CONTROLS */}
-            <nav className="fusing-pagination-bar" aria-label="Job cards pagination">
-              <div className="fusing-pagination-info">
-                Showing <strong>{(currentPage - 1) * pageSize + 1}</strong> – <strong>{Math.min(currentPage * pageSize, filteredCards.length)}</strong> of <strong>{filteredCards.length}</strong> Job Cards
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                {/* Page Size Selector */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: 'var(--ee-fusing-text-muted)' }}>
-                  <span>Show:</span>
-                  <select
-                    className="fusing-filter-select"
-                    value={pageSize}
-                    onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                    style={{ minHeight: '34px', padding: '0.2rem 0.5rem' }}
-                    aria-label="Items per page"
-                  >
-                    <option value={25}>25 / page</option>
-                    <option value={50}>50 / page</option>
-                    <option value={100}>100 / page</option>
-                  </select>
-                </div>
-
-                {/* Page Navigation Buttons */}
-                <div className="fusing-pagination-controls">
-                  <button
-                    type="button"
-                    className="fusing-page-btn"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    aria-label="Go to first page"
-                  >
-                    «
-                  </button>
-                  <button
-                    type="button"
-                    className="fusing-page-btn"
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    aria-label="Go to previous page"
-                  >
-                    ‹
-                  </button>
-
-                  <span style={{ fontSize: '0.84rem', fontWeight: 800, padding: '0 8px', color: 'var(--ee-fusing-text-primary)' }}>
-                    Page {currentPage} of {totalPages}
-                  </span>
-
-                  <button
-                    type="button"
-                    className="fusing-page-btn"
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    aria-label="Go to next page"
-                  >
-                    ›
-                  </button>
-                  <button
-                    type="button"
-                    className="fusing-page-btn"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    aria-label="Go to last page"
-                  >
-                    »
-                  </button>
-                </div>
-              </div>
-            </nav>
+            {/* 3. INFINITE SCROLL & CHUNKING CONTROLS */}
+            <InfiniteScrollPagination
+              hasMore={paginatedCards.length < filteredCards.length}
+              loading={loading && cards.length === 0}
+              loadingMore={loadingMore}
+              onLoadMore={handleLoadMore}
+              page={currentPage}
+              pages={totalPages}
+              total={filteredCards.length}
+              currentCount={paginatedCards.length}
+              itemName="job cards"
+              pageSize={pageSize}
+              pageSizeOptions={[25, 50, 100, 'All']}
+              onPageSizeChange={(newSize) => {
+                const s = newSize === 'All' ? 'all' : Number(newSize);
+                setPageSize(s);
+                setVisibleCount(s === 'all' ? filteredCards.length : s);
+              }}
+              onLoadAll={() => {
+                setPageSize('all');
+                setVisibleCount(filteredCards.length);
+              }}
+            />
           </>
         )}
       </section>

@@ -50,19 +50,34 @@ export default function InfiniteScrollPagination({
 
   useEffect(() => {
     let ticking = false;
+    const sentinel = sentinelRef.current;
+
+    // Detect true scroll container: explicit ref -> closest .content-area-wrap -> fallback to querySelector
+    const scrollParent =
+      scrollContainerRef?.current ||
+      sentinel?.closest('.content-area-wrap') ||
+      sentinel?.closest('section') ||
+      document.querySelector('.content-area-wrap') ||
+      null;
 
     const checkAutoLoad = () => {
       if (!hasMoreRef.current || loadingMoreRef.current || loadingRef.current || cooldownRef.current) {
         return;
       }
-      const sentinel = sentinelRef.current;
-      if (!sentinel) return;
+      const s = sentinelRef.current;
+      if (!s) return;
 
-      const rect = sentinel.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const rect = s.getBoundingClientRect();
+      const parentRect = scrollParent && scrollParent.getBoundingClientRect
+        ? scrollParent.getBoundingClientRect()
+        : null;
 
-      // Trigger automatic infinite scroll when within 600px of viewport bottom
-      if (rect.top <= viewportHeight + 600) {
+      const boundaryBottom = parentRect
+        ? parentRect.bottom
+        : (window.innerHeight || document.documentElement.clientHeight);
+
+      // Trigger automatic infinite scroll when within 600px of container bottom
+      if (rect.top <= boundaryBottom + 600) {
         cooldownRef.current = true;
         if (onLoadMoreRef.current) {
           onLoadMoreRef.current();
@@ -83,13 +98,15 @@ export default function InfiniteScrollPagination({
       }
     };
 
-    // 1. Window scroll & resize listeners for foolproof auto-scrolling
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    // 1. Direct scroll listener on container + captured listener on window for 100% reliability
+    if (scrollParent && scrollParent.addEventListener) {
+      scrollParent.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
     window.addEventListener('resize', handleScroll, { passive: true });
 
-    // 2. IntersectionObserver with generous 600px margin
+    // 2. IntersectionObserver with generous 600px margin using the actual scroll parent
     let observer = null;
-    const sentinel = sentinelRef.current;
     if (sentinel && window.IntersectionObserver) {
       observer = new IntersectionObserver(
         (entries) => {
@@ -98,7 +115,7 @@ export default function InfiniteScrollPagination({
           }
         },
         {
-          root: scrollContainerRef?.current || null,
+          root: scrollParent || null,
           rootMargin: '600px',
           threshold: 0
         }
@@ -112,7 +129,10 @@ export default function InfiniteScrollPagination({
     return () => {
       clearTimeout(timer);
       if (observer) observer.disconnect();
-      window.removeEventListener('scroll', handleScroll);
+      if (scrollParent && scrollParent.removeEventListener) {
+        scrollParent.removeEventListener('scroll', handleScroll);
+      }
+      window.removeEventListener('scroll', handleScroll, { capture: true });
       window.removeEventListener('resize', handleScroll);
     };
   }, [scrollContainerRef, page, currentCount]);

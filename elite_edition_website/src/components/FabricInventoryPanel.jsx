@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import '../styles/fabricEnterprise.css';
 import { SmartActionGroup } from './common/SmartActionGroup';
+import InfiniteScrollPagination from './InfiniteScrollPagination';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
@@ -180,6 +181,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [challans, setChallans] = useState([]);
   const [challanSearch, setChallanSearch] = useState('');
   const [challanStatusFilter, setChallanStatusFilter] = useState('All');
+  const [challanVisibleCount, setChallanVisibleCount] = useState(50);
+  const [challanLoadingMore, setChallanLoadingMore] = useState(false);
   // Ref to always hold latest challan filter values — prevents stale closure in setInterval
   const challanFiltersRef = useRef({ search: '', dateStart: defaultThisMonth.dateStart, dateEnd: defaultThisMonth.dateEnd, status: 'All' });
   const [challanDatePreset, setChallanDatePreset] = useState('this_month');
@@ -1339,6 +1342,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Date changes fire immediately (no delay). Cleanup cancels stale requests.
   useEffect(() => {
     challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd, status: challanStatusFilter };
+    setChallanVisibleCount(50);
     // No debounce for date/status filter changes, only for text search
     const delay = challanSearch !== challanFiltersRef.current.search ? 400 : 0;
     const debounceTimer = setTimeout(() => {
@@ -4529,7 +4533,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           <div className="table-responsive-wrapper" style={{ padding: 0, border: '1px solid var(--border-light)' }}>
             <div className="table-responsive" style={{ width: '100%' }}>
               {(() => {
-                const displayedChallans = challans;
+                const displayedChallans = challans.slice(0, challanVisibleCount);
 
                 return (
                   <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
@@ -4742,6 +4746,27 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               })()}
             </div>
           </div>
+
+          {/* Infinite Scroll & Chunking Dock */}
+          <InfiniteScrollPagination
+            hasMore={challans.length > challanVisibleCount}
+            loading={false}
+            loadingMore={challanLoadingMore}
+            onLoadMore={() => {
+              if (challanLoadingMore || challans.length <= challanVisibleCount) return;
+              setChallanLoadingMore(true);
+              setTimeout(() => {
+                setChallanVisibleCount(c => Math.min(challans.length, c + 50));
+                setChallanLoadingMore(false);
+              }, 120);
+            }}
+            page={Math.ceil(challanVisibleCount / 50)}
+            pages={Math.max(1, Math.ceil(challans.length / 50))}
+            total={challans.length}
+            currentCount={Math.min(challanVisibleCount, challans.length)}
+            itemName="challans"
+            onLoadAll={() => setChallanVisibleCount(challans.length)}
+          />
         </div>
       )}
 
