@@ -4,6 +4,10 @@ import './index.css'
 import App from './App.jsx'
 import { SocketProvider } from './contexts/SocketContext.jsx'
 import { ErrorBoundary } from './ErrorBoundary.jsx'
+import { installGlobalDialogInterceptors } from './services/dialogService.js'
+
+// Initialize enterprise dialog & global error interceptors
+installGlobalDialogInterceptors()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

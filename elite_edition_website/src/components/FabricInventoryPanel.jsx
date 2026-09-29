@@ -8,6 +8,7 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import { openPrintOptionsDialog } from '../utils/printService';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import { useFormDraft } from '../utils/useFormDraft';
 import {
@@ -315,17 +316,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     return result.length > 0 ? result : stock;
   }, [stock, transactions, stockDateStart, stockDateEnd]);
 
-  // Download PDF Report for Stock & Fabric Consumption
-  const handleDownloadStockPDF = () => {
+  // Download PDF Report for Stock & Fabric Consumption with Advance Print Settings
+  const handleDownloadStockPDF = async () => {
     const listToExport = displayStock && displayStock.length > 0 ? displayStock : stock;
     if (!listToExport || listToExport.length === 0) {
-      triggerEliteAlert('No stock data available to export.');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank', 'width=1000,height=800');
-    if (!printWindow) {
-      triggerEliteAlert('Pop-up blocked. Please allow pop-ups in your browser settings.');
+      triggerEliteAlert('No Data', 'No stock data available to export.', 'warning');
       return;
     }
 
@@ -340,12 +335,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       : 'All Time';
 
     const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Fabric Stock & Consumption Report - Elite Digital Prints</title>
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #1e293b; background: #ffffff;">
         <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 24px; color: #1e293b; background: #ffffff; }
           .header { text-align: center; border-bottom: 3px solid #4f46e5; padding-bottom: 14px; margin-bottom: 20px; }
           .company { font-size: 24px; font-weight: 900; color: #1e1b4b; text-transform: uppercase; letter-spacing: 1px; }
           .subtitle { font-size: 15px; font-weight: 800; color: #4f46e5; margin-top: 4px; }
@@ -366,12 +357,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           .badge-low { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
           .badge-empty { background: #ffe4e6; color: #be123c; border: 1px solid #fecdd3; }
           .footer { margin-top: 36px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; font-weight: 600; }
-          @media print {
-            body { margin: 0; }
-          }
         </style>
-      </head>
-      <body>
         <div class="header">
           <div class="company">Elite Digital Prints</div>
           <div class="subtitle">Fabric Stock & Consumption Report</div>
@@ -418,19 +404,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         <div class="footer">
           This is a computer-generated report from Elite Digital Prints ERP System.
         </div>
-
-        <script>
-          window.onload = function() {
-            window.print();
-          };
-        </script>
-      </body>
-      </html>
+      </div>
     `;
 
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    await openPrintOptionsDialog({
+      title: 'Fabric Stock & Consumption Report',
+      content: htmlContent,
+      defaultSettings: {
+        paperSize: 'A4',
+        orientation: 'portrait',
+        margin: 'default'
+      }
+    });
   };
 
   const fileInputRef = useRef(null);

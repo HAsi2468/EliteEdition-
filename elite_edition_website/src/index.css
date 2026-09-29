@@ -800,9 +800,9 @@ tr:hover td {
 }
 
 .app-header {
-  height: 56px !important;
-  min-height: 56px !important;
-  max-height: 56px !important;
+  height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+  min-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+  max-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
   flex-shrink: 0 !important;
   background: #ffffff !important;
   border-bottom: 1px solid var(--border-color) !important;
@@ -811,13 +811,16 @@ tr:hover td {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding: 0 16px !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-left: calc(16px + env(safe-area-inset-left, 0px)) !important;
+  padding-right: calc(16px + env(safe-area-inset-right, 0px)) !important;
+  padding-bottom: 0 !important;
 }
 
 .main-layout-container {
   flex: 1 !important;
   min-height: 0 !important;
-  height: calc(100dvh - 56px) !important;
+  height: calc(100dvh - 56px - env(safe-area-inset-top, 0px)) !important;
   display: flex !important;
   overflow: hidden !important;
   width: 100% !important;
@@ -1083,13 +1086,16 @@ tr:hover td {
     display: none !important;
   }
   .app-header {
-    height: 52px !important;
-    min-height: 52px !important;
-    max-height: 52px !important;
-    padding: 0 12px !important;
+    height: calc(52px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(52px + env(safe-area-inset-top, 0px)) !important;
+    max-height: calc(52px + env(safe-area-inset-top, 0px)) !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-left: calc(12px + env(safe-area-inset-left, 0px)) !important;
+    padding-right: calc(12px + env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: 0 !important;
   }
   .main-layout-container {
-    height: calc(100dvh - 52px) !important;
+    height: calc(100dvh - 52px - env(safe-area-inset-top, 0px)) !important;
     padding: 8px 10px !important;
     gap: 0 !important;
   }

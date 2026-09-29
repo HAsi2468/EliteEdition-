@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import { openPrintOptionsDialog } from '../utils/printService';
 
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
@@ -822,14 +823,31 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
         </div>
       )}
 
-      {/* Printable Modal Paper Layout (@media print) */}
+      {/* Printable Modal Paper Layout */}
       {printChallan && (
         <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '1rem' }}>
           <div style={{ background: '#fff', color: '#000', borderRadius: '8px', width: '100%', maxWidth: 850, padding: '1.5rem', maxHeight: '95vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }} className="no-print">
               <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#1e3a8a' }}>Print View — {printChallan.challanNo}</span>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button onClick={() => window.print()} className="btn-primary" style={{ padding: '0.4rem 1rem' }}>
+                <button 
+                  onClick={() => {
+                    const printEl = document.getElementById('stitching-challan-printable-paper');
+                    if (printEl && printChallan) {
+                      openPrintOptionsDialog({
+                        title: `Stitching Challan — ${printChallan.challanNo}`,
+                        content: printEl.outerHTML,
+                        defaultSettings: {
+                          paperSize: 'A4',
+                          orientation: 'portrait',
+                          margin: 'default'
+                        }
+                      });
+                    }
+                  }} 
+                  className="btn-primary" 
+                  style={{ padding: '0.4rem 1rem' }}
+                >
                   <Printer size={14} /> Print Now
                 </button>
                 <button onClick={() => setPrintChallan(null)} className="btn-secondary" style={{ padding: '0.4rem 1rem' }}>
@@ -839,7 +857,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
             </div>
 
             {/* Paper Layout */}
-            <div style={{ border: '2px solid #1e40af', padding: '1.25rem', fontFamily: 'Arial, sans-serif' }}>
+            <div id="stitching-challan-printable-paper" style={{ border: '2px solid #1e40af', padding: '1.25rem', fontFamily: 'Arial, sans-serif' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #cbd5e1', paddingBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>GARMENT DELIVERY CHALLAN</span>
                 <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e3a8a', letterSpacing: '1px' }}>ELITE EDITION</span>

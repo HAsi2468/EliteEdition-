@@ -2428,7 +2428,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     link.href = url;
     link.download = `${channelName.replace(/[^a-zA-Z0-9_-]/g, '_')}_chat_history.txt`;
     link.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 2000);
   };
 
 

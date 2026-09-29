@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Calculator, Layers, Scissors, DollarSign, Save } from 'lucide-react';
 import { api } from '../services/api';
+import { useFormDraft } from '../utils/useFormDraft';
 
 const SIZES = [
   { key: 'xs_34', label: 'XS-34' },
@@ -42,6 +43,9 @@ export default function GarmentJobCardForm({ card, onSave, onClose }) {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Auto-recovery of unsaved form progress in sessionStorage
+  const { clearDraft } = useFormDraft('garment_job_card', form, setForm, !card);
 
   useEffect(() => {
     if (card) {
@@ -186,6 +190,7 @@ export default function GarmentJobCardForm({ card, onSave, onClose }) {
       } else {
         await api.createGarmentJobCard(payload);
       }
+      clearDraft();
       onSave();
     } catch (err) {
       setError(err.message || 'Failed to save garment job card.');

@@ -187,16 +187,24 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
   return (
     <div style={styles.container}>
       {toasts.map(toast => {
+        const isError = toast.type === 'error' || toast.type === 'danger';
+        const isWarning = toast.type === 'warning';
+        const isSuccess = toast.type === 'success';
+
         const getIcon = () => {
-          switch (toast.type) {
-            case 'success': return <CheckCircle2 size={18} color="var(--success)" />;
-            case 'warning': return <AlertTriangle size={18} color="var(--warning)" />;
-            case 'danger': return <XCircle size={18} color="var(--danger)" />;
-            default: return <Info size={18} color="var(--primary)" />;
-          }
+          if (isError) return <XCircle size={18} color="#ef4444" />;
+          if (isWarning) return <AlertTriangle size={18} color="#f59e0b" />;
+          if (isSuccess) return <CheckCircle2 size={18} color="#10b981" />;
+          return <Info size={18} color="#2563eb" />;
         };
 
-        const borderColor = toast.type === 'success' ? 'var(--success)' : toast.type === 'warning' ? 'var(--warning)' : toast.type === 'danger' ? 'var(--danger)' : 'var(--primary)';
+        const borderColor = isError
+          ? '#ef4444'
+          : isWarning
+          ? '#f59e0b'
+          : isSuccess
+          ? '#10b981'
+          : '#2563eb';
 
         return (
           <div key={toast.id} style={{ ...styles.toastCard, borderLeft: `4px solid ${borderColor}` }}>
@@ -498,19 +506,17 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.65rem',
-    maxWidth: '360px',
+    maxWidth: '380px',
     width: 'calc(100vw - 2.5rem)',
     pointerEvents: 'none',
   },
   toastCard: {
     pointerEvents: 'auto',
-    background: 'var(--bg-card, rgba(22, 27, 38, 0.94))',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid var(--border-light)',
-    borderRadius: 'var(--radius-md)',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
     padding: '0.85rem 1rem',
-    boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15)',
+    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
     animation: 'toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
     position: 'relative',
     overflow: 'hidden',
@@ -518,22 +524,26 @@ const styles = {
   title: {
     fontSize: '0.88rem',
     fontWeight: '700',
-    color: 'var(--text-primary)',
+    color: '#0f172a',
     lineHeight: '1.3',
   },
   message: {
-    fontSize: '0.78rem',
-    color: 'var(--text-muted)',
-    marginTop: '0.2rem',
-    lineHeight: '1.35',
+    fontSize: '0.8rem',
+    color: '#475569',
+    marginTop: '0.25rem',
+    lineHeight: '1.4',
+    wordBreak: 'break-word',
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-muted)',
+    color: '#94a3b8',
     cursor: 'pointer',
-    padding: '2px',
+    padding: '4px',
     borderRadius: '4px',
     lineHeight: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   }
 };

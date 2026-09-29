@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { triggerEliteAlert } from '../services/dialogService';
+import { openPrintOptionsDialog } from '../utils/printService';
 
 export default function JobCardStatusDashboard({ onSelectCard, department = 'digital_print' }) {
   const [cards, setCards] = useState([]);
@@ -189,16 +191,10 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
     return list;
   }, [cards, activeStageTab, search, analytics]);
 
-  // PDF Report Download Generator
-  const handleDownloadPdfReport = () => {
+  // PDF Report Download Generator with Print Options Modal
+  const handleDownloadPdfReport = async () => {
     if (!cards || cards.length === 0) {
-      alert('No job card records found for generating status report.');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Please allow popups to view/print the Pending Status PDF report.');
+      triggerEliteAlert('No Records Found', 'No job card records found for generating status report.', 'warning');
       return;
     }
 
@@ -206,13 +202,8 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
     const nowStr = `${formatDateDDMMYYYY(new Date())} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
 
     const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>JobCards_Pending_Status_Report_${new Date().toISOString().split('T')[0]}</title>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; padding: 12px; font-size: 10.5px;">
         <style>
-          @page { size: A4 landscape; margin: 8mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #fff; margin: 0; padding: 12px; font-size: 10.5px; }
           .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #2563eb; padding-bottom: 10px; margin-bottom: 10px; }
           .title { font-size: 17px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; }
           .subtitle { font-size: 10px; color: #64748b; margin-top: 2px; font-weight: 600; }
@@ -236,8 +227,6 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
 
           .footer { margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 8.5px; color: #94a3b8; display: flex; justify-content: space-between; }
         </style>
-      </head>
-      <body>
         <div class="header">
           <div>
             <div class="title">ELITE DIGITAL PRINTS — PENDING JOBCARD STATUS REPORT</div>
@@ -287,7 +276,6 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
               const pDone = (c.printStatus || '').toLowerCase().includes('done');
               const fDone = (c.fusingStatus || '').toLowerCase().includes('done');
               const dDone = (c.deliveryStatus || '').toLowerCase().includes('done');
-
               const jMtr = c.totalMtr ? `${c.totalMtr} mtr` : (c.consumption ? `${c.consumption} mtr` : '—');
 
               return `
@@ -317,21 +305,18 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
           <div>Elite Digital Prints — Job Card Current Pending Status Audit</div>
           <div>Total Listed Cards: ${displayedCards.length}</div>
         </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 250);
-          };
-        </script>
-      </body>
-      </html>
+      </div>
     `;
 
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    await openPrintOptionsDialog({
+      title: `Job Cards Status Report (${activeRangeText})`,
+      content: htmlContent,
+      defaultSettings: {
+        paperSize: 'A4',
+        orientation: 'landscape',
+        margin: 'default'
+      }
+    });
   };
 
   return (

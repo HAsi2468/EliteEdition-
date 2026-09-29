@@ -1,37 +1,66 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { triggerPushNotification } from '../components/NotificationToast';
 
 /**
- * Hook to automatically persist and restore form drafts in localStorage
- * Prevents data loss if user refreshes, loses internet, or server updates mid-entry.
+ * Enterprise Form Auto-recovery Hook
+ * Caches active multi-step forms in sessionStorage so refreshing or switching tabs never wipes user input.
  * 
- * @param {string} draftKey - Unique key for this form (e.g. 'fabric_transfer', 'fabric_inward')
+ * @param {string} draftKey - Unique key for this form (e.g. 'garment_job_card', 'bulk_inward', 'fabric_transfer')
  * @param {object} formState - Current state of the form
  * @param {function} setFormState - State setter function
- * @param {boolean} isModalOpen - Whether the form modal is currently active
+ * @param {boolean} [isFormActive=true] - Whether the form modal/view is currently active
+ * @param {object} [options={}] - Additional options
+ * @param {boolean} [options.notifyOnRestore=true] - Show subtle toast when draft restored
  */
-export function useFormDraft(draftKey, formState, setFormState, isModalOpen = true) {
+export function useFormDraft(
+  draftKey, 
+  formState, 
+  setFormState, 
+  isFormActive = true, 
+  options = {}
+) {
+  const { notifyOnRestore = true } = options;
   const isLoadedRef = useRef(false);
-  const storageKey = `elite_draft_${draftKey}`;
+  const latestStateRef = useRef(formState);
+  latestStateRef.current = formState;
 
-  // Restore draft when form opens
+  const storageKey = `elite_session_draft_${draftKey}`;
+
+  // Restore draft when form activates
   useEffect(() => {
-    if (!isModalOpen) {
+    if (!isFormActive) {
       isLoadedRef.current = false;
       return;
     }
 
     try {
-      const saved = localStorage.getItem(storageKey);
+      // Prioritize sessionStorage, fallback to localStorage
+      const saved = sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          // Check if parsed has at least one non-empty field
-          const hasData = Object.values(parsed).some(v => v !== '' && v !== null && v !== undefined);
+          // Check if parsed has at least one non-empty value
+          const hasData = Object.values(parsed).some(v => {
+            if (Array.isArray(v)) return v.length > 0;
+            if (typeof v === 'object' && v !== null) return Object.values(v).some(nested => nested !== '' && nested !== 0 && nested !== null);
+            return v !== '' && v !== null && v !== undefined && v !== 0;
+          });
+
           if (hasData) {
-            setFormState(prev => ({
-              ...prev,
-              ...parsed
-            }));
+            setFormState(prev => {
+              if (typeof prev === 'object' && prev !== null) {
+                return { ...prev, ...parsed };
+              }
+              return parsed;
+            });
+
+            if (notifyOnRestore) {
+              triggerPushNotification(
+                'Draft Restored',
+                'Your unsaved form progress was automatically recovered.',
+                'info'
+              );
+            }
           }
         }
       }
@@ -39,32 +68,60 @@ export function useFormDraft(draftKey, formState, setFormState, isModalOpen = tr
       console.warn('Could not restore form draft for', draftKey, e);
     }
     isLoadedRef.current = true;
-  }, [isModalOpen, draftKey]);
+  }, [isFormActive, draftKey]);
 
-  // Auto-save draft on every change (debounced 400ms)
+  // Auto-save draft on every change (debounced 350ms)
   useEffect(() => {
-    if (!isModalOpen || !isLoadedRef.current) return;
+    if (!isFormActive || !isLoadedRef.current) return;
 
     const timer = setTimeout(() => {
       try {
-        // Only save if there is actual input
-        const hasData = Object.values(formState || {}).some(v => v !== '' && v !== null && v !== undefined);
+        const hasData = Object.values(formState || {}).some(v => {
+          if (Array.isArray(v)) return v.length > 0;
+          if (typeof v === 'object' && v !== null) return Object.values(v).some(nested => nested !== '' && nested !== 0 && nested !== null);
+          return v !== '' && v !== null && v !== undefined;
+        });
+
         if (hasData) {
-          localStorage.setItem(storageKey, JSON.stringify(formState));
+          const payload = JSON.stringify(formState);
+          sessionStorage.setItem(storageKey, payload);
         }
       } catch (e) {
-        // Storage quota or private browsing
+        // Quota exceeded or private browsing
       }
-    }, 400);
+    }, 350);
 
     return () => clearTimeout(timer);
-  }, [formState, isModalOpen, storageKey]);
+  }, [formState, isFormActive, storageKey]);
+
+  // Flush on tab hide / page reload to prevent any loss of latest keystrokes
+  useEffect(() => {
+    const handleFlush = () => {
+      if (!isFormActive || !isLoadedRef.current) return;
+      try {
+        if (latestStateRef.current) {
+          sessionStorage.setItem(storageKey, JSON.stringify(latestStateRef.current));
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('beforeunload', handleFlush);
+    document.addEventListener('visibilitychange', handleFlush);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleFlush);
+      document.removeEventListener('visibilitychange', handleFlush);
+    };
+  }, [isFormActive, storageKey]);
 
   const clearDraft = () => {
     try {
+      sessionStorage.removeItem(storageKey);
       localStorage.removeItem(storageKey);
     } catch (e) {}
   };
 
   return { clearDraft };
 }
+
+export default useFormDraft;

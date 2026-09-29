@@ -122,9 +122,71 @@ export function SkeletonForm({ fields = 4 }) {
   );
 }
 
+export function DashboardSkeleton() {
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '16px', padding: '12px 0' }}>
+      {/* Header Bar Placeholder */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <SkeletonBlock width="180px" height="1.5rem" />
+          <SkeletonBlock width="260px" height="0.875rem" />
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <SkeletonBlock width="110px" height="2.25rem" style={{ borderRadius: '8px' }} />
+          <SkeletonBlock width="120px" height="2.25rem" style={{ borderRadius: '8px' }} />
+        </div>
+      </div>
+
+      {/* KPI Cards Placeholder */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <SkeletonBlock width="45%" height="0.8rem" />
+              <SkeletonBlock width="24px" height="24px" style={{ borderRadius: '6px' }} />
+            </div>
+            <SkeletonBlock width="70%" height="1.75rem" />
+            <SkeletonBlock width="40%" height="0.75rem" />
+          </div>
+        ))}
+      </div>
+
+      {/* Filter / Search Bar Placeholder */}
+      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <SkeletonBlock width="240px" height="2.25rem" style={{ borderRadius: '6px' }} />
+        <SkeletonBlock width="130px" height="2.25rem" style={{ borderRadius: '6px' }} />
+        <SkeletonBlock width="130px" height="2.25rem" style={{ borderRadius: '6px' }} />
+        <div style={{ flex: 1 }} />
+        <SkeletonBlock width="90px" height="2.25rem" style={{ borderRadius: '6px' }} />
+      </div>
+
+      {/* Main Table Placeholder */}
+      <div style={{ flex: 1 }}>
+        <SkeletonTable rows={7} cols={6} />
+      </div>
+    </div>
+  );
+}
+
+export const ModuleSkeleton = DashboardSkeleton;
+
 export default {
   SkeletonBlock,
   SkeletonCard,
   SkeletonTable,
-  SkeletonForm
+  SkeletonForm,
+  DashboardSkeleton,
+  ModuleSkeleton
 };

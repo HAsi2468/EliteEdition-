@@ -37,6 +37,9 @@ const DesignerModule = lazy(() => import('./components/DesignerModule'));
 const DesignerScreen = lazy(() => import('./components/DesignerScreen'));
 
 import EliteModalDialog from './components/EliteModalDialog';
+import { triggerEliteAlert, triggerEliteConfirm } from './services/dialogService';
+import PdfPreviewModal from './components/PdfPreviewModal';
+import PrintOptionsModal from './components/PrintOptionsModal';
 import AutoUpdateNotification from './components/AutoUpdateNotification';
 import AIMeasurementAgentModal from './components/common/AIMeasurementAgentModal';
 import { matchSkuOrBrandCode } from './utils/skuHelper';
@@ -96,6 +99,9 @@ import GlobalSearchModal from './components/common/GlobalSearchModal';
 import MobileBottomNav from './components/common/MobileBottomNav';
 import UndoToastContainer from './components/common/UndoToast';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import OfflineBanner from './components/common/OfflineBanner';
+import PullToRefresh from './components/common/PullToRefresh';
+import { DashboardSkeleton } from './components/common/Skeleton';
 
 
 
@@ -238,7 +244,37 @@ export default function App() {
 
   const handleSelectSearchResult = (item) => {
     if (!item) return;
-    if (item.type === 'jobcard') {
+
+    if (item.action === 'new_jobcard') {
+      setActiveTab('jobcards');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('elite-create-job-card'));
+      }, 100);
+    } else if (item.action === 'new_inward') {
+      setIsBulkInwardOpen(true);
+    } else if (item.action === 'view_stock') {
+      if (activeDepartment === 'digital_print') {
+        setActiveTab('fabric_inventory');
+      } else {
+        setActiveTab('inventory');
+      }
+    } else if (item.action === 'new_invoice') {
+      if (activeDepartment === 'digital_print') {
+        setActiveTab('billing');
+      } else {
+        setActiveTab('ee_invoices');
+      }
+    } else if (item.action === 'stitching_challan') {
+      setActiveTab('stitching_challan');
+    } else if (item.action === 'refresh_data') {
+      fetchData();
+      triggerGlobalDataRefresh();
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Data refreshed successfully', 'success');
+      }
+    } else if (item.tab) {
+      setActiveTab(item.tab);
+    } else if (item.type === 'jobcard') {
       setActiveTab('jobcards');
     } else if (item.type === 'invoice') {
       setActiveTab('ee_invoices');
@@ -1022,10 +1058,10 @@ export default function App() {
     setLoading(true);
     try {
       const res = await api.syncMissingProducts();
-      alert(res.message || 'Product catalog sync triggered successfully!');
+      triggerEliteAlert('Catalog Sync', res.message || 'Product catalog sync triggered successfully!', 'success');
       await fetchData();
     } catch (err) {
-      alert(err.message || 'Failed to sync catalog.');
+      triggerEliteAlert('Catalog Sync Error', err.message || 'Failed to sync catalog.', 'error');
     } finally {
       setLoading(false);
     }
@@ -1089,7 +1125,7 @@ export default function App() {
       triggerGlobalDataRefresh();
       await fetchData();
     } catch (err) {
-      alert(err.message || 'Failed to create product in catalog.');
+      triggerEliteAlert('Creation Error', err.message || 'Failed to create product in catalog.', 'error');
     } finally {
       setLoading(false);
       restoreSavedScrollPos();
@@ -1124,7 +1160,7 @@ export default function App() {
       triggerGlobalDataRefresh();
       await fetchData();
     } catch (err) {
-      alert(err.message || 'Failed to update item.');
+      triggerEliteAlert('Update Error', err.message || 'Failed to update item.', 'error');
     } finally {
       setLoading(false);
       restoreSavedScrollPos();
@@ -1134,27 +1170,43 @@ export default function App() {
   const handleDeleteItem = async (id) => {
     const isCatalog = activeTab === 'catalog' || catalogItems.some(c => c._id === id);
     if (isCatalog) {
-      if (!window.confirm('Are you sure you want to delete this product from catalog?')) return;
+      const confirmed = await triggerEliteConfirm({
+        title: 'Delete Catalog Product',
+        message: 'Are you sure you want to delete this product from the catalog?',
+        confirmText: 'Delete Product',
+        cancelText: 'Cancel',
+        type: 'danger'
+      });
+      if (!confirmed) return;
+
       setLoading(true);
       try {
         await api.deleteProductCatalog(id);
         setCatalogItems(prev => prev.filter(item => item._id !== id));
         triggerGlobalDataRefresh();
       } catch (err) {
-        alert(err.message || 'Failed to delete product from catalog.');
+        triggerEliteAlert('Delete Error', err.message || 'Failed to delete product from catalog.', 'error');
       } finally {
         setLoading(false);
         restoreSavedScrollPos();
       }
     } else {
-      if (!window.confirm('Are you sure you want to delete this inventory item?')) return;
+      const confirmed = await triggerEliteConfirm({
+        title: 'Delete Inventory Item',
+        message: 'Are you sure you want to delete this inventory item?',
+        confirmText: 'Delete Item',
+        cancelText: 'Cancel',
+        type: 'danger'
+      });
+      if (!confirmed) return;
+
       setLoading(true);
       try {
         await api.deleteInventory(id);
         setItems(prev => prev.filter(item => item._id !== id));
         triggerGlobalDataRefresh();
       } catch (err) {
-        alert(err.message || 'Failed to delete inventory item.');
+        triggerEliteAlert('Delete Error', err.message || 'Failed to delete inventory item.', 'error');
       } finally {
         setLoading(false);
         restoreSavedScrollPos();
@@ -1169,7 +1221,7 @@ export default function App() {
       triggerGlobalDataRefresh();
     } catch (err) {
       console.error('Failed to update stock:', err);
-      alert(err.message || 'Failed to update stock level.');
+      triggerEliteAlert('Stock Update Failed', err.message || 'Failed to update stock level.', 'error');
     }
   };
 
@@ -1185,9 +1237,9 @@ export default function App() {
       setIsBulkInwardOpen(false);
       triggerGlobalDataRefresh();
       await fetchData();
-      alert(res.message || 'Bulk inward completed successfully!');
+      triggerEliteAlert('Bulk Inward Complete', res.message || 'Bulk inward completed successfully!', 'success');
     } catch (err) {
-      alert(err.message || 'Failed to process bulk inward.');
+      triggerEliteAlert('Bulk Inward Error', err.message || 'Failed to process bulk inward.', 'error');
     } finally {
       setLoading(false);
       restoreSavedScrollPos();
@@ -1202,9 +1254,9 @@ export default function App() {
       setStockOutItem(null);
       triggerGlobalDataRefresh();
       await fetchData();
-      alert('Outward dispatch completed successfully!');
+      triggerEliteAlert('Outward Complete', 'Outward dispatch completed successfully!', 'success');
     } catch (err) {
-      alert(err.message || 'Failed to submit outward transaction.');
+      triggerEliteAlert('Outward Error', err.message || 'Failed to submit outward transaction.', 'error');
     } finally {
       setLoading(false);
       restoreSavedScrollPos();
@@ -1363,12 +1415,8 @@ export default function App() {
 
   return (
     <div style={styles.appContainer} className="app-container">
-      {/* PWA System Banners: Offline, Update Available & iOS Install Hint */}
-      {!isOnline && (
-        <div className="pwa-offline-bar">
-          <span>You are offline. Real-time actions and sync are paused.</span>
-        </div>
-      )}
+      {/* Non-Intrusive Floating Offline Connection Banner */}
+      <OfflineBanner />
 
       {updateWaitingWorker && (
         <div className="pwa-update-bar">
@@ -2443,12 +2491,8 @@ export default function App() {
           {error && <div style={styles.globalError}>{error}</div>}
 
           <ErrorBoundary>
-          <Suspense fallback={
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '1rem', color: 'var(--text-muted)' }}>
-              <RefreshCw size={28} className="spin-loader" color="var(--primary)" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Loading module...</span>
-            </div>
-          }>
+          <PullToRefresh onRefresh={async () => { await fetchData(); triggerGlobalDataRefresh(); }}>
+          <Suspense fallback={<DashboardSkeleton />}>
 
           {['communication', 'workspace', 'task_management'].includes(activeTab) ? null : activeTab === 'dashboard' ? (
             <DashboardStats items={items} sales={sales} />
@@ -2555,6 +2599,7 @@ export default function App() {
             </div>
           )}
           </Suspense>
+          </PullToRefresh>
           </ErrorBoundary>
 
           {/* Persistent CommunicationPanel (Chat & Task Manager - preserved across tab navigation) */}
@@ -2813,13 +2858,10 @@ export default function App() {
         )}
       </Suspense>
 
-      {/* Loading Overlay */}
+      {/* Content-Shaped Skeleton Screen for Initial Database Load */}
       {loading && items.length === 0 && sales.length === 0 && (
-        <div style={styles.loadingOverlay}>
-          <div style={styles.loaderBox}>
-            <RefreshCw size={36} className="spin-loader" color="var(--primary)" />
-            <p style={{ marginTop: '1rem', fontWeight: '500' }}>Fetching database analytics...</p>
-          </div>
+        <div style={{ ...styles.loadingOverlay, backgroundColor: 'var(--bg-main, #f8fafc)', padding: '16px', overflowY: 'auto' }}>
+          <DashboardSkeleton />
         </div>
       )}
       {/* ── MOBILE QUICK COMPANY SWITCHER SHEET (Option 1 & 3 Combined) ── */}
@@ -3045,6 +3087,12 @@ export default function App() {
 
       {/* Global Elite Glassmorphic Modal Dialog */}
       <EliteModalDialog />
+
+      {/* Global In-App PDF Preview & Share Modal */}
+      <PdfPreviewModal />
+
+      {/* Global Print Setup & Media Options Modal */}
+      <PrintOptionsModal />
 
       {/* AI Textile Production Measurement Agent Modal */}
       <AIMeasurementAgentModal

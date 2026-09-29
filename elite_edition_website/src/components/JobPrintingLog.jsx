@@ -11,6 +11,7 @@ import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD, formatForInputD
 import { matchSearchQuery } from '../utils/searchUtils';
 import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import { openPrintOptionsDialog } from '../utils/printService';
 import JobCardTooltip from './JobCardTooltip';
 import DateRangePicker from './DateRangePicker';
 
@@ -413,16 +414,10 @@ export default function JobPrintingLog() {
     }
   };
 
-  // ⚡ INSTANT OPERATOR REPORT PRINT / PDF GENERATOR (0.02s SPEED)
-  const handlePrintOperatorReport = (repLogs) => {
+  // ⚡ INSTANT OPERATOR REPORT PRINT / PDF GENERATOR
+  const handlePrintOperatorReport = async (repLogs) => {
     if (!repLogs || repLogs.length === 0) {
-      alert('No printing log entries found for the selected filter criteria.');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Please allow popups to view/print report.');
+      triggerEliteAlert('No Entries', 'No printing log entries found for the selected filter criteria.', 'warning');
       return;
     }
 
@@ -646,21 +641,18 @@ export default function JobPrintingLog() {
           <div>Elite Edition ERP — Digital Printing Operator Production Report</div>
           <div>Printed On: ${formatDateDDMMYYYY(new Date())}</div>
         </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 200);
-          };
-        </script>
-      </body>
-      </html>
+      </div>
     `;
 
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    await openPrintOptionsDialog({
+      title: `Digital Operator Printing Report (${reportStartDate} to ${reportEndDate})`,
+      content: htmlContent,
+      defaultSettings: {
+        paperSize: 'A4',
+        orientation: 'portrait',
+        margin: 'default'
+      }
+    });
   };
 
   // Paper Entry Handlers for Multiple Paper Rows

@@ -1,3 +1,5 @@
+import { downloadOrPreviewPdf } from '../utils/pdfDownloadService';
+
 // API Base URL management
 const DEFAULT_URL = '/v1';
 
@@ -476,14 +478,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName);
   },
 
   async downloadInventoryReport(reportPath, dateStart, dateEnd, fileName) {
@@ -506,14 +501,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName);
   },
 
   async downloadSalesReport(dateStart, dateEnd, searchCode, fileName) {
@@ -534,14 +522,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName);
   },
 
   async downloadBrandReport(dateStart, dateEnd, searchCode, fileName) {
@@ -562,14 +543,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName);
   },
 
   async downloadBrandReportHourWise(dateStart, dateEnd, searchCode, fileName) {
@@ -590,14 +564,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName);
   },
 
   async downloadReturnsBrandReport(dateStart, dateEnd, subType, fileName) {
@@ -617,14 +584,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName);
   },
 
   async downloadSalesReturnsRatioReport(dateStart, dateEnd, fileName) {
@@ -644,14 +604,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName);
   },
 
   // Raw Report Data
@@ -715,14 +668,7 @@ export const api = {
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Elite Print Report' });
   },
 
   async getBrandReportData(dateStart, dateEnd, searchCode = '') {
@@ -776,14 +722,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to download Job Card PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `JobCard_${jobNo || 'preview'}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    if (link.parentNode) link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, `JobCard_${jobNo || 'preview'}.pdf`, { title: `Job Card #${jobNo || id}` });
   },
   async downloadBulkJobCardPdf(ids = [], fileName = 'Combined_Job_Cards.pdf') {
     if (!ids || ids.length === 0) return;
@@ -794,14 +733,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate combined Job Cards PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    if (link.parentNode) link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Combined Job Cards' });
   },
   async getNextJobCardNo() {
     return request('/jobCards/next-number');
@@ -1288,14 +1220,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate lot-wise fabric PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Stock Report' });
   },
 
   async downloadSingleLotPdf(lotNo, fileName) {
@@ -1307,14 +1232,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate lot statement PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName || `Fabric_Lot_${lotNo}_Statement.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName || `Fabric_Lot_${lotNo}_Statement.pdf`, { title: `Fabric Lot ${lotNo} Statement` });
   },
 
   async getFabricRequirement() {
@@ -1353,14 +1271,7 @@ export const api = {
       throw new Error(errText);
     }
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `fabric-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    if (link.parentNode) link.parentNode.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+    downloadOrPreviewPdf(blob, `fabric-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`, { title: 'Fabric Ledger' });
   },
 
   // Raw Materials Inventory
@@ -1422,18 +1333,9 @@ export const api = {
       throw new Error(errText);
     }
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const typeTag = params.type && params.type !== 'All' ? `-${params.type.toLowerCase()}` : '';
-    link.setAttribute('download', `raw-materials${typeTag}-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    if (link.parentNode) link.parentNode.removeChild(link);
-    try {
-      window.open(url, '_blank');
-    } catch (e) {}
-    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    const fileName = `raw-materials${typeTag}-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`;
+    downloadOrPreviewPdf(blob, fileName, { title: 'Raw Materials Ledger' });
   },
 
   async importRawMaterialStock(rows) {
@@ -1486,14 +1388,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate Fabric Inward PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Inward Report' });
   },
 
   async downloadFabricOutwardReportPdf(dateStart, dateEnd, fileName) {
@@ -1508,14 +1403,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate Fabric Outward PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Outward Report' });
   },
 
   async downloadFabricLotWiseReportPdf(dateStart, dateEnd, fileName) {
@@ -1530,14 +1418,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate Lot-Wise Fabric PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Report' });
   },
 
   async downloadFabricCombinedReportPdf(dateStart, dateEnd, reportsArray, fileName, filters = {}) {
@@ -1567,14 +1448,7 @@ export const api = {
       throw new Error(errText);
     }
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName || 'Elite_Digital_Prints_Combined_Report.pdf');
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName || 'Elite_Digital_Prints_Combined_Report.pdf', { title: 'Digital Prints Combined Report' });
   },
 
   async getInfraBills() {
@@ -1636,13 +1510,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate challan PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Challan_${challanNo || 'preview'}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
+    downloadOrPreviewPdf(blob, `Challan_${challanNo || 'preview'}.pdf`, { title: `Fabric Challan #${challanNo || id}` });
   },
 
   async downloadBulkFabricChallanPdf(ids = [], fileName = 'Combined_Fabric_Challans.pdf') {
@@ -1654,14 +1522,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate combined Fabric Challans PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Combined Fabric Challans' });
   },
 
   async downloadChallanReportPdf(dateStart, dateEnd, search, fileName) {
@@ -1677,14 +1538,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate Fabric Challan report PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Challan Report' });
   },
 
   async getNextChallanNo() {
@@ -1722,14 +1576,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate Stitching Challan PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Stitching_Challan_${challanNo || 'PCH'}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, `Stitching_Challan_${challanNo || 'PCH'}.pdf`, { title: `Stitching Challan #${challanNo || 'PCH'}` });
   },
 
   async downloadBulkStitchingChallanPdf(ids = [], fileName = 'Combined_Stitching_Challans.pdf') {
@@ -1741,14 +1588,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate combined Stitching Challans PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Combined Stitching Challans' });
   },
 
   // ── Stock Adjustment (SA) ──────────────────────────────────────────────
@@ -1875,14 +1715,8 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate Invoice PDF');
     const blob = await response.blob();
-    const objUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objUrl;
-    link.setAttribute('download', `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(objUrl);
+    const pdfName = `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`;
+    downloadOrPreviewPdf(blob, pdfName, { title: `Tax Invoice #${invoiceNo || 'Draft'}` });
     console.log(`[PDF Download] Generated & downloaded in ${(performance.now() - t0).toFixed(0)}ms`);
   },
 
@@ -1897,14 +1731,7 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to generate combined Invoices PDF');
     const blob = await response.blob();
-    const objUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objUrl;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(objUrl);
+    downloadOrPreviewPdf(blob, fileName, { title: 'Combined Invoices' });
     console.log(`[Bulk PDF Download] Generated & downloaded combined PDF in ${(performance.now() - t0).toFixed(0)}ms`);
   },
 
@@ -1993,7 +1820,9 @@ export const api = {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 2000);
   },
 
   // ── Authority-Based Inter-Department Communication ───────────────────────

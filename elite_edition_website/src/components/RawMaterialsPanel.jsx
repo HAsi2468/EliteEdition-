@@ -45,8 +45,10 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      if (link.parentNode) document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 2000);
   };
 
   const formatMaterialDetailsString = (t) => {
