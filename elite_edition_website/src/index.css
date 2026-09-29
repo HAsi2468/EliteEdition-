@@ -522,6 +522,9 @@ input::placeholder, textarea::placeholder {
   background-size: 36px 100%, 36px 100%, 14px 100%, 14px 100%;
   background-attachment: local, local, scroll, scroll;
   overflow-x: auto !important;
+  overflow-y: visible !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
 }
 
@@ -537,8 +540,11 @@ input::placeholder, textarea::placeholder {
   width: 100%;
   max-width: 100%;
   overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
+  overflow-y: visible !important;
+  touch-action: pan-y !important;
   overscroll-behavior-x: auto !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
   scroll-behavior: smooth;
   will-change: scroll-position;
 }
@@ -1080,8 +1086,9 @@ tr:hover td {
 }
 
 .main-layout-container {
-  flex: 1 !important;
+  flex: 1 1 auto !important;
   min-height: 0 !important;
+  height: calc(100% - 56px) !important;
   height: calc(100dvh - 56px - env(safe-area-inset-top, 0px)) !important;
   display: flex !important;
   overflow: hidden !important;
@@ -1111,10 +1118,8 @@ tr:hover td {
   flex: 1 1 0% !important;
   min-width: 0 !important;
   min-height: 0 !important;
-  /* Explicit calc so scroll-container height is always finite regardless of
-     how the browser resolves height:100% inside a flex row. */
-  height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 24px) !important;
-  max-height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 24px) !important;
+  height: 100% !important;
+  max-height: 100% !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
@@ -1379,16 +1384,17 @@ tr:hover td {
     padding-bottom: 0 !important;
   }
   .main-layout-container {
+    height: calc(100% - 52px) !important;
     height: calc(100dvh - 52px - env(safe-area-inset-top, 0px)) !important;
     padding: 8px 10px !important;
     gap: 0 !important;
   }
-  /* Mobile: re-calc explicit height for the inner scroll container
-     (header 52px + padding 8px top + 8px bottom = 68px total overhead) */
   .main-layout-container > section,
   .content-area-wrap {
-    height: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - 16px) !important;
-    max-height: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - 16px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 }
 

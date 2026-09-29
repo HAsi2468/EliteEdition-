@@ -140,6 +140,7 @@ export function PullToRefresh({ onRefresh, children, className = '', style = {} 
         position: 'relative',
         width: '100%',
         minHeight: '100%',
+        touchAction: 'pan-y',
         overscrollBehaviorY: isPulling ? 'contain' : 'auto',
         WebkitOverflowScrolling: 'touch',
         ...style
