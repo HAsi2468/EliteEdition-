@@ -1,0 +1,77 @@
+rules:
+  # ─── SEC-RULE-01: Detect Unescaped SQL/NoSQL String Interpolation ─────────
+  - id: ban-raw-sql-interpolation
+    languages:
+      - javascript
+      - typescript
+    message: >-
+      SECURITY CRITICAL: Detected raw template string interpolation or concatenation in a database query.
+      All query parameters must be passed out-of-band via parameterized queries ($1, $2) or native ORM/Mongoose methods.
+    severity: ERROR
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query(`...${$INPUT}...`, ...)
+          - pattern: $DB.raw(`...${$INPUT}...`, ...)
+          - pattern: $DB.execute(`...${$INPUT}...`, ...)
+          - pattern: $DB.query("..." + $INPUT, ...)
+          - pattern: $DB.query('...' + $INPUT, ...)
+
+  # ─── SEC-RULE-02: Enforce DOMPurify on dangerouslySetInnerHTML ─────────────
+  - id: ban-unsanitized-dangerously-set-inner-html
+    languages:
+      - javascript
+      - typescript
+    message: >-
+      SECURITY WARNING: Direct usage of dangerouslySetInnerHTML without DOMPurify.sanitize() or <SafeHtml /> wrapper detected.
+      This introduces Cross-Site Scripting (XSS) vulnerabilities.
+    severity: ERROR
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern: |
+          < $EL ... dangerouslySetInnerHTML={{ __html: $UNSAFE }} ... />
+      - pattern-not: |
+          < $EL ... dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(...) }} ... />
+      - pattern-not: |
+          < $EL ... dangerouslySetInnerHTML={{ __html: purify(...) }} ... />
+
+  # ─── SEC-RULE-03: Ban eval() and Unsafe Function Constructors ──────────────
+  - id: ban-eval-and-code-execution
+    languages:
+      - javascript
+      - typescript
+    message: >-
+      SECURITY CRITICAL: Direct evaluation of dynamic code via eval() or Function() constructor detected.
+      This allows arbitrary remote code execution (RCE).
+    severity: ERROR
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: new Function(...)
+          - pattern: window.execScript(...)
+          - pattern: setTimeout($CODE, ...)
+          - pattern: setInterval($CODE, ...)
+
+  # ─── SEC-RULE-04: Enforce .strict() on Zod Body Validation Schemas ──────────
+  - id: enforce-zod-strict-body-schemas
+    languages:
+      - javascript
+      - typescript
+    message: >-
+      SECURITY BEST PRACTICE: Ensure mutation request body schemas enforce .strict() or use strictBody()
+      to prevent mass-assignment and privilege escalation vulnerabilities.
+    severity: WARNING
+    metadata:
+      cwe: "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes"
+      owasp: "A08:2021 - Software and Data Integrity Failures"
+    pattern: |
+      const $SCHEMA = {
+        body: z.object(...)
+      }

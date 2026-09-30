@@ -1,0 +1,29 @@
+{
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "no-proto": "error",
+    "no-iterator": "error",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.property.name='query'] > TemplateLiteral",
+        "message": "Direct template literal interpolation in database queries is strictly forbidden. Use parameterized queries or Mongoose ODM methods."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='$where']",
+        "message": "MongoDB $where operator enables arbitrary JavaScript execution on the server and is strictly banned."
+      }
+    ]
+  }
+}
