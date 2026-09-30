@@ -17,7 +17,7 @@ const getCookieDomain = () => {
     return process.env.COOKIE_DOMAIN;
   }
   if (process.env.NODE_ENV === 'production') {
-    return '.eliteerp.com';
+    return '.eliteedition.in';
   }
   return undefined;
 };

@@ -13,6 +13,12 @@ const logger = require('../config/logger');
 
 // Default trusted exact origin allowlist (Set for O(1) exact lookups)
 const DEFAULT_ALLOWED_ORIGINS = new Set([
+  'https://erp.eliteedition.in',
+  'http://erp.eliteedition.in',
+  'https://eliteedition.in',
+  'http://eliteedition.in',
+  'https://www.eliteedition.in',
+  'http://www.eliteedition.in',
   'https://app.eliteerp.com',
   'https://admin.eliteerp.com',
   'http://localhost:5173',
@@ -28,6 +34,7 @@ const DEFAULT_ALLOWED_ORIGINS = new Set([
 // Anchored regular expression patterns for dynamic multi-subdomain validation
 // CRITICAL: Anchored strictly with ^ and $ and escaped dots to prevent prefix/suffix domain hijackings
 const DEFAULT_ANCHORED_REGEXES = [
+  /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*eliteedition\.in(?::\d+)?$/,
   /^https:\/\/(?:app|admin|portal)\.eliteerp\.com$/,
   /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/,
   /^https?:\/\/3\.7\.174\.180(?::\d+)?$/
@@ -80,7 +87,7 @@ function createCorsMiddleware(options = {}) {
   function isOriginAllowed(origin) {
     if (!origin || typeof origin !== 'string') return false;
 
-    const trimmed = origin.trim();
+    const trimmed = origin.trim().replace(/\/+$/, '');
 
     // CRITICAL: Explicitly block 'null' origin (RFC 6454 opaque origins from sandboxed iframes, file://, data:)
     if (trimmed.toLowerCase() === 'null') {

@@ -25,7 +25,7 @@ describe('Cookie Security & Specification Phase 2 Engine', () => {
     process.env = { ...originalEnv };
   });
 
-  it('SEC-COOKIE-01: Session / Refresh cookies enforce HttpOnly, SameSite=Lax, Path=/ and .eliteerp.com in production', () => {
+  it('SEC-COOKIE-01: Session / Refresh cookies enforce HttpOnly, SameSite=Lax, Path=/ and .eliteedition.in in production', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.COOKIE_DOMAIN;
 
@@ -34,7 +34,7 @@ describe('Cookie Security & Specification Phase 2 Engine', () => {
     assert.equal(opts.secure, true);
     assert.equal(opts.sameSite, 'lax');
     assert.equal(opts.path, '/');
-    assert.equal(opts.domain, '.eliteerp.com');
+    assert.equal(opts.domain, '.eliteedition.in');
   });
 
   it('SEC-COOKIE-02: High-privilege cookies enforce SameSite=Strict and Secure in production', () => {
@@ -45,7 +45,7 @@ describe('Cookie Security & Specification Phase 2 Engine', () => {
     assert.equal(opts.secure, true);
     assert.equal(opts.sameSite, 'strict');
     assert.equal(opts.path, '/');
-    assert.equal(opts.domain, '.eliteerp.com');
+    assert.equal(opts.domain, '.eliteedition.in');
   });
 
   it('SEC-COOKIE-03: Respects custom COOKIE_DOMAIN and COOKIE_SECURE flags', () => {
@@ -81,7 +81,7 @@ describe('Cookie Security & Specification Phase 2 Engine', () => {
     assert.equal(capturedOpts.secure, true);
     assert.equal(capturedOpts.sameSite, 'lax');
     assert.equal(capturedOpts.path, '/');
-    assert.equal(capturedOpts.domain, '.eliteerp.com');
+    assert.equal(capturedOpts.domain, '.eliteedition.in');
     assert.equal(capturedOpts.expires.getTime(), expDate.getTime());
   });
 
@@ -101,7 +101,7 @@ describe('Cookie Security & Specification Phase 2 Engine', () => {
     assert.equal(capturedOpts.httpOnly, true);
     assert.equal(capturedOpts.secure, true);
     assert.equal(capturedOpts.maxAge, 3600000);
-    assert.equal(capturedOpts.domain, '.eliteerp.com');
+    assert.equal(capturedOpts.domain, '.eliteedition.in');
     assert.equal(capturedOpts.path, '/');
   });
 
@@ -122,7 +122,7 @@ describe('Cookie Security & Specification Phase 2 Engine', () => {
 
     assert.equal(clearedName, 'session_id');
     assert.equal(clearedOpts.path, '/');
-    assert.equal(clearedOpts.domain, '.eliteerp.com');
+    assert.equal(clearedOpts.domain, '.eliteedition.in');
     assert.equal(clearedOpts.httpOnly, true);
     assert.equal(clearedOpts.secure, true);
     assert.equal(clearedOpts.sameSite, 'lax');

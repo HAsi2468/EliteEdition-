@@ -44,6 +44,8 @@ describe('CORS Security Engine & Technical Specification Phase 1 Suite', () => {
 
     it('should NEVER reflect wildcard "*" when Access-Control-Allow-Credentials is true', async () => {
       const allowedOrigins = [
+        'https://erp.eliteedition.in',
+        'https://eliteedition.in',
         'https://app.eliteerp.com',
         'https://admin.eliteerp.com',
         'http://localhost:5173'

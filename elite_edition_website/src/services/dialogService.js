@@ -143,9 +143,23 @@ export const installGlobalDialogInterceptors = () => {
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
     const msg = reason?.message || (typeof reason === 'string' ? reason : '');
+    const stack = reason?.stack || '';
     
-    // Ignore harmless browser/network abort cancellations
-    if (!msg || msg.includes('AbortError') || msg.includes('cancelled') || msg.includes('canceled')) {
+    // Ignore harmless browser/network abort cancellations and third-party extension chatter
+    if (
+      !msg ||
+      msg.includes('AbortError') ||
+      msg.includes('cancelled') ||
+      msg.includes('canceled') ||
+      msg.includes('runtime.sendMessage') ||
+      msg.includes('Extension context') ||
+      msg.includes('Receiving end does not exist') ||
+      msg.includes('Tab not found') ||
+      msg.includes('chrome-extension://') ||
+      msg.includes('moz-extension://') ||
+      stack.includes('chrome-extension://') ||
+      stack.includes('moz-extension://')
+    ) {
       return;
     }
 
@@ -159,10 +173,18 @@ export const installGlobalDialogInterceptors = () => {
 
   // Catch global runtime errors
   window.addEventListener('error', (event) => {
-    // Filter non-actionable browser noise
+    const msg = event.message || '';
+    const filename = event.filename || '';
+    // Filter non-actionable browser noise and browser extension errors
     if (
-      event.message?.includes('ResizeObserver loop') ||
-      event.message?.includes('Script error')
+      msg.includes('ResizeObserver loop') ||
+      msg.includes('Script error') ||
+      msg.includes('runtime.sendMessage') ||
+      msg.includes('Extension context') ||
+      msg.includes('Receiving end does not exist') ||
+      msg.includes('Tab not found') ||
+      filename.includes('chrome-extension://') ||
+      filename.includes('moz-extension://')
     ) {
       return;
     }
