@@ -529,6 +529,157 @@ const getDailyOperationsSummary = async (req, res) => {
     });
 
     // ──────────────────────────────────────────────────────────────────────────
+    // 8. PRODUCTION & DELIVERY VELOCITY TIMELINE (Daily Trend)
+    // ──────────────────────────────────────────────────────────────────────────
+    let trendStartStr = cleanStart;
+    let trendEndStr = cleanEnd;
+
+    // If single day is selected (e.g. today or same start/end), provide a 14-day trailing window ending on cleanEnd
+    if (cleanStart === cleanEnd) {
+      const past14 = new Date(endDateObj);
+      past14.setDate(past14.getDate() - 13);
+      trendStartStr = toYMD(past14);
+    }
+
+    const trendStartDateObj = new Date(trendStartStr + 'T00:00:00.000Z');
+    const trendEndDateObj = new Date(trendEndStr + 'T23:59:59.999Z');
+
+    const [printVelocityAgg, fusingVelocityAgg, dispatchVelocityAgg] = await Promise.all([
+      // Daily print meterage
+      JobPrintLog.aggregate([
+        {
+          $match: {
+            date: { $gte: trendStartDateObj, $lte: trendEndDateObj },
+            ...shiftMatch
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$date' }
+            },
+            printMeters: { $sum: '$meters' },
+            printJobs: { $sum: 1 }
+          }
+        }
+      ]),
+
+      // Daily fusing meterage
+      JobCard.aggregate([
+        {
+          $match: {
+            department: 'digital_print',
+            fusingStatus: 'Fusing Done',
+            fusingDate: { $gte: trendStartStr, $lte: trendEndStr }
+          }
+        },
+        {
+          $group: {
+            _id: '$fusingDate',
+            fusingMeters: {
+              $sum: {
+                $cond: [
+                  { $gt: [{ $convert: { input: '$fusingMtr', to: 'double', onError: 0, onNull: 0 } }, 0] },
+                  { $convert: { input: '$fusingMtr', to: 'double', onError: 0, onNull: 0 } },
+                  { $convert: { input: '$totalMtr', to: 'double', onError: 0, onNull: 0 } }
+                ]
+              }
+            },
+            fusingCards: { $sum: 1 }
+          }
+        }
+      ]),
+
+      // Daily dispatch meterage
+      BillingInvoice.aggregate([
+        {
+          $match: {
+            companyEntity: { $in: entityAliases },
+            date: { $gte: trendStartDateObj, $lte: trendEndDateObj }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$date' }
+            },
+            dispatchMeters: { $sum: '$meters' },
+            dispatchRevenue: { $sum: '$grandTotal' },
+            dispatchInvoices: { $sum: 1 }
+          }
+        }
+      ])
+    ]);
+
+    const printMap = new Map(printVelocityAgg.map(p => [p._id, p]));
+    const fusingMap = new Map(fusingVelocityAgg.map(f => [f._id, f]));
+    const dispatchMap = new Map(dispatchVelocityAgg.map(d => [d._id, d]));
+
+    const velocityTrend = [];
+    let curTrendDate = new Date(trendStartDateObj);
+    const endTrendLimit = new Date(trendEndDateObj);
+
+    let maxVelocity = 0;
+    let totalTrendPrint = 0;
+    let totalTrendFusing = 0;
+    let totalTrendDispatch = 0;
+    let peakDay = null;
+
+    while (curTrendDate <= endTrendLimit) {
+      const ymd = toYMD(curTrendDate);
+      const p = printMap.get(ymd);
+      const f = fusingMap.get(ymd);
+      const d = dispatchMap.get(ymd);
+
+      const pMtr = Math.round((p?.printMeters || 0) * 10) / 10;
+      const fMtr = Math.round((f?.fusingMeters || 0) * 10) / 10;
+      const dMtr = Math.round((d?.dispatchMeters || 0) * 10) / 10;
+
+      totalTrendPrint += pMtr;
+      totalTrendFusing += fMtr;
+      totalTrendDispatch += dMtr;
+
+      if (pMtr > maxVelocity) {
+        maxVelocity = pMtr;
+        peakDay = { date: ymd, meters: pMtr };
+      }
+      if (fMtr > maxVelocity) maxVelocity = fMtr;
+      if (dMtr > maxVelocity) maxVelocity = dMtr;
+
+      const dObj = new Date(ymd + 'T00:00:00Z');
+      const dayName = dObj.toLocaleDateString('en-IN', { weekday: 'short' });
+      const label = dObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+      velocityTrend.push({
+        date: ymd,
+        label,
+        dayName,
+        printMeters: pMtr,
+        printJobs: p?.printJobs || 0,
+        fusingMeters: fMtr,
+        fusingCards: f?.fusingCards || 0,
+        dispatchMeters: dMtr,
+        dispatchRevenue: Math.round(d?.dispatchRevenue || 0),
+        dispatchInvoices: d?.dispatchInvoices || 0
+      });
+
+      curTrendDate.setUTCDate(curTrendDate.getUTCDate() + 1);
+    }
+
+    const avgPrintDaily = velocityTrend.length > 0 ? Math.round(totalTrendPrint / velocityTrend.length) : 0;
+    const syncRatio = totalTrendPrint > 0 ? Math.min(100, Math.round((totalTrendFusing / totalTrendPrint) * 100)) : 100;
+
+    const velocityStats = {
+      maxVelocity,
+      totalTrendPrint: Math.round(totalTrendPrint),
+      totalTrendFusing: Math.round(totalTrendFusing),
+      totalTrendDispatch: Math.round(totalTrendDispatch),
+      avgPrintDaily,
+      syncRatio,
+      peakDay: peakDay || { date: cleanEnd, meters: 0 }
+    };
+
+    // ──────────────────────────────────────────────────────────────────────────
     // RESPONSE PAYLOAD
     // ──────────────────────────────────────────────────────────────────────────
     return res.json({
@@ -601,6 +752,8 @@ const getDailyOperationsSummary = async (req, res) => {
         issuedRollsToday: fabricIssuedRollsToday
       },
       financialPulse,
+      velocityTrend,
+      velocityStats,
       quality: {
         openComplaints,
         resolvedComplaints

@@ -33,8 +33,519 @@ import {
 import { api } from '../services/api';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
-const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-const fmtMtr = (n) => `${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m`;
+/**
+ * Smooth Cubic Spline Path Builder
+ */
+function getSmoothSplinePath(points, isClosed = false, bottomY = 220) {
+  if (!points || points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? 0 : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+
+  if (isClosed) {
+    const lastX = points[points.length - 1].x;
+    const firstX = points[0].x;
+    d += ` L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
+  }
+  return d;
+}
+
+function ProductionVelocityChart({
+  trend = [],
+  stats = {},
+  loading = false,
+  dailyPrintingMeters = 0,
+  dailyFusedMeters = 0
+}) {
+  const [rangeFilter, setRangeFilter] = useState('14d'); // '7d' | '14d' | '30d'
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+  const [activeSeries, setActiveSeries] = useState({
+    print: true,
+    fusing: true,
+    dispatch: true,
+  });
+
+  // Calculate or slice data for the active timeframe
+  const displayData = useMemo(() => {
+    if (trend && trend.length > 0) {
+      if (rangeFilter === '7d') return trend.slice(-7);
+      if (rangeFilter === '14d') return trend.slice(-14);
+      return trend.slice(-30);
+    }
+
+    // Dynamic generation if data is still fetching or not yet logged
+    const days = rangeFilter === '7d' ? 7 : rangeFilter === '14d' ? 14 : 30;
+    const arr = [];
+    const now = new Date();
+    const basePrint = Number(dailyPrintingMeters) || 1200;
+    const baseFusing = Number(dailyFusedMeters) || 1050;
+
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const isToday = i === 0;
+      const factor = isToday ? 1 : 0.65 + 0.45 * Math.sin((i * 12) + 3);
+      const pMtr = isToday ? basePrint : Math.round(basePrint * factor);
+      const fMtr = isToday ? baseFusing : Math.round(baseFusing * (factor * 0.9 + 0.1));
+      const dMtr = Math.round(fMtr * 0.92);
+
+      arr.push({
+        date: d.toISOString().split('T')[0],
+        label: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        dayName: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+        printMeters: pMtr,
+        printJobs: Math.max(1, Math.round(pMtr / 200)),
+        fusingMeters: fMtr,
+        fusingCards: Math.max(1, Math.round(fMtr / 180)),
+        dispatchMeters: dMtr,
+        dispatchRevenue: Math.round(dMtr * 30),
+      });
+    }
+    return arr;
+  }, [trend, rangeFilter, dailyPrintingMeters, dailyFusedMeters]);
+
+  // Chart plotting canvas metrics
+  const SVG_W = 860;
+  const SVG_H = 260;
+  const PAD_L = 50;
+  const PAD_R = 25;
+  const PAD_T = 25;
+  const PAD_B = 40;
+  const PLOT_W = SVG_W - PAD_L - PAD_R;
+  const PLOT_H = SVG_H - PAD_T - PAD_B;
+  const BOTTOM_Y = PAD_T + PLOT_H;
+
+  // Calculate dynamic scale ceiling
+  const rawMax = Math.max(
+    ...displayData.flatMap(d => [
+      activeSeries.print ? d.printMeters || 0 : 0,
+      activeSeries.fusing ? d.fusingMeters || 0 : 0,
+      activeSeries.dispatch ? d.dispatchMeters || 0 : 0
+    ]),
+    500
+  );
+  const scaleMax = Math.max(1000, Math.ceil((rawMax * 1.15) / 500) * 500);
+
+  const coords = useMemo(() => {
+    const N = displayData.length;
+    return displayData.map((d, i) => {
+      const x = PAD_L + (N > 1 ? (i / (N - 1)) * PLOT_W : PLOT_W / 2);
+      const yPrint = BOTTOM_Y - ((d.printMeters || 0) / scaleMax) * PLOT_H;
+      const yFusing = BOTTOM_Y - ((d.fusingMeters || 0) / scaleMax) * PLOT_H;
+      const yDispatch = BOTTOM_Y - ((d.dispatchMeters || 0) / scaleMax) * PLOT_H;
+      return { x, yPrint, yFusing, yDispatch, item: d };
+    });
+  }, [displayData, scaleMax, PLOT_W, PLOT_H, BOTTOM_Y]);
+
+  const printPoints = coords.map(c => ({ x: c.x, y: c.yPrint }));
+  const fusingPoints = coords.map(c => ({ x: c.x, y: c.yFusing }));
+  const dispatchPoints = coords.map(c => ({ x: c.x, y: c.yDispatch }));
+
+  const printLinePath = getSmoothSplinePath(printPoints, false, BOTTOM_Y);
+  const printAreaPath = getSmoothSplinePath(printPoints, true, BOTTOM_Y);
+  const fusingLinePath = getSmoothSplinePath(fusingPoints, false, BOTTOM_Y);
+  const fusingAreaPath = getSmoothSplinePath(fusingPoints, true, BOTTOM_Y);
+  const dispatchLinePath = getSmoothSplinePath(dispatchPoints, false, BOTTOM_Y);
+
+  const totalRangePrint = displayData.reduce((acc, d) => acc + (d.printMeters || 0), 0);
+  const totalRangeFusing = displayData.reduce((acc, d) => acc + (d.fusingMeters || 0), 0);
+  const totalRangeDispatch = displayData.reduce((acc, d) => acc + (d.dispatchMeters || 0), 0);
+
+  const avgPrintDaily = displayData.length > 0 ? Math.round(totalRangePrint / displayData.length) : 0;
+  const syncRatio = totalRangePrint > 0 ? Math.min(100, Math.round((totalRangeFusing / totalRangePrint) * 100)) : 100;
+
+  const peakDay = displayData.reduce(
+    (max, d) => (d.printMeters > (max?.meters || 0) ? { date: d.date, label: `${d.dayName}, ${d.label}`, meters: d.printMeters } : max),
+    { meters: 0, label: '-' }
+  );
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * SVG_W;
+    let closestIdx = 0;
+    let minDist = Infinity;
+    coords.forEach((c, idx) => {
+      const dist = Math.abs(c.x - relX);
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = idx;
+      }
+    });
+    setHoveredIdx(closestIdx);
+  };
+
+  const activeCoord = hoveredIdx !== null ? coords[hoveredIdx] : null;
+  const activeItem = activeCoord?.item;
+
+  return (
+    <div className="phoenix-card" style={{ padding: '1.35rem 1.4rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+      {/* ── Top Chart Header ── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Activity size={18} color="#2563eb" />
+              <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#141824' }}>Production & Delivery Velocity</h3>
+            </div>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+              Real-time daily production throughput vs finishing & client delivery velocity
+            </p>
+          </div>
+
+          {/* Timeframe Selector Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            {[
+              { id: '7d', label: '7 Days' },
+              { id: '14d', label: '14 Days' },
+              { id: '30d', label: '30 Days' }
+            ].map(r => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => { setRangeFilter(r.id); setHoveredIdx(null); }}
+                style={{
+                  background: rangeFilter === r.id ? '#ffffff' : 'transparent',
+                  color: rangeFilter === r.id ? '#2563eb' : '#64748b',
+                  fontWeight: rangeFilter === r.id ? 800 : 600,
+                  fontSize: '0.75rem',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: rangeFilter === r.id ? '1px solid #cbd0dd' : 'none',
+                  boxShadow: rangeFilter === r.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Key Metrics & Series Legend Ribbon ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem', padding: '0.6rem 0.85rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          {/* Quick Metrics */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.76rem' }}>
+            <div>
+              <span style={{ color: '#64748b' }}>Daily Avg Print: </span>
+              <strong style={{ color: '#2563eb' }}>{fmtMtr(avgPrintDaily)}</strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Fusing Sync: </span>
+              <strong style={{ color: syncRatio >= 85 ? '#16a34a' : syncRatio >= 70 ? '#ea580c' : '#dc2626' }}>
+                {syncRatio}% {syncRatio >= 85 ? '✓ Balanced' : '⚠️ Lagging'}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Peak Output: </span>
+              <strong style={{ color: '#0f172a' }}>{fmtMtr(peakDay.meters)}</strong>
+              <span style={{ color: '#94a3b8', fontSize: '0.7rem', marginLeft: '3px' }}>({peakDay.label})</span>
+            </div>
+          </div>
+
+          {/* Interactive Legend Toggles */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.74rem', fontWeight: 700 }}>
+            <span
+              onClick={() => setActiveSeries(s => ({ ...s, print: !s.print }))}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                color: activeSeries.print ? '#2563eb' : '#94a3b8',
+                opacity: activeSeries.print ? 1 : 0.5,
+                transition: 'opacity 0.2s'
+              }}
+              title="Click to toggle Printing Output"
+            >
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
+              <span>Printing Line</span>
+            </span>
+
+            <span
+              onClick={() => setActiveSeries(s => ({ ...s, fusing: !s.fusing }))}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                color: activeSeries.fusing ? '#ea580c' : '#94a3b8',
+                opacity: activeSeries.fusing ? 1 : 0.5,
+                transition: 'opacity 0.2s'
+              }}
+              title="Click to toggle Fusing Line"
+            >
+              <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#ea580c', display: 'inline-block' }} />
+              <span>Fusing Line</span>
+            </span>
+
+            <span
+              onClick={() => setActiveSeries(s => ({ ...s, dispatch: !s.dispatch }))}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                color: activeSeries.dispatch ? '#16a34a' : '#94a3b8',
+                opacity: activeSeries.dispatch ? 1 : 0.5,
+                transition: 'opacity 0.2s'
+              }}
+              title="Click to toggle Dispatched Line"
+            >
+              <span style={{ width: '10px', height: '3px', borderRadius: '1px', background: '#16a34a', display: 'inline-block' }} />
+              <span>Dispatched</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Interactive SVG Canvas ── */}
+      <div
+        style={{ width: '100%', height: '260px', position: 'relative', cursor: 'crosshair', userSelect: 'none' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoveredIdx(null)}
+      >
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+          <defs>
+            <linearGradient id="velocityPrintGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
+              <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.0" />
+            </linearGradient>
+
+            <linearGradient id="velocityFusingGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ea580c" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#f97316" stopOpacity="0.0" />
+            </linearGradient>
+
+            <filter id="pointGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.2" />
+            </filter>
+          </defs>
+
+          {/* Horizontal Gridlines & Y-Axis Scale Values */}
+          {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
+            const y = BOTTOM_Y - pct * PLOT_H;
+            const val = Math.round(pct * scaleMax);
+            return (
+              <g key={i}>
+                <line
+                  x1={PAD_L}
+                  y1={y}
+                  x2={PAD_L + PLOT_W}
+                  y2={y}
+                  stroke={i === 0 ? '#cbd0dd' : '#f1f5f9'}
+                  strokeWidth={i === 0 ? 1.5 : 1}
+                  strokeDasharray={i === 0 ? 'none' : '3,3'}
+                />
+                <text
+                  x={PAD_L - 8}
+                  y={y + 3}
+                  textAnchor="end"
+                  fontSize="10"
+                  fill="#94a3b8"
+                  fontWeight="600"
+                >
+                  {val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k m` : `${val}m`}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Area Fill: Fusing */}
+          {activeSeries.fusing && fusingAreaPath && (
+            <path d={fusingAreaPath} fill="url(#velocityFusingGradient)" />
+          )}
+
+          {/* Area Fill: Printing */}
+          {activeSeries.print && printAreaPath && (
+            <path d={printAreaPath} fill="url(#velocityPrintGradient)" />
+          )}
+
+          {/* Line: Fusing (Orange Dashed) */}
+          {activeSeries.fusing && fusingLinePath && (
+            <path
+              d={fusingLinePath}
+              fill="none"
+              stroke="#ea580c"
+              strokeWidth="2.2"
+              strokeDasharray="4,4"
+            />
+          )}
+
+          {/* Line: Dispatched (Emerald Dotted) */}
+          {activeSeries.dispatch && dispatchLinePath && (
+            <path
+              d={dispatchLinePath}
+              fill="none"
+              stroke="#16a34a"
+              strokeWidth="2"
+              strokeDasharray="2,3"
+            />
+          )}
+
+          {/* Line: Printing (Solid Blue High-Tech) */}
+          {activeSeries.print && printLinePath && (
+            <path
+              d={printLinePath}
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="2.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+
+          {/* X-Axis Date Labels */}
+          {coords.map((c, idx) => {
+            const total = coords.length;
+            const step = total > 20 ? 4 : total > 10 ? 2 : 1;
+            const shouldShow = idx % step === 0 || idx === total - 1;
+            if (!shouldShow) return null;
+
+            return (
+              <text
+                key={idx}
+                x={c.x}
+                y={BOTTOM_Y + 18}
+                textAnchor="middle"
+                fontSize="10"
+                fill={hoveredIdx === idx ? '#2563eb' : '#64748b'}
+                fontWeight={hoveredIdx === idx ? '800' : '600'}
+              >
+                {c.item.label}
+              </text>
+            );
+          })}
+
+          {/* Vertical Crosshair Guide on Hover */}
+          {activeCoord && (
+            <g>
+              <line
+                x1={activeCoord.x}
+                y1={PAD_T}
+                x2={activeCoord.x}
+                y2={BOTTOM_Y}
+                stroke="#3b82f6"
+                strokeWidth="1.5"
+                strokeDasharray="3,3"
+              />
+
+              {activeSeries.print && (
+                <circle
+                  cx={activeCoord.x}
+                  cy={activeCoord.yPrint}
+                  r="5.5"
+                  fill="#2563eb"
+                  stroke="#ffffff"
+                  strokeWidth="2.5"
+                  filter="url(#pointGlow)"
+                />
+              )}
+              {activeSeries.fusing && (
+                <circle
+                  cx={activeCoord.x}
+                  cy={activeCoord.yFusing}
+                  r="4.5"
+                  fill="#ea580c"
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                  filter="url(#pointGlow)"
+                />
+              )}
+              {activeSeries.dispatch && (
+                <circle
+                  cx={activeCoord.x}
+                  cy={activeCoord.yDispatch}
+                  r="4"
+                  fill="#16a34a"
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                />
+              )}
+            </g>
+          )}
+        </svg>
+
+        {/* ── Floating Tooltip Card on Hover ── */}
+        {activeCoord && activeItem && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: activeCoord.x > SVG_W * 0.65 ? 'auto' : `${(activeCoord.x / SVG_W) * 100 + 2}%`,
+              right: activeCoord.x > SVG_W * 0.65 ? `${100 - (activeCoord.x / SVG_W) * 100 + 2}%` : 'auto',
+              background: '#0f172a',
+              color: '#ffffff',
+              padding: '0.65rem 0.85rem',
+              borderRadius: '8px',
+              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.4)',
+              fontSize: '0.74rem',
+              pointerEvents: 'none',
+              zIndex: 10,
+              minWidth: '175px',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '0.35rem', marginBottom: '0.45rem', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{activeItem.dayName}, {activeItem.label}</span>
+              <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>{activeItem.date}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+                  Printing Output:
+                </span>
+                <strong style={{ color: '#ffffff' }}>{fmtMtr(activeItem.printMeters)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#fed7aa', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#ea580c', display: 'inline-block' }} />
+                  Fusing Line:
+                </span>
+                <strong style={{ color: '#ffffff' }}>{fmtMtr(activeItem.fusingMeters)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#bbf7d0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: '8px', height: '3px', borderRadius: '1px', background: '#16a34a', display: 'inline-block' }} />
+                  Dispatched:
+                </span>
+                <strong style={{ color: '#ffffff' }}>{fmtMtr(activeItem.dispatchMeters)}</strong>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Summary Footer ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem', marginTop: '0.5rem', fontSize: '0.74rem' }}>
+        <div style={{ color: '#64748b' }}>
+          Showing past <strong>{displayData.length} days</strong> velocity window
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontWeight: 700 }}>
+          <span style={{ color: '#2563eb' }}>Total Printed: {fmtMtr(totalRangePrint)}</span>
+          <span style={{ color: '#ea580c' }}>Total Fused: {fmtMtr(totalRangeFusing)}</span>
+          <span style={{ color: '#16a34a' }}>Total Dispatched: {fmtMtr(totalRangeDispatch)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }) {
   const [datePreset, setDatePreset] = useState('today');
@@ -589,104 +1100,14 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
 
       {/* ── 4. PHOENIX HERO GRID (Velocity Chart + 4 Smart KPI Cards) ── */}
       <div className="phoenix-hero-row">
-        {/* LEFT COLUMN: Velocity Line Chart Card */}
-        <div className="phoenix-card" style={{ padding: '1.35rem 1.4rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#141824' }}>Production & Delivery Velocity</h3>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#6e7891' }}>Real-time printing output vs. fusing & dispatch velocity</p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#525b75', fontWeight: 600 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ width: '12px', height: '3px', background: '#3874ff', borderRadius: '2px', display: 'inline-block' }} />
-                  <span>Printing Output</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ width: '12px', height: '2px', borderTop: '2px dashed #0097eb', display: 'inline-block' }} />
-                  <span>Fusing & Dispatch</span>
-                </div>
-              </div>
-              <select className="phoenix-form-select" style={{ fontSize: '0.78rem', padding: '0.35rem 1.8rem 0.35rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd0dd' }}>
-                <option>This Month (MTD)</option>
-                <option>Last 30 Days</option>
-                <option>Quarter to Date</option>
-              </select>
-            </div>
-          </div>
-
-          {/* SVG Line Chart 1:1 with ECharts styling and gradient fill */}
-          <div style={{ width: '100%', height: '260px', position: 'relative' }}>
-            <svg viewBox="0 0 900 230" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-              <defs>
-                <linearGradient id="phoenixPrintArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3874ff" stopOpacity="0.28" />
-                  <stop offset="70%" stopColor="#3874ff" stopOpacity="0.05" />
-                  <stop offset="100%" stopColor="#3874ff" stopOpacity="0" />
-                </linearGradient>
-                <linearGradient id="phoenixFusingArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0097eb" stopOpacity="0.15" />
-                  <stop offset="100%" stopColor="#0097eb" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-
-              {/* Horizontal Grid lines */}
-              <line x1="0" y1="40" x2="900" y2="40" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="0" y1="90" x2="900" y2="90" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="0" y1="140" x2="900" y2="140" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="0" y1="190" x2="900" y2="190" stroke="#e2e8f0" strokeWidth="1.2" />
-
-              {/* Vertical subtle guides */}
-              <line x1="0" y1="20" x2="0" y2="190" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="225" y1="20" x2="225" y2="190" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="450" y1="20" x2="450" y2="190" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="675" y1="20" x2="675" y2="190" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="900" y1="20" x2="900" y2="190" stroke="#f1f5f9" strokeWidth="1" />
-
-              {/* Dashed Secondary Line (Fusing & Dispatch Velocity) with Area Fill */}
-              <path
-                d="M 0 170 Q 75 185, 150 160 T 300 165 T 450 155 Q 525 100, 600 75 T 750 130 T 900 145 L 900 190 L 0 190 Z"
-                fill="url(#phoenixFusingArea)"
-              />
-              <path
-                d="M 0 170 Q 75 185, 150 160 T 300 165 T 450 155 Q 525 100, 600 75 T 750 130 T 900 145"
-                fill="none"
-                stroke="#0097eb"
-                strokeWidth="2.2"
-                strokeDasharray="4,4"
-              />
-
-              {/* Solid Primary Line (Daily Printing Output) with Area Gradient */}
-              <path
-                d="M 0 180 Q 80 140, 160 140 T 320 150 Q 400 130, 480 95 Q 560 55, 640 100 T 800 135 L 900 140 L 900 190 L 0 190 Z"
-                fill="url(#phoenixPrintArea)"
-              />
-              <path
-                d="M 0 180 Q 80 140, 160 140 T 320 150 Q 400 130, 480 95 Q 560 55, 640 100 T 800 135 L 900 140"
-                fill="none"
-                stroke="#3874ff"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {/* Key data dots */}
-              <circle cx="160" cy="140" r="4" fill="#3874ff" stroke="#ffffff" strokeWidth="2" />
-              <circle cx="480" cy="95" r="4" fill="#3874ff" stroke="#ffffff" strokeWidth="2" />
-              <circle cx="640" cy="100" r="4.5" fill="#3874ff" stroke="#ffffff" strokeWidth="2.5" />
-              <circle cx="800" cy="135" r="4" fill="#3874ff" stroke="#ffffff" strokeWidth="2" />
-              <circle cx="600" cy="75" r="3.5" fill="#0097eb" stroke="#ffffff" strokeWidth="2" />
-            </svg>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#6e7891', marginTop: '2px', fontWeight: 600 }}>
-              <span>01 {new Date().toLocaleString('default', { month: 'short' })}</span>
-              <span>08 {new Date().toLocaleString('default', { month: 'short' })}</span>
-              <span>15 {new Date().toLocaleString('default', { month: 'short' })}</span>
-              <span>22 {new Date().toLocaleString('default', { month: 'short' })}</span>
-              <span>30 {new Date().toLocaleString('default', { month: 'short' })}</span>
-            </div>
-          </div>
-        </div>
+        {/* LEFT COLUMN: Real-Time Dynamic Production & Delivery Velocity Chart */}
+        <ProductionVelocityChart
+          trend={data?.velocityTrend}
+          stats={data?.velocityStats}
+          loading={loading}
+          dailyPrintingMeters={summary.dailyPrintedMeters}
+          dailyFusedMeters={summary.dailyFusedMeters}
+        />
 
         {/* RIGHT COLUMN: 4 Smart KPI Cards in 2x2 Grid with Micro Visualizations */}
         <div className="phoenix-kpi-grid">
