@@ -34,6 +34,22 @@ import { api } from '../services/api';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
 /**
+ * Format meters with Indian numbering and 'm' unit suffix
+ */
+const fmtMtr = (val) => {
+  const num = Number(val) || 0;
+  return `${num.toLocaleString('en-IN', { maximumFractionDigits: 1 })} m`;
+};
+
+/**
+ * Format currency with Indian Rupee symbol and Indian numbering
+ */
+const fmtINR = (val) => {
+  const num = Number(val) || 0;
+  return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+};
+
+/**
  * Smooth Cubic Spline Path Builder
  */
 function getSmoothSplinePath(points, isClosed = false, bottomY = 220) {
