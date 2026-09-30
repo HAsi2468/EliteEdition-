@@ -20,8 +20,12 @@ require('./schedule/eodExecutiveBriefingScheduler').startEodExecutiveBriefingSch
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const userModel = require('./db/models/user.model');
+const { csrfManager } = require('./utils/csrfManager');
+const { verifyCsrfToken } = require('./middlewares/csrf.middleware');
+const { safeRestGuard } = require('./middlewares/safeRestGuard');
 
 const app = express();
+
 
 // Trust reverse proxy (Nginx) so client IP and rate limiting are properly identified
 app.set('trust proxy', 1);
@@ -88,7 +92,11 @@ app.use(express.json({ limit: '50mb' }));
 // parse urlencoded request body
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// parse cookies for session authentication and CSRF Double-Submit token extraction
+app.use(cookieParser());
+
 // sanitize request data against MongoDB Operator Injection
+
 app.use(mongoSanitize());
 
 // gzip compression
@@ -566,22 +574,46 @@ const distCandidates = [
 const websiteDistPath = distCandidates.find(p => fs.existsSync(p)) || distCandidates[0];
 app.use(express.static(websiteDistPath));
 
-// v1 api routes
+// Safe REST Semantics Guard: architectural protection against mutations on GET/HEAD
+app.use(safeRestGuard);
+
+// Dedicated Anti-CSRF Handshake Handlers (Phase 3 - GET/POST /api/v1/auth/csrf-token)
+app.get(
+  ['/api/v1/auth/csrf-token', '/v1/auth/csrf-token', '/api/v1/csrf-token', '/v1/csrf-token'],
+  csrfManager.handshakeHandler
+);
+app.post(
+  ['/api/v1/auth/csrf-token', '/v1/auth/csrf-token', '/api/v1/csrf-token', '/v1/csrf-token'],
+  csrfManager.handshakeHandler
+);
+
+// Anti-CSRF Verification Middleware: protects all state-changing endpoints (POST/PUT/PATCH/DELETE)
+app.use(['/v1', '/api/v1'], verifyCsrfToken);
+
+// v1 and api/v1 api routes
 app.use('/v1', routes);
+app.use('/api/v1', routes);
 
 // Public verification route for physical challan QR scanning (without /v1 prefix)
 app.use('/verify/challan', require('./routes/v1/challanVerification.route'));
 
 // send back a 404 error for any unknown api request
-app.use('/v1', (req, res, next) => {
+app.use(['/v1', '/api/v1'], (req, res, next) => {
 	next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
 });
 
 // Serve frontend website with no-cache headers to ensure users always receive the latest version
 app.get('*', (req, res, next) => {
-	if (req.path.startsWith('/v1') || req.path.startsWith('/uploads') || req.path.startsWith('/designs') || req.path.startsWith('/verify/challan')) {
+	if (
+    req.path.startsWith('/v1') ||
+    req.path.startsWith('/api/v1') ||
+    req.path.startsWith('/uploads') ||
+    req.path.startsWith('/designs') ||
+    req.path.startsWith('/verify/challan')
+  ) {
 		return next();
 	}
+
 	res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 	res.setHeader('Pragma', 'no-cache');
 	res.setHeader('Expires', '0');

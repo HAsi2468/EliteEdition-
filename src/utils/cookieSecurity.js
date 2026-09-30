@@ -157,6 +157,33 @@ const setSecureCookie = (res, name, value, options = {}) => {
   res.cookie(name, value, cookieOpts);
 };
 
+/**
+ * Options for CSRF token cookie (XSRF-TOKEN).
+ * Enforces: SameSite=Lax; Secure; Path=/; HttpOnly=false (readable by SPA for Double-Submit header injection)
+ * 
+ * @param {import('express').CookieOptions} [overrides={}]
+ * @returns {import('express').CookieOptions}
+ */
+const getCsrfCookieOptions = (overrides = {}) => {
+  return getBaseCookieOptions({
+    httpOnly: false,
+    sameSite: 'lax',
+    ...overrides,
+  });
+};
+
+/**
+ * Sets the standard client-readable XSRF-TOKEN cookie for client-side SPA hydration.
+ * 
+ * @param {import('express').Response} res
+ * @param {string} token
+ * @param {import('express').CookieOptions} [options={}]
+ */
+const setCsrfCookie = (res, token, options = {}) => {
+  const cookieOpts = getCsrfCookieOptions(options);
+  res.cookie('XSRF-TOKEN', token, cookieOpts);
+};
+
 module.exports = {
   getCookieDomain,
   isSecureContext,
@@ -167,4 +194,7 @@ module.exports = {
   setHighPrivilegeCookie,
   clearSecureCookie,
   setSecureCookie,
+  getCsrfCookieOptions,
+  setCsrfCookie,
 };
+

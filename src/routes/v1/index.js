@@ -34,6 +34,7 @@ router.use('/party', partyRoute);
 router.use('/stockOut', stockOutRoute);
 router.use('/oms', omsRoute);
 router.use('/jobCards', jobCardRoute);
+router.use('/jobcards', jobCardRoute);
 router.use('/designs', designRoute);
 router.use('/analytics', analyticsRoute);
 router.use('/myntra', myntraRoute);

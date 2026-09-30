@@ -19,6 +19,51 @@ export const setBaseUrl = (url) => {
   localStorage.setItem('elite_api_base_url', cleaned);
 };
 
+// CSRF Token Resolver & Injector for State-Changing Requests (Phase 3)
+let inMemoryCsrfToken = null;
+let csrfRefreshPromise = null;
+
+export const getCsrfTokenFromCookie = () => {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)(?:XSRF-TOKEN|csrf_token)=([^;]+)/);
+  if (match && match[1]) {
+    try {
+      return decodeURIComponent(match[1]);
+    } catch (e) {
+      return match[1];
+    }
+  }
+  return null;
+};
+
+export const fetchCsrfToken = async () => {
+  if (csrfRefreshPromise) return csrfRefreshPromise;
+  csrfRefreshPromise = (async () => {
+    try {
+      const baseUrl = getBaseUrl();
+      const res = await fetch(`${baseUrl}/auth/csrf-token`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const token = data.csrfToken || data.token || getCsrfTokenFromCookie();
+        if (token) {
+          inMemoryCsrfToken = token;
+          return token;
+        }
+      }
+    } catch (e) {
+      console.warn('[CSRF] Failed to fetch fresh CSRF token:', e?.message || e);
+    } finally {
+      csrfRefreshPromise = null;
+    }
+    return inMemoryCsrfToken || getCsrfTokenFromCookie();
+  })();
+  return csrfRefreshPromise;
+};
+
 // Generic request wrapper with Auto-Retry, Timeout & Safe Error Parser
 const request = async (path, options = {}) => {
   const maxRetries = options.maxRetries ?? (options.method && options.method !== 'GET' ? 2 : 3);
@@ -44,6 +89,17 @@ const request = async (path, options = {}) => {
 
     const activeCompanyId = localStorage.getItem('elite_active_department') || '';
 
+    const method = (options.method || 'GET').toUpperCase();
+    const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+
+    let csrfToken = null;
+    if (isMutating) {
+      csrfToken = inMemoryCsrfToken || getCsrfTokenFromCookie();
+      if (!csrfToken && typeof window !== 'undefined') {
+        csrfToken = await fetchCsrfToken();
+      }
+    }
+
     const headers = {
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -51,6 +107,7 @@ const request = async (path, options = {}) => {
       ...(uName ? { 'X-User-Name': uName } : {}),
       ...(uRole ? { 'X-User-Role': uRole } : {}),
       ...(activeCompanyId ? { 'X-Company-Id': activeCompanyId } : {}),
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Pragma': 'no-cache',
       ...options.headers,
@@ -64,6 +121,7 @@ const request = async (path, options = {}) => {
     try {
       response = await fetch(`${baseUrl}${path}`, {
         ...options,
+        credentials: options.credentials || 'include',
         cache: 'no-store',
         headers,
         signal: options.signal || controller.signal,
@@ -96,6 +154,20 @@ const request = async (path, options = {}) => {
     } finally {
       clearTimeout(timeoutId);
     }
+
+    // Auto-refresh CSRF token if rejected due to expiration or missing token
+    if (response.status === 403 && isMutating && !options._csrfRetried) {
+      try {
+        const cloned = response.clone();
+        const errJson = await cloned.json();
+        if (errJson?.error && typeof errJson.error === 'string' && errJson.error.startsWith('CSRF_TOKEN_')) {
+          inMemoryCsrfToken = null;
+          await fetchCsrfToken();
+          return request(path, { ...options, _csrfRetried: true });
+        }
+      } catch (e) {}
+    }
+
     
     // If server is reloading during deployment, status code is 502, 503, or 504
     if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt <= maxRetries) {

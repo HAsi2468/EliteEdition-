@@ -1,0 +1,120 @@
+name: CORS & Anti-CSRF Vulnerability Gate (Phase 4 SLA)
+
+on:
+  push:
+    branches: [ main, master, production ]
+  pull_request:
+    branches: [ main, master, production ]
+  workflow_dispatch:
+
+concurrency:
+  group: cors-csrf-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep-audit:
+    name: Semgrep Static Code Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep Static Security Audit
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: .semgrep/cors-csrf-guard.yml
+          generateSarif: "1"
+        env:
+          SEMGREP_RULES: .semgrep/cors-csrf-guard.yml
+
+      - name: Upload Semgrep SARIF Report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+        continue-on-error: true
+
+  penetration-test-suite:
+    name: Penetration & Origin Isolation Tests (SEC-CORS/CSRF)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [ 20.x, 22.x ]
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Execute Full Penetration & Anti-CSRF Test Suite
+        env:
+          NODE_ENV: test
+          MONGODB_URL: mongodb://localhost:27017/elite-test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci_test_secret_for_csrf_and_auth_testing_32chars
+          CSRF_SECRET: ci_test_csrf_secret_for_hmac_double_submit_key
+          COOKIE_SECURE: "false"
+        run: |
+          echo "Running Phase 1 CORS Remediation Suite..."
+          node --test src/tests/corsRemediation.test.js
+          echo "Running Phase 2 Cookie Security Suite..."
+          node --test src/tests/cookieSecurity.test.js
+          echo "Running Phase 3 & 4 Full End-to-End CORS & CSRF Penetration Suite..."
+          node --test src/tests/corsCsrfSecurity.test.js
+
+  owasp-zap-baseline-scan:
+    name: OWASP ZAP Baseline Security Scan
+    runs-on: ubuntu-latest
+    needs: [ penetration-test-suite ]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Install & Start Staging Server
+        env:
+          NODE_ENV: test
+          PORT: 8080
+          COOKIE_SECURE: "false"
+        run: |
+          npm ci
+          node -e "
+            const app = require('./src/app');
+            const server = app.listen(8080, () => {
+              console.log('Staging server running on port 8080');
+            });
+            setTimeout(() => {
+              console.log('Server health verified.');
+            }, 2000);
+          " &
+          sleep 5
+          curl -I http://localhost:8080/v1/auth/csrf-token || exit 1
+
+      - name: Run OWASP ZAP Cross-Origin & CSRF Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:8080/v1/auth/csrf-token'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j -m 2'
+        continue-on-error: true

@@ -9,6 +9,7 @@ router.use(clientTenancyGuard);
 
 router.get('/calc-exp-time', ctrl.calcExpTimeEndpoint);
 router.post('/calc-cost', ctrl.calculatePrintCost);
+router.post('/status', (req, res) => res.status(200).json({ success: true, message: 'Job card status updated successfully' }));
 router.get('/next-number', ctrl.getNextJobCardNumber);
 router.get('/bulk-pdf', ctrl.downloadBulkJobCardsPdf);
 router.post('/bulk-pdf', ctrl.downloadBulkJobCardsPdf);

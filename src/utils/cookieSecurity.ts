@@ -150,3 +150,28 @@ export const setSecureCookie = (
   const cookieOpts = getBaseCookieOptions(options);
   res.cookie(name, value, cookieOpts);
 };
+
+/**
+ * Options for CSRF token cookie (XSRF-TOKEN).
+ * Enforces: SameSite=Lax; Secure; Path=/; HttpOnly=false (readable by SPA for Double-Submit header injection)
+ */
+export const getCsrfCookieOptions = (overrides: CookieOptions = {}): CookieOptions => {
+  return getBaseCookieOptions({
+    httpOnly: false,
+    sameSite: 'lax',
+    ...overrides,
+  });
+};
+
+/**
+ * Sets the standard client-readable XSRF-TOKEN cookie for client-side SPA hydration.
+ */
+export const setCsrfCookie = (
+  res: Response,
+  token: string,
+  options: CookieOptions = {}
+): void => {
+  const cookieOpts = getCsrfCookieOptions(options);
+  res.cookie('XSRF-TOKEN', token, cookieOpts);
+};
+

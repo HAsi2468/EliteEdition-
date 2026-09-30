@@ -40,3 +40,12 @@ export function setSecureCookie(
   value: string,
   options?: CookieOptions
 ): void;
+
+export function getCsrfCookieOptions(overrides?: CookieOptions): CookieOptions;
+
+export function setCsrfCookie(
+  res: Response,
+  token: string,
+  options?: CookieOptions
+): void;
+

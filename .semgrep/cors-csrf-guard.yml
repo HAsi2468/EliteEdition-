@@ -1,0 +1,136 @@
+rules:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Rule 1: Flag Unsafe CORS Origin Reflection & Wildcard Credentials
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: unsafe-cors-origin-reflection
+    languages:
+      - javascript
+      - typescript
+    severity: ERROR
+    message: >-
+      Unsafe CORS origin reflection detected! Reflecting 'req.headers.origin' without
+      strict whitelist validation or using wildcard '*' with credentials violates origin
+      isolation and enables cross-origin credential theft.
+    metadata:
+      cwe: "CWE-942: Permissive Cross-Origin Resource Sharing Policy"
+      owasp: "A01:2021 - Broken Access Control"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: $RES.setHeader('Access-Control-Allow-Origin', $REQ.headers.origin)
+          - pattern: $RES.setHeader('Access-Control-Allow-Origin', $REQ.headers['origin'])
+          - pattern: $RES.header('Access-Control-Allow-Origin', $REQ.headers.origin)
+          - pattern: $RES.header('Access-Control-Allow-Origin', $REQ.headers['origin'])
+          - pattern: $RES.set('Access-Control-Allow-Origin', $REQ.headers.origin)
+          - pattern: $RES.set('Access-Control-Allow-Origin', $REQ.headers['origin'])
+          - pattern: |
+              $RES.setHeader('Access-Control-Allow-Origin', '*');
+              ...
+              $RES.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Rule 2: Flag State Mutations inside Safe GET Route Handlers
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: express-mutation-in-get-handler
+    languages:
+      - javascript
+      - typescript
+    severity: ERROR
+    message: >-
+      State mutation detected inside an idempotent GET route handler! Safe REST semantics
+      and RFC 9110 strictly forbid data mutations (delete, update, save) via GET/HEAD.
+      Use POST, PUT, PATCH, or DELETE with Anti-CSRF protection instead.
+    metadata:
+      cwe: "CWE-352: Cross-Site Request Forgery (CSRF)"
+      owasp: "A01:2021 - Broken Access Control"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $ROUTER.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.deleteMany(...);
+                ...
+              })
+          - pattern: |
+              $ROUTER.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.deleteOne(...);
+                ...
+              })
+          - pattern: |
+              $ROUTER.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.findByIdAndDelete(...);
+                ...
+              })
+          - pattern: |
+              $ROUTER.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.updateMany(...);
+                ...
+              })
+          - pattern: |
+              $ROUTER.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.updateOne(...);
+                ...
+              })
+          - pattern: |
+              $ROUTER.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.findByIdAndUpdate(...);
+                ...
+              })
+          - pattern: |
+              $APP.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.deleteMany(...);
+                ...
+              })
+          - pattern: |
+              $APP.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.deleteOne(...);
+                ...
+              })
+          - pattern: |
+              $APP.get($PATH, async ($REQ, $RES, ...) => {
+                ...
+                await $MODEL.findByIdAndDelete(...);
+                ...
+              })
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Rule 3: Flag Set-Cookie Invocations Missing SameSite or Secure Attributes
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: cookie-missing-samesite-or-secure
+    languages:
+      - javascript
+      - typescript
+    severity: WARNING
+    message: >-
+      Insecure cookie configuration! Cookies must explicitly set 'sameSite' (Lax or Strict)
+      and 'secure' attributes to defend against ambient session CSRF attacks. Use the
+      standardized 'cookieSecurity' utility (setSessionCookie or setCsrfCookie).
+    metadata:
+      cwe: "CWE-1275: Sensitive Cookie with Improper SameSite Attribute"
+      owasp: "A05:2021 - Security Misconfiguration"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $RES.cookie($NAME, $VAL, {
+                ...,
+                sameSite: 'none',
+                ...
+              })
+          - pattern: |
+              $RES.cookie($NAME, $VAL, {
+                ...,
+                secure: false,
+                ...
+              })

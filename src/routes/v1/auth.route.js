@@ -4,10 +4,16 @@ const authValidation = require('../../validations/auth.validation');
 const authController = require('../../controllers/auth.controller');
 
 const router = express.Router();
+const { csrfManager } = require('../../utils/csrfManager');
 
 router.get('/ping', (req, res) => {
   res.send({ message: 'Auth service is alive' });
 });
+
+// Phase 3 CSRF Handshake Handlers (GET /v1/auth/csrf-token, POST for client compatibility)
+router.get('/csrf-token', csrfManager.handshakeHandler);
+router.post('/csrf-token', csrfManager.handshakeHandler);
+
 
 // Existing routes
 router.post(
