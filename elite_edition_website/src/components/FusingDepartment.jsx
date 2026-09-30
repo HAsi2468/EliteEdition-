@@ -1353,18 +1353,12 @@ export default function FusingDepartment() {
       {activeFusingTab === 'entry' && (
       <>
       {/* ── TOP SECTION: NEW FUSING ENTRY FORM CARD (Matches User Reference Image) ── */}
-      <div className="glass-panel" style={{
-        padding: '1.35rem 1.5rem',
-        borderRadius: '16px',
-        boxShadow: '0 10px 30px -10px rgba(2, 132, 199, 0.12)',
-        background: '#ffffff',
-        border: '1px solid #e0f2fe'
-      }}>
+      <div className="glass-panel fusing-entry-card">
         {/* Form Card Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isFormExpanded ? '1.25rem' : '0.5rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+        <div className="fusing-entry-header-row" style={{ marginBottom: isFormExpanded ? '1.25rem' : '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
             <div style={{
-              width: 28, height: 28, borderRadius: '50%', background: '#e0f2fe',
+              width: 30, height: 30, borderRadius: '50%', background: '#e0f2fe',
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7'
             }}>
               <PlusCircle size={18} />
@@ -1375,7 +1369,6 @@ export default function FusingDepartment() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-
             <button
               type="button"
               onClick={() => setIsFormExpanded(prev => !prev)}
@@ -1437,12 +1430,12 @@ export default function FusingDepartment() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleTopFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form onSubmit={handleTopFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', boxSizing: 'border-box' }}>
           
           {/* Row 1: DATE, SHIFT, ON TIME, OFF TIME */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+          <div className="fusing-entry-row-time">
+            <div className="fusing-field-col">
+              <label className="fusing-field-label" style={{ color: '#475569' }}>
                 DATE *
               </label>
               <input
@@ -1450,19 +1443,20 @@ export default function FusingDepartment() {
                 required
                 value={topForm.date}
                 onChange={e => setTopForm(f => ({ ...f, date: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
+                className="fusing-field-input"
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+            <div className="fusing-field-col">
+              <label className="fusing-field-label" style={{ color: '#475569' }}>
                 SHIFT *
               </label>
               <select
                 required
                 value={topForm.shift}
                 onChange={e => setTopForm(f => ({ ...f, shift: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
+                className="fusing-field-input"
+                style={{ cursor: 'pointer' }}
               >
                 <option value="Morning">Morning</option>
                 <option value="Night">Night</option>
@@ -1471,54 +1465,50 @@ export default function FusingDepartment() {
               </select>
             </div>
 
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                <Clock size={12} color="#16a34a" /> START TIME
+            <div className="fusing-field-col">
+              <label className="fusing-field-label" style={{ color: '#16a34a' }}>
+                <Clock size={13} color="#16a34a" /> START TIME
               </label>
               <input
                 type="time"
                 value={topForm.onTime}
                 onChange={e => setTopForm(f => ({ ...f, onTime: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
+                className="fusing-field-input"
               />
             </div>
 
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                <Clock size={12} color="#dc2626" /> END TIME
+            <div className="fusing-field-col">
+              <label className="fusing-field-label" style={{ color: '#dc2626' }}>
+                <Clock size={13} color="#dc2626" /> END TIME
               </label>
               <input
                 type="time"
                 value={topForm.offTime}
                 onChange={e => setTopForm(f => ({ ...f, offTime: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
+                className="fusing-field-input"
               />
             </div>
           </div>
 
-          {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, FABRIC WASTAGE, FRESH OUTPUT, FUSING TEMP, SPEED, BUTTER PAPER, PANNA */}
+          {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, WASTAGE MATRIX, FRESH OUTPUT, FUSING TEMP, SPEED, BUTTER PAPER, PANNA */}
             <div style={{
-              gridColumn: '1 / -1',
               display: 'flex',
               flexDirection: 'column',
               gap: '1rem',
               background: '#f8fafc',
               padding: '1.15rem 1.25rem',
               borderRadius: '14px',
-              border: '1.5px solid #cbd5e1'
+              border: '1.5px solid #cbd5e1',
+              width: '100%',
+              boxSizing: 'border-box'
             }}>
               
-              {/* TIER 1: Job Card Selection, Printed Meters, Fabric Wastage & Fresh Fused Output */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '1rem',
-                alignItems: 'start'
-              }}>
+              {/* TIER 1: Job Card Selection, Printed Meters & Fresh Fused Output */}
+              <div className="fusing-entry-tier1">
                 {/* 1. JOB TYPE / JOBCARD NO. - Searchable & Filtered to Printing Done & Fusing Pending */}
-                <div ref={jobDropdownRef} style={{ gridColumn: 'span 2 / span 2', position: 'relative' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '4px' }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase' }}>
+                <div ref={jobDropdownRef} className="fusing-field-col" style={{ position: 'relative' }}>
+                  <div className="fusing-field-label-between">
+                    <label className="fusing-field-label" style={{ color: '#0284c7', margin: 0 }}>
                       JOB TYPE / JOBCARD NO. *
                     </label>
                     <button
@@ -1560,16 +1550,13 @@ export default function FusingDepartment() {
                           handleTopJobCardSelect('');
                         }
                       }}
+                      className="fusing-field-input"
                       style={{
-                        width: '100%',
-                        padding: '0.65rem 2.8rem 0.65rem 2.2rem',
-                        borderRadius: '8px',
+                        paddingLeft: '2.2rem',
+                        paddingRight: '2.8rem',
                         border: '2px solid #38bdf8',
-                        fontSize: '0.92rem',
-                        fontWeight: 800,
-                        background: '#ffffff',
                         color: '#0369a1',
-                        boxSizing: 'border-box'
+                        fontWeight: 800
                       }}
                     />
                     {/* Clear / Dropdown Toggle Button */}
@@ -1747,21 +1734,15 @@ export default function FusingDepartment() {
                 </div>
 
                 {/* 2. PRINTED METERS (DISPLAYED REFERENCE) */}
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#0369a1', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                <div className="fusing-field-col">
+                  <label className="fusing-field-label" style={{ color: '#0369a1' }}>
                     🖨️ PRINTED METERS
                   </label>
-                  <div style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
+                  <div className="fusing-field-input" style={{
                     border: '1.5px solid #bae6fd',
-                    fontSize: '0.92rem',
-                    fontWeight: 900,
                     background: '#f0f9ff',
                     color: '#0284c7',
-                    boxSizing: 'border-box',
-                    minHeight: '44px',
+                    fontWeight: 900,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
@@ -1776,9 +1757,9 @@ export default function FusingDepartment() {
                 </div>
 
                 {/* 3. FRESH FUSED OUTPUT (MTR) — Auto-Calculated as (Printed - Total Wastage) & Editable */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#15803d', margin: 0, textTransform: 'uppercase' }}>
+                <div className="fusing-field-col">
+                  <div className="fusing-field-label-between">
+                    <label className="fusing-field-label" style={{ color: '#15803d', margin: 0 }}>
                       <CheckCircle2 size={13} color="#15803d" /> FRESH FUSED (MTR) *
                     </label>
                     {parseFloat(topForm.printedMtr) > 0 && (
@@ -1795,32 +1776,20 @@ export default function FusingDepartment() {
                     placeholder="Fresh mtr..."
                     value={topForm.freshMtr}
                     onChange={e => handleFreshMtrChange(e.target.value)}
+                    className="fusing-field-input"
                     style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
                       border: '2px solid #4ade80',
-                      fontSize: '0.95rem',
-                      fontWeight: 900,
                       background: '#f0fdf4',
                       color: '#15803d',
-                      boxSizing: 'border-box'
+                      fontWeight: 900,
+                      fontSize: '0.95rem'
                     }}
                   />
                 </div>
               </div>
 
               {/* TIER 1.5: DEDICATED WASTAGE BREAKDOWN MATRIX (ALL 4 FAULT TYPES) */}
-              <div style={{
-                background: '#ffffff',
-                border: '1.5px solid #fecdd3',
-                borderRadius: '12px',
-                padding: '1rem 1.15rem',
-                boxShadow: '0 2px 10px rgba(244, 63, 94, 0.05)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.85rem'
-              }}>
+              <div className="fusing-wastage-matrix">
                 {/* Wastage Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1881,13 +1850,9 @@ export default function FusingDepartment() {
                 </div>
 
                 {/* 4 Wastage Inputs Grid */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '0.85rem'
-                }}>
+                <div className="fusing-wastage-grid">
                   {/* 1. Fabric Fault (Mtr) */}
-                  <div style={{ background: '#fff5f5', border: '1px solid #fed7d7', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                  <div className="fusing-wastage-card" style={{ background: '#fff5f5', border: '1px solid #fed7d7' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c53030' }}>
                         🧵 1. Fabric Fault
@@ -1914,7 +1879,7 @@ export default function FusingDepartment() {
                         ))}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       Weaving holes, yarn defects, oil stains
                     </div>
                     <input
@@ -1926,7 +1891,8 @@ export default function FusingDepartment() {
                       onChange={e => handleFaultChange('fabricFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '0.5rem 0.65rem',
+                        height: '38px',
+                        padding: '0.45rem 0.65rem',
                         borderRadius: '6px',
                         border: '1.5px solid #feb2b2',
                         fontSize: '0.92rem',
@@ -1939,7 +1905,7 @@ export default function FusingDepartment() {
                   </div>
 
                   {/* 2. Fusing Fault (Mtr) */}
-                  <div style={{ background: '#fffaf0', border: '1px solid #feebc8', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                  <div className="fusing-wastage-card" style={{ background: '#fffaf0', border: '1px solid #feebc8' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c05621' }}>
                         🔥 2. Fusing Fault
@@ -1966,7 +1932,7 @@ export default function FusingDepartment() {
                         ))}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       Heat crease, paper jam, roll marks
                     </div>
                     <input
@@ -1978,7 +1944,8 @@ export default function FusingDepartment() {
                       onChange={e => handleFaultChange('fusingFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '0.5rem 0.65rem',
+                        height: '38px',
+                        padding: '0.45rem 0.65rem',
                         borderRadius: '6px',
                         border: '1.5px solid #fbd38d',
                         fontSize: '0.92rem',
@@ -1991,7 +1958,7 @@ export default function FusingDepartment() {
                   </div>
 
                   {/* 3. Print Fault (Mtr) */}
-                  <div style={{ background: '#ebf8ff', border: '1px solid #bee3f8', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                  <div className="fusing-wastage-card" style={{ background: '#ebf8ff', border: '1px solid #bee3f8' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2b6cb0' }}>
                         🖨️ 3. Print Fault
@@ -2018,7 +1985,7 @@ export default function FusingDepartment() {
                         ))}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       Banding, color bleed, head strikes
                     </div>
                     <input
@@ -2030,7 +1997,8 @@ export default function FusingDepartment() {
                       onChange={e => handleFaultChange('printFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '0.5rem 0.65rem',
+                        height: '38px',
+                        padding: '0.45rem 0.65rem',
                         borderRadius: '6px',
                         border: '1.5px solid #90cdf4',
                         fontSize: '0.92rem',
@@ -2043,7 +2011,7 @@ export default function FusingDepartment() {
                   </div>
 
                   {/* 4. Genuine Fault / Joint (Mtr) */}
-                  <div style={{ background: '#faf5ff', border: '1px solid #e9d8fd', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                  <div className="fusing-wastage-card" style={{ background: '#faf5ff', border: '1px solid #e9d8fd' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#6b46c1' }}>
                         ✂️ 4. Genuine / Joint
@@ -2070,7 +2038,7 @@ export default function FusingDepartment() {
                         ))}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       Leader fabric, roll joint, cutting trim
                     </div>
                     <input
@@ -2082,7 +2050,8 @@ export default function FusingDepartment() {
                       onChange={e => handleFaultChange('genuineFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '0.5rem 0.65rem',
+                        height: '38px',
+                        padding: '0.45rem 0.65rem',
                         borderRadius: '6px',
                         border: '1.5px solid #d6bcfa',
                         fontSize: '0.92rem',
@@ -2148,15 +2117,10 @@ export default function FusingDepartment() {
               </div>
 
               {/* TIER 2: Machine & Operating Parameters (Temperature, Speed, Panna, Butter Paper, Roll Completed) */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                gap: '1rem',
-                alignItems: 'end'
-              }}>
+              <div className="fusing-params-grid">
                 {/* 5. FUSING TEMPERATURE */}
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#d97706', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                <div className="fusing-field-col">
+                  <label className="fusing-field-label" style={{ color: '#d97706' }}>
                     <Thermometer size={14} color="#d97706" /> FUSING TEMP (°C) *
                   </label>
                   <input
@@ -2165,20 +2129,22 @@ export default function FusingDepartment() {
                     placeholder="e.g. 210°C"
                     value={topForm.fusingTemp}
                     onChange={e => setTopForm(f => ({ ...f, fusingTemp: e.target.value }))}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #fde68a', fontSize: '0.92rem', fontWeight: 900, background: '#fffbe6', color: '#92400e', boxSizing: 'border-box' }}
+                    className="fusing-field-input"
+                    style={{ border: '2px solid #fde68a', background: '#fffbe6', color: '#92400e', fontWeight: 900 }}
                   />
                 </div>
 
                 {/* 6. FUSING SPEED */}
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                <div className="fusing-field-col">
+                  <label className="fusing-field-label" style={{ color: '#2563eb' }}>
                     <Gauge size={14} color="#2563eb" /> FUSING SPEED (m/min) *
                   </label>
                   <select
                     required
                     value={topForm.fusingSpeed || '80'}
                     onChange={e => setTopForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 900, background: '#eff6ff', color: '#1e40af', cursor: 'pointer', boxSizing: 'border-box' }}
+                    className="fusing-field-input"
+                    style={{ border: '2px solid #bfdbfe', background: '#eff6ff', color: '#1e40af', cursor: 'pointer', fontWeight: 900 }}
                   >
                     {topForm.fusingSpeed && !FUSING_SPEED_OPTIONS.map(String).includes(String(topForm.fusingSpeed).replace(/[^0-9]/g, '')) && (
                       <option value={topForm.fusingSpeed}>{topForm.fusingSpeed}</option>
@@ -2192,9 +2158,9 @@ export default function FusingDepartment() {
                 </div>
 
                 {/* 7. PANNA */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', margin: 0, textTransform: 'uppercase' }}>
+                <div className="fusing-field-col">
+                  <div className="fusing-field-label-between">
+                    <label className="fusing-field-label" style={{ color: '#0284c7', margin: 0 }}>
                       <Layers size={14} color="#0284c7" /> PANNA *
                     </label>
                     <button
@@ -2209,7 +2175,8 @@ export default function FusingDepartment() {
                     required
                     value={topForm.panna}
                     onChange={e => setTopForm(f => ({ ...f, panna: e.target.value }))}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.92rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer', boxSizing: 'border-box' }}
+                    className="fusing-field-input"
+                    style={{ border: '1px solid #cbd5e1', color: '#0369a1', cursor: 'pointer', fontWeight: 800 }}
                   >
                     {pannaOptions.map(p => (
                       <option key={p} value={p}>{p}</option>
@@ -2218,8 +2185,8 @@ export default function FusingDepartment() {
                 </div>
 
                 {/* 8. BUTTER PAPER USED? */}
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                <div className="fusing-field-col">
+                  <label className="fusing-field-label" style={{ color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b' }}>
                     <Scale size={14} color={topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b'} /> BUTTER PAPER USED? *
                   </label>
                   <select
@@ -2232,17 +2199,13 @@ export default function FusingDepartment() {
                         butterPaperWeightKg: val === 'No' ? '0' : f.butterPaperWeightKg
                       }));
                     }}
+                    className="fusing-field-input"
                     style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
                       border: `2px solid ${topForm.useButterPaper === 'Yes' ? '#8b5cf6' : '#cbd5e1'}`,
-                      fontSize: '0.92rem',
-                      fontWeight: 800,
                       background: topForm.useButterPaper === 'Yes' ? '#f5f3ff' : '#ffffff',
                       color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#475569',
-                      cursor: 'pointer',
-                      boxSizing: 'border-box'
+                      fontWeight: 800,
+                      cursor: 'pointer'
                     }}
                   >
                     <option value="Yes">✓ Yes</option>
@@ -2251,9 +2214,9 @@ export default function FusingDepartment() {
                 </div>
 
                 {/* 9. BUTTER PAPER WEIGHT (KG) - Shown when Yes */}
-                {topForm.useButterPaper === 'Yes' && (
-                  <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                {topForm.useButterPaper === 'Yes' ? (
+                  <div className="fusing-field-col">
+                    <label className="fusing-field-label" style={{ color: '#6d28d9' }}>
                       <Scale size={14} color="#6d28d9" /> BUTTER PAPER (KG)
                     </label>
                     <input
@@ -2263,32 +2226,21 @@ export default function FusingDepartment() {
                       placeholder="Weight kg..."
                       value={topForm.butterPaperWeightKg}
                       onChange={e => setTopForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
+                      className="fusing-field-input"
                       style={{
-                        width: '100%',
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: '8px',
                         border: '2px solid #c4b5fd',
-                        fontSize: '0.92rem',
-                        fontWeight: 800,
                         background: '#f5f3ff',
                         color: '#6d28d9',
-                        boxSizing: 'border-box'
+                        fontWeight: 800
                       }}
                     />
                   </div>
-                )}
+                ) : null}
 
                 {/* 10. ROLL COMPLETED? */}
-                <div>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#16a34a' : (topForm.rollCompleted === 'Partial Complete' ? '#0284c7' : '#ea580c'),
-                    marginBottom: '0.35rem',
-                    textTransform: 'uppercase'
+                <div className="fusing-field-col">
+                  <label className="fusing-field-label" style={{
+                    color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#16a34a' : (topForm.rollCompleted === 'Partial Complete' ? '#0284c7' : '#ea580c')
                   }}>
                     {(topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? (
                       <CheckCircle2 size={14} color="#16a34a" />
@@ -2302,19 +2254,15 @@ export default function FusingDepartment() {
                   <select
                     value={topForm.rollCompleted === 'Yes' ? 'Complete' : (topForm.rollCompleted === 'No' ? 'Partial Complete' : (topForm.rollCompleted || 'Complete'))}
                     onChange={e => setTopForm(f => ({ ...f, rollCompleted: e.target.value }))}
+                    className="fusing-field-input"
                     style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
                       border: `2px solid ${
                         (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#4ade80' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fb923c')
                       }`,
-                      fontSize: '0.92rem',
-                      fontWeight: 800,
                       background: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#f0fdf4' : (topForm.rollCompleted === 'Partial Complete' ? '#f0f9ff' : '#fff7ed'),
                       color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#15803d' : (topForm.rollCompleted === 'Partial Complete' ? '#0369a1' : '#c2410c'),
                       cursor: 'pointer',
-                      boxSizing: 'border-box'
+                      fontWeight: 800
                     }}
                   >
                     <option value="Complete">✓ Complete</option>
@@ -2377,68 +2325,55 @@ export default function FusingDepartment() {
             </div>
 
           {/* Row 3: OPERATOR NAME, REMARKS / NOTES */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                OPERATOR NAME
+          <div className="fusing-remarks-grid">
+            <div className="fusing-field-col">
+              <label className="fusing-field-label" style={{ color: '#475569' }}>
+                OPERATOR NAME *
               </label>
               <input
                 type="text"
+                required
                 value={topForm.fusingOperator}
                 onChange={e => setTopForm(f => ({ ...f, fusingOperator: e.target.value }))}
                 placeholder="Operator Name..."
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600, background: '#ffffff', color: '#0f172a' }}
+                className="fusing-field-input"
               />
             </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem', flexWrap: 'wrap', gap: '4px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  REMARKS / NOTES
-                </label>
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {['Heat Crease', 'Fabric Shrinkage', 'Paper Jam', 'Color Bleed', 'Roller Mark'].map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => setTopForm(f => ({ ...f, notes: f.notes ? `${f.notes}, [${tag}]` : `[${tag}]` }))}
-                      style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
-                    >
-                      +{tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="fusing-field-col">
+              <label className="fusing-field-label" style={{ color: '#475569' }}>
+                REMARKS / NOTES
+              </label>
               <input
                 type="text"
                 value={topForm.notes}
                 onChange={e => setTopForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Optional notes e.g. Butter Paper Roll #2..."
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 500, background: '#ffffff', color: '#0f172a' }}
+                className="fusing-field-input"
+                style={{ fontWeight: 500 }}
               />
+              <div className="fusing-chips-tray">
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Quick Tag:</span>
+                {['Heat Crease', 'Fabric Shrinkage', 'Paper Jam', 'Color Bleed', 'Roller Mark'].map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setTopForm(f => ({ ...f, notes: f.notes ? `${f.notes}, [${tag}]` : `[${tag}]` }))}
+                    className="fusing-chip-btn"
+                  >
+                    +{tag}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Submit Action Button */}
-          <div style={{ marginTop: '0.4rem' }}>
+          <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center' }}>
             <button
               type="submit"
               disabled={submitting}
-              style={{
-                background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
-                color: '#ffffff',
-                border: 'none',
-                padding: '0.75rem 1.8rem',
-                borderRadius: '10px',
-                fontSize: '0.92rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
-                transition: 'all 0.15s'
-              }}
+              className="fusing-submit-btn"
             >
               {submitting ? <RefreshCw size={18} className="spin-loader" /> : <PlusCircle size={18} />}
               <span>Submit Fusing Entry Log</span>
