@@ -639,6 +639,102 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     };
   };
 
+  // Helper to comprehensively resolve customer / party name and GSTIN across invoices and master database
+  const resolvePartyInfo = (inv, fallbackParty = null) => {
+    let matchedCust = null;
+    const invCustId = inv?.customer?.customerId || inv?.customerId || inv?.customer?._id || inv?.customer?.id;
+    if (invCustId) {
+      matchedCust = customers.find(c => String(c._id) === String(invCustId) || String(c.id) === String(invCustId));
+    }
+
+    const rawGst = (
+      inv?.customer?.gstin ||
+      inv?.customer?.partyGstin ||
+      inv?.customerGst ||
+      inv?.customerGstin ||
+      inv?.partyGstin ||
+      inv?.gstin ||
+      ''
+    ).trim().toUpperCase();
+
+    if (!matchedCust && rawGst && rawGst !== 'N/A' && rawGst !== 'UNDEFINED' && rawGst !== 'NULL') {
+      matchedCust = customers.find(c => (c.gstin || '').trim().toUpperCase() === rawGst);
+    }
+
+    const rawName = (
+      inv?.customer?.businessName ||
+      inv?.customer?.name ||
+      inv?.customerName ||
+      inv?.partyName ||
+      inv?.billTo ||
+      (typeof inv?.customer === 'string' ? inv?.customer : '') ||
+      ''
+    ).trim().toLowerCase();
+
+    if (!matchedCust && rawName) {
+      matchedCust = customers.find(c => {
+        const cBiz = (c.businessName || '').trim().toLowerCase();
+        const cName = (c.name || '').trim().toLowerCase();
+        return (cBiz && (cBiz === rawName || rawName.includes(cBiz) || cBiz.includes(rawName))) ||
+               (cName && (cName === rawName || rawName.includes(cName) || cName.includes(rawName)));
+      });
+    }
+
+    const rawPhone = (inv?.customer?.phone || inv?.customerPhone || '').trim();
+    if (!matchedCust && rawPhone && rawPhone !== 'N/A') {
+      matchedCust = customers.find(c => (c.phone || '').trim() === rawPhone);
+    }
+
+    const finalCust = matchedCust || (fallbackParty && fallbackParty._id ? fallbackParty : null);
+
+    // Business name is standard for Tally party ledgers, fallback to name or rawName
+    const resolvedName = (
+      finalCust?.businessName ||
+      inv?.customer?.businessName ||
+      finalCust?.name ||
+      inv?.customer?.name ||
+      inv?.customerName ||
+      inv?.partyName ||
+      inv?.billTo ||
+      (typeof inv?.customer === 'string' ? inv?.customer : '') ||
+      (fallbackParty?.businessName && fallbackParty.businessName !== 'Global Account Ledger' ? fallbackParty.businessName : '') ||
+      (fallbackParty?.name && fallbackParty.name !== 'All Customers' ? fallbackParty.name : '') ||
+      'Sundry Debtors'
+    ).trim();
+
+    // Clean GSTIN resolution
+    const candidateGst = (
+      rawGst ||
+      finalCust?.gstin ||
+      fallbackParty?.gstin ||
+      ''
+    ).trim().toUpperCase();
+    const cleanGst = (candidateGst === 'N/A' || candidateGst === 'UNDEFINED' || candidateGst === 'NULL' || candidateGst === 'NONE') ? '' : candidateGst;
+
+    const resolvedState = (
+      finalCust?.state ||
+      inv?.customer?.state ||
+      inv?.state ||
+      fallbackParty?.state ||
+      (cleanGst.startsWith('24') ? 'Gujarat (24)' : (cleanGst ? 'Inter-State' : 'Gujarat (24)'))
+    );
+
+    const resolvedStateCode = (
+      finalCust?.stateCode ||
+      inv?.customer?.stateCode ||
+      fallbackParty?.stateCode ||
+      (cleanGst.length >= 2 && !isNaN(cleanGst.slice(0, 2)) ? cleanGst.slice(0, 2) : '24')
+    );
+
+    return {
+      partyName: resolvedName,
+      partyGstin: cleanGst,
+      state: resolvedState,
+      stateCode: resolvedStateCode,
+      matchedCust: finalCust
+    };
+  };
+
   // Compute Party Ledger Data with robust matching & date parsing
   const computePartyLedger = (partyId, startD, endD) => {
     const parseInvDate = (dateVal) => {
@@ -662,17 +758,18 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       if (inv.customerId && String(inv.customerId) === String(partyId)) return true;
       if (inv.customer?._id && String(inv.customer._id) === String(partyId)) return true;
       if (inv.customer?.id && String(inv.customer.id) === String(partyId)) return true;
+      if (inv.customer?.customerId && String(inv.customer.customerId) === String(partyId)) return true;
 
       if (targetParty) {
         const pName = (targetParty.businessName || targetParty.name || '').toLowerCase().trim();
         const pGst = (targetParty.gstin || '').toLowerCase().trim();
         const pPhone = (targetParty.phone || '').toLowerCase().trim();
 
-        const invCustName = (inv.customer?.businessName || inv.customer?.name || inv.customerName || (typeof inv.customer === 'string' ? inv.customer : '')).toLowerCase().trim();
-        const invGst = (inv.customer?.gstin || inv.customerGst || '').toLowerCase().trim();
+        const invCustName = (inv.customer?.businessName || inv.customer?.name || inv.customerName || inv.partyName || inv.billTo || (typeof inv.customer === 'string' ? inv.customer : '')).toLowerCase().trim();
+        const invGst = (inv.customer?.gstin || inv.customer?.partyGstin || inv.customerGst || inv.customerGstin || inv.partyGstin || inv.gstin || '').toLowerCase().trim();
         const invPhone = (inv.customer?.phone || inv.customerPhone || '').toLowerCase().trim();
 
-        if (pName && invCustName && (invCustName.includes(pName) || pName.includes(invCustName))) return true;
+        if (pName && invCustName && (invCustName === pName || invCustName.includes(pName) || pName.includes(invCustName))) return true;
         if (pGst && invGst && invGst === pGst) return true;
         if (pPhone && invPhone && invPhone === pPhone) return true;
       }
@@ -699,10 +796,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       if (endD && invDate > endD) return;
 
       const taxDetails = extractInvoiceTaxDetails(inv);
-      const pName = inv.customer?.businessName || inv.customer?.name || inv.customerName || (targetParty?.businessName || targetParty?.name || 'Party');
-      const pGstin = inv.customer?.gstin || inv.customerGst || targetParty?.gstin || '';
-      const pState = inv.customer?.state || targetParty?.state || (taxDetails.isIgst ? 'Inter-State' : 'Gujarat (24)');
-      const pStateCode = inv.customer?.stateCode || targetParty?.stateCode || (taxDetails.isIgst ? '' : '24');
+      const partyInfo = resolvePartyInfo(inv, targetParty);
+      const pName = partyInfo.partyName;
+      const pGstin = partyInfo.partyGstin;
+      const pState = partyInfo.state;
+      const pStateCode = partyInfo.stateCode;
 
       if (grandTotal > 0) {
         periodTx.push({
@@ -713,6 +811,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           particulars: `Sales Invoice #${inv.invoiceNo || ''}`,
           department: inv.department || 'Elite Digital Prints',
           partyName: pName,
+          partyGstin: pGstin,
           gstin: pGstin,
           state: pState,
           stateCode: pStateCode,
@@ -740,6 +839,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           particulars: `Payment Received (${payMode}) — Invoice #${inv.invoiceNo || ''}`,
           department: inv.department || 'Elite Digital Prints',
           partyName: pName,
+          partyGstin: pGstin,
           gstin: pGstin,
           state: pState,
           stateCode: pStateCode,
@@ -842,6 +942,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         const vchType = isSales ? 'Sales' : 'Receipt';
         const tallyDate = toTallyDate(t.date);
         const amt = Math.abs(isSales ? t.debit : t.credit);
+        const rowPartyName = t.partyName || (partyName !== 'All Customers (Combined)' && partyName !== 'Global Account Ledger' ? partyName : '') || 'Sundry Debtors';
+        const rowGstin = (t.partyGstin || t.gstin || partyGstin || '').trim().toUpperCase();
+        const cleanGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
 
         xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
         xml += `          <VOUCHER VCHTYPE="${vchType}" ACTION="Create" OBJVIEW="Accounting Voucher View">\n`;
@@ -849,13 +952,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         xml += `            <EFFECTIVEDATE>${tallyDate}</EFFECTIVEDATE>\n`;
         xml += `            <VOUCHERTYPENAME>${vchType}</VOUCHERTYPENAME>\n`;
         xml += `            <VOUCHERNUMBER>${escapeXml(t.voucherNo || 'GEN')}</VOUCHERNUMBER>\n`;
-        xml += `            <PARTYLEDGERNAME>${escapeXml(partyName)}</PARTYLEDGERNAME>\n`;
+        xml += `            <PARTYLEDGERNAME>${escapeXml(rowPartyName)}</PARTYLEDGERNAME>\n`;
+        xml += `            <PARTYNAME>${escapeXml(rowPartyName)}</PARTYNAME>\n`;
+        xml += `            <BASICBUYERNAME>${escapeXml(rowPartyName)}</BASICBUYERNAME>\n`;
+        if (cleanGst) xml += `            <PARTYGSTIN>${escapeXml(cleanGst)}</PARTYGSTIN>\n`;
         xml += `            <NARRATION>${escapeXml(t.particulars || '')} - ${escapeXml(t.department || 'Digital Print')}</NARRATION>\n`;
         xml += '            <PERSISTEDVIEW>Accounting Voucher View</PERSISTEDVIEW>\n';
 
         if (isSales) {
           xml += '            <ALLLEDGERENTRIES.LIST>\n';
-          xml += `              <LEDGERNAME>${escapeXml(partyName)}</LEDGERNAME>\n`;
+          xml += `              <LEDGERNAME>${escapeXml(rowPartyName)}</LEDGERNAME>\n`;
           xml += '              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>\n';
           xml += `              <AMOUNT>-${amt.toFixed(2)}</AMOUNT>\n`;
           xml += '              <BILLALLOCATIONS.LIST>\n';
@@ -901,7 +1007,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           xml += '            </ALLLEDGERENTRIES.LIST>\n';
 
           xml += '            <ALLLEDGERENTRIES.LIST>\n';
-          xml += `              <LEDGERNAME>${escapeXml(partyName)}</LEDGERNAME>\n`;
+          xml += `              <LEDGERNAME>${escapeXml(rowPartyName)}</LEDGERNAME>\n`;
           xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
           xml += `              <AMOUNT>${amt.toFixed(2)}</AMOUNT>\n`;
           xml += '              <BILLALLOCATIONS.LIST>\n';
@@ -921,6 +1027,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         const custName = cust.businessName || cust.name || 'Unknown';
         const partyLedger = computePartyLedger(cust._id, startD, endD);
         const opBal = partyLedger.openingBalance || 0;
+        const foundGst = (partyLedger.transactions || []).find(x => x.partyGstin || x.gstin);
+        const cleanGstin = (cust.gstin || foundGst?.partyGstin || foundGst?.gstin || '').trim().toUpperCase();
 
         xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
         xml += `          <LEDGER NAME="${escapeXml(custName)}" ACTION="Create">\n`;
@@ -928,7 +1036,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         xml += '            <PARENT>Sundry Debtors</PARENT>\n';
         xml += `            <OPENINGBALANCE>${opBal > 0 ? (opBal * -1).toFixed(2) : Math.abs(opBal).toFixed(2)}</OPENINGBALANCE>\n`;
         xml += '            <ISBILLWISEON>Yes</ISBILLWISEON>\n';
-        if (cust.gstin) xml += `            <PARTYGSTIN>${escapeXml(cust.gstin)}</PARTYGSTIN>\n`;
+        if (cleanGstin && cleanGstin !== 'N/A' && cleanGstin !== 'UNDEFINED' && cleanGstin !== 'NULL') xml += `            <PARTYGSTIN>${escapeXml(cleanGstin)}</PARTYGSTIN>\n`;
         if (cust.phone) xml += `            <LEDGERPHONE>${escapeXml(cust.phone)}</LEDGERPHONE>\n`;
         xml += `            <MAILINGNAME>${escapeXml(custName)}</MAILINGNAME>\n`;
         xml += '          </LEDGER>\n';
@@ -948,8 +1056,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     const { startD, endD } = getLedgerDateRange();
 
     if (ledgerMode === 'party') {
-      const selectedParty = customers.find(c => c._id === selectedPartyId) || { name: 'All Customers', businessName: 'Global Account Ledger' };
-      const partyName = selectedParty.businessName || selectedParty.name;
+      const selectedParty = customers.find(c => String(c._id) === String(selectedPartyId) || String(c.id) === String(selectedPartyId)) || { name: 'All Customers', businessName: 'Global Account Ledger' };
+      const partyName = selectedPartyId === 'ALL' ? 'All Customers (Combined)' : (selectedParty.businessName || selectedParty.name);
       const ledger = computePartyLedger(selectedPartyId, startD, endD);
 
       if (ledgerFormat === 'tally' || ledgerFormat === 'xml') {
@@ -979,18 +1087,19 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         const wb = XLSX.utils.book_new();
 
         // ── SHEET 1: PARTY LEDGER STATEMENT (Comprehensive with Tax & Voucher Type) ──
-        const pGst = selectedParty?.gstin || 'N/A';
+        const pGst = (selectedParty?.gstin || '').trim().toUpperCase();
+        const cleanPGst = (pGst === 'N/A' || pGst === 'UNDEFINED' || pGst === 'NULL') ? '' : pGst;
         const pPhone = selectedParty?.phone || 'N/A';
-        const pState = selectedParty?.state || (pGst && pGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+        const pState = selectedParty?.state || (cleanPGst.startsWith('24') ? 'Gujarat (24)' : (cleanPGst ? 'Inter-State' : 'Gujarat (24)'));
 
         const rows = [
           ['ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT'],
           ['Party Name:', partyName],
-          ['GSTIN:', pGst, 'State / POS:', pState, 'Phone:', pPhone],
+          ['GSTIN:', selectedPartyId === 'ALL' ? 'Various / Multi-Party' : (cleanPGst || 'Unregistered'), 'State / POS:', pState, 'Phone:', pPhone],
           ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
           ['Opening Balance (₹):', Number(ledger.openingBalance) || 0],
           [],
-          ['Date', 'Voucher Type', 'Voucher No', 'Particulars', 'Taxable (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Party GSTIN', 'Particulars', 'Taxable (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
         ];
 
         let sumTaxable = 0;
@@ -1004,10 +1113,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           sumSgst += (t.sgstAmount || 0);
           sumIgst += (t.igstAmount || 0);
 
+          const rowParty = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? cleanPGst : '') || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+
           rows.push([
             t.date,
             t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt'),
             t.voucherNo,
+            rowParty,
+            cleanRowGst,
             t.particulars,
             Number(t.taxableAmount) || 0,
             Number(t.cgstAmount) || 0,
@@ -1026,6 +1141,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           '',
           '',
           '',
+          '',
+          '',
           parseFloat(sumTaxable.toFixed(2)),
           parseFloat(sumCgst.toFixed(2)),
           parseFloat(sumSgst.toFixed(2)),
@@ -1041,6 +1158,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           { wch: 13 }, // Date
           { wch: 14 }, // Voucher Type
           { wch: 20 }, // Voucher No
+          { wch: 32 }, // Party Ledger Name
+          { wch: 18 }, // Party GSTIN
           { wch: 42 }, // Particulars
           { wch: 15 }, // Taxable
           { wch: 12 }, // CGST
@@ -1063,11 +1182,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
           const totAmt = t.debit > 0 ? t.debit : t.credit;
 
+          const rowPartyName = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? cleanPGst : '') || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+          const rowState = t.state || pState || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+
           tallyRows.push([
             t.date,
             vType,
             t.voucherNo,
-            partyName,
+            rowPartyName,
             oppLedger,
             Number(t.taxableAmount) || 0,
             Number(t.cgstAmount) || 0,
@@ -1076,8 +1200,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             Number(totAmt) || 0,
             Number(t.debit) || 0,
             Number(t.credit) || 0,
-            t.state || pState,
-            pGst !== 'N/A' ? pGst : '',
+            rowState,
+            cleanRowGst,
             t.narration || t.particulars || ''
           ]);
         });
@@ -1113,13 +1237,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         csvContent += `Party Name: "${partyName}"\n`;
         csvContent += `Period: ${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}\n`;
         csvContent += `Opening Balance: ₹ ${ledger.openingBalance.toFixed(2)}\n\n`;
-        csvContent += `Date,Voucher No,Particulars,Department,Debit (₹),Credit (₹),Running Balance (₹),Dr/Cr\n`;
+        csvContent += `Date,Voucher No,Party Ledger Name,Party GSTIN,Particulars,Department,Debit (₹),Credit (₹),Running Balance (₹),Dr/Cr\n`;
 
         ledger.transactions.forEach(t => {
-          csvContent += `"${t.date}","${t.voucherNo}","${t.particulars}","${t.department}",${t.debit.toFixed(2)},${t.credit.toFixed(2)},${Math.abs(t.runningBalance).toFixed(2)},"${t.balType}"\n`;
+          const rowParty = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? selectedParty.gstin : '') || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+          csvContent += `"${t.date}","${t.voucherNo}","${rowParty}","${cleanRowGst}","${t.particulars}","${t.department}",${t.debit.toFixed(2)},${t.credit.toFixed(2)},${Math.abs(t.runningBalance).toFixed(2)},"${t.balType}"\n`;
         });
 
-        csvContent += `\nTOTALS,,,"",${ledger.totalDebit.toFixed(2)},${ledger.totalCredit.toFixed(2)},${Math.abs(ledger.closingBalance).toFixed(2)},"${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'}"\n`;
+        csvContent += `\nTOTALS,,,,,"",${ledger.totalDebit.toFixed(2)},${ledger.totalCredit.toFixed(2)},${Math.abs(ledger.closingBalance).toFixed(2)},"${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'}"\n`;
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -1276,23 +1403,28 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           grandPaid += partyLedger.totalCredit;
           grandBal += partyLedger.closingBalance;
 
-          const pState = cust.state || (cust.gstin && cust.gstin.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
           const pName = cust.businessName || cust.name || 'Party';
+          const foundGst = (partyLedger.transactions || []).find(x => x.partyGstin || x.gstin);
+          const rawCustGst = (cust.gstin || foundGst?.partyGstin || foundGst?.gstin || '').trim().toUpperCase();
+          const cleanCustGst = (rawCustGst === 'N/A' || rawCustGst === 'UNDEFINED' || rawCustGst === 'NULL') ? '' : rawCustGst;
+          const pState = cust.state || (cleanCustGst.startsWith('24') ? 'Gujarat (24)' : (cleanCustGst ? 'Inter-State' : 'Gujarat (24)'));
 
           (partyLedger.transactions || []).forEach(tx => {
+            const txGst = (tx.partyGstin || tx.gstin || cleanCustGst || '').trim().toUpperCase();
+            const cleanTxGst = (txGst === 'N/A' || txGst === 'UNDEFINED' || txGst === 'NULL') ? '' : txGst;
             allTransactions.push({
               ...tx,
               partyCode: `CUST-${cust._id.slice(-4).toUpperCase()}`,
-              partyName: pName,
-              partyGstin: cust.gstin || '',
-              partyState: pState
+              partyName: tx.partyName || pName,
+              partyGstin: cleanTxGst,
+              partyState: tx.state || pState
             });
           });
 
           rows.push([
             `CUST-${cust._id.slice(-4).toUpperCase()}`,
             pName,
-            cust.gstin || 'N/A',
+            cleanCustGst || 'Unregistered',
             pState,
             cust.phone || 'N/A',
             Number(partyLedger.openingBalance) || 0,
@@ -1301,6 +1433,42 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             Number(partyLedger.closingBalance) || 0,
             partyLedger.closingBalance > 0 ? 'Overdue' : 'Active'
           ]);
+        });
+
+        // Include any standalone invoices not linked to customers list
+        const processedInvNos = new Set(allTransactions.map(t => t.voucherNo));
+        invoices.forEach(inv => {
+          if (!inv.invoiceNo || processedInvNos.has(inv.invoiceNo)) return;
+          const invDate = new Date(inv.invoiceDate || inv.createdAt);
+          if (startD && invDate < startD) return;
+          if (endD && invDate > endD) return;
+
+          const pInfo = resolvePartyInfo(inv, null);
+          const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+          const taxD = extractInvoiceTaxDetails(inv);
+          if (grandTotal > 0) {
+            allTransactions.push({
+              date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
+              rawDate: invDate,
+              voucherType: 'Sales',
+              voucherNo: inv.invoiceNo,
+              particulars: `Sales Invoice #${inv.invoiceNo}`,
+              department: inv.department || 'Elite Digital Prints',
+              partyCode: 'CUST-WALK',
+              partyName: pInfo.partyName,
+              partyGstin: pInfo.partyGstin,
+              partyState: pInfo.state,
+              opposingLedger: 'Sales - Digital Print',
+              taxableAmount: taxD.taxable,
+              cgstAmount: taxD.cgst,
+              sgstAmount: taxD.sgst,
+              igstAmount: taxD.igst,
+              totalTax: taxD.totalTax,
+              debit: grandTotal,
+              credit: 0,
+              narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo}`
+            });
+          }
         });
 
         rows.push([]);
@@ -1344,11 +1512,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
           const totAmt = t.debit > 0 ? t.debit : t.credit;
 
+          const rowPartyName = t.partyName || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+          const rowState = t.partyState || t.state || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+
           tallyRows.push([
             t.date,
             vType,
             t.voucherNo,
-            t.partyName,
+            rowPartyName,
             oppLedger,
             Number(t.taxableAmount) || 0,
             Number(t.cgstAmount) || 0,
@@ -1357,8 +1530,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             Number(totAmt) || 0,
             Number(t.debit) || 0,
             Number(t.credit) || 0,
-            t.partyState || 'Gujarat (24)',
-            t.partyGstin || '',
+            rowState,
+            cleanRowGst,
             t.narration || t.particulars || ''
           ]);
         });
