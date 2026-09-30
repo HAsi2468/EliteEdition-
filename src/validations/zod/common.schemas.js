@@ -138,12 +138,60 @@ function strictBody(shape) {
   return rejectPrivilegedFields(z.object(shape).strict());
 }
 
+/**
+ * Route parameter schema generator for standard RFC UUID parameter
+ * @param {string} [paramName='id']
+ * @returns {{ params: z.ZodObject<any> }}
+ */
+function uuidParamSchema(paramName = 'id') {
+  return {
+    params: z
+      .object({
+        [paramName]: uuidSchema,
+      })
+      .strict(),
+  };
+}
+
+/**
+ * Route parameter schema generator for positive integer parameter
+ * @param {string} [paramName='id']
+ * @returns {{ params: z.ZodObject<any> }}
+ */
+function positiveIntParamSchema(paramName = 'id') {
+  return {
+    params: z
+      .object({
+        [paramName]: positiveIntIdSchema,
+      })
+      .strict(),
+  };
+}
+
+/**
+ * Route parameter schema generator for 24-hex MongoDB ObjectId parameter
+ * @param {string} [paramName='id']
+ * @returns {{ params: z.ZodObject<any> }}
+ */
+function objectIdParamSchema(paramName = 'id') {
+  return {
+    params: z
+      .object({
+        [paramName]: objectIdSchema,
+      })
+      .strict(),
+  };
+}
+
 module.exports = {
   objectIdSchema,
   mongoIdSchema,
   uuidSchema,
   entityIdSchema,
   positiveIntIdSchema,
+  uuidParamSchema,
+  positiveIntParamSchema,
+  objectIdParamSchema,
   emailSchema,
   passwordSchema,
   PRIVILEGED_FIELDS,
@@ -151,3 +199,4 @@ module.exports = {
   createPaginationQuerySchema,
   strictBody,
 };
+

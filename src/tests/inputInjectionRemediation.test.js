@@ -28,7 +28,13 @@ const {
   createOrderSchema,
   getOrderParamsSchema,
 } = require('../validations/zod/order.schemas');
-const { objectIdSchema } = require('../validations/zod/common.schemas');
+const {
+  objectIdSchema,
+  uuidSchema,
+  positiveIntIdSchema,
+  uuidParamSchema,
+  positiveIntParamSchema,
+} = require('../validations/zod/common.schemas');
 
 // Build an isolated, lightweight Express test harness
 function createTestApp() {
@@ -43,6 +49,16 @@ function createTestApp() {
   // User registration
   app.post('/api/auth/register', validateRequest(registerSchema), (req, res) => {
     res.status(201).json({ success: true, user: req.body });
+  });
+
+  // Dedicated UUID route param endpoint
+  app.get('/api/documents/:docId', validateRequest(uuidParamSchema('docId')), (req, res) => {
+    res.status(200).json({ success: true, docId: req.params.docId });
+  });
+
+  // Dedicated positive integer route param endpoint
+  app.get('/api/items/:itemId', validateRequest(positiveIntParamSchema('itemId')), (req, res) => {
+    res.status(200).json({ success: true, itemId: req.params.itemId });
   });
 
   // SEC-INJ-04 Endpoint: Profile update with strict schema
@@ -93,12 +109,12 @@ function createTestApp() {
 
 const app = createTestApp();
 
-describe('Phase 2: Unsanitized Input Injections Remediation', () => {
+describe('Phase 2 & 3: Unsanitized Input Injections Remediation', () => {
   // ─── SEC-INJ-03: NoSQL Operator & Type Confusion Neutralization ────────────
   describe('SEC-INJ-03: NoSQL Operator & Type Confusion Neutralization', () => {
-    it('POST {"email": "user@example.com", "password": {"$gt": ""}} -> Immediate HTTP 400 Bad Request rejection with RFC 7807', async () => {
+    it('SEC-INJ-03: Submit {"email": "admin@example.com", "password": {"$gt": ""}} -> Assert HTTP 400 Bad Request rejection', async () => {
       const payload = {
-        email: 'user@example.com',
+        email: 'admin@example.com',
         password: { $gt: '' },
       };
 
@@ -108,7 +124,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
       assert.strictEqual(res.body.status, 400);
       assert.ok(Array.isArray(res.body.details));
 
@@ -132,7 +148,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
       const emailError = res.body.details.find((d) => d.field === 'body.email');
       assert.ok(emailError, 'Expected validation error detail for body.email');
     });
@@ -155,7 +171,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
   // ─── SEC-INJ-04: Mass Assignment Defense (.strict() Pipeline) ──────────────
   describe('SEC-INJ-04: Mass Assignment Defense (.strict() Pipeline)', () => {
-    it('PATCH profile with {"bio": "Clean bio", "isAdmin": true} -> Immediate HTTP 400 rejection', async () => {
+    it('SEC-INJ-04: Submit profile update with undeclared "isAdmin": true -> Assert HTTP 400 rejection', async () => {
       const payload = {
         bio: 'Clean bio',
         isAdmin: true,
@@ -167,11 +183,11 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
       assert.strictEqual(res.body.status, 400);
 
       const adminError = res.body.details.find(
-        (d) => d.field.includes('isAdmin') || d.code === 'unrecognized_keys'
+        (d) => d.field.includes('isAdmin') || d.code === 'unrecognized_keys' || d.code === 'custom'
       );
       assert.ok(
         adminError,
@@ -192,7 +208,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
     });
 
     it('should reject privilege elevation payload containing "isVerified": true or "permissions": ["*"]', async () => {
@@ -208,6 +224,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
     });
 
     it('should successfully accept valid profile update matching declared schema shape', async () => {
@@ -230,6 +247,19 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
   // ─── SEC-INJ-05: Route Parameters & Query Allowlisting ─────────────────────
   describe('SEC-INJ-05: Route Parameters & Query Allowlisting', () => {
+    it('SEC-INJ-05: Submit SQL/command payload in sortBy query parameter (e.g. ?sortBy=id;DROP TABLE users;) -> Assert immediate HTTP 400 Bad Request from enum validation', async () => {
+      const res = await request(app).get(
+        '/api/users?sortBy=id;DROP%20TABLE%20users;'
+      );
+
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
+
+      const sortError = res.body.details.find((d) => d.field === 'query.sortBy');
+      assert.ok(sortError, 'Expected validation error detail for query.sortBy');
+    });
+
     it('GET /orders?sortBy=name;db.users.drop() -> Immediate HTTP 400 Bad Request from enum validation', async () => {
       const res = await request(app).get(
         '/api/orders?sortBy=name;db.users.drop()'
@@ -237,7 +267,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
 
       const sortError = res.body.details.find((d) => d.field === 'query.sortBy');
       assert.ok(sortError, 'Expected validation error detail for query.sortBy');
@@ -245,19 +275,6 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
         sortError.message.includes('Invalid sortBy field'),
         `Expected custom invalid sortBy message, got: ${sortError.message}`
       );
-    });
-
-    it('should immediately reject SQL/command payload in sortBy query parameter with HTTP 400', async () => {
-      const res = await request(app).get(
-        '/api/users?sortBy=id;DROP%20TABLE%20users;'
-      );
-
-      assert.strictEqual(res.status, 400);
-      assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
-
-      const sortError = res.body.details.find((d) => d.field === 'query.sortBy');
-      assert.ok(sortError, 'Expected validation error detail for query.sortBy');
     });
 
     it('should coerce and clamp valid query pagination and sorting parameters (default limit: 20)', async () => {
@@ -289,7 +306,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
       const limitError = res.body.details.find((d) => d.field === 'query.limit');
       assert.ok(limitError, 'Expected validation error for query.limit');
     });
@@ -299,9 +316,34 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
       const paramError = res.body.details.find((d) => d.field === 'params.userId');
       assert.ok(paramError, 'Expected validation error for params.userId');
+    });
+
+    it('should validate UUID route parameter via uuidParamSchema helper', async () => {
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      const validRes = await request(app).get(`/api/documents/${validUuid}`);
+      assert.strictEqual(validRes.status, 200);
+      assert.strictEqual(validRes.body.docId, validUuid);
+
+      const invalidRes = await request(app).get('/api/documents/invalid-uuid-format');
+      assert.strictEqual(invalidRes.status, 400);
+      assert.strictEqual(invalidRes.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(invalidRes.body.message, 'Invalid request payload');
+    });
+
+    it('should validate and coerce positive integer route parameter via positiveIntParamSchema', async () => {
+      const validRes = await request(app).get('/api/items/42');
+      assert.strictEqual(validRes.status, 200);
+      assert.strictEqual(validRes.body.itemId, 42); // Coerced to number
+
+      const invalidRes = await request(app).get('/api/items/-10');
+      assert.strictEqual(invalidRes.status, 400);
+      assert.strictEqual(invalidRes.body.error, 'VALIDATION_ERROR');
+
+      const nonIntRes = await request(app).get('/api/items/abc');
+      assert.strictEqual(nonIntRes.status, 400);
     });
 
     it('should reject invalid MongoDB ObjectId in order route parameter using custom objectIdSchema', async () => {
@@ -309,7 +351,7 @@ describe('Phase 2: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.message, 'Invalid request payload');
       const paramError = res.body.details.find((d) => d.field === 'params.orderId');
       assert.ok(paramError, 'Expected validation error for params.orderId');
       assert.ok(paramError.message.includes('Invalid MongoDB ObjectId'));

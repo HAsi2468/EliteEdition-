@@ -60,15 +60,16 @@ function formatZodDetails(error, target) {
  *
  * @param {Array<{ field: string, message: string, code: string }>} details
  * @param {string} instanceUrl
+ * @param {string} [message='Invalid request payload']
  * @returns {Object}
  */
-function createRfc7807ValidationError(details, instanceUrl = '') {
+function createRfc7807ValidationError(details, instanceUrl = '', message = 'Invalid request payload') {
   return {
     type: 'https://tools.ietf.org/html/rfc7807',
     title: 'Bad Request',
     status: httpStatus.BAD_REQUEST,
     error: 'VALIDATION_ERROR',
-    message: 'Invalid payload',
+    message,
     instance: instanceUrl,
     timestamp: new Date().toISOString(),
     details,

@@ -8,6 +8,10 @@ export const positiveIntIdSchema: z.ZodNumber;
 export const emailSchema: z.ZodString;
 export const passwordSchema: z.ZodString;
 
+export function uuidParamSchema(paramName?: string): { params: z.ZodObject<any> };
+export function positiveIntParamSchema(paramName?: string): { params: z.ZodObject<any> };
+export function objectIdParamSchema(paramName?: string): { params: z.ZodObject<any> };
+
 export const PRIVILEGED_FIELDS: readonly ['role', 'isAdmin', 'isVerified', 'permissions', 'balance'];
 export function rejectPrivilegedFields<T extends z.ZodTypeAny>(schema: T): T;
 

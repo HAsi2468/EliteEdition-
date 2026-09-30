@@ -34,7 +34,8 @@ export function formatZodDetails(
 
 export function createRfc7807ValidationError(
   details: ValidationErrorDetail[],
-  instanceUrl?: string
+  instanceUrl?: string,
+  message?: string
 ): Rfc7807ValidationError;
 
 export function validateRequest(schemas?: ValidationSchemas): RequestHandler;
