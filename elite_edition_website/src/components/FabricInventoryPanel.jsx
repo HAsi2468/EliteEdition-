@@ -4536,7 +4536,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 const displayedChallans = challans.slice(0, challanVisibleCount);
 
                 return (
-                  <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                  <table className="data-table" style={{ width: '100%', minWidth: '950px', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9))', borderBottom: '1px solid var(--border-light)' }}>
                         <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', width: '38px' }}>

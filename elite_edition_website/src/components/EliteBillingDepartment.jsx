@@ -2339,7 +2339,21 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         </div>
 
         {/* Sub-Tabs Bar */}
-        <div className="ent-tab-bar">
+        <div
+          className="ent-tab-bar"
+          style={{
+            display: 'flex',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-x pan-y',
+            width: '100%',
+            maxWidth: '100%',
+            gap: '0.5rem',
+            padding: '4px 2px 6px 2px',
+            scrollbarWidth: 'none',
+          }}
+        >
           {[
             { id: 'challans', label: 'Challan' },
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
@@ -2356,6 +2370,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={`ent-tab-btn ${isActive ? 'active' : ''}`}
+                style={{ flexShrink: 0, flex: '0 0 auto', whiteSpace: 'nowrap', minWidth: 'max-content' }}
               >
                 <span>{t.label}</span>
               </button>

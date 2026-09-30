@@ -523,7 +523,8 @@ input::placeholder, textarea::placeholder {
   background-attachment: local, local, scroll, scroll;
   overflow-x: auto !important;
   overflow-y: visible !important;
-  touch-action: pan-y !important;
+  touch-action: pan-x pan-y !important;
+  overscroll-behavior-x: contain !important;
   overscroll-behavior-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
 }
@@ -541,8 +542,8 @@ input::placeholder, textarea::placeholder {
   max-width: 100%;
   overflow-x: auto !important;
   overflow-y: visible !important;
-  touch-action: pan-y !important;
-  overscroll-behavior-x: auto !important;
+  touch-action: pan-x pan-y !important;
+  overscroll-behavior-x: contain !important;
   overscroll-behavior-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
   scroll-behavior: smooth;
@@ -1794,31 +1795,47 @@ tr:hover td {
 .ent-tab-bar {
   display: flex !important;
   align-items: center !important;
-  gap: 0.4rem !important;
+  flex-wrap: nowrap !important;
+  gap: 0.5rem !important;
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch !important;
-  padding-bottom: 2px !important;
+  padding: 4px 2px 6px 2px !important;
   border-bottom: 1px solid var(--border-light, #e2e8f0) !important;
   width: 100% !important;
+  max-width: 100% !important;
   box-sizing: border-box !important;
+  touch-action: pan-x pan-y !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  overscroll-behavior-x: contain !important;
+}
+
+.ent-tab-bar::-webkit-scrollbar {
+  display: none !important;
 }
 
 .ent-tab-btn {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0.4rem !important;
-  min-height: 32px !important;
-  height: 32px !important;
-  padding: 0 0.85rem !important;
-  font-size: 0.78rem !important;
+  justify-content: center !important;
+  gap: 0.45rem !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  min-width: max-content !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 0.95rem !important;
+  font-size: 0.8rem !important;
   font-weight: 700 !important;
-  border-radius: 7px !important;
+  border-radius: 8px !important;
   border: 1px solid var(--border-light, #e2e8f0) !important;
   background: #ffffff !important;
   color: var(--text-muted, #64748b) !important;
   cursor: pointer !important;
   white-space: nowrap !important;
   transition: all 0.15s ease !important;
+  user-select: none !important;
+  touch-action: manipulation !important;
 }
 .ent-tab-btn:hover {
   background: #f8fafc !important;
@@ -1877,6 +1894,122 @@ tr:hover td {
   padding: 2px 7px !important;
   border-radius: 6px !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   UNIVERSAL MOBILE UI & DUAL-AXIS (LEFT-RIGHT) SCROLLING ENGINE
+   1. Unlocks smooth horizontal swipe for all tables, sub-tabs, and pill filters.
+   2. Prevents flex-item collapsing/overlapping on tabs and action headers.
+   3. Calibrates spacing and safe area insets for mobile devices.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Universal Left/Right Touch Gestures */
+table,
+thead,
+tbody,
+tr,
+th,
+td,
+.data-table {
+  touch-action: pan-x pan-y !important;
+}
+
+/* Universal Table & List Horizontal Scroll Containers */
+.table-responsive-wrapper,
+.table-responsive,
+.table-container,
+.table-scroll-container,
+.scroll-container-h,
+.horizontal-scroll-container,
+.fusing-table-scroll,
+.inv-pill-container,
+.tab-scroll-container,
+.status-chips-scroll,
+.ent-tab-bar,
+.subtabs-scroll-track,
+.fabric-subtab-track,
+[class*="table-responsive"],
+[class*="table-scroll"],
+div:has(> table) {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x pan-y !important;
+  overscroll-behavior-x: contain !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Universal Sub-Tabs & Filter Pills: NEVER shrink, overlap, or wrap */
+.ent-tab-bar button,
+.ent-tab-btn,
+.subtab-chip,
+.inv-sub-tab-bar button,
+.fabric-tab-chip,
+.status-chips-scroll button,
+.filter-pill,
+.tab-btn {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  min-width: max-content !important;
+  touch-action: manipulation !important;
+}
+
+/* Mobile Specific Refinements (<= 768px) */
+@media (max-width: 768px) {
+  /* Prevent tables from shrinking columns into illegibility; preserve horizontal swipe */
+  .table-responsive-wrapper table,
+  .table-responsive table,
+  .table-container table,
+  .table-scroll-container table,
+  .scroll-container-h table,
+  .horizontal-scroll-container table,
+  .fusing-table-scroll table,
+  .data-table,
+  div:has(> table) table {
+    min-width: max-content;
+    max-width: none !important;
+  }
+
+  /* Table cells: keep tabular numbers and labels from breaking onto multiple lines */
+  th, td {
+    white-space: nowrap;
+  }
+
+  /* Ensure screen containers have proper mobile breathing room */
+  .ent-screen-container {
+    padding: 0.65rem 0.5rem 5.5rem 0.5rem !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Screen header adjustments on mobile */
+  .ent-screen-header {
+    padding: 0.75rem 0.85rem !important;
+    border-radius: 10px !important;
+  }
+
+  .ent-header-title {
+    font-size: 1.05rem !important;
+  }
+
+  .ent-header-actions {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Stat cards on mobile: clean 2-column or fluid grid */
+  .ent-stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Bottom navigation bar clearance across all content areas */
+  .content-area-wrap,
+  .main-layout-container > section {
+    padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
 
 
 
