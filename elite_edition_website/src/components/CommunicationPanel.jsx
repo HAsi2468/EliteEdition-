@@ -100,7 +100,7 @@ const ICE_SERVERS = [
   }
 ];
 
-export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat', onUnreadChange }) {
+export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat', activeTab = 'communication', onUnreadChange }) {
   const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
 
   useEffect(() => {
@@ -114,6 +114,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [inputMessage, setInputMessage] = useState('');
   const [roomDrafts, setRoomDrafts] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Mobile View Guarantee: When user navigates to Communication, ALWAYS display the Chats list screen on mobile!
+  useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (isMobile && (activeTab === 'communication' || activeTab === 'workspace')) {
+      setActiveGroup(null);
+      setMainTab('chat');
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleOpenChatList = () => {
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobile) {
+        setActiveGroup(null);
+        setMainTab('chat');
+      }
+    };
+    window.addEventListener('elite-open-chat-list', handleOpenChatList);
+    return () => window.removeEventListener('elite-open-chat-list', handleOpenChatList);
+  }, []);
 
   // Real-time unread count badges calculations
   const groupUnreadCount = useMemo(() => {
@@ -1594,8 +1615,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (socket && targetGroup._id) {
       socket.emit('join-room', targetGroup._id);
     }
-    // Note: The useEffect on activeGroup?._id handles background/initial fetch automatically
+
+    // Support Android / mobile browser back gesture/button to return to chat list
+    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobileScreen);
+    if (isMobile && typeof window !== 'undefined' && window.history?.pushState) {
+      window.history.pushState({ eliteChatRoom: targetGroup._id }, '');
+    }
   };
+
+  // Mobile Back Button / Gesture support to return to Chats list screen
+  useEffect(() => {
+    const handlePopState = () => {
+      const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobileScreen);
+      if (isMobile) {
+        setActiveGroup(null);
+        setShowMobileActionMenu(false);
+        setShowMobileHeaderMenu(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isMobileScreen]);
 
   // Auto-scroll to chat bottom safely strictly within message container
   useEffect(() => {
@@ -1628,6 +1668,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
         setActiveGroup((prev) => {
           if (!prev) {
+            // CRITICAL: On mobile screens, NEVER auto-select or open any room! Always show the Chats list inbox screen!
+            const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobileScreen);
+            if (isMobile) {
+              return null;
+            }
             if (savedRoomId) {
               const matched = res.data.find((g) => String(g._id) === String(savedRoomId));
               if (matched) return matched;
@@ -2856,6 +2901,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const handleRosterTabChange = (tab) => {
     setRosterTab(tab);
+    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobileScreen);
+    if (isMobile) {
+      // On mobile, never auto-select a room when switching tabs; keep user on the list screen
+      return;
+    }
     if (tab === 'direct') {
       const dmRooms = groups.filter((g) => g.type === 'direct');
       if (dmRooms.length > 0) {
@@ -3419,7 +3469,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         {isMobileScreen && activeGroup && (
                           <button
                             type="button"
-                            onClick={() => { setActiveGroup(null); setShowMobileActionMenu(false); setShowMobileHeaderMenu(false); }}
+                            onClick={() => {
+                              setActiveGroup(null);
+                              setShowMobileActionMenu(false);
+                              setShowMobileHeaderMenu(false);
+                              if (typeof window !== 'undefined' && window.history.state?.eliteChatRoom) {
+                                window.history.back();
+                              }
+                            }}
                             className="phoenix-action-btn-neutral"
                             style={{
                               width: '32px',

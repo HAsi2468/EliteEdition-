@@ -1554,6 +1554,9 @@ export default function App() {
                   onClick={() => {
                     setActiveTab('communication');
                     setMobileMenuOpen(false);
+                    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                      window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
+                    }
                   }}
                   className={`dept-switcher-btn comm-btn ${['communication', 'workspace', 'task_management'].includes(activeTab) ? 'active' : ''}`}
                   title="Inter-Department Communication & Workforce Chat"
@@ -1959,7 +1962,13 @@ export default function App() {
 
                 {hasWorkspaceAccess && (
                   <button
-                    onClick={() => { setActiveTab('communication'); setMobileMenuOpen(false); }}
+                    onClick={() => {
+                      setActiveTab('communication');
+                      setMobileMenuOpen(false);
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
+                      }
+                    }}
                     className={`mobile-drawer-item ${activeTab === 'communication' ? 'active' : ''}`}
                   >
                     <span>Communication</span>
@@ -2680,6 +2689,7 @@ export default function App() {
             <CommunicationPanel
               currentUser={currentUser}
               initialMainTab={activeTab === 'task_management' ? 'task' : 'chat'}
+              activeTab={activeTab}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onUnreadChange={(count) => setChatUnreadCount(count)}
             />
@@ -3084,6 +3094,9 @@ export default function App() {
                     setActiveTab('communication');
                     setShowCompanyQuickSheet(false);
                     setMobileMenuOpen(false);
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
+                    }
                   }}
                   style={{
                     display: 'flex',
