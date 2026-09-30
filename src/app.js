@@ -4,7 +4,7 @@ require('./polyfills/crypto');
 const helmet = require('helmet');
 const xss = require('xss-clean');
 const compression = require('compression');
-const cors = require('cors');
+const { createCorsMiddleware } = require('./middlewares/cors.middleware');
 const cookieParser = require('cookie-parser');
 const httpStatus = require('http-status').default;
 const config = require('./config/config');
@@ -94,9 +94,8 @@ app.use(mongoSanitize());
 // gzip compression
 app.use(compression());
 
-// enable cors
-app.use(cors());
-// CORS preflight handled by app.use(cors())
+// Production-grade hardened CORS middleware engine
+app.use(createCorsMiddleware());
 
 const jwtUtils = require('./utils/auth');
 

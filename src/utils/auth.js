@@ -30,11 +30,10 @@ async function decryptData(string, hashedString) {
 	return isValid;
 }
 
+const { setSessionCookie, clearSecureCookie } = require('./cookieSecurity');
+
 function setCookie(res, cookieName, cookieValue, expiresMs) {
-	res.cookie(cookieName, cookieValue, {
-		httpOnly: true,
-		expires: new Date(expiresMs),
-	});
+	setSessionCookie(res, cookieName, cookieValue, new Date(expiresMs));
 }
 
 function generateExpires(hours) {
@@ -49,4 +48,6 @@ module.exports = {
 	encryptData,
 	decryptData,
 	setCookie,
+	setSessionCookie,
+	clearSecureCookie,
 };
