@@ -237,10 +237,45 @@ export default function FusingDepartment() {
     butterPaperWeightKg: '',
     rollCompleted: 'Complete',
     printedMtr: '',
+    freshMtr: '',
+    fabricWastageMtr: '0',
+    fabricFaultMtr: '0',
+    fusingFaultMtr: '0',
+    printFaultMtr: '0',
+    genuineFaultMtr: '0',
     fusingMtr: '',
     fusingOperator: accountFullName,
     notes: ''
   });
+
+  // Dynamic handlers for Fabric Wastage & Fresh Mtr balance
+  const handleWastageChange = (val) => {
+    setTopForm(prev => {
+      const pMtr = parseFloat(prev.printedMtr) || 0;
+      const wMtr = parseFloat(val) || 0;
+      // Auto-compute fresh meters = max(0, printedMtr - wastage) when printedMtr is available
+      const autoFresh = pMtr > 0 ? Math.max(0, pMtr - wMtr) : (parseFloat(prev.freshMtr) || 0);
+      return {
+        ...prev,
+        fabricWastageMtr: val,
+        fabricFaultMtr: val,
+        freshMtr: pMtr > 0 ? String(autoFresh) : prev.freshMtr,
+        fusingMtr: String(autoFresh + wMtr)
+      };
+    });
+  };
+
+  const handleFreshMtrChange = (val) => {
+    setTopForm(prev => {
+      const fMtr = parseFloat(val) || 0;
+      const wMtr = parseFloat(prev.fabricWastageMtr) || 0;
+      return {
+        ...prev,
+        freshMtr: val,
+        fusingMtr: String(fMtr + wMtr)
+      };
+    });
+  };
 
   // Dynamic Report Modal Table State (Panna, Roll Qty, Weight KG)
   const [reportForm, setReportForm] = useState({
@@ -522,8 +557,15 @@ export default function FusingDepartment() {
         jobCardId: '',
         jobNo: '',
         printedMtr: '',
+        freshMtr: '',
+        fabricWastageMtr: '0',
+        fabricFaultMtr: '0',
+        fusingFaultMtr: '0',
+        printFaultMtr: '0',
+        genuineFaultMtr: '0',
         fusingMtr: '',
-        butterPaperWeightKg: ''
+        butterPaperWeightKg: '',
+        notes: ''
       }));
       setJobSearchText('');
       return;
@@ -540,22 +582,39 @@ export default function FusingDepartment() {
 
       const applyCard = (c) => {
         const pMtr = getCardPrintedMeters(c);
-        const defaultMtr = pMtr || (c.fusingMtr ? String(c.fusingMtr).match(/[\d.]+/)?.[0] : '') || '';
+        const cardWaste = c.totalWastageMtr !== undefined && c.totalWastageMtr !== '' ? String(c.totalWastageMtr) : '0';
         const cardPanna = c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"';
         const preset = getFabricFusingPreset(c.fabric);
         const jobDisplay = formatJobCardNo(c.jobNo);
+        
+        const pVal = parseFloat(pMtr) || 0;
+        const wVal = parseFloat(cardWaste) || 0;
+        const calculatedFresh = pVal > 0 ? Math.max(0, pVal - wVal) : 0;
+        const defaultFresh = c.freshMtr !== undefined && c.freshMtr !== ''
+          ? String(c.freshMtr)
+          : (calculatedFresh > 0 ? String(calculatedFresh) : (pMtr || ''));
+
         setTopForm(prev => ({
           ...prev,
           jobCardId: c._id || c.id,
           jobNo: c.jobNo || '',
           panna: cardPanna,
           printedMtr: pMtr,
-          fusingMtr: defaultMtr,
+          freshMtr: defaultFresh,
+          fabricWastageMtr: cardWaste,
+          fabricFaultMtr: c.fabricFaultMtr !== undefined && c.fabricFaultMtr !== '' ? String(c.fabricFaultMtr) : cardWaste,
+          fusingFaultMtr: c.fusingFaultMtr !== undefined && c.fusingFaultMtr !== '' ? String(c.fusingFaultMtr) : '0',
+          printFaultMtr: c.printFaultMtr !== undefined && c.printFaultMtr !== '' ? String(c.printFaultMtr) : '0',
+          genuineFaultMtr: c.genuineFaultMtr !== undefined && c.genuineFaultMtr !== '' ? String(c.genuineFaultMtr) : '0',
+          fusingMtr: c.fusingMtr || String((parseFloat(defaultFresh) || 0) + wVal),
           fusingTemp: c.fusingTemp || c.temperature || preset.temp,
           fusingSpeed: c.fusingSpeed || c.speed || preset.speed || '80',
           fusingMachine: c.fusingMachine || prev.fusingMachine,
+          fusingOperator: c.fusingOperator || prev.fusingOperator || accountFullName,
+          useButterPaper: c.useButterPaper || (parseFloat(c.butterPaperWeightKg) > 0 ? 'Yes' : prev.useButterPaper || 'Yes'),
           butterPaperWeightKg: c.butterPaperWeightKg || '',
-          rollCompleted: c.fusingStatus === 'Fusing Done' ? 'Complete' : ((c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete') ? 'Partial Complete' : prev.rollCompleted || 'Complete')
+          rollCompleted: c.fusingStatus === 'Fusing Done' ? 'Complete' : ((c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete') ? 'Partial Complete' : prev.rollCompleted || 'Complete'),
+          notes: c.emergencyNotes || c.note1 || ''
         }));
         setJobSearchText(`${jobDisplay} — ${c.party || ''} | ${c.designName || ''} (${c.fabric || ''} ${cardPanna})`);
       };
@@ -589,8 +648,15 @@ export default function FusingDepartment() {
         jobCardId: '',
         jobNo: '',
         printedMtr: '',
+        freshMtr: '',
+        fabricWastageMtr: '0',
+        fabricFaultMtr: '0',
+        fusingFaultMtr: '0',
+        printFaultMtr: '0',
+        genuineFaultMtr: '0',
         fusingMtr: '',
-        butterPaperWeightKg: ''
+        butterPaperWeightKg: '',
+        notes: ''
       }));
       setJobSearchText('');
     }
@@ -604,7 +670,14 @@ export default function FusingDepartment() {
       return;
     }
 
-    const fusingMtrVal = topForm.fusingMtr || topForm.printedMtr || '0';
+    const printedVal = parseFloat(topForm.printedMtr) || 0;
+    const wasteMtrVal = Math.max(0, parseFloat(topForm.fabricWastageMtr) || 0);
+    const freshMtrVal = topForm.freshMtr !== ''
+      ? Math.max(0, parseFloat(topForm.freshMtr) || 0)
+      : Math.max(0, printedVal - wasteMtrVal);
+    const totalFabricUsed = (freshMtrVal + wasteMtrVal).toFixed(2);
+    const finalButterKg = topForm.useButterPaper === 'No' ? '0' : String(topForm.butterPaperWeightKg || 0);
+
     const rollStatus = (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes')
       ? 'Complete'
       : (topForm.rollCompleted === 'Partial Complete' ? 'Partial Complete' : 'Pending');
@@ -659,23 +732,30 @@ export default function FusingDepartment() {
           fusingSpeed: topForm.fusingSpeed,
           speed: topForm.fusingSpeed,
           panna: topForm.panna,
-          butterPaperWeightKg: String(topForm.butterPaperWeightKg || 0),
-          fusingMtr: String(fusingMtrVal),
-          freshMtr: String(fusingMtrVal),
+          useButterPaper: topForm.useButterPaper,
+          butterPaperWeightKg: finalButterKg,
+          freshMtr: String(freshMtrVal),
+          totalWastageMtr: String(wasteMtrVal),
+          totalFabricUsedMtr: String(totalFabricUsed),
+          fabricFaultMtr: String(topForm.fabricFaultMtr !== undefined ? topForm.fabricFaultMtr : wasteMtrVal),
+          fusingFaultMtr: String(topForm.fusingFaultMtr || 0),
+          printFaultMtr: String(topForm.printFaultMtr || 0),
+          genuineFaultMtr: String(topForm.genuineFaultMtr || 0),
+          fusingMtr: wasteMtrVal > 0 ? String(totalFabricUsed) : String(freshMtrVal),
           fusingOperator: topForm.fusingOperator,
-          emergencyNotes: `Roll Status: ${rollStatus}${topForm.notes ? ' | ' + topForm.notes : ''}`
+          emergencyNotes: `Roll Status: ${rollStatus}${wasteMtrVal > 0 ? ` | Wastage: ${wasteMtrVal}m` : ''}${topForm.notes ? ' | ' + topForm.notes : ''}`
         };
         await api.updateJobCard(targetId, payload);
       }
 
       // 2. Log Raw Material Consumption for Butter Paper (Weight in KG)
-      if (topForm.useButterPaper === 'Yes' && topForm.butterPaperWeightKg && Number(topForm.butterPaperWeightKg) > 0) {
+      if (topForm.useButterPaper === 'Yes' && parseFloat(finalButterKg) > 0) {
         try {
           await api.createRawMaterialTransaction({
             type: 'OUTWARD',
             date: topForm.date,
             materialName: 'Butter Paper',
-            qty: Number(topForm.butterPaperWeightKg),
+            qty: Number(finalButterKg),
             unit: 'Kg',
             panna: topForm.panna,
             jobNo: topForm.jobNo,
@@ -688,7 +768,7 @@ export default function FusingDepartment() {
 
       triggerPushNotification(
         '🔥 Fusing Entry Submitted',
-        `Job #${topForm.jobNo}: ${fusingMtrVal}m Fused | Roll: ${rollStatus} | ${topForm.useButterPaper === 'Yes' ? (topForm.butterPaperWeightKg || 0) + 'kg Butter Paper' : 'No Butter Paper'} logged!`,
+        `Job #${topForm.jobNo}: ${freshMtrVal}m Fresh${wasteMtrVal > 0 ? ` | ${wasteMtrVal}m Wastage` : ''} | Roll: ${rollStatus} logged!`,
         'success'
       );
 
@@ -710,6 +790,12 @@ export default function FusingDepartment() {
         butterPaperWeightKg: '',
         rollCompleted: 'Complete',
         printedMtr: '',
+        freshMtr: '',
+        fabricWastageMtr: '0',
+        fabricFaultMtr: '0',
+        fusingFaultMtr: '0',
+        printFaultMtr: '0',
+        genuineFaultMtr: '0',
         fusingMtr: '',
         fusingOperator: accountFullName,
         notes: ''
@@ -772,6 +858,7 @@ export default function FusingDepartment() {
     });
 
     // Populate top form so user can view and edit values directly in top form as well!
+    const cardWaste = card.totalWastageMtr !== undefined && card.totalWastageMtr !== '' ? String(card.totalWastageMtr) : '0';
     setTopForm({
       date: card.fusingDate || toLocalYMD(),
       shift: card.shift || getAutoShift(),
@@ -787,10 +874,17 @@ export default function FusingDepartment() {
       butterPaperWeightKg: card.butterPaperWeightKg || '',
       rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Complete' : ((card.fusingStatus === 'Fusing In Progress' || card.fusingStatus === 'Partial Complete') ? 'Partial Complete' : 'Pending'),
       printedMtr: printedM || defaultFresh,
-      fusingMtr: defaultFresh,
+      freshMtr: defaultFresh,
+      fabricWastageMtr: cardWaste,
+      fabricFaultMtr: card.fabricFaultMtr !== undefined && card.fabricFaultMtr !== '' ? String(card.fabricFaultMtr) : cardWaste,
+      fusingFaultMtr: card.fusingFaultMtr !== undefined && card.fusingFaultMtr !== '' ? String(card.fusingFaultMtr) : '0',
+      printFaultMtr: card.printFaultMtr !== undefined && card.printFaultMtr !== '' ? String(card.printFaultMtr) : '0',
+      genuineFaultMtr: card.genuineFaultMtr !== undefined && card.genuineFaultMtr !== '' ? String(card.genuineFaultMtr) : '0',
+      fusingMtr: card.fusingMtr || defaultFresh,
       fusingOperator: card.fusingOperator || accountFullName,
       notes: card.emergencyNotes || card.note1 || ''
     });
+    setJobSearchText(`${formatJobCardNo(card.jobNo)} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
 
     setShowFormModal(true);
   };
@@ -1060,28 +1154,45 @@ export default function FusingDepartment() {
 
     const headers = [
       'Job No', 'Date', 'Shift', 'Party Name', 'Design Name', 'Fabric', 'Panna',
-      'Butter Paper (kg)', 'Fresh Mtr', 'Fabric Fault (m)', 'Fusing Fault (m)',
-      'Print Fault (m)', 'Genuine Fault (m)', 'Total Wastage (m)', 'Machine', 'Operator'
+      'Printed Mtr', 'Fresh Mtr', 'Yield %', 'Total Wastage (m)', 'Fabric Fault (m)',
+      'Fusing Fault (m)', 'Print Fault (m)', 'Genuine Fault (m)', 'Butter Paper (kg)',
+      'Speed (m/min)', 'Temp (°C)', 'Status', 'Machine', 'Operator'
     ];
     
-    const rows = filteredCards.map(c => [
-      c.jobNo || '',
-      c.fusingDate || '',
-      c.shift || 'Morning',
-      `"${(c.party || '').replace(/"/g, '""')}"`,
-      `"${(c.designName || '').replace(/"/g, '""')}"`,
-      `"${(c.fabric || '').replace(/"/g, '""')}"`,
-      c.panna || '',
-      c.butterPaperWeightKg || 0,
-      c.freshMtr || c.fusingMtr || 0,
-      c.fabricFaultMtr || 0,
-      c.fusingFaultMtr || 0,
-      c.printFaultMtr || 0,
-      c.genuineFaultMtr || 0,
-      c.totalWastageMtr || 0,
-      `"${(c.fusingMachine || '').replace(/"/g, '""')}"`,
-      `"${(c.fusingOperator || '').replace(/"/g, '""')}"`
-    ]);
+    const rows = filteredCards.map(c => {
+      const printed = parseFloat(getCardPrintedMeters(c)) || 0;
+      const waste = parseFloat(c.totalWastageMtr) || 0;
+      const rawFresh = c.freshMtr !== undefined && c.freshMtr !== '' 
+        ? parseFloat(c.freshMtr) 
+        : (parseFloat(c.fusingMtr) ? Math.max(0, parseFloat(c.fusingMtr) - waste) : 0);
+      const fresh = isNaN(rawFresh) ? 0 : rawFresh;
+      const yieldPct = printed > 0 && fresh > 0 ? ((fresh / printed) * 100).toFixed(1) : (fresh + waste > 0 ? ((fresh / (fresh + waste)) * 100).toFixed(1) : '—');
+      const preset = getFabricFusingPreset(c.fabric);
+
+      return [
+        c.jobNo || '',
+        c.fusingDate || c.date || '',
+        c.shift || 'Morning',
+        `"${(c.party || c.clientName || '').replace(/"/g, '""')}"`,
+        `"${(c.designName || c.designNo || '').replace(/"/g, '""')}"`,
+        `"${(c.fabric || '').replace(/"/g, '""')}"`,
+        c.panna || '',
+        printed,
+        fresh,
+        yieldPct,
+        waste,
+        c.fabricFaultMtr || 0,
+        c.fusingFaultMtr || 0,
+        c.printFaultMtr || 0,
+        c.genuineFaultMtr || 0,
+        c.butterPaperWeightKg || 0,
+        c.fusingSpeed || preset.speed,
+        c.fusingTemp || preset.temp,
+        c.fusingStatus || 'Pending',
+        `"${(c.fusingMachine || '').replace(/"/g, '""')}"`,
+        `"${(c.fusingOperator || '').replace(/"/g, '""')}"`
+      ];
+    });
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -1347,397 +1458,585 @@ export default function FusingDepartment() {
             </div>
           </div>
 
-          {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, FUSING TEMP, FUSING SPEED, BUTTER PAPER USED?, ROLL COMPLETED?, PANNA */}
-            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+          {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, FABRIC WASTAGE, FRESH OUTPUT, FUSING TEMP, SPEED, BUTTER PAPER, PANNA */}
+            <div style={{
+              gridColumn: '1 / -1',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              background: '#f8fafc',
+              padding: '1.15rem 1.25rem',
+              borderRadius: '14px',
+              border: '1.5px solid #cbd5e1'
+            }}>
               
-              {/* 1. JOB TYPE / JOBCARD NO. - Searchable & Filtered to Printing Done & Fusing Pending */}
-              <div ref={jobDropdownRef} style={{ gridColumn: 'span 2 / span 2', position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem', flexWrap: 'wrap', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase' }}>
-                    JOB TYPE / JOBCARD NO. *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowAllCardsFilter(prev => !prev)}
-                    style={{
-                      background: showAllCardsFilter ? '#e0f2fe' : '#f0fdf4',
-                      color: showAllCardsFilter ? '#0369a1' : '#15803d',
-                      border: `1px solid ${showAllCardsFilter ? '#7dd3fc' : '#86efac'}`,
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                    title="Toggle between only Ready for Fusing jobs vs All Job Cards"
-                  >
-                    <span>{showAllCardsFilter ? '🔍 Showing All Cards' : `⚡ Ready Queue (${eligibleFusingCards.length})`}</span>
-                    <span style={{ textDecoration: 'underline', opacity: 0.8 }}>({showAllCardsFilter ? 'Show Ready' : 'Show All'})</span>
-                  </button>
+              {/* TIER 1: Job Card Selection, Printed Meters, Fabric Wastage & Fresh Fused Output */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '1rem',
+                alignItems: 'start'
+              }}>
+                {/* 1. JOB TYPE / JOBCARD NO. - Searchable & Filtered to Printing Done & Fusing Pending */}
+                <div ref={jobDropdownRef} style={{ gridColumn: 'span 2 / span 2', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '4px' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase' }}>
+                      JOB TYPE / JOBCARD NO. *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCardsFilter(prev => !prev)}
+                      style={{
+                        background: showAllCardsFilter ? '#e0f2fe' : '#f0fdf4',
+                        color: showAllCardsFilter ? '#0369a1' : '#15803d',
+                        border: `1px solid ${showAllCardsFilter ? '#7dd3fc' : '#86efac'}`,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.7rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Toggle between only Ready for Fusing jobs vs All Job Cards"
+                    >
+                      <span>{showAllCardsFilter ? '🔍 Showing All Cards' : `⚡ Ready Queue (${eligibleFusingCards.length})`}</span>
+                      <span style={{ textDecoration: 'underline', opacity: 0.8 }}>({showAllCardsFilter ? 'Show Ready' : 'Show All'})</span>
+                    </button>
+                  </div>
+
+                  {/* Search Input Box with Clear & Dropdown Caret */}
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Search size={16} color="#0284c7" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Search Job No, Party, Design..."
+                      value={jobSearchText}
+                      onFocus={() => setShowJobDropdown(true)}
+                      onChange={e => {
+                        setJobSearchText(e.target.value);
+                        setShowJobDropdown(true);
+                        if (!e.target.value) {
+                          handleTopJobCardSelect('');
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 2.8rem 0.65rem 2.2rem',
+                        borderRadius: '8px',
+                        border: '2px solid #38bdf8',
+                        fontSize: '0.92rem',
+                        fontWeight: 800,
+                        background: '#ffffff',
+                        color: '#0369a1',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    {/* Clear / Dropdown Toggle Button */}
+                    <div style={{ position: 'absolute', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {topForm.jobCardId ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleTopJobCardSelect('');
+                            setJobSearchText('');
+                            setShowJobDropdown(true);
+                          }}
+                          style={{
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            border: 'none',
+                            borderRadius: '4px',
+                            width: '22px',
+                            height: '22px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontWeight: 900,
+                            fontSize: '0.75rem'
+                          }}
+                          title="Clear Selection"
+                        >
+                          ✕
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setShowJobDropdown(prev => !prev)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#0284c7',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Open List"
+                      >
+                        <ChevronDown size={18} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Floating Interactive Dropdown Menu */}
+                  {showJobDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      maxHeight: '280px',
+                      overflowY: 'auto',
+                      background: '#ffffff',
+                      border: '2px solid #38bdf8',
+                      borderRadius: '10px',
+                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.2)',
+                      zIndex: 1000,
+                      marginTop: '4px'
+                    }}>
+                      <div style={{
+                        padding: '6px 12px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        color: '#64748b',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #e2e8f0',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <span>
+                          {showAllCardsFilter ? 'ALL JOBCARDS' : 'PRINTING DONE & FUSING PENDING'} ({searchMatchingCards.length})
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>
+                          Click card to select
+                        </span>
+                      </div>
+
+                      {searchMatchingCards.length === 0 ? (
+                        <div style={{ padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                          <p style={{ margin: 0, fontWeight: 700 }}>No matching job cards found.</p>
+                          {!showAllCardsFilter && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAllCardsFilter(true)}
+                              style={{
+                                marginTop: '0.5rem',
+                                background: '#eff6ff',
+                                color: '#2563eb',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: '6px',
+                                padding: '0.3rem 0.75rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Click to Search All Job Cards
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        searchMatchingCards.map(c => {
+                          const isSelected = String(topForm.jobCardId) === String(c._id || c.id);
+                          const cardPanna = c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"';
+                          return (
+                            <div
+                              key={c._id || c.id}
+                              onMouseDown={() => {
+                                handleTopJobCardSelect(c);
+                                setShowJobDropdown(false);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                borderBottom: '1px solid #f1f5f9',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                background: isSelected ? '#e0f2fe' : '#ffffff',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f0fdf4'; }}
+                              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '#ffffff'; }}
+                            >
+                              <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                  <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.9rem' }}>
+                                    {formatJobCardNo(c.jobNo)}
+                                  </span>
+                                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                                    {c.party || 'Party'}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  Design: <strong style={{ color: '#475569' }}>{c.designName || '—'}</strong> • Fabric: <strong>{c.fabric || '—'} ({cardPanna})</strong>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+                                <span style={{
+                                  padding: '1px 7px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  background: '#dcfce7',
+                                  color: '#15803d',
+                                  border: '1px solid #bbf7d0'
+                                }}>
+                                  🖨️ {getCardPrintedMeters(c) || 0}m Printed
+                                </span>
+                                <span style={{
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  background: c.fusingStatus === 'Fusing Done' ? '#f1f5f9' : (c.fusingStatus === 'Fusing In Progress' ? '#e0f2fe' : '#fef3c7'),
+                                  color: c.fusingStatus === 'Fusing Done' ? '#64748b' : (c.fusingStatus === 'Fusing In Progress' ? '#0369a1' : '#b45309')
+                                }}>
+                                  {c.fusingStatus === 'Fusing Done' ? '✓ Complete' : (c.fusingStatus === 'Fusing In Progress' ? '⏳ Partial' : '⏸️ Pending')}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Search Input Box with Clear & Dropdown Caret */}
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Search size={16} color="#0284c7" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
+                {/* 2. PRINTED METERS (DISPLAYED REFERENCE) */}
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#0369a1', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                    🖨️ PRINTED METERS
+                  </label>
+                  <div style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #bae6fd',
+                    fontSize: '0.92rem',
+                    fontWeight: 900,
+                    background: '#f0f9ff',
+                    color: '#0284c7',
+                    boxSizing: 'border-box',
+                    minHeight: '44px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    {topForm.printedMtr ? `${topForm.printedMtr} mtr` : <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>Select Job Card</span>}
+                  </div>
+                </div>
+
+                {/* 3. FABRIC WASTAGE (MTR) — User Inputs Directly Here */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#dc2626', margin: 0, textTransform: 'uppercase' }}>
+                      <Trash2 size={13} color="#dc2626" /> FABRIC WASTAGE (MTR) *
+                    </label>
+                    {/* Quick Micro-Pills */}
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      {['0', '1', '2', '5'].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => handleWastageChange(val)}
+                          style={{
+                            background: String(topForm.fabricWastageMtr) === val ? '#fee2e2' : '#ffffff',
+                            border: `1px solid ${String(topForm.fabricWastageMtr) === val ? '#ef4444' : '#fca5a5'}`,
+                            borderRadius: '4px',
+                            padding: '1px 5px',
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            color: '#b91c1c',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {val}m
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input
-                    type="text"
-                    required
-                    placeholder="Search Job No, Party, Design..."
-                    value={jobSearchText}
-                    onFocus={() => setShowJobDropdown(true)}
-                    onChange={e => {
-                      setJobSearchText(e.target.value);
-                      setShowJobDropdown(true);
-                      if (!e.target.value) {
-                        handleTopJobCardSelect('');
-                      }
-                    }}
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="0.0"
+                    value={topForm.fabricWastageMtr}
+                    onChange={e => handleWastageChange(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '0.65rem 2.8rem 0.65rem 2.2rem',
+                      padding: '0.65rem 0.85rem',
                       borderRadius: '8px',
-                      border: '2px solid #38bdf8',
-                      fontSize: '0.92rem',
-                      fontWeight: 800,
-                      background: '#ffffff',
-                      color: '#0369a1',
+                      border: '2px solid #f87171',
+                      fontSize: '0.95rem',
+                      fontWeight: 900,
+                      background: '#fff1f2',
+                      color: '#9f1239',
                       boxSizing: 'border-box'
                     }}
                   />
-                  {/* Clear / Dropdown Toggle Button */}
-                  <div style={{ position: 'absolute', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {topForm.jobCardId ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleTopJobCardSelect('');
-                          setJobSearchText('');
-                          setShowJobDropdown(true);
-                        }}
-                        style={{
-                          background: '#fee2e2',
-                          color: '#dc2626',
-                          border: 'none',
-                          borderRadius: '4px',
-                          width: '22px',
-                          height: '22px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          fontWeight: 900,
-                          fontSize: '0.75rem'
-                        }}
-                        title="Clear Selection"
-                      >
-                        ✕
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => setShowJobDropdown(prev => !prev)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#0284c7',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                      title="Open List"
-                    >
-                      <ChevronDown size={18} />
-                    </button>
-                  </div>
                 </div>
 
-                {/* Floating Interactive Dropdown Menu */}
-                {showJobDropdown && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    maxHeight: '280px',
-                    overflowY: 'auto',
-                    background: '#ffffff',
-                    border: '2px solid #38bdf8',
-                    borderRadius: '10px',
-                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.2)',
-                    zIndex: 1000,
-                    marginTop: '4px'
-                  }}>
-                    <div style={{
-                      padding: '6px 12px',
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      color: '#64748b',
-                      background: '#f8fafc',
-                      borderBottom: '1px solid #e2e8f0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span>
-                        {showAllCardsFilter ? 'ALL JOBCARDS' : 'PRINTING DONE & FUSING PENDING'} ({searchMatchingCards.length})
+                {/* 4. FRESH FUSED OUTPUT (MTR) — Auto-Calculated as (Printed - Wastage) & Editable */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#15803d', margin: 0, textTransform: 'uppercase' }}>
+                      <CheckCircle2 size={13} color="#15803d" /> FRESH FUSED (MTR) *
+                    </label>
+                    {parseFloat(topForm.printedMtr) > 0 && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a' }}>
+                        {(((parseFloat(topForm.freshMtr) || 0) / parseFloat(topForm.printedMtr)) * 100).toFixed(0)}% yield
                       </span>
-                      <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>
-                        Click card to select
-                      </span>
-                    </div>
-
-                    {searchMatchingCards.length === 0 ? (
-                      <div style={{ padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
-                        <p style={{ margin: 0, fontWeight: 700 }}>No matching job cards found.</p>
-                        {!showAllCardsFilter && (
-                          <button
-                            type="button"
-                            onClick={() => setShowAllCardsFilter(true)}
-                            style={{
-                              marginTop: '0.5rem',
-                              background: '#eff6ff',
-                              color: '#2563eb',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '6px',
-                              padding: '0.3rem 0.75rem',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Click to Search All Job Cards
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      searchMatchingCards.map(c => {
-                        const isSelected = String(topForm.jobCardId) === String(c._id || c.id);
-                        const cardPanna = c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"';
-                        return (
-                          <div
-                            key={c._id || c.id}
-                            onMouseDown={() => {
-                              handleTopJobCardSelect(c);
-                              setShowJobDropdown(false);
-                            }}
-                            style={{
-                              padding: '8px 12px',
-                              borderBottom: '1px solid #f1f5f9',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              background: isSelected ? '#e0f2fe' : '#ffffff',
-                              transition: 'background 0.15s ease'
-                            }}
-                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f0fdf4'; }}
-                            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '#ffffff'; }}
-                          >
-                            <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.9rem' }}>
-                                  {formatJobCardNo(c.jobNo)}
-                                </span>
-                                <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
-                                  {c.party || 'Party'}
-                                </span>
-                              </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                Design: <strong style={{ color: '#475569' }}>{c.designName || '—'}</strong> • Fabric: <strong>{c.fabric || '—'} ({cardPanna})</strong>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
-                              <span style={{
-                                padding: '1px 7px',
-                                borderRadius: '4px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                background: '#dcfce7',
-                                color: '#15803d',
-                                border: '1px solid #bbf7d0'
-                              }}>
-                                🖨️ {getCardPrintedMeters(c) || 0}m Printed
-                              </span>
-                              <span style={{
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                background: c.fusingStatus === 'Fusing Done' ? '#f1f5f9' : (c.fusingStatus === 'Fusing In Progress' ? '#e0f2fe' : '#fef3c7'),
-                                color: c.fusingStatus === 'Fusing Done' ? '#64748b' : (c.fusingStatus === 'Fusing In Progress' ? '#0369a1' : '#b45309')
-                              }}>
-                                {c.fusingStatus === 'Fusing Done' ? '✓ Complete' : (c.fusingStatus === 'Fusing In Progress' ? '⏳ Partial' : '⏸️ Pending')}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })
                     )}
                   </div>
-                )}
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    required
+                    placeholder="Fresh mtr..."
+                    value={topForm.freshMtr}
+                    onChange={e => handleFreshMtrChange(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '8px',
+                      border: '2px solid #4ade80',
+                      fontSize: '0.95rem',
+                      fontWeight: 900,
+                      background: '#f0fdf4',
+                      color: '#15803d',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* 2. PRINTED METERS (DISPLAYED) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#059669', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  🖨️ PRINTED METERS (MTR)
-                </label>
-                <input
-                  type="text"
-                  readOnly
-                  placeholder="Select Job Card to view"
-                  value={topForm.printedMtr ? `${topForm.printedMtr} mtr` : ''}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #a7f3d0', fontSize: '0.92rem', fontWeight: 900, background: '#ecfdf5', color: '#047857' }}
-                />
-              </div>
-
-              {/* 3. FUSING TEMPERATURE */}
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#d97706', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  <Thermometer size={14} color="#d97706" /> FUSING TEMP (°C) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 210°C"
-                  value={topForm.fusingTemp}
-                  onChange={e => setTopForm(f => ({ ...f, fusingTemp: e.target.value }))}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #fde68a', fontSize: '0.92rem', fontWeight: 900, background: '#fffbe6', color: '#92400e' }}
-                />
-              </div>
-
-              {/* 4. FUSING MACHINE SPEED - Dropdown with 50, 52, 54 ... up to 80 */}
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  <Gauge size={14} color="#2563eb" /> FUSING SPEED (m/min) *
-                </label>
-                <select
-                  required
-                  value={topForm.fusingSpeed || '80'}
-                  onChange={e => setTopForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 900, background: '#eff6ff', color: '#1e40af', cursor: 'pointer' }}
-                >
-                  {topForm.fusingSpeed && !FUSING_SPEED_OPTIONS.map(String).includes(String(topForm.fusingSpeed).replace(/[^0-9]/g, '')) && (
-                    <option value={topForm.fusingSpeed}>{topForm.fusingSpeed}</option>
-                  )}
-                  {FUSING_SPEED_OPTIONS.map(spd => (
-                    <option key={spd} value={String(spd)}>
-                      {spd}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 6. IS BUTTER PAPER USED? */}
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  <Scale size={14} color={topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b'} /> BUTTER PAPER USED? *
-                </label>
-                <select
-                  value={topForm.useButterPaper}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setTopForm(f => ({
-                      ...f,
-                      useButterPaper: val,
-                      butterPaperWeightKg: val === 'No' ? '0' : f.butterPaperWeightKg
-                    }));
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: `2px solid ${topForm.useButterPaper === 'Yes' ? '#8b5cf6' : '#cbd5e1'}`,
-                    fontSize: '0.92rem',
-                    fontWeight: 800,
-                    background: topForm.useButterPaper === 'Yes' ? '#f5f3ff' : '#ffffff',
-                    color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#475569',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="Yes">✓ Yes</option>
-                  <option value="No">✕ No</option>
-                </select>
-              </div>
-
-              {/* 7. ROLL COMPLETED? */}
-              <div>
-                <label style={{
+              {/* Realtime Reconciliation Balance Strip */}
+              {topForm.jobCardId && (
+                <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#16a34a' : (topForm.rollCompleted === 'Partial Complete' ? '#0284c7' : '#ea580c'),
-                  marginBottom: '0.3rem',
-                  textTransform: 'uppercase'
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  padding: '0.55rem 0.95rem',
+                  borderRadius: '8px',
+                  background: '#ffffff',
+                  border: '1px dashed #cbd5e1',
+                  fontSize: '0.78rem'
                 }}>
-                  {(topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? (
-                    <CheckCircle2 size={14} color="#16a34a" />
-                  ) : topForm.rollCompleted === 'Partial Complete' ? (
-                    <Clock size={14} color="#0284c7" />
-                  ) : (
-                    <AlertCircle size={14} color="#ea580c" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#64748b', fontWeight: 700 }}>Meter Balance:</span>
+                    <span style={{ color: '#0369a1', fontWeight: 800 }}>🖨️ {topForm.printedMtr || 0}m Printed</span>
+                    <span style={{ color: '#94a3b8' }}>=</span>
+                    <span style={{ color: '#15803d', fontWeight: 900 }}>✨ {topForm.freshMtr || 0}m Fresh Output</span>
+                    <span style={{ color: '#94a3b8' }}>+</span>
+                    <span style={{ color: '#dc2626', fontWeight: 900 }}>🗑️ {topForm.fabricWastageMtr || 0}m Wastage</span>
+                    <span style={{ color: '#94a3b8' }}>➔</span>
+                    <span style={{ color: '#0f172a', fontWeight: 900 }}>
+                      Total Fabric: {((parseFloat(topForm.freshMtr) || 0) + (parseFloat(topForm.fabricWastageMtr) || 0)).toFixed(1)}m
+                    </span>
+                  </div>
+                  {parseFloat(topForm.fabricWastageMtr) > 0 && (
+                    <span style={{
+                      color: '#b91c1c',
+                      background: '#fee2e2',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontWeight: 800,
+                      fontSize: '0.72rem'
+                    }}>
+                      ⚠️ {(((parseFloat(topForm.fabricWastageMtr) || 0) / (parseFloat(topForm.printedMtr) || 1)) * 100).toFixed(1)}% Fabric Wastage
+                    </span>
                   )}
-                  ROLL COMPLETED? *
-                </label>
-                <select
-                  value={topForm.rollCompleted === 'Yes' ? 'Complete' : (topForm.rollCompleted === 'No' ? 'Partial Complete' : (topForm.rollCompleted || 'Complete'))}
-                  onChange={e => setTopForm(f => ({ ...f, rollCompleted: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: `2px solid ${
-                      (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#4ade80' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fb923c')
-                    }`,
-                    fontSize: '0.92rem',
-                    fontWeight: 800,
-                    background: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#f0fdf4' : (topForm.rollCompleted === 'Partial Complete' ? '#f0f9ff' : '#fff7ed'),
-                    color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#15803d' : (topForm.rollCompleted === 'Partial Complete' ? '#0369a1' : '#c2410c'),
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="Complete">✓ Complete</option>
-                  <option value="Partial Complete">⏳ Partial Complete</option>
-                  <option value="Pending">⏸️ Pending</option>
-                </select>
-              </div>
-
-              {/* 8. PANNA */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', margin: 0, textTransform: 'uppercase' }}>
-                    <Layers size={14} color="#0284c7" /> PANNA *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowPannaManagerModal(true)}
-                    style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.7rem', fontWeight: 800 }}
-                  >
-                    <Settings size={12} /> Edit
-                  </button>
                 </div>
-                <select
-                  required
-                  value={topForm.panna}
-                  onChange={e => setTopForm(f => ({ ...f, panna: e.target.value }))}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.92rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
-                >
-                  {pannaOptions.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+              )}
+
+              {/* TIER 2: Machine & Operating Parameters (Temperature, Speed, Panna, Butter Paper, Roll Completed) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                gap: '1rem',
+                alignItems: 'end'
+              }}>
+                {/* 5. FUSING TEMPERATURE */}
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#d97706', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                    <Thermometer size={14} color="#d97706" /> FUSING TEMP (°C) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 210°C"
+                    value={topForm.fusingTemp}
+                    onChange={e => setTopForm(f => ({ ...f, fusingTemp: e.target.value }))}
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #fde68a', fontSize: '0.92rem', fontWeight: 900, background: '#fffbe6', color: '#92400e', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {/* 6. FUSING SPEED */}
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                    <Gauge size={14} color="#2563eb" /> FUSING SPEED (m/min) *
+                  </label>
+                  <select
+                    required
+                    value={topForm.fusingSpeed || '80'}
+                    onChange={e => setTopForm(f => ({ ...f, fusingSpeed: e.target.value }))}
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 900, background: '#eff6ff', color: '#1e40af', cursor: 'pointer', boxSizing: 'border-box' }}
+                  >
+                    {topForm.fusingSpeed && !FUSING_SPEED_OPTIONS.map(String).includes(String(topForm.fusingSpeed).replace(/[^0-9]/g, '')) && (
+                      <option value={topForm.fusingSpeed}>{topForm.fusingSpeed}</option>
+                    )}
+                    {FUSING_SPEED_OPTIONS.map(spd => (
+                      <option key={spd} value={String(spd)}>
+                        {spd}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 7. PANNA */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', margin: 0, textTransform: 'uppercase' }}>
+                      <Layers size={14} color="#0284c7" /> PANNA *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPannaManagerModal(true)}
+                      style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.7rem', fontWeight: 800 }}
+                    >
+                      <Settings size={12} /> Edit
+                    </button>
+                  </div>
+                  <select
+                    required
+                    value={topForm.panna}
+                    onChange={e => setTopForm(f => ({ ...f, panna: e.target.value }))}
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.92rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer', boxSizing: 'border-box' }}
+                  >
+                    {pannaOptions.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 8. BUTTER PAPER USED? */}
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                    <Scale size={14} color={topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b'} /> BUTTER PAPER USED? *
+                  </label>
+                  <select
+                    value={topForm.useButterPaper}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setTopForm(f => ({
+                        ...f,
+                        useButterPaper: val,
+                        butterPaperWeightKg: val === 'No' ? '0' : f.butterPaperWeightKg
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '8px',
+                      border: `2px solid ${topForm.useButterPaper === 'Yes' ? '#8b5cf6' : '#cbd5e1'}`,
+                      fontSize: '0.92rem',
+                      fontWeight: 800,
+                      background: topForm.useButterPaper === 'Yes' ? '#f5f3ff' : '#ffffff',
+                      color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#475569',
+                      cursor: 'pointer',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <option value="Yes">✓ Yes</option>
+                    <option value="No">✕ No</option>
+                  </select>
+                </div>
+
+                {/* 9. BUTTER PAPER WEIGHT (KG) - Shown when Yes */}
+                {topForm.useButterPaper === 'Yes' && (
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                      <Scale size={14} color="#6d28d9" /> BUTTER PAPER (KG)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="Weight kg..."
+                      value={topForm.butterPaperWeightKg}
+                      onChange={e => setTopForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: '8px',
+                        border: '2px solid #c4b5fd',
+                        fontSize: '0.92rem',
+                        fontWeight: 800,
+                        background: '#f5f3ff',
+                        color: '#6d28d9',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* 10. ROLL COMPLETED? */}
+                <div>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#16a34a' : (topForm.rollCompleted === 'Partial Complete' ? '#0284c7' : '#ea580c'),
+                    marginBottom: '0.35rem',
+                    textTransform: 'uppercase'
+                  }}>
+                    {(topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? (
+                      <CheckCircle2 size={14} color="#16a34a" />
+                    ) : topForm.rollCompleted === 'Partial Complete' ? (
+                      <Clock size={14} color="#0284c7" />
+                    ) : (
+                      <AlertCircle size={14} color="#ea580c" />
+                    )}
+                    ROLL COMPLETED? *
+                  </label>
+                  <select
+                    value={topForm.rollCompleted === 'Yes' ? 'Complete' : (topForm.rollCompleted === 'No' ? 'Partial Complete' : (topForm.rollCompleted || 'Complete'))}
+                    onChange={e => setTopForm(f => ({ ...f, rollCompleted: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '8px',
+                      border: `2px solid ${
+                        (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#4ade80' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fb923c')
+                      }`,
+                      fontSize: '0.92rem',
+                      fontWeight: 800,
+                      background: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#f0fdf4' : (topForm.rollCompleted === 'Partial Complete' ? '#f0f9ff' : '#fff7ed'),
+                      color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#15803d' : (topForm.rollCompleted === 'Partial Complete' ? '#0369a1' : '#c2410c'),
+                      cursor: 'pointer',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <option value="Complete">✓ Complete</option>
+                    <option value="Partial Complete">⏳ Partial Complete</option>
+                    <option value="Pending">⏸️ Pending</option>
+                  </select>
+                </div>
               </div>
 
               {/* Smart Heat & Speed Guard Indicator Banner */}
               {activeFabricPreset && (
                 <div style={{
-                  gridColumn: '1 / -1',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -1919,6 +2218,21 @@ export default function FusingDepartment() {
           </div>
         </div>
 
+        {/* Total Fabric Wastage */}
+        <div className="fusing-metric-card accent-rose">
+          <div className="fusing-metric-top">
+            <span className="fusing-metric-label">Total Fabric Wastage</span>
+            <Trash2 size={18} color="#E11D48" />
+          </div>
+          <div className="fusing-metric-val" style={{ color: '#E11D48' }}>
+            {stats.totalWastageMtr.toLocaleString('en-IN')}
+            <span className="fusing-metric-unit">meters</span>
+          </div>
+          <div className="fusing-metric-subtitle" style={{ color: stats.totalWastageMtr > 0 ? '#BE123C' : '#059669' }}>
+            {stats.totalWastageMtr > 0 ? `${((stats.totalWastageMtr / (stats.totalFreshMtr + stats.totalWastageMtr || 1)) * 100).toFixed(1)}% plant wastage loss` : '✓ Zero wastage recorded'}
+          </div>
+        </div>
+
         {/* Pending Fusing */}
         <div className="fusing-metric-card accent-amber">
           <div className="fusing-metric-top">
@@ -2073,9 +2387,11 @@ export default function FusingDepartment() {
                       <th scope="col">Job Card #</th>
                       <th scope="col">Party Name</th>
                       <th scope="col">Design &amp; Fabric</th>
+                      <th scope="col">Operator &amp; Shift</th>
                       <th scope="col" style={{ textAlign: 'center' }}>Speed &amp; Temp</th>
                       <th scope="col" style={{ textAlign: 'center' }}>Butter Paper</th>
                       <th scope="col" style={{ textAlign: 'center' }}>Status</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>Printed Mtr</th>
                       <th scope="col" style={{ textAlign: 'right' }}>Fresh Output</th>
                       <th scope="col" style={{ textAlign: 'right' }}>Total Wastage</th>
                       <th scope="col" className="fusing-sticky-col-header">Action</th>
@@ -2085,8 +2401,12 @@ export default function FusingDepartment() {
                     {paginatedCards.map((c) => {
                       const isDone = c.fusingStatus === 'Fusing Done';
                       const isPartial = c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete';
-                      const fresh = parseFloat(c.freshMtr || c.fusingMtr) || 0;
+                      const printedMtr = parseFloat(getCardPrintedMeters(c)) || 0;
                       const waste = parseFloat(c.totalWastageMtr) || 0;
+                      const rawFresh = c.freshMtr !== undefined && c.freshMtr !== '' 
+                        ? parseFloat(c.freshMtr) 
+                        : (parseFloat(c.fusingMtr) ? Math.max(0, parseFloat(c.fusingMtr) - waste) : 0);
+                      const fresh = isNaN(rawFresh) ? 0 : rawFresh;
                       const butterKg = parseFloat(c.butterPaperWeightKg) || 0;
                       const preset = getFabricFusingPreset(c.fabric);
 
@@ -2152,6 +2472,23 @@ export default function FusingDepartment() {
                             </div>
                           </td>
 
+                          {/* Operator & Shift */}
+                          <td>
+                            <div style={{ fontWeight: 800, color: 'var(--ee-fusing-text-primary)', fontSize: '0.85rem' }}>
+                              {c.fusingOperator || '—'}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--ee-fusing-text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                              <span style={{ padding: '1px 5px', borderRadius: 4, background: '#f1f5f9', border: '1px solid #e2e8f0', fontWeight: 700, color: '#334155' }}>
+                                {c.shift || 'Morning'}
+                              </span>
+                              {c.fusingMachine && (
+                                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  • {c.fusingMachine.replace(/\s*\(.*?\)/, '')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
                           {/* Speed & Temp */}
                           <td style={{ textAlign: 'center' }}>
                             <button
@@ -2208,14 +2545,45 @@ export default function FusingDepartment() {
                             </button>
                           </td>
 
+                          {/* Printed Meters */}
+                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#0369a1', fontSize: '0.88rem' }}>
+                            {printedMtr > 0 ? `${printedMtr.toLocaleString('en-IN')} m` : '—'}
+                          </td>
+
                           {/* Fresh Output */}
                           <td style={{ textAlign: 'right', fontWeight: 900, color: '#059669', fontSize: '0.92rem' }}>
-                            {fresh > 0 ? `${fresh.toLocaleString('en-IN')} m` : '—'}
+                            <div>{fresh > 0 ? `${fresh.toLocaleString('en-IN')} m` : '—'}</div>
+                            {printedMtr > 0 && fresh > 0 && (
+                              <div style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>
+                                {((fresh / printedMtr) * 100).toFixed(0)}% yield
+                              </div>
+                            )}
                           </td>
 
                           {/* Total Wastage */}
-                          <td style={{ textAlign: 'right', fontWeight: 800, color: waste > 0 ? '#DC2626' : '#94A3B8' }}>
-                            {waste > 0 ? `${waste} m` : '0 m'}
+                          <td style={{ textAlign: 'right', fontWeight: 800 }}>
+                            {waste > 0 ? (
+                              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                <span style={{
+                                  background: '#fee2e2',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fca5a5',
+                                  padding: '2px 8px',
+                                  borderRadius: '5px',
+                                  fontWeight: 900,
+                                  fontSize: '0.84rem'
+                                }}>
+                                  ⚠️ {waste} m
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 700 }}>
+                                  {printedMtr > 0 
+                                    ? `${((waste / printedMtr) * 100).toFixed(1)}% waste`
+                                    : (fresh + waste > 0 ? `${((waste / (fresh + waste)) * 100).toFixed(1)}% waste` : '')}
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>0 m</span>
+                            )}
                           </td>
 
                           {/* Actions (Sticky Column) */}
@@ -2243,8 +2611,12 @@ export default function FusingDepartment() {
               {paginatedCards.map((c) => {
                 const isDone = c.fusingStatus === 'Fusing Done';
                 const isPartial = c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete';
-                const fresh = parseFloat(c.freshMtr || c.fusingMtr) || 0;
+                const printedMtr = parseFloat(getCardPrintedMeters(c)) || 0;
                 const waste = parseFloat(c.totalWastageMtr) || 0;
+                const rawFresh = c.freshMtr !== undefined && c.freshMtr !== '' 
+                  ? parseFloat(c.freshMtr) 
+                  : (parseFloat(c.fusingMtr) ? Math.max(0, parseFloat(c.fusingMtr) - waste) : 0);
+                const fresh = isNaN(rawFresh) ? 0 : rawFresh;
                 const butterKg = parseFloat(c.butterPaperWeightKg) || 0;
                 const preset = getFabricFusingPreset(c.fabric);
 
@@ -2323,18 +2695,24 @@ export default function FusingDepartment() {
                         </div>
                       </div>
 
-                      {/* Fresh Output vs Wastage Grid */}
-                      <div className="fusing-card-stats-row">
+                      {/* Fresh Output vs Wastage Grid (3-Tier Balance) */}
+                      <div className="fusing-card-stats-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                        <div className="fusing-card-stat-item">
+                          <span className="fusing-card-stat-label">Printed</span>
+                          <span className="fusing-card-stat-val" style={{ color: '#0369a1', fontSize: '0.86rem' }}>
+                            {printedMtr > 0 ? `${printedMtr} m` : '—'}
+                          </span>
+                        </div>
                         <div className="fusing-card-stat-item">
                           <span className="fusing-card-stat-label">Fresh Output</span>
-                          <span className="fusing-card-stat-val fresh">
+                          <span className="fusing-card-stat-val fresh" style={{ fontSize: '0.86rem' }}>
                             {fresh > 0 ? `${fresh.toLocaleString('en-IN')} m` : '—'}
                           </span>
                         </div>
                         <div className="fusing-card-stat-item">
-                          <span className="fusing-card-stat-label">Total Wastage</span>
-                          <span className={`fusing-card-stat-val ${waste > 0 ? 'waste' : ''}`}>
-                            {waste > 0 ? `${waste} m` : '0 m'}
+                          <span className="fusing-card-stat-label">Wastage</span>
+                          <span className={`fusing-card-stat-val ${waste > 0 ? 'waste' : ''}`} style={{ fontSize: '0.86rem' }}>
+                            {waste > 0 ? `⚠️ ${waste}m` : '0 m'}
                           </span>
                         </div>
                       </div>
@@ -2349,6 +2727,9 @@ export default function FusingDepartment() {
                         </span>
                         <span className={`fusing-chip ${c.useButterPaper === 'Yes' || butterKg > 0 ? 'butter-yes' : 'butter-no'}`}>
                           Butter Paper: {c.useButterPaper === 'Yes' || butterKg > 0 ? `YES (${butterKg || 0}kg)` : 'NO'}
+                        </span>
+                        <span className="fusing-chip">
+                          Shift: {c.shift || 'Morning'}
                         </span>
                         {c.fusingMachine && (
                           <span className="fusing-chip">

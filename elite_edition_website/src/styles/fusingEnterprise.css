@@ -309,6 +309,7 @@
 .fusing-metric-card.accent-amber::before { background: #D97706; }
 .fusing-metric-card.accent-purple::before { background: #7C3AED; }
 .fusing-metric-card.accent-teal::before { background: #0D9488; }
+.fusing-metric-card.accent-rose::before { background: #E11D48; }
 
 .fusing-metric-top {
   display: flex;
