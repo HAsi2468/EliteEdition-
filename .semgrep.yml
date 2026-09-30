@@ -75,3 +75,42 @@ rules:
       const $SCHEMA = {
         body: z.object(...)
       }
+
+  # ─── SEC-RULE-05: Ban Untrusted Request Object in Mongoose Queries ─────────
+  - id: ban-raw-mongo-request-binding
+    languages:
+      - javascript
+      - typescript
+    message: >-
+      SECURITY CRITICAL: Raw HTTP request container (req.query, req.body, req.params) passed directly
+      to Mongoose query method without schema validation or sanitization. This enables NoSQL operator injection.
+    severity: ERROR
+    metadata:
+      cwe: "CWE-943: Improper Neutralization of Special Elements in Data Query Logic"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern-either:
+          - pattern: $MODEL.find(req.query, ...)
+          - pattern: $MODEL.findOne(req.body, ...)
+          - pattern: $MODEL.updateOne(req.query, ...)
+          - pattern: $MODEL.deleteMany(req.query, ...)
+
+  # ─── SEC-RULE-06: Ban MongoDB $where and $expr Arbitrary Code Execution ───
+  - id: ban-mongo-where-execution
+    languages:
+      - javascript
+      - typescript
+    message: >-
+      SECURITY CRITICAL: Detected MongoDB '$where' or '$function' clause in query.
+      This executes arbitrary JavaScript on the database engine and must be eliminated.
+    severity: ERROR
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern-either:
+          - pattern: "{ $where: ... }"
+          - pattern: "{ '$where': ... }"
+          - pattern: "{ $function: ... }"
+          - pattern: "{ '$function': ... }"
+

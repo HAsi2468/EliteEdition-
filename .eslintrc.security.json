@@ -23,6 +23,10 @@
       {
         "selector": "CallExpression[callee.property.name='$where']",
         "message": "MongoDB $where operator enables arbitrary JavaScript execution on the server and is strictly banned."
+      },
+      {
+        "selector": "BinaryExpression[operator='+'][left.type='Literal'][right.type='Identifier']",
+        "message": "Review string concatenation: Ensure user input is never concatenated directly into SQL/NoSQL query predicates."
       }
     ]
   }

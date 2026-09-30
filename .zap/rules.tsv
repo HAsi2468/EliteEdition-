@@ -1,0 +1,23 @@
+# OWASP ZAP Baseline Rules Configuration
+# Format: <rule-id>\t<action>\t<comment>
+# Actions: IGNORE, INFO, WARN, FAIL
+
+10020	FAIL	X-Frame-Options Header Scanner
+10038	FAIL	Content Security Policy (CSP) Header Not Set
+10055	FAIL	CSP: script-src unsafe-inline
+40018	FAIL	SQL Injection - Hypersonic SQL
+40019	FAIL	SQL Injection - MySQL
+40020	FAIL	SQL Injection - PostgreSQL
+40021	FAIL	SQL Injection - Oracle
+40022	FAIL	SQL Injection - SQLite
+40024	FAIL	SQL Injection - Generic
+40027	FAIL	SQL Injection - SQLite
+90019	FAIL	Server Side Code Injection
+90020	FAIL	Remote OS Command Injection
+40003	FAIL	CRLF Injection
+40012	FAIL	Cross Site Scripting (Reflected)
+40014	FAIL	Cross Site Scripting (Persistent)
+40016	FAIL	Cross Site Scripting (DOM Based)
+90033	FAIL	Format String Error
+10048	WARN	Remote Code Execution - Shellshock
+10023	INFO	Information Disclosure - Debug Error Messages
