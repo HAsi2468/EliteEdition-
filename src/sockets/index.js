@@ -4,6 +4,7 @@ const eventBus = require('../services/eventBus.service');
 const { verifyToken } = require('../utils/auth');
 const { normalizeCompanyId, COMPANIES } = require('../config/company.constants');
 const webPushService = require('../services/webPush.service');
+const { sanitizeChatMessage, validateAttachment } = require('../utils/sanitizeChat');
 
 const getMemberIdString = (m) => {
   if (!m) return '';
@@ -166,7 +167,32 @@ const setupSockets = (io) => {
       try {
         const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = data;
         
-        // Membership Check: Ensure sender belongs to room (automatically add if missing)
+        // Anti-Spoofing: Bind sender strictly to authenticated socket user when available
+        const actualSenderId = socket.userId || (socket.user ? String(socket.user._id) : senderId);
+        if (!actualSenderId) {
+          socket.emit('error-notice', { message: 'Authentication required to post messages' });
+          return;
+        }
+
+        // Socket Flood Rate Limiting (max 10 messages per 3 seconds per socket)
+        const now = Date.now();
+        socket._msgTimestamps = (socket._msgTimestamps || []).filter((t) => now - t < 3000);
+        if (socket._msgTimestamps.length >= 10) {
+          socket.emit('error-notice', { message: 'Too many messages sent. Please slow down.' });
+          return;
+        }
+        socket._msgTimestamps.push(now);
+
+        // Attachment security check (block executables and oversized payloads)
+        if (attachment) {
+          const attachCheck = validateAttachment(attachment);
+          if (!attachCheck.valid) {
+            socket.emit('error-notice', { message: attachCheck.error });
+            return;
+          }
+        }
+
+        // Membership Check: Ensure sender belongs to room
         const targetRoom = await ChatRoom.findById(roomId);
         if (!targetRoom) {
           console.warn(`send-message failed: Room ${roomId} not found`);
@@ -176,21 +202,38 @@ const setupSockets = (io) => {
         const isMember = targetRoom.members && targetRoom.members.some((m) => {
           if (!m) return false;
           const memberIdStr = getMemberIdString(m);
-          return memberIdStr === String(senderId);
+          return memberIdStr === String(actualSenderId);
         });
 
+        const isSuperOrAdmin = socket.user && (
+          socket.user.role === 'admin' ||
+          socket.user.role === 'super_admin' ||
+          socket.user.isMainAdmin === true
+        );
+
         if (!isMember) {
+          if (targetRoom.type === 'direct') {
+            socket.emit('error-notice', { message: 'Access denied: You are not a participant in this direct message conversation' });
+            return;
+          }
+          if (targetRoom.isPrivate && !isSuperOrAdmin) {
+            socket.emit('error-notice', { message: 'Access denied: You are not a member of this private channel' });
+            return;
+          }
           const mongoose = require('mongoose');
           targetRoom.members = targetRoom.members || [];
-          if (mongoose.Types.ObjectId.isValid(senderId)) {
-            targetRoom.members.push(new mongoose.Types.ObjectId(senderId));
+          if (mongoose.Types.ObjectId.isValid(actualSenderId)) {
+            targetRoom.members.push(new mongoose.Types.ObjectId(actualSenderId));
             await targetRoom.save();
           }
         }
+
+        // Sanitize content against stored XSS
+        const sanitizedContent = sanitizeChatMessage(content || '');
         
         // Parse user mentions
         const mentionRegex = /@(\w+)/g;
-        const matches = [...content.matchAll(mentionRegex)];
+        const matches = [...(sanitizedContent || '').matchAll(mentionRegex)];
         const usernames = matches.map(m => m[1]);
         const mentions = [];
         if (usernames.length > 0) {
@@ -200,9 +243,9 @@ const setupSockets = (io) => {
 
         // Parse record mentions e.g. @JC-1004, @DES-55, @INV-201
         const recordMentions = inRecordMentions || [];
-        if (!inRecordMentions) {
+        if (!inRecordMentions && sanitizedContent) {
           const recordRegex = /@(JC|DES|INV)-([a-zA-Z0-9_-]+)/gi;
-          const recordMatches = [...content.matchAll(recordRegex)];
+          const recordMatches = [...sanitizedContent.matchAll(recordRegex)];
           recordMatches.forEach((m) => {
             const prefix = m[1].toUpperCase();
             const refVal = m[0].replace(/^@/, '');
@@ -216,8 +259,8 @@ const setupSockets = (io) => {
         // Save message to MongoDB
         const newMessage = await ChatMessage.create({
           roomId,
-          senderId,
-          content,
+          senderId: actualSenderId,
+          content: sanitizedContent || (attachment ? `Attached ${attachment.fileName || 'file'}` : 'Message'),
           replyTo: replyTo || null,
           type: msgType,
           msgType: 'human',

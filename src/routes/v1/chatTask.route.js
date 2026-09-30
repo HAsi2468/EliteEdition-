@@ -27,9 +27,22 @@ const diskStorage = multer.diskStorage({
     cb(null, 'chat-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
+
+const FORBIDDEN_EXTENSIONS = [
+  '.exe', '.bat', '.cmd', '.sh', '.bash', '.php', '.phtml',
+  '.cgi', '.pl', '.py', '.vbs', '.msi', '.jar', '.scr', '.html', '.htm'
+];
+
 const upload = multer({
   storage: isR2Configured() ? memoryStorage : diskStorage,
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit per attachment
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit per attachment
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (FORBIDDEN_EXTENSIONS.includes(ext)) {
+      return cb(new Error(`File type ${ext} is blocked for security reasons.`));
+    }
+    cb(null, true);
+  }
 });
 
 const router = express.Router();

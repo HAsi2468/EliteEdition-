@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { ChatRoom, ChatMessage, user: User } = require('../db/models');
 const { syncCommunicationGroups } = require('../utils/syncCommunicationGroups');
 const { publishActivity } = require('../utils/activityEvent');
+const { sanitizeChatMessage, validateAttachment } = require('../utils/sanitizeChat');
 
 const getMemberIdString = (m) => {
   if (!m) return '';
@@ -27,22 +28,31 @@ const getGroups = async (req, res) => {
     const currentUserId = currentUser ? currentUser._id : (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : null);
     const currentUserIdStr = currentUserId ? String(currentUserId) : (rawUserId ? String(rawUserId) : null);
 
+    const isClient = req.user && (req.user.isClient || req.user.role === 'Client');
     let query;
 
-    if (currentUserId || currentUserIdStr) {
+    if (isClient) {
+      // Multi-tenancy guard: External Clients ONLY see channels where they are an explicit member
+      query = {
+        isArchived: { $ne: true },
+        members: currentUserId,
+        isInternalOnly: { $ne: true }
+      };
+    } else if (currentUserId || currentUserIdStr) {
       const userMemberFilter = { $in: [currentUserId, currentUserIdStr].filter(Boolean) };
       query = {
         isArchived: { $ne: true },
         $or: [
-          { type: { $ne: 'direct' } },
+          { type: { $ne: 'direct' }, isPrivate: { $ne: true } },
           { members: userMemberFilter }
         ]
       };
     } else {
-      // If user identity is missing, do NOT expose direct 1-on-1 messages of other users
+      // If user identity is missing, do NOT expose direct 1-on-1 messages or private channels
       query = {
         isArchived: { $ne: true },
-        type: { $ne: 'direct' }
+        type: { $ne: 'direct' },
+        isPrivate: { $ne: true }
       };
     }
 
@@ -154,10 +164,20 @@ const getGroupMessages = async (req, res) => {
         return memberIdStr === reqUserIdStr;
       });
 
+      const isSuperOrAdmin = req.user && (
+        req.user.role === 'admin' ||
+        req.user.role === 'super_admin' ||
+        req.user.isAdmin === true ||
+        req.user.isMainAdmin === true
+      );
+
       if (!isMember) {
         if (room.type === 'direct') {
           // Do NOT allow non-members to view or auto-join private 1-on-1 direct rooms
           return res.status(403).json({ success: false, message: 'Access denied to direct message conversation' });
+        }
+        if (room.isPrivate && !isSuperOrAdmin) {
+          return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this private group' });
         }
         // Auto-join public/authority group rooms if user has access
         await ChatRoom.findByIdAndUpdate(groupId, { $addToSet: { members: rawReqUserId } });
@@ -355,6 +375,14 @@ const postGroupMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message content, attachment, or poll is required' });
     }
 
+    // Attachment security validation (block executables and oversized files)
+    if (attachment) {
+      const attachCheck = validateAttachment(attachment);
+      if (!attachCheck.valid) {
+        return res.status(400).json({ success: false, message: attachCheck.error });
+      }
+    }
+
     const targetRoom = await ChatRoom.findById(groupId);
     if (!targetRoom) {
       return res.status(404).json({ success: false, message: 'Group not found' });
@@ -369,18 +397,31 @@ const postGroupMessage = async (req, res) => {
       return memberIdStr === strSender;
     });
 
+    const isSuperOrAdmin = req.user && (
+      req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.isAdmin === true ||
+      req.user.isMainAdmin === true
+    );
+
     if (!isMember) {
       if (targetRoom.type === 'direct') {
         return res.status(403).json({ success: false, message: 'You are not a member of this direct conversation' });
+      }
+      if (targetRoom.isPrivate && !isSuperOrAdmin) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this private group' });
       }
       targetRoom.members = targetRoom.members || [];
       targetRoom.members.push(senderObjId);
       await targetRoom.save();
     }
 
+    // Sanitize content against Stored XSS and malicious script injection
+    const sanitizedContent = sanitizeChatMessage(content || '');
+
     // Parse user mentions
     const mentionRegex = /@(\w+)/g;
-    const matches = [...(content || '').matchAll(mentionRegex)];
+    const matches = [...(sanitizedContent || '').matchAll(mentionRegex)];
     const usernames = matches.map(m => m[1]);
     const mentions = [];
     if (usernames.length > 0) {
@@ -390,9 +431,9 @@ const postGroupMessage = async (req, res) => {
 
     // Parse record mentions
     const recordMentions = inRecordMentions || [];
-    if (!inRecordMentions && content) {
+    if (!inRecordMentions && sanitizedContent) {
       const recordRegex = /@(JC|DES|INV)-([a-zA-Z0-9_-]+)/gi;
-      const recordMatches = [...content.matchAll(recordRegex)];
+      const recordMatches = [...sanitizedContent.matchAll(recordRegex)];
       recordMatches.forEach((m) => {
         const prefix = m[1].toUpperCase();
         const refVal = m[0].replace(/^@/, '');
@@ -406,7 +447,7 @@ const postGroupMessage = async (req, res) => {
     const newMessage = await ChatMessage.create({
       roomId: groupId,
       senderId: senderObjId,
-      content: content || (pollMeta ? pollMeta.question : attachment ? `Attached ${attachment.fileName || 'file'}` : 'Message'),
+      content: sanitizedContent || (pollMeta ? pollMeta.question : attachment ? `Attached ${attachment.fileName || 'file'}` : 'Message'),
       replyTo: replyTo || null,
       type: msgType,
       msgType: 'human',
@@ -683,6 +724,17 @@ const createGroup = async (req, res) => {
     }
 
     const creatorId = req.user ? req.user._id : (req.body.userId || req.query.userId);
+    if (!creatorId) {
+      return res.status(401).json({ success: false, message: 'Authentication required to create a group' });
+    }
+
+    // External clients are restricted from creating internal communication channels
+    if (req.user && (req.user.isClient || req.user.role === 'Client')) {
+      return res.status(403).json({ success: false, message: 'Clients are not permitted to create internal operational groups' });
+    }
+
+    const sanitizedName = sanitizeChatMessage(name, 100);
+    const sanitizedDesc = sanitizeChatMessage(description || '', 500);
 
     // If caller explicitly selected members, respect that exact member list!
     const explicitIds = (Array.isArray(requestedMemberIds) && requestedMemberIds.length > 0)
@@ -730,13 +782,15 @@ const createGroup = async (req, res) => {
     }
 
     const room = await ChatRoom.create({
-      name: name.trim(),
-      description: description.trim(),
+      name: sanitizedName,
+      description: sanitizedDesc,
       type: 'group',
       department: department.trim(),
       companyEntity: companyEntity.trim(),
       permissionScope: permissionScope.trim(),
       isSystemGroup: false,
+      isPrivate: Boolean(req.body.isPrivate),
+      createdBy: creatorId,
       subscribedModules: subscribedModules || [],
       subscribedActions: subscribedActions || [],
       members: finalMemberIds
@@ -764,6 +818,21 @@ const updateGroupMembers = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Group not found' });
     }
 
+    const isSuperOrAdmin = req.user && (
+      req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.isAdmin === true ||
+      req.user.isMainAdmin === true
+    );
+    const isCreator = req.user && room.createdBy && String(room.createdBy) === String(req.user._id);
+
+    if (!isSuperOrAdmin && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group creators or administrators can modify group members'
+      });
+    }
+
     room.members = memberIds.map((id) => new mongoose.Types.ObjectId(id));
     await room.save();
 
@@ -785,6 +854,28 @@ const deleteGroup = async (req, res) => {
     const room = await ChatRoom.findById(groupId);
     if (!room) {
       return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    const isSuperOrAdmin = req.user && (
+      req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.isAdmin === true ||
+      req.user.isMainAdmin === true
+    );
+    const isCreator = req.user && room.createdBy && String(room.createdBy) === String(req.user._id);
+
+    if (!isSuperOrAdmin && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group creators or administrators can delete this group'
+      });
+    }
+
+    if (room.isSystemGroup) {
+      return res.status(403).json({
+        success: false,
+        message: 'System department groups cannot be deleted'
+      });
     }
 
     // Mark as archived so syncCommunicationGroups will NEVER resurrect it!
