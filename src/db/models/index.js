@@ -63,6 +63,7 @@ const db = {
   MonthlyCosting: require('./monthlyCosting.model'),
   DesignerTask: require('./designerTask.model'),
   Facility: require('./facility.model'),
+  PushSubscription: require('./pushSubscription.model'),
   mongoose,
 };
 

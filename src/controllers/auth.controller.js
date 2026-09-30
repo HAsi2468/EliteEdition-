@@ -1,5 +1,6 @@
 const httpStatus = require('http-status').default;
 const catchAsync = require('../utils/catchAsync');
+const ApiError = require('../utils/ApiError');
 const {
 	authService,
 	userService,
@@ -19,6 +20,25 @@ const register = catchAsync(async (req, res) => {
 
 const login = catchAsync(async (req, res) => {
 	const user = await authService.loginUserWithEmailAndPassword(req);
+	const tokens = await tokenService.generateAuthTokens({
+		userId: user.id,
+	});
+	res.send({ user, tokens });
+});
+
+const refreshTokens = catchAsync(async (req, res) => {
+	const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
+	if (!refreshToken) {
+		throw new ApiError(httpStatus.UNAUTHORIZED, 'Refresh token required');
+	}
+	const payload = await verifyToken(refreshToken);
+	if (!payload || !payload.userId) {
+		throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid or expired refresh token');
+	}
+	const user = await userService.getUserById(payload.userId);
+	if (!user) {
+		throw new ApiError(httpStatus.UNAUTHORIZED, 'User not found');
+	}
 	const tokens = await tokenService.generateAuthTokens({
 		userId: user.id,
 	});
@@ -46,6 +66,7 @@ const resetPassword = catchAsync(async (req, res) => {
 module.exports = {
 	register,
 	login,
+	refreshTokens,
 	forgotPassword,
 	resetPassword,
 };

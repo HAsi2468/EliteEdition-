@@ -12,6 +12,7 @@ const morgan = require('./config/morgan');
 const jwt = require('./config/jwt');
 const mongoSanitize = require('express-mongo-sanitize');
 const { authLimiter, apiLimiter } = require('./middlewares/rateLimiter');
+const { createCspMiddleware } = require('./middlewares/csp');
 const routes = require('./routes/v1');
 require('./schedule/fetchFromAPISScheduler');
 require('./schedule/myntraScheduler').startMyntraScheduler();
@@ -76,6 +77,9 @@ app.use(
 		noSniff: true,
 	})
 );
+
+// Apply strict Content-Security-Policy middleware
+app.use(createCspMiddleware());
 
 // parse json request body
 app.use(express.json({ limit: '50mb' }));

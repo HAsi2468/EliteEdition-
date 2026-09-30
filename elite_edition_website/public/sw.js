@@ -148,3 +148,86 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+// ==============================================================================
+// 4. WEB PUSH NOTIFICATION ENGINE
+// Delivers system-level desktop/mobile alerts when tabs are backgrounded or closed
+// ==============================================================================
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    payload = { title: 'Elite Edition ERP', body: event.data.text() };
+  }
+
+  const title = payload.title || 'Elite Edition ERP Message';
+  const notificationOptions = {
+    body: payload.body || 'You received a new message.',
+    icon: payload.icon || '/Logo.png',
+    badge: payload.badge || '/Logo.png',
+    tag: payload.tag || 'elite-chat-default', // Collapses duplicate room notifications
+    renotify: payload.renotify !== undefined ? payload.renotify : true,
+    data: payload.data || { url: '/communication' },
+    vibrate: payload.priority === 'urgent' ? [200, 100, 200, 100, 400] : [100, 50, 100],
+    actions: payload.actions || [
+      { action: 'open', title: 'Open Chat' },
+      { action: 'dismiss', title: 'Dismiss' },
+    ],
+  };
+
+  // Smart Focus & In-Tab Suppression:
+  // If the user already has an active, focused tab viewing this room, suppress OS push
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      const targetRoomId = payload.data?.roomId;
+      
+      const isRoomFocused = clientList.some((client) => {
+        return client.visibilityState === 'visible' &&
+               client.focused &&
+               client.url.includes(`room=${targetRoomId}`);
+      });
+
+      if (isRoomFocused) {
+        // Tab is active; broadcast in-tab alert without popping external OS modal
+        clientList.forEach((c) => c.postMessage({ type: 'IN_APP_MESSAGE_ALERT', payload }));
+        return;
+      }
+
+      return self.registration.showNotification(title, notificationOptions);
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || '/communication';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // 1. If an existing ERP tab is already open, focus it and navigate
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          if ('navigate' in client) {
+            client.navigate(targetUrl);
+          }
+          return client.focus();
+        }
+      }
+
+      // 2. If no tab is open, launch a new window directly to the thread
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

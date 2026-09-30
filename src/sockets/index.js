@@ -3,6 +3,7 @@ const { ChatMessage, User, Task, ChatRoom } = require('../db/models');
 const eventBus = require('../services/eventBus.service');
 const { verifyToken } = require('../utils/auth');
 const { normalizeCompanyId, COMPANIES } = require('../config/company.constants');
+const webPushService = require('../services/webPush.service');
 
 const getMemberIdString = (m) => {
   if (!m) return '';
@@ -254,6 +255,28 @@ const setupSockets = (io) => {
           });
         }
         broadcast.emit('receive-message', populatedMessage);
+
+        // Dispatch Web Push Notification to backgrounded / unfocused room members
+        try {
+          const recipientIds = (targetRoom.members || [])
+            .map((m) => getMemberIdString(m))
+            .filter((id) => id && id !== String(senderId));
+
+          if (recipientIds.length > 0) {
+            const senderDisplayName = populatedMessage.senderId?.name || populatedMessage.senderId?.username || 'Team Member';
+            const cleanSnippet = (content || '').slice(0, 120) || (attachment ? `Sent attachment: ${attachment.name || 'file'}` : 'New message');
+            webPushService.dispatchChatNotification(recipientIds, {
+              senderName: senderDisplayName,
+              messagePreview: cleanSnippet,
+              roomId: String(roomId),
+              roomName: targetRoom.name || '',
+              priority: priority === 'urgent' ? 'urgent' : 'normal',
+              avatarUrl: '/Logo.png'
+            }).catch((err) => console.warn('[WebPush] Dispatch error:', err.message));
+          }
+        } catch (pushErr) {
+          console.warn('[WebPush] Error gathering recipients:', pushErr.message);
+        }
 
         // Emit direct notification to each mentioned user
         if (mentions.length > 0) {

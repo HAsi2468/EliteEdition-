@@ -16,6 +16,7 @@ router.post(
   authController.register
 );
 router.post('/login', validate(authValidation.login), authController.login);
+router.post('/refresh-tokens', authController.refreshTokens);
 router.post(
   '/forgot-password',
   validate(authValidation.forgotPassword),

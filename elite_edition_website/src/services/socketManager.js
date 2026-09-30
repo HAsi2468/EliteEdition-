@@ -174,7 +174,7 @@ class SocketManager {
 
     // Check company isolation on client as defense-in-depth
     if (event.companyId && this.currentCompanyId &&
-        String(event.companyId).toLowerCase() !== String(this.currentCompanyId).toLowerCase()) {
+      String(event.companyId).toLowerCase() !== String(this.currentCompanyId).toLowerCase()) {
       return; // Ignore event destined for another company
     }
 
@@ -222,7 +222,7 @@ class SocketManager {
           timestamp: Date.now()
         }
       }));
-    } catch (e) {}
+    } catch (e) { }
   }
 
   /**
@@ -233,7 +233,7 @@ class SocketManager {
       this.conflictListeners.forEach((fn) => {
         try {
           fn(event);
-        } catch (e) {}
+        } catch (e) { }
       });
     }
   }
@@ -286,7 +286,7 @@ class SocketManager {
           window.dispatchEvent(new CustomEvent('elite-data-refresh', {
             detail: { source: 'resync-fallback', timestamp: Date.now() }
           }));
-        } catch (err) {}
+        } catch (err) { }
       }
     }
   }
@@ -381,7 +381,7 @@ class SocketManager {
         window.dispatchEvent(new CustomEvent('elite-data-refresh', {
           detail: { source: 'polling-fallback', timestamp: Date.now() }
         }));
-      } catch (e) {}
+      } catch (e) { }
     }, 20000);
   }
 
@@ -412,7 +412,7 @@ class SocketManager {
     if (this.socket) {
       try {
         this.socket.connect();
-      } catch (e) {}
+      } catch (e) { }
     } else {
       this._connect();
     }
@@ -465,7 +465,7 @@ class SocketManager {
     if (this.status === status) return;
     this.status = status;
     this.statusListeners.forEach((fn) => {
-      try { fn(status); } catch (e) {}
+      try { fn(status); } catch (e) { }
     });
   }
 
@@ -500,7 +500,7 @@ class SocketManager {
         const u = JSON.parse(userStr);
         return u.id || u._id || null;
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   }
 }
