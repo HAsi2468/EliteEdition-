@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
-    "test": "node --test src/tests/inputInjectionRemediation.test.js src/tests/securityFuzzingSuite.test.js && node src/tests/jobCardRaceConditionEngine.test.js",
+    "test": "node --test src/tests/inputInjectionRemediation.test.js src/tests/securityFuzzingSuite.test.js src/tests/clientTenancyAndFlac.test.js src/tests/productionVarianceAndLedgerGuard.test.js src/tests/challanQrVerification.test.js src/tests/eodExecutiveBriefing.test.js && node src/tests/jobCardRaceConditionEngine.test.js",
     "version": "update-changelog && git add CHANGELOG.md",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -67,6 +67,7 @@
     "nodemailer": "^8.0.9",
     "pdfkit": "^0.19.1",
     "pg": "^8.23.0",
+    "qrcode": "^1.5.4",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.3.0",

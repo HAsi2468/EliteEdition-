@@ -167,7 +167,27 @@ const fabricChallanSchema = new mongoose.Schema(
       approvedBy: { type: String, default: '' },
       approvedByName: { type: String, default: '' },
       rejectionReason: { type: String, default: '' }
-    }
+    },
+
+    // ── Phase 3: Digital QR Code Verification & Physical Challan Authentication ──
+    verificationUuid: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    verificationHash: {
+      type: String,
+      default: '',
+    },
+    verificationScanCount: {
+      type: Number,
+      default: 0,
+    },
+    lastScannedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -175,16 +195,26 @@ const fabricChallanSchema = new mongoose.Schema(
   }
 );
 
-// Auto-increment challanNo before saving a new doc
+// Auto-increment challanNo & generate verification UUID/hash before saving a new doc
 // Starting from EDP-621 as the baseline
 const CHALLAN_START_NO = 621;
 fabricChallanSchema.pre('save', async function () {
+  const crypto = require('crypto');
   if (this.isNew && !this.challanNo) {
     const last = await this.constructor.findOne({}, 'challanNo').sort({ challanNo: -1 });
     this.challanNo = last && last.challanNo
       ? Math.max(last.challanNo + 1, CHALLAN_START_NO)
       : CHALLAN_START_NO;
   }
+
+  // Ensure cryptographic UUID exists for physical QR verification
+  if (!this.verificationUuid) {
+    this.verificationUuid = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+  }
+
+  // Generate tamper-evident 16-hex digest
+  const hashPayload = `${this.challanNo || ''}:${this.partyName || ''}:${this.totalMtr || 0}:${this.date ? new Date(this.date).toISOString().split('T')[0] : ''}`;
+  this.verificationHash = crypto.createHash('sha256').update(hashPayload).digest('hex').substring(0, 16);
 });
 
 // Challan queries filtering by fabric and panna

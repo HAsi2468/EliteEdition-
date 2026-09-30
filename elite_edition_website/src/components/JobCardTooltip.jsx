@@ -32,7 +32,7 @@ export default function JobCardTooltip({ card, children, style = {} }) {
       }}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setShow(false)}
-      style={{ display: 'inline-block', position: 'relative', cursor: 'pointer', ...style }}
+      style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, position: 'relative', cursor: 'pointer', ...style }}
     >
       {children}
 

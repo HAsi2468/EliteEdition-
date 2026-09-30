@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const c = require('../../controllers/fabricChallan.controller');
+const { clientTenancyGuard, verifyRecordOwnership } = require('../../middlewares/clientTenancyGuard');
+
+// Apply client tenancy guard across all fabric challan endpoints
+router.use(clientTenancyGuard);
 
 // Get next auto challan number
 router.get('/next-no', c.getNextChallanNo);
@@ -15,10 +19,10 @@ router.get('/', c.getChallans);
 router.post('/', c.createChallan);
 
 // Update a challan
-router.put('/:id', c.updateChallan);
+router.put('/:id', verifyRecordOwnership('FabricChallan', 'partyName'), c.updateChallan);
 
 // Delete a challan
-router.delete('/:id', c.deleteChallan);
+router.delete('/:id', verifyRecordOwnership('FabricChallan', 'partyName'), c.deleteChallan);
 
 // Reset all challans
 router.post('/reset-all', c.resetAllChallans);
@@ -31,6 +35,7 @@ router.get('/bulk-pdf', c.downloadBulkChallansPdf);
 router.post('/bulk-pdf', c.downloadBulkChallansPdf);
 
 // Download single challan PDF
-router.get('/:id/pdf', c.downloadChallanPdf);
+router.get('/:id/pdf', verifyRecordOwnership('FabricChallan', 'partyName'), c.downloadChallanPdf);
 
 module.exports = router;
+

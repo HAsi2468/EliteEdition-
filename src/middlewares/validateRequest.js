@@ -68,7 +68,7 @@ function createRfc7807ValidationError(details, instanceUrl = '') {
     title: 'Bad Request',
     status: httpStatus.BAD_REQUEST,
     error: 'VALIDATION_ERROR',
-    message: 'Invalid request payload',
+    message: 'Invalid payload',
     instance: instanceUrl,
     timestamp: new Date().toISOString(),
     details,

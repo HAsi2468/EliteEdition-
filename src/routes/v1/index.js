@@ -71,5 +71,7 @@ router.use('/events', require('./event.route'));
 router.use('/search', require('./search.route'));
 router.use('/job-cards', require('./jobCardCompletion.route'));
 router.use('/notifications', require('./notification.route'));
+router.use('/verify/challan', require('./challanVerification.route'));
 
 module.exports = router;
+

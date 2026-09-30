@@ -111,6 +111,47 @@ fabricTransactionSchema.pre('save', async function () {
   }
 });
 
+// ── Non-Negative Ledger Guard Pre-Save Hook ──
+// Prohibits OUTWARD transactions from driving lot inventory below zero
+fabricTransactionSchema.pre('save', async function () {
+  if (this.type === 'OUTWARD' && this.lotNo && !this.forceAllowNegative) {
+    const lotNum = Number(this.lotNo);
+    if (!isNaN(lotNum) && lotNum > 0) {
+      const matchCriteria = { lotNo: lotNum };
+      if (!this.isNew && this._id) {
+        matchCriteria._id = { $ne: this._id };
+      }
+
+      const agg = await this.constructor.aggregate([
+        { $match: matchCriteria },
+        {
+          $group: {
+            _id: '$lotNo',
+            totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+            totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          },
+        },
+      ]);
+
+      const currentStats = agg && agg[0] ? agg[0] : { totalIn: 0, totalOut: 0 };
+      const currentAvailable = currentStats.totalIn - currentStats.totalOut;
+      const requestedQty = parseFloat(this.qty) || 0;
+
+      // Allow 0.05m tolerance for floating point rounding differences
+      if (requestedQty > currentAvailable + 0.05) {
+        const deficit = Math.round((requestedQty - currentAvailable) * 100) / 100;
+        const err = new Error(
+          `INSUFFICIENT_FABRIC_STOCK: Cannot issue ${requestedQty} mtr from Lot #${lotNum}. Available balance is only ${Math.max(0, Math.round(currentAvailable * 100) / 100)} mtr (Deficit: ${deficit} mtr). Negative inventory ledger balances are strictly prohibited.`
+        );
+        err.name = 'LedgerStockError';
+        err.statusCode = 422;
+        err.code = 'INSUFFICIENT_FABRIC_STOCK';
+        throw err;
+      }
+    }
+  }
+});
+
 // ── Indexes for query optimization ──
 // Stock overview & panna grouping (getStockOverview, getStockByPanna, getTransactions)
 fabricTransactionSchema.index({ type: 1, department: 1 });

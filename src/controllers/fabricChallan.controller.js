@@ -868,6 +868,16 @@ const downloadChallanPdf = async (req, res) => {
       return res.status(404).json({ error: 'Challan not found' });
     }
 
+    // ── Phase 3: Digital QR Code Verification Buffer Generation ──
+    const { generateChallanQrBuffer } = require('./challanVerification.controller');
+    let qrBuffer = null;
+    try {
+      const qrUuid = challan.verificationUuid || String(challan._id);
+      qrBuffer = await generateChallanQrBuffer(qrUuid);
+    } catch (qrErr) {
+      console.warn('Could not generate verification QR buffer:', qrErr.message);
+    }
+
     const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="EDP-${challan.challanNo || 'preview'}.pdf"`);
@@ -1344,6 +1354,18 @@ const downloadChallanPdf = async (req, res) => {
       doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
         .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
+
+      // Digital QR Code Physical Document Verification Seal
+      if (qrBuffer) {
+        const qrCenterX = ML + (contentWidth - 46) / 2;
+        try {
+          doc.image(qrBuffer, qrCenterX, sigLineY - 14, { width: 46, height: 46 });
+          doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(6.5).font('Helvetica-Bold')
+            .text('SCAN TO VERIFY', qrCenterX - 17, sigLineY + 36, { width: 80, align: 'center', lineBreak: false });
+        } catch (qrDrawErr) {
+          console.warn('Failed to draw QR code on PDF:', qrDrawErr.message);
+        }
+      }
 
       doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')

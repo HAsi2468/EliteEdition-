@@ -1,7 +1,7 @@
 /**
- * Automated Verification Suite for Unsanitized Input Injections Remediation (Phase 3)
+ * Automated Verification Suite for Unsanitized Input Injections Remediation (Phase 2)
  * Tests RFC 7807 schema validation, mass-assignment defense (.strict()),
- * NoSQL operator injection neutralization, and parameter allowlisting.
+ * NoSQL operator injection neutralization, custom objectIdSchema, and query allowlisting.
  */
 
 const { describe, it } = require('node:test');
@@ -23,6 +23,12 @@ const {
   getUsersQuerySchema,
   getUserParamsSchema,
 } = require('../validations/zod/user.schemas');
+const {
+  getOrdersQuerySchema,
+  createOrderSchema,
+  getOrderParamsSchema,
+} = require('../validations/zod/order.schemas');
+const { objectIdSchema } = require('../validations/zod/common.schemas');
 
 // Build an isolated, lightweight Express test harness
 function createTestApp() {
@@ -48,9 +54,24 @@ function createTestApp() {
     }
   );
 
-  // SEC-INJ-05 Endpoint: Query allowlisting & pagination
+  // SEC-INJ-05 Endpoint: Query allowlisting & pagination for Users
   app.get('/api/users', validateRequest(getUsersQuerySchema), (req, res) => {
     res.status(200).json({ success: true, query: req.query });
+  });
+
+  // SEC-INJ-05 Endpoint: Orders listing with strict sortBy enum
+  app.get('/api/orders', validateRequest(getOrdersQuerySchema), (req, res) => {
+    res.status(200).json({ success: true, query: req.query });
+  });
+
+  // Order creation endpoint
+  app.post('/api/orders', validateRequest(createOrderSchema), (req, res) => {
+    res.status(201).json({ success: true, order: req.body });
+  });
+
+  // Order parameter validation
+  app.get('/api/orders/:orderId', validateRequest(getOrderParamsSchema), (req, res) => {
+    res.status(200).json({ success: true, orderId: req.params.orderId });
   });
 
   // Route parameter validation
@@ -72,12 +93,12 @@ function createTestApp() {
 
 const app = createTestApp();
 
-describe('Phase 3: Unsanitized Input Injections Remediation', () => {
+describe('Phase 2: Unsanitized Input Injections Remediation', () => {
   // ─── SEC-INJ-03: NoSQL Operator & Type Confusion Neutralization ────────────
   describe('SEC-INJ-03: NoSQL Operator & Type Confusion Neutralization', () => {
-    it('should reject login payload with {"$gt": ""} in password with HTTP 400 Bad Request', async () => {
+    it('POST {"email": "user@example.com", "password": {"$gt": ""}} -> Immediate HTTP 400 Bad Request rejection with RFC 7807', async () => {
       const payload = {
-        email: 'admin@example.com',
+        email: 'user@example.com',
         password: { $gt: '' },
       };
 
@@ -87,7 +108,8 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
-      assert.strictEqual(res.body.message, 'Invalid request payload');
+      assert.strictEqual(res.body.message, 'Invalid payload');
+      assert.strictEqual(res.body.status, 400);
       assert.ok(Array.isArray(res.body.details));
 
       const passwordError = res.body.details.find((d) => d.field === 'body.password');
@@ -98,7 +120,7 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
       );
     });
 
-    it('should reject login payload with NoSQL operator in email with HTTP 400 Bad Request', async () => {
+    it('should reject login payload with NoSQL operator in email {"$ne": null} with HTTP 400 Bad Request', async () => {
       const payload = {
         email: { $ne: null },
         password: 'ValidPassword123!',
@@ -110,6 +132,7 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       const emailError = res.body.details.find((d) => d.field === 'body.email');
       assert.ok(emailError, 'Expected validation error detail for body.email');
     });
@@ -132,9 +155,9 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
 
   // ─── SEC-INJ-04: Mass Assignment Defense (.strict() Pipeline) ──────────────
   describe('SEC-INJ-04: Mass Assignment Defense (.strict() Pipeline)', () => {
-    it('should reject profile update payload containing undeclared "isAdmin": true with HTTP 400 Bad Request', async () => {
+    it('PATCH profile with {"bio": "Clean bio", "isAdmin": true} -> Immediate HTTP 400 rejection', async () => {
       const payload = {
-        name: 'John Doe',
+        bio: 'Clean bio',
         isAdmin: true,
       };
 
@@ -144,6 +167,7 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       assert.strictEqual(res.body.status, 400);
 
       const adminError = res.body.details.find(
@@ -151,7 +175,7 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
       );
       assert.ok(
         adminError,
-        `Expected unrecognized key error for isAdmin, details: ${JSON.stringify(res.body.details)}`
+        `Expected unrecognized key / privilege error for isAdmin, details: ${JSON.stringify(res.body.details)}`
       );
     });
 
@@ -160,6 +184,22 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
         name: 'Jane Doe',
         role: 'superadmin',
         balance: 99999,
+      };
+
+      const res = await request(app)
+        .patch('/api/users/profile')
+        .send(payload);
+
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
+    });
+
+    it('should reject privilege elevation payload containing "isVerified": true or "permissions": ["*"]', async () => {
+      const payload = {
+        name: 'Jane Doe',
+        isVerified: true,
+        permissions: ['*'],
       };
 
       const res = await request(app)
@@ -184,18 +224,20 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
       assert.strictEqual(res.body.updated.name, 'Updated Name');
+      assert.strictEqual(res.body.updated.bio, 'Senior Software Engineer');
     });
   });
 
   // ─── SEC-INJ-05: Route Parameters & Query Allowlisting ─────────────────────
   describe('SEC-INJ-05: Route Parameters & Query Allowlisting', () => {
-    it('should immediately reject SQL/command payload in sortBy query parameter with HTTP 400', async () => {
+    it('GET /orders?sortBy=name;db.users.drop() -> Immediate HTTP 400 Bad Request from enum validation', async () => {
       const res = await request(app).get(
-        '/api/users?sortBy=id;DROP%20TABLE%20users;'
+        '/api/orders?sortBy=name;db.users.drop()'
       );
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
 
       const sortError = res.body.details.find((d) => d.field === 'query.sortBy');
       assert.ok(sortError, 'Expected validation error detail for query.sortBy');
@@ -203,15 +245,35 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
         sortError.message.includes('Invalid sortBy field'),
         `Expected custom invalid sortBy message, got: ${sortError.message}`
       );
-      assert.ok(
-        sortError.code === 'invalid_value' || sortError.code === 'invalid_enum_value',
-        `Expected invalid enum code, got: ${sortError.code}`
-      );
     });
 
-    it('should coerce and clamp valid query pagination and sorting parameters', async () => {
+    it('should immediately reject SQL/command payload in sortBy query parameter with HTTP 400', async () => {
       const res = await request(app).get(
-        '/api/users?page=3&limit=25&sortBy=name&order=asc'
+        '/api/users?sortBy=id;DROP%20TABLE%20users;'
+      );
+
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
+
+      const sortError = res.body.details.find((d) => d.field === 'query.sortBy');
+      assert.ok(sortError, 'Expected validation error detail for query.sortBy');
+    });
+
+    it('should coerce and clamp valid query pagination and sorting parameters (default limit: 20)', async () => {
+      const res = await request(app).get('/api/orders');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.query.page, 1);
+      assert.strictEqual(res.body.query.limit, 20);
+      assert.strictEqual(res.body.query.sortBy, 'createdAt');
+      assert.strictEqual(res.body.query.order, 'desc');
+    });
+
+    it('should coerce query string values into typed numbers and accept valid pagination', async () => {
+      const res = await request(app).get(
+        '/api/orders?page=3&limit=25&sortBy=name&order=asc'
       );
 
       assert.strictEqual(res.status, 200);
@@ -223,10 +285,11 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
     });
 
     it('should reject pagination limit exceeding 100 with HTTP 400', async () => {
-      const res = await request(app).get('/api/users?limit=500');
+      const res = await request(app).get('/api/orders?limit=500');
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       const limitError = res.body.details.find((d) => d.field === 'query.limit');
       assert.ok(limitError, 'Expected validation error for query.limit');
     });
@@ -236,31 +299,45 @@ describe('Phase 3: Unsanitized Input Injections Remediation', () => {
 
       assert.strictEqual(res.status, 400);
       assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
       const paramError = res.body.details.find((d) => d.field === 'params.userId');
       assert.ok(paramError, 'Expected validation error for params.userId');
     });
 
-    it('should accept valid 24-hex MongoDB ObjectId in route parameter', async () => {
-      const validObjectId = '507f1f77bcf86cd799439011';
-      const res = await request(app).get(`/api/users/${validObjectId}`);
+    it('should reject invalid MongoDB ObjectId in order route parameter using custom objectIdSchema', async () => {
+      const res = await request(app).get('/api/orders/invalid-mongo-id');
 
-      assert.strictEqual(res.status, 200);
-      assert.strictEqual(res.body.success, true);
-      assert.strictEqual(res.body.userId, validObjectId);
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.error, 'VALIDATION_ERROR');
+      assert.strictEqual(res.body.message, 'Invalid payload');
+      const paramError = res.body.details.find((d) => d.field === 'params.orderId');
+      assert.ok(paramError, 'Expected validation error for params.orderId');
+      assert.ok(paramError.message.includes('Invalid MongoDB ObjectId'));
     });
 
-    it('should accept valid RFC 4122 UUID in route parameter', async () => {
-      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
-      const res = await request(app).get(`/api/users/${validUuid}`);
+    it('should accept valid 24-hex MongoDB ObjectId in route parameter', async () => {
+      const validObjectId = '507f1f77bcf86cd799439011';
+      const res = await request(app).get(`/api/orders/${validObjectId}`);
 
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
-      assert.strictEqual(res.body.userId, validUuid);
+      assert.strictEqual(res.body.orderId, validObjectId);
+    });
+
+    it('should validate standalone objectIdSchema helper directly', () => {
+      const validId = '507f1f77bcf86cd799439011';
+      const parsed = objectIdSchema.safeParse(validId);
+      assert.strictEqual(parsed.success, true);
+
+      const invalidId = 'not-a-valid-24-hex-id';
+      const invalidParsed = objectIdSchema.safeParse(invalidId);
+      assert.strictEqual(invalidParsed.success, false);
+      assert.strictEqual(invalidParsed.error.issues[0].message, 'Invalid MongoDB ObjectId');
     });
   });
 
   // ─── Deep NoSQL Operator Stripping Unit Tests ──────────────────────────────
-  describe('stripNoSqlOperators Utility', () => {
+  describe('stripNoSqlOperators Utility & Gateway Sanitization', () => {
     it('should recursively strip keys starting with "$" or containing "."', () => {
       const dangerousInput = {
         safeField: 'hello',

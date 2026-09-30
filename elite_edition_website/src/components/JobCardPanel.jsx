@@ -3,7 +3,7 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
-  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt, Loader
+  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt, Loader, User
 } from 'lucide-react';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
@@ -3029,18 +3029,35 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                       e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
                     }}
                   >
-                    {/* Header Row 1: Job Number, Machine & Overall Status */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
-                        <JobCardTooltip card={c}>
+                    {/* Header Row 1: Job Number & Machine (Left) + Urgent & Status (Right) */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      {/* Left: Job Number & Machine Identifier (Guaranteed No Overlap) */}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          flexShrink: 0
+                        }}
+                      >
+                        <JobCardTooltip card={c} style={{ flexShrink: 0 }}>
                           <span
                             style={{
                               fontWeight: 800,
-                              fontSize: '0.98rem',
+                              fontSize: '0.96rem',
                               color: 'var(--primary, #2563eb)',
                               cursor: 'pointer',
                               letterSpacing: '-0.01em',
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block'
                             }}
                           >
                             {c.jobNo}
@@ -3050,25 +3067,37 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                         {c.machineName && (
                           <span
                             style={{
-                              padding: '2px 7px',
+                              flexShrink: 0,
+                              padding: '2px 8px',
                               borderRadius: '6px',
                               fontSize: '0.67rem',
                               fontWeight: 800,
-                              letterSpacing: '0.02em',
+                              letterSpacing: '0.03em',
                               whiteSpace: 'nowrap',
-                              background: isGrando ? '#eff6ff' : '#fff1f2',
-                              color: isGrando ? '#1d4ed8' : '#e11d48',
-                              border: `1px solid ${isGrando ? '#bfdbfe' : '#fecdd3'}`
+                              background: isGrando ? '#eff6ff' : '#f5f3ff',
+                              color: isGrando ? '#1d4ed8' : '#7c3aed',
+                              border: `1px solid ${isGrando ? '#bfdbfe' : '#ddd6fe'}`
                             }}
                           >
                             {c.machineName}
                           </span>
                         )}
+                      </div>
 
+                      {/* Right: Urgent Indicator & Operational Status */}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          flexShrink: 0
+                        }}
+                      >
                         {c.emergencyNotes && c.emergencyNotes.trim() && (
                           <span
                             style={{
-                              padding: '2px 6px',
+                              flexShrink: 0,
+                              padding: '2px 7px',
                               borderRadius: '6px',
                               fontSize: '0.64rem',
                               fontWeight: 800,
@@ -3081,9 +3110,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                             URGENT
                           </span>
                         )}
-                      </div>
 
-                      <div style={{ flexShrink: 0 }}>
                         <StatusBadge status={c.status} />
                       </div>
                     </div>
@@ -3231,25 +3258,40 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                     </div>
 
                     {/* Subtle Creator Footnote */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted, #94a3b8)', marginTop: '-0.2rem' }}>
-                      <span>By {c.createdByName || c.createdBy || 'Staff User'}</span>
-                    </div>
-
-                    {/* Card Actions: Primary Operations (Left) + Secondary Utilities (Right) */}
                     <div
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        gap: '0.4rem',
-                        borderTop: '1px solid var(--border-light, #e2e8f0)',
-                        paddingTop: '0.75rem',
-                        marginTop: 'auto',
-                        flexWrap: 'wrap'
+                        fontSize: '0.72rem',
+                        color: 'var(--text-muted, #94a3b8)',
+                        marginTop: '-0.1rem'
                       }}
                     >
-                      {/* Left: Quick Operation Buttons */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <User size={12} style={{ opacity: 0.7 }} />
+                        <span>By {c.createdByName || c.createdBy || 'Staff User'}</span>
+                      </span>
+                      {c.lotNo && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted, #94a3b8)' }}>
+                          Lot: {c.lotNo}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Card Actions: Primary Operations (Tier 1) + Secondary Utilities (Tier 2) */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        borderTop: '1px solid var(--border-light, #e2e8f0)',
+                        paddingTop: '0.75rem',
+                        marginTop: 'auto'
+                      }}
+                    >
+                      {/* Tier 1: Primary Operation Buttons (Challan & Print) */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
                         <button
                           type="button"
                           onClick={() => handleSendToBilling(c)}
@@ -3257,17 +3299,19 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
+                            justifyContent: 'center',
                             gap: '0.35rem',
-                            padding: '0.38rem 0.75rem',
-                            borderRadius: '7px',
-                            fontSize: '0.75rem',
+                            padding: '0.44rem 0.6rem',
+                            borderRadius: '8px',
+                            fontSize: '0.76rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             background: isReadyForChallan ? 'linear-gradient(135deg, #4f46e5, #4338ca)' : '#f1f5f9',
-                            color: isReadyForChallan ? '#ffffff' : '#475569',
+                            color: isReadyForChallan ? '#ffffff' : '#64748b',
                             border: isReadyForChallan ? 'none' : '1px solid #cbd5e1',
                             boxShadow: isReadyForChallan ? '0 2px 6px rgba(79,70,229,0.25)' : 'none',
-                            transition: 'all 0.15s ease'
+                            transition: 'all 0.15s ease',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           <FileText size={13} />
@@ -3281,16 +3325,18 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
+                            justifyContent: 'center',
                             gap: '0.35rem',
-                            padding: '0.38rem 0.75rem',
-                            borderRadius: '7px',
-                            fontSize: '0.75rem',
+                            padding: '0.44rem 0.6rem',
+                            borderRadius: '8px',
+                            fontSize: '0.76rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             background: '#ecfdf5',
                             color: '#065f46',
                             border: '1px solid #a7f3d0',
-                            transition: 'all 0.15s ease'
+                            transition: 'all 0.15s ease',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           <Printer size={13} />
@@ -3298,37 +3344,50 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                         </button>
                       </div>
 
-                      {/* Right: Secondary Utilities */}
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {/* Tier 2: Secondary Utilities (Edit, Preview, History, Share, Delete) */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '6px',
+                          paddingTop: '0.1rem'
+                        }}
+                      >
                         <SmartIconButton
                           icon={Edit2}
                           tooltip="Edit Job Card"
                           onClick={() => openEdit(c)}
                           variant="primary"
+                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         />
                         <SmartIconButton
                           icon={Eye}
                           tooltip="Full Preview"
                           onClick={() => setPreviewCard(c)}
                           variant="default"
+                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         />
                         <SmartIconButton
                           icon={Clock}
                           tooltip="Audit History & Log"
                           onClick={() => setHistoryModalCard(c)}
                           variant="warning"
+                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         />
                         <SmartIconButton
                           icon={Send}
                           tooltip="Share Job Card"
                           onClick={() => handleOpenShareModal(c)}
                           variant="default"
+                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         />
                         <SmartIconButton
                           icon={Trash2}
                           tooltip="Delete Job Card"
                           onClick={() => handleDelete(c._id, c.jobNo)}
                           variant="danger"
+                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         />
                       </div>
                     </div>

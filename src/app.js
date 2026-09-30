@@ -16,6 +16,7 @@ const { createCspMiddleware } = require('./middlewares/csp');
 const routes = require('./routes/v1');
 require('./schedule/fetchFromAPISScheduler');
 require('./schedule/myntraScheduler').startMyntraScheduler();
+require('./schedule/eodExecutiveBriefingScheduler').startEodExecutiveBriefingScheduler();
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const userModel = require('./db/models/user.model');
@@ -99,12 +100,18 @@ app.use(cors());
 
 const jwtUtils = require('./utils/auth');
 
+const clientModel = require('./db/models/client.model');
+const { fieldLevelSanitizer } = require('./middlewares/fieldLevelSanitizer');
+
 // Automatic User Context Middleware
 app.use(async (req, res, next) => {
   try {
     let userId = req.headers['x-user-id'] || req.query?.userId || req.body?.userId;
     let userName = req.headers['x-user-name'] || req.body?.userName;
     let authHeader = req.headers['authorization'];
+    const isExplicitClientRole =
+      req.headers['x-user-role'] === 'Client' ||
+      req.headers['x-user-role'] === 'client';
 
     if (!userId && authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
@@ -117,32 +124,86 @@ app.use(async (req, res, next) => {
     }
 
     if (userId) {
-      const u = await userModel.findById(userId).lean();
+      let u = await userModel.findById(userId).lean();
       if (u) {
         req.user = u;
       } else {
+        // Check if userId belongs to Client collection
+        try {
+          const client = await clientModel.findById(userId).lean();
+          if (client) {
+            req.user = {
+              ...client,
+              _id: client._id,
+              id: client._id,
+              role: 'Client',
+              isClient: true,
+              name: client.username || client.companyName,
+              username: client.username,
+              companyName: client.companyName,
+              companyCode: client.companyCode,
+            };
+            req.isClient = true;
+          }
+        } catch (cErr) {}
+      }
+
+      if (!req.user) {
         req.user = {
           _id: userId,
           name: userName || 'HASI',
-          username: userName || 'HASI'
+          username: userName || 'HASI',
         };
       }
     } else if (userName) {
-      req.user = {
-        name: userName,
-        username: userName
-      };
+      if (isExplicitClientRole) {
+        try {
+          const client = await clientModel.findOne({
+            $or: [{ username: userName }, { companyName: userName }],
+          }).lean();
+          if (client) {
+            req.user = {
+              ...client,
+              _id: client._id,
+              id: client._id,
+              role: 'Client',
+              isClient: true,
+              name: client.username || client.companyName,
+              username: client.username,
+              companyName: client.companyName,
+              companyCode: client.companyCode,
+            };
+            req.isClient = true;
+          }
+        } catch (cErr) {}
+      }
+      if (!req.user) {
+        req.user = {
+          name: userName,
+          username: userName,
+        };
+      }
     } else {
       req.user = {
         name: 'HASI',
-        username: 'HASI'
+        username: 'HASI',
       };
+    }
+
+    if (isExplicitClientRole && req.user) {
+      req.user.role = 'Client';
+      req.user.isClient = true;
+      req.isClient = true;
     }
   } catch (err) {
     console.warn('[authMiddleware] Error resolving user:', err.message);
   }
   next();
 });
+
+// Apply Field-Level Access Control (FLAC) Projection Sanitizer across all API responses
+app.use(fieldLevelSanitizer);
+
 
 
 
@@ -509,6 +570,9 @@ app.use(express.static(websiteDistPath));
 // v1 api routes
 app.use('/v1', routes);
 
+// Public verification route for physical challan QR scanning (without /v1 prefix)
+app.use('/verify/challan', require('./routes/v1/challanVerification.route'));
+
 // send back a 404 error for any unknown api request
 app.use('/v1', (req, res, next) => {
 	next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
@@ -516,7 +580,7 @@ app.use('/v1', (req, res, next) => {
 
 // Serve frontend website with no-cache headers to ensure users always receive the latest version
 app.get('*', (req, res, next) => {
-	if (req.path.startsWith('/v1') || req.path.startsWith('/uploads') || req.path.startsWith('/designs')) {
+	if (req.path.startsWith('/v1') || req.path.startsWith('/uploads') || req.path.startsWith('/designs') || req.path.startsWith('/verify/challan')) {
 		return next();
 	}
 	res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

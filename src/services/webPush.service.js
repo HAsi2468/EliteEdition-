@@ -140,6 +140,47 @@ class WebPushService {
 
     await Promise.allSettled(pushPromises);
   }
+
+  /**
+   * Broadcasts executive intelligence alert to all active admin/manager devices
+   * @param {object} alertData
+   */
+  async dispatchExecutiveAlert(alertData) {
+    const {
+      title = '🏭 8:00 PM Executive Intelligence Briefing',
+      body = 'Daily production telemetry ready for review.',
+      url = '/analytics',
+    } = alertData;
+
+    const subscriptions = await PushSubscription.find({});
+    if (!subscriptions || subscriptions.length === 0) return;
+
+    const payload = JSON.stringify({
+      title,
+      body,
+      icon: '/Logo.png',
+      badge: '/Logo.png',
+      tag: 'eod-executive-briefing',
+      timestamp: Date.now(),
+      data: { url },
+    });
+
+    const pushPromises = subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification({
+          endpoint: sub.endpoint,
+          keys: sub.keys,
+        }, payload, { TTL: 43200, urgency: 'high' });
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await PushSubscription.deleteOne({ _id: sub._id });
+        }
+      }
+    });
+
+    await Promise.allSettled(pushPromises);
+  }
 }
 
 module.exports = new WebPushService();
+
