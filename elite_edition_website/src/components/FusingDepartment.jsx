@@ -248,19 +248,48 @@ export default function FusingDepartment() {
     notes: ''
   });
 
-  // Dynamic handlers for Fabric Wastage & Fresh Mtr balance
-  const handleWastageChange = (val) => {
+  // Dynamic calculation of total wastage across all 4 fault types in Top Form
+  const totalTopWastageMtr = useMemo(() => {
+    const fab = parseFloat(topForm.fabricFaultMtr) || 0;
+    const fus = parseFloat(topForm.fusingFaultMtr) || 0;
+    const prt = parseFloat(topForm.printFaultMtr) || 0;
+    const gen = parseFloat(topForm.genuineFaultMtr) || 0;
+    return (fab + fus + prt + gen).toFixed(1);
+  }, [topForm.fabricFaultMtr, topForm.fusingFaultMtr, topForm.printFaultMtr, topForm.genuineFaultMtr]);
+
+  // Handler for individual fault type changes (Fabric, Fusing, Print, Genuine)
+  const handleFaultChange = (field, val) => {
+    setTopForm(prev => {
+      const updated = { ...prev, [field]: val };
+      const fab = parseFloat(field === 'fabricFaultMtr' ? val : updated.fabricFaultMtr) || 0;
+      const fus = parseFloat(field === 'fusingFaultMtr' ? val : updated.fusingFaultMtr) || 0;
+      const prt = parseFloat(field === 'printFaultMtr' ? val : updated.printFaultMtr) || 0;
+      const gen = parseFloat(field === 'genuineFaultMtr' ? val : updated.genuineFaultMtr) || 0;
+      const totalW = fab + fus + prt + gen;
+      const pMtr = parseFloat(prev.printedMtr) || 0;
+      const autoFresh = pMtr > 0 ? Math.max(0, pMtr - totalW) : (parseFloat(prev.freshMtr) || 0);
+
+      return {
+        ...updated,
+        fabricWastageMtr: String(totalW),
+        freshMtr: pMtr > 0 ? String(autoFresh) : prev.freshMtr,
+        fusingMtr: String(autoFresh + totalW)
+      };
+    });
+  };
+
+  const handleResetWastage = () => {
     setTopForm(prev => {
       const pMtr = parseFloat(prev.printedMtr) || 0;
-      const wMtr = parseFloat(val) || 0;
-      // Auto-compute fresh meters = max(0, printedMtr - wastage) when printedMtr is available
-      const autoFresh = pMtr > 0 ? Math.max(0, pMtr - wMtr) : (parseFloat(prev.freshMtr) || 0);
       return {
         ...prev,
-        fabricWastageMtr: val,
-        fabricFaultMtr: val,
-        freshMtr: pMtr > 0 ? String(autoFresh) : prev.freshMtr,
-        fusingMtr: String(autoFresh + wMtr)
+        fabricWastageMtr: '0',
+        fabricFaultMtr: '0',
+        fusingFaultMtr: '0',
+        printFaultMtr: '0',
+        genuineFaultMtr: '0',
+        freshMtr: pMtr > 0 ? String(pMtr) : prev.freshMtr,
+        fusingMtr: pMtr > 0 ? String(pMtr) : prev.fusingMtr
       };
     });
   };
@@ -268,11 +297,15 @@ export default function FusingDepartment() {
   const handleFreshMtrChange = (val) => {
     setTopForm(prev => {
       const fMtr = parseFloat(val) || 0;
-      const wMtr = parseFloat(prev.fabricWastageMtr) || 0;
+      const fab = parseFloat(prev.fabricFaultMtr) || 0;
+      const fus = parseFloat(prev.fusingFaultMtr) || 0;
+      const prt = parseFloat(prev.printFaultMtr) || 0;
+      const gen = parseFloat(prev.genuineFaultMtr) || 0;
+      const totalW = fab + fus + prt + gen;
       return {
         ...prev,
         freshMtr: val,
-        fusingMtr: String(fMtr + wMtr)
+        fusingMtr: String(fMtr + totalW)
       };
     });
   };
@@ -671,7 +704,12 @@ export default function FusingDepartment() {
     }
 
     const printedVal = parseFloat(topForm.printedMtr) || 0;
-    const wasteMtrVal = Math.max(0, parseFloat(topForm.fabricWastageMtr) || 0);
+    const fabW = parseFloat(topForm.fabricFaultMtr) || 0;
+    const fusW = parseFloat(topForm.fusingFaultMtr) || 0;
+    const prtW = parseFloat(topForm.printFaultMtr) || 0;
+    const genW = parseFloat(topForm.genuineFaultMtr) || 0;
+    const totalW = fabW + fusW + prtW + genW;
+    const wasteMtrVal = Math.max(0, totalW > 0 ? totalW : (parseFloat(topForm.fabricWastageMtr) || 0));
     const freshMtrVal = topForm.freshMtr !== ''
       ? Math.max(0, parseFloat(topForm.freshMtr) || 0)
       : Math.max(0, printedVal - wasteMtrVal);
@@ -1725,70 +1763,26 @@ export default function FusingDepartment() {
                     boxSizing: 'border-box',
                     minHeight: '44px',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
                   }}>
-                    {topForm.printedMtr ? `${topForm.printedMtr} mtr` : <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>Select Job Card</span>}
+                    <span>{topForm.printedMtr ? `${topForm.printedMtr} mtr` : <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>Select Job Card</span>}</span>
+                    {topForm.printedMtr && (
+                      <span style={{ fontSize: '0.68rem', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
+                        Base Roll
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* 3. FABRIC WASTAGE (MTR) — User Inputs Directly Here */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#dc2626', margin: 0, textTransform: 'uppercase' }}>
-                      <Trash2 size={13} color="#dc2626" /> FABRIC WASTAGE (MTR) *
-                    </label>
-                    {/* Quick Micro-Pills */}
-                    <div style={{ display: 'flex', gap: '2px' }}>
-                      {['0', '1', '2', '5'].map(val => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => handleWastageChange(val)}
-                          style={{
-                            background: String(topForm.fabricWastageMtr) === val ? '#fee2e2' : '#ffffff',
-                            border: `1px solid ${String(topForm.fabricWastageMtr) === val ? '#ef4444' : '#fca5a5'}`,
-                            borderRadius: '4px',
-                            padding: '1px 5px',
-                            fontSize: '0.65rem',
-                            fontWeight: 800,
-                            color: '#b91c1c',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {val}m
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    placeholder="0.0"
-                    value={topForm.fabricWastageMtr}
-                    onChange={e => handleWastageChange(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
-                      border: '2px solid #f87171',
-                      fontSize: '0.95rem',
-                      fontWeight: 900,
-                      background: '#fff1f2',
-                      color: '#9f1239',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
-                {/* 4. FRESH FUSED OUTPUT (MTR) — Auto-Calculated as (Printed - Wastage) & Editable */}
+                {/* 3. FRESH FUSED OUTPUT (MTR) — Auto-Calculated as (Printed - Total Wastage) & Editable */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#15803d', margin: 0, textTransform: 'uppercase' }}>
                       <CheckCircle2 size={13} color="#15803d" /> FRESH FUSED (MTR) *
                     </label>
                     {parseFloat(topForm.printedMtr) > 0 && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px' }}>
                         {(((parseFloat(topForm.freshMtr) || 0) / parseFloat(topForm.printedMtr)) * 100).toFixed(0)}% yield
                       </span>
                     )}
@@ -1816,46 +1810,342 @@ export default function FusingDepartment() {
                 </div>
               </div>
 
-              {/* Realtime Reconciliation Balance Strip */}
-              {topForm.jobCardId && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  padding: '0.55rem 0.95rem',
-                  borderRadius: '8px',
-                  background: '#ffffff',
-                  border: '1px dashed #cbd5e1',
-                  fontSize: '0.78rem'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ color: '#64748b', fontWeight: 700 }}>Meter Balance:</span>
-                    <span style={{ color: '#0369a1', fontWeight: 800 }}>🖨️ {topForm.printedMtr || 0}m Printed</span>
-                    <span style={{ color: '#94a3b8' }}>=</span>
-                    <span style={{ color: '#15803d', fontWeight: 900 }}>✨ {topForm.freshMtr || 0}m Fresh Output</span>
-                    <span style={{ color: '#94a3b8' }}>+</span>
-                    <span style={{ color: '#dc2626', fontWeight: 900 }}>🗑️ {topForm.fabricWastageMtr || 0}m Wastage</span>
-                    <span style={{ color: '#94a3b8' }}>➔</span>
-                    <span style={{ color: '#0f172a', fontWeight: 900 }}>
-                      Total Fabric: {((parseFloat(topForm.freshMtr) || 0) + (parseFloat(topForm.fabricWastageMtr) || 0)).toFixed(1)}m
-                    </span>
+              {/* TIER 1.5: DEDICATED WASTAGE BREAKDOWN MATRIX (ALL 4 FAULT TYPES) */}
+              <div style={{
+                background: '#ffffff',
+                border: '1.5px solid #fecdd3',
+                borderRadius: '12px',
+                padding: '1rem 1.15rem',
+                boxShadow: '0 2px 10px rgba(244, 63, 94, 0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem'
+              }}>
+                {/* Wastage Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#ffe4e6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}>
+                      <Trash2 size={16} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#9f1239', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Wastage Breakdown</span>
+                        <span style={{ fontSize: '0.7rem', color: '#be123c', background: '#ffe4e6', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>4 Fault Categories</span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        Enter loss per fault category — automatically deducted from Fresh Output
+                      </div>
+                    </div>
                   </div>
-                  {parseFloat(topForm.fabricWastageMtr) > 0 && (
-                    <span style={{
-                      color: '#b91c1c',
-                      background: '#fee2e2',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontWeight: 800,
-                      fontSize: '0.72rem'
+
+                  {/* Badges & Reset Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{
+                      background: parseFloat(totalTopWastageMtr) > 0 ? '#fee2e2' : '#f1f5f9',
+                      border: `1px solid ${parseFloat(totalTopWastageMtr) > 0 ? '#fca5a5' : '#e2e8f0'}`,
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
                     }}>
-                      ⚠️ {(((parseFloat(topForm.fabricWastageMtr) || 0) / (parseFloat(topForm.printedMtr) || 1)) * 100).toFixed(1)}% Fabric Wastage
-                    </span>
-                  )}
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Wastage:</span>
+                      <strong style={{ fontSize: '0.9rem', color: parseFloat(totalTopWastageMtr) > 0 ? '#b91c1c' : '#475569' }}>
+                        {totalTopWastageMtr} mtr
+                      </strong>
+                    </div>
+
+                    {parseFloat(totalTopWastageMtr) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetWastage}
+                        style={{
+                          background: '#fff1f2',
+                          border: '1px solid #fda4af',
+                          color: '#e11d48',
+                          borderRadius: '6px',
+                          padding: '4px 9px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Reset all wastage categories to 0m"
+                      >
+                        <RefreshCw size={11} /> Reset to 0
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
+
+                {/* 4 Wastage Inputs Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '0.85rem'
+                }}>
+                  {/* 1. Fabric Fault (Mtr) */}
+                  <div style={{ background: '#fff5f5', border: '1px solid #fed7d7', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c53030' }}>
+                        🧵 1. Fabric Fault
+                      </span>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        {['0', '1', '2', '5'].map(val => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => handleFaultChange('fabricFaultMtr', val)}
+                            style={{
+                              background: String(topForm.fabricFaultMtr) === val ? '#fed7d7' : '#ffffff',
+                              border: `1px solid ${String(topForm.fabricFaultMtr) === val ? '#e53e3e' : '#feb2b2'}`,
+                              borderRadius: '3px',
+                              padding: '0 4px',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              color: '#9b2c2c',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {val}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                      Weaving holes, yarn defects, oil stains
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="0.0"
+                      value={topForm.fabricFaultMtr}
+                      onChange={e => handleFaultChange('fabricFaultMtr', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        borderRadius: '6px',
+                        border: '1.5px solid #feb2b2',
+                        fontSize: '0.92rem',
+                        fontWeight: 900,
+                        background: '#ffffff',
+                        color: '#9b2c2c',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* 2. Fusing Fault (Mtr) */}
+                  <div style={{ background: '#fffaf0', border: '1px solid #feebc8', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c05621' }}>
+                        🔥 2. Fusing Fault
+                      </span>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        {['0', '1', '2', '5'].map(val => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => handleFaultChange('fusingFaultMtr', val)}
+                            style={{
+                              background: String(topForm.fusingFaultMtr) === val ? '#feebc8' : '#ffffff',
+                              border: `1px solid ${String(topForm.fusingFaultMtr) === val ? '#dd6b20' : '#fbd38d'}`,
+                              borderRadius: '3px',
+                              padding: '0 4px',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              color: '#9c4221',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {val}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                      Heat crease, paper jam, roll marks
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="0.0"
+                      value={topForm.fusingFaultMtr}
+                      onChange={e => handleFaultChange('fusingFaultMtr', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        borderRadius: '6px',
+                        border: '1.5px solid #fbd38d',
+                        fontSize: '0.92rem',
+                        fontWeight: 900,
+                        background: '#ffffff',
+                        color: '#9c4221',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* 3. Print Fault (Mtr) */}
+                  <div style={{ background: '#ebf8ff', border: '1px solid #bee3f8', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2b6cb0' }}>
+                        🖨️ 3. Print Fault
+                      </span>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        {['0', '1', '2', '5'].map(val => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => handleFaultChange('printFaultMtr', val)}
+                            style={{
+                              background: String(topForm.printFaultMtr) === val ? '#bee3f8' : '#ffffff',
+                              border: `1px solid ${String(topForm.printFaultMtr) === val ? '#3182ce' : '#90cdf4'}`,
+                              borderRadius: '3px',
+                              padding: '0 4px',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              color: '#2a4365',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {val}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                      Banding, color bleed, head strikes
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="0.0"
+                      value={topForm.printFaultMtr}
+                      onChange={e => handleFaultChange('printFaultMtr', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        borderRadius: '6px',
+                        border: '1.5px solid #90cdf4',
+                        fontSize: '0.92rem',
+                        fontWeight: 900,
+                        background: '#ffffff',
+                        color: '#2a4365',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* 4. Genuine Fault / Joint (Mtr) */}
+                  <div style={{ background: '#faf5ff', border: '1px solid #e9d8fd', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#6b46c1' }}>
+                        ✂️ 4. Genuine / Joint
+                      </span>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        {['0', '1', '2', '5'].map(val => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => handleFaultChange('genuineFaultMtr', val)}
+                            style={{
+                              background: String(topForm.genuineFaultMtr) === val ? '#e9d8fd' : '#ffffff',
+                              border: `1px solid ${String(topForm.genuineFaultMtr) === val ? '#805ad5' : '#d6bcfa'}`,
+                              borderRadius: '3px',
+                              padding: '0 4px',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              color: '#44337a',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {val}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#718096', marginBottom: '0.35rem' }}>
+                      Leader fabric, roll joint, cutting trim
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="0.0"
+                      value={topForm.genuineFaultMtr}
+                      onChange={e => handleFaultChange('genuineFaultMtr', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        borderRadius: '6px',
+                        border: '1.5px solid #d6bcfa',
+                        fontSize: '0.92rem',
+                        fontWeight: 900,
+                        background: '#ffffff',
+                        color: '#44337a',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Realtime Reconciliation Balance Strip */}
+                {topForm.jobCardId && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    padding: '0.55rem 0.85rem',
+                    borderRadius: '8px',
+                    background: '#f8fafc',
+                    border: '1px dashed #cbd5e1',
+                    fontSize: '0.78rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ color: '#64748b', fontWeight: 700 }}>Meter Balance:</span>
+                      <span style={{ color: '#0369a1', fontWeight: 800 }}>🖨️ {topForm.printedMtr || 0}m Printed</span>
+                      <span style={{ color: '#94a3b8' }}>=</span>
+                      <span style={{ color: '#15803d', fontWeight: 900 }}>✨ {topForm.freshMtr || 0}m Fresh Output</span>
+                      <span style={{ color: '#94a3b8' }}>+</span>
+                      <span style={{ color: '#dc2626', fontWeight: 900 }}>🗑️ {totalTopWastageMtr}m Total Wastage</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {parseFloat(totalTopWastageMtr) > 0 ? (
+                        <span style={{
+                          color: '#b91c1c',
+                          background: '#fee2e2',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontWeight: 800,
+                          fontSize: '0.72rem'
+                        }}>
+                          ⚠️ {(((parseFloat(totalTopWastageMtr) || 0) / (parseFloat(topForm.printedMtr) || 1)) * 100).toFixed(1)}% Wastage Loss
+                        </span>
+                      ) : (
+                        <span style={{
+                          color: '#15803d',
+                          background: '#dcfce7',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontWeight: 800,
+                          fontSize: '0.72rem'
+                        }}>
+                          ✓ 100% Zero-Loss Output
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* TIER 2: Machine & Operating Parameters (Temperature, Speed, Panna, Butter Paper, Roll Completed) */}
               <div style={{
