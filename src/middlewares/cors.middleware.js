@@ -60,8 +60,10 @@ const PREFLIGHT_MAX_AGE = '86400';
 function createCorsMiddleware(options = {}) {
   const allowlistSet = new Set(DEFAULT_ALLOWED_ORIGINS);
   
-  if (options.allowedOrigins) {
-    options.allowedOrigins.forEach((orig) => {
+  // Merge caller-supplied additional origins (new API: additionalOrigins; legacy alias: allowedOrigins)
+  const callerOrigins = options.additionalOrigins || options.allowedOrigins;
+  if (callerOrigins) {
+    callerOrigins.forEach((orig) => {
       if (typeof orig === 'string' && orig.trim()) {
         allowlistSet.add(orig.trim());
       }

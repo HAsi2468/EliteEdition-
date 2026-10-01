@@ -8,7 +8,17 @@
 
 import type { Response, CookieOptions } from 'express';
 
-export type CookieType = 'session' | 'refresh' | 'highPrivilege' | 'custom';
+export type CookieType = 'session' | 'refresh' | 'highPrivilege' | 'csrf' | 'custom';
+
+/** Canonical names for standard cookies — avoids magic strings across controllers */
+export const COOKIE_NAMES = Object.freeze({
+  AUTH_TOKEN:  'elite_auth_token',
+  REFRESH:     'elite_refresh_token',
+  XSRF_TOKEN:  'XSRF-TOKEN',
+  SESSION_ID:  'session_id',
+} as const);
+
+export type KnownCookieName = typeof COOKIE_NAMES[keyof typeof COOKIE_NAMES];
 
 /**
  * Resolves the cookie domain scope.
@@ -164,7 +174,8 @@ export const getCsrfCookieOptions = (overrides: CookieOptions = {}): CookieOptio
 };
 
 /**
- * Sets the standard client-readable XSRF-TOKEN cookie for client-side SPA hydration.
+ * Sets the readable CSRF (XSRF-TOKEN) cookie for client-side SPA hydration.
+ * HttpOnly: false — intentionally readable by browser JS for Double-Submit header injection.
  */
 export const setCsrfCookie = (
   res: Response,
@@ -172,6 +183,90 @@ export const setCsrfCookie = (
   options: CookieOptions = {}
 ): void => {
   const cookieOpts = getCsrfCookieOptions(options);
-  res.cookie('XSRF-TOKEN', token, cookieOpts);
+  res.cookie(COOKIE_NAMES.XSRF_TOKEN, token, cookieOpts);
 };
 
+/**
+ * Sets the standard authentication token cookie (HttpOnly; Secure; SameSite=Lax).
+ * Default maxAge: 24 hours (86 400 000 ms).
+ */
+export const setAuthTokenCookie = (
+  res: Response,
+  token: string,
+  maxAgeMs: number = 24 * 60 * 60 * 1000,
+  options: CookieOptions = {}
+): void => {
+  const cookieOpts = getSessionCookieOptions({ maxAge: maxAgeMs, ...options });
+  res.cookie(COOKIE_NAMES.AUTH_TOKEN, token, cookieOpts);
+};
+
+/**
+ * Sets the refresh token cookie (HttpOnly; Secure; SameSite=Lax; Path=/v1/auth).
+ * Uses a tighter path to minimise cookie scope surface.
+ * Default maxAge: 30 days.
+ */
+export const setRefreshCookie = (
+  res: Response,
+  token: string,
+  maxAgeMs: number = 30 * 24 * 60 * 60 * 1000,
+  options: CookieOptions = {}
+): void => {
+  const cookieOpts = getSessionCookieOptions({
+    maxAge: maxAgeMs,
+    path: '/v1/auth',
+    ...options,
+  });
+  res.cookie(COOKIE_NAMES.REFRESH, token, cookieOpts);
+};
+
+/**
+ * Atomically revokes a cookie using identical scope (domain + path) to its
+ * set counterpart. Prevents shadow/dangling cookies caused by scope mismatches.
+ *
+ * CRITICAL: The `path` and `domain` arguments MUST match what was used when
+ * the cookie was originally set, otherwise the browser will not delete it.
+ */
+export const revokeCookie = (
+  res: Response,
+  name: string,
+  options: CookieOptions = {}
+): void => {
+  // Build options using the same defaults as the setter, then clear age/expiry
+  const clearOpts = getBaseCookieOptions({ ...options });
+  delete clearOpts.maxAge;
+  delete clearOpts.expires;
+  // Force expiry into the past to guarantee removal across all browsers
+  clearOpts.expires = new Date(0);
+  res.clearCookie(name, clearOpts);
+};
+
+/**
+ * Convenience: revokes all standard auth cookies in one call.
+ * Useful on logout handlers to guarantee a clean slate.
+ */
+export const revokeAllAuthCookies = (
+  res: Response,
+  options: CookieOptions = {}
+): void => {
+  revokeCookie(res, COOKIE_NAMES.AUTH_TOKEN, options);
+  revokeCookie(res, COOKIE_NAMES.XSRF_TOKEN, options);
+  // Refresh token has a different path — override it
+  revokeCookie(res, COOKIE_NAMES.REFRESH, { ...options, path: '/v1/auth' });
+  revokeCookie(res, COOKIE_NAMES.SESSION_ID, options);
+};
+
+/**
+ * Production runtime guard — throws if Secure flag would be suppressed in production.
+ * Call once at application boot to catch misconfigured COOKIE_SECURE=false deployments.
+ *
+ * @throws {Error} If NODE_ENV=production and Secure flag is disabled.
+ */
+export const assertProductionSecure = (): void => {
+  if (process.env.NODE_ENV === 'production' && !isSecureContext()) {
+    throw new Error(
+      '[CookieSecurity] FATAL: Secure cookie flag is DISABLED in a production environment. ' +
+      'Set COOKIE_SECURE=true or ensure NODE_ENV is not "production" for non-HTTPS deployments. ' +
+      'Emitting non-Secure cookies in production exposes session tokens over plaintext HTTP.'
+    );
+  }
+};

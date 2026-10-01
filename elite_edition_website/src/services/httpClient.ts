@@ -17,6 +17,35 @@ import axios, {
 /** Mutating HTTP methods requiring anti-CSRF token verification */
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
+/** CSRF handshake endpoint — matches the server route in csrf.middleware.ts */
+export const CSRF_REFRESH_ENDPOINT = '/api/v1/auth/csrf-token' as const;
+
+/**
+ * First-party hostname patterns. Requests to hostnames NOT matching these
+ * should go through externalClient, not httpClient.
+ */
+const FIRST_PARTY_HOSTNAME_PATTERNS: readonly RegExp[] = Object.freeze([
+  /^https?:\/\/(?:[a-z0-9-]+\.)*eliteedition\.in(?::\d+)?$/i,
+  /^https?:\/\/(?:app|admin|api|portal)\.eliteerp\.com$/i,
+  /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i,
+  /^\/v?\d*(?:\/|$)/,   // relative paths (dev proxy)
+]);
+
+/**
+ * Validates that a URL is targeting a first-party host.
+ * Non-fatal warning — does not block the request but alerts developers.
+ */
+function warnIfExternalUrl(url: string): void {
+  if (!url || url.startsWith('/')) return; // relative paths are fine
+  const isFirstParty = FIRST_PARTY_HOSTNAME_PATTERNS.some((re) => re.test(url));
+  if (!isFirstParty) {
+    console.warn(
+      `[httpClient] WARNING: Request to external URL "${url}" sent via httpClient ` +
+      '(withCredentials=true). Use externalClient for third-party endpoints to prevent credential leakage.',
+    );
+  }
+}
+
 export const isMutatingMethod = (method?: string): boolean => {
   if (!method) return false;
   return MUTATING_METHODS.has(method.toLowerCase());
@@ -32,7 +61,7 @@ export interface ExtendedRequestConfig extends InternalAxiosRequestConfig {
 class CsrfTokenManager {
   private inMemoryToken: string | null = null;
   private refreshPromise: Promise<string> | null = null;
-  private refreshEndpoint: string = '/api/v1/csrf-token';
+  private refreshEndpoint: string = CSRF_REFRESH_ENDPOINT;
 
   /**
    * Returns current in-memory token.
@@ -104,10 +133,13 @@ class CsrfTokenManager {
   }
 
   /**
-   * Performs an anti-CSRF token refresh handshake.
-   * Employs mutex promise locking to avoid concurrent refresh storms.
+   * Performs an anti-CSRF token refresh handshake against the server.
+   * Uses GET (matching GET /api/v1/auth/csrf-token server route).
+   * Employs mutex promise locking to avoid concurrent refresh storms:
+   * if 10 requests arrive simultaneously on a 403, only ONE GET is issued.
    */
   public async refreshToken(clientInstance?: AxiosInstance): Promise<string> {
+    // Mutex: if a refresh is already in flight, return the same Promise
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
@@ -115,11 +147,11 @@ class CsrfTokenManager {
     this.refreshPromise = (async () => {
       try {
         const client = clientInstance || httpClient;
-        const response = await client.post<{ csrfToken?: string; token?: string }>(
+        const response = await client.get<{ csrfToken?: string; token?: string }>(
           this.refreshEndpoint,
-          {},
           {
-            // Omit token injection during refresh handshake
+            // Prevent the request interceptor from injecting a token
+            // into the handshake request itself (avoids recursive loop)
             headers: { 'X-Skip-CSRF-Injection': 'true' },
           }
         );
@@ -137,6 +169,7 @@ class CsrfTokenManager {
         this.inMemoryToken = freshToken;
         return freshToken;
       } finally {
+        // Always release the mutex — even on error — so future retries can proceed
         this.refreshPromise = null;
       }
     })();
@@ -166,8 +199,11 @@ export const httpClient: AxiosInstance = axios.create({
 /** Request Interceptor: Attach X-CSRF-Token for mutating methods */
 httpClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    // Guarantee withCredentials is true
+    // Guarantee withCredentials is always true for first-party client
     config.withCredentials = true;
+
+    // Non-fatal baseURL scope check — warns if URL targets a third-party host
+    if (config.url) warnIfExternalUrl(config.url);
 
     // Mutating requests (POST, PUT, PATCH, DELETE) require X-CSRF-Token
     if (isMutatingMethod(config.method)) {
@@ -179,11 +215,21 @@ httpClient.interceptors.request.use(
         const token = csrfManager.readTokenFromSources();
         if (token) {
           config.headers.set('X-CSRF-Token', token);
+        } else {
+          // Token not found — warn in development so the issue is visible
+          // The request still goes through; the server CSRF middleware will
+          // reject it with 403 if it genuinely requires a token.
+          if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+            console.warn(
+              `[httpClient] No CSRF token available for ${config.method?.toUpperCase()} ${url}. ` +
+              'Ensure the CSRF handshake (GET /api/v1/auth/csrf-token) has been called at app startup.',
+            );
+          }
         }
       }
     }
 
-    // Clean internal marker header before wire transmission
+    // Strip the internal marker before wire transmission
     if (config.headers?.['X-Skip-CSRF-Injection']) {
       delete config.headers['X-Skip-CSRF-Injection'];
     }

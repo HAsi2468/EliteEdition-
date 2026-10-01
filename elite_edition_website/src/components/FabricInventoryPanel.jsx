@@ -1770,10 +1770,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         return handleChallanSubmit(e, true);
       }
 
+      // Compute effective totalMtr: prefer the sum of TP rows; fall back to the
+      // manually-entered totalMtr field, then to pcs — prevents saving 0 when the
+      // TP rows were not filled in (old challans, event-opened challans, etc.)
+      const effectiveTotalMtr = challanTotalMtr > 0
+        ? challanTotalMtr
+        : (parseFloat(challanForm.totalMtr) || parseFloat(challanForm.pcs) || 0);
+
       const payload = {
         ...challanForm,
         fabricName: cleanFabric || challanForm.fabricName,
-        totalMtr: challanTotalMtr,
+        totalMtr: effectiveTotalMtr,
         totalTp: challanTotalTp,
         adminOverride: forceAdminOverride || (isAdmin && needsOverride),
         tpDetails: challanForm.tpDetails

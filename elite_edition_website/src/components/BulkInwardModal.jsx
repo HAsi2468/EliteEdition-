@@ -511,6 +511,24 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           </div>
         </div>
 
+        {/* Camera Scanner Zone - OUTSIDE the scroll container so it stays pinned
+            and html5-qrcode can attach the video stream without DOM reflow issues.
+            This mirrors the exact structure used in StockOutForm (outward) which works
+            perfectly on all phones. */}
+        {showCameraScanner && (
+          <div style={{ padding: isMobile ? '0 0.75rem 0' : '0 1.25rem 0', flexShrink: 0 }}>
+            <CameraBarcodeScanner
+              compact={isMobile}
+              totalPieces={totalInwardUnits}
+              totalItems={activeRowsCount}
+              lastScannedItem={lastScannedItem}
+              itemsList={formRows.filter(r => r.skuCode && r.skuCode.trim())}
+              onScan={(code) => processScannedSku(code)}
+              onClose={() => setShowCameraScanner(false)}
+            />
+          </div>
+        )}
+
         {/* Modal Body - Single unified smooth scroll container */}
         <div style={{
           flex: 1,
@@ -529,20 +547,6 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             </div>
           )}
 
-          {/* Embedded Mobile Camera Scanner */}
-          {showCameraScanner && (
-            <div style={{ marginBottom: isMobile ? '0.35rem' : '0.75rem' }}>
-              <CameraBarcodeScanner
-                compact={isMobile}
-                totalPieces={totalInwardUnits}
-                totalItems={activeRowsCount}
-                lastScannedItem={lastScannedItem}
-                itemsList={formRows.filter(r => r.skuCode && r.skuCode.trim())}
-                onScan={(code) => processScannedSku(code)}
-                onClose={() => setShowCameraScanner(false)}
-              />
-            </div>
-          )}
           
           {/* Quick Set Header Bar - Compact when camera is active on mobile */}
           {isMobile && showCameraScanner ? (
@@ -550,13 +554,22 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               <span style={{ fontWeight: 700, color: '#475569' }}>
                 🏢 Default Vendor: <strong style={{ color: '#059669' }}>{bulkVendor || 'All Rows'}</strong>
               </span>
-              <button
-                type="button"
-                onClick={() => setShowVendorManager(true)}
-                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#059669', cursor: 'pointer' }}
-              >
-                + Manage Vendor
-              </button>
+              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowVendorManager(true)}
+                  style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#059669', cursor: 'pointer' }}
+                >
+                  + Vendor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCameraScanner(false)}
+                  style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', cursor: 'pointer' }}
+                >
+                  ✕ Close Camera
+                </button>
+              </div>
             </div>
           ) : (
             <div className="bulk-inward-quickset" style={styles.quickSetPanel}>

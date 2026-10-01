@@ -57,7 +57,7 @@ export const isUnsafeGetMutation = (req: Request): { unsafe: boolean; reason?: s
   // 2. Boolean mutation flags (e.g. ?delete=true or ?destroy=1)
   for (const flag of MUTATION_BOOLEAN_FLAGS) {
     const val = query[flag];
-    if (val === true || val === 'true' || val === '1' || val === 'yes') {
+    if (val === 'true' || val === '1' || val === 'yes') {
       return {
         unsafe: true,
         reason: `Query parameter '${flag}=${val}' triggers state mutation via ${method}.`,

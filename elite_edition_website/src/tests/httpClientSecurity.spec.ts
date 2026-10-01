@@ -5,6 +5,7 @@ import {
   externalClient,
   csrfManager,
   isMutatingMethod,
+  CSRF_REFRESH_ENDPOINT,
 } from '../services/httpClient';
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
@@ -209,11 +210,13 @@ describe('HTTP Transport Security & CSRF Token Interceptor (Phase 2)', () => {
 
       let attemptCount = 0;
       let handshakeInvoked = false;
+      let handshakeMethod: string | undefined;
 
       httpClient.defaults.adapter = async (config) => {
-        // Intercept the token handshake endpoint
+        // Intercept the token handshake endpoint (GET /api/v1/auth/csrf-token)
         if (config.url?.includes('/csrf-token')) {
           handshakeInvoked = true;
+          handshakeMethod = config.method; // capture the HTTP method used
           return {
             data: { csrfToken: 'new_freshly_minted_token' },
             status: 200,
@@ -249,11 +252,108 @@ describe('HTTP Transport Security & CSRF Token Interceptor (Phase 2)', () => {
 
       const response = await httpClient.post('/api/payout', { amount: 5000 });
 
+      // Handshake must be invoked via GET (matches server route GET /api/v1/auth/csrf-token)
       expect(handshakeInvoked).toBe(true);
+      expect(handshakeMethod).toBe('get');
       expect(attemptCount).toBe(2);
       expect(response.data.replayedSuccessfully).toBe(true);
       expect(response.data.tokenUsed).toBe('new_freshly_minted_token');
       expect(csrfManager.getToken()).toBe('new_freshly_minted_token');
+    });
+
+    // ── Phase 2 Extension: PATCH method token injection ────────────────────
+    it('attaches X-CSRF-Token header on PATCH requests', async () => {
+      csrfManager.setToken('patch_csrf_token_xyz');
+
+      let capturedConfig: InternalAxiosRequestConfig | null = null;
+      httpClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: { updated: true },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      await httpClient.patch('/api/orders/55', { status: 'shipped' });
+      expect(capturedConfig).not.toBeNull();
+      expect(capturedConfig!.headers['X-CSRF-Token']).toBe('patch_csrf_token_xyz');
+    });
+
+    // ── Phase 2 Extension: Concurrent refresh mutex guard ─────────────────
+    it('mutex: 3 concurrent 403 CSRF errors trigger exactly 1 GET handshake', async () => {
+      csrfManager.setToken('shared_stale_token');
+
+      let handshakeCallCount = 0;
+      let successCount = 0;
+
+      httpClient.defaults.adapter = async (config) => {
+        if (config.url?.includes('/csrf-token')) {
+          handshakeCallCount++;
+          // Simulate a tiny async delay to make concurrency visible
+          await new Promise((r) => setTimeout(r, 10));
+          return {
+            data: { csrfToken: 'mutex_protected_fresh_token' },
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config,
+          } as AxiosResponse;
+        }
+
+        // First call on each concurrent request fails with 403
+        const isRetried = (config as any)._csrfRetried;
+        if (!isRetried) {
+          const err = new Error('CSRF expired') as any;
+          err.response = {
+            status: 403,
+            data: { code: 'CSRF_TOKEN_INVALID' },
+            headers: {},
+            config,
+          };
+          err.config = config;
+          throw err;
+        }
+
+        // Retried calls succeed
+        successCount++;
+        return {
+          data: { ok: true, token: config.headers['X-CSRF-Token'] },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      // Fire 3 concurrent mutating requests
+      const results = await Promise.all([
+        httpClient.post('/api/order/1', {}),
+        httpClient.post('/api/order/2', {}),
+        httpClient.post('/api/order/3', {}),
+      ]);
+
+      // All 3 should succeed after replays
+      expect(results).toHaveLength(3);
+      results.forEach((r) => expect(r.data.ok).toBe(true));
+
+      // Mutex must have collapsed N concurrent refresh attempts into 1
+      expect(handshakeCallCount).toBe(1);
+      expect(successCount).toBe(3);
+
+      // All replayed requests must carry the refreshed token
+      results.forEach((r) =>
+        expect(r.data.token).toBe('mutex_protected_fresh_token'),
+      );
+    });
+  });
+
+  // ── Phase 2 Extension: CSRF_REFRESH_ENDPOINT constant ─────────────────────
+  describe('Directive 4: CSRF_REFRESH_ENDPOINT constant', () => {
+    it('is set to the canonical server handshake endpoint', () => {
+      expect(CSRF_REFRESH_ENDPOINT).toBe('/api/v1/auth/csrf-token');
     });
   });
 });
