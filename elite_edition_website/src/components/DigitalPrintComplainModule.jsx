@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
   AlertTriangle, PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
-  CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2, User, FileText, ArrowRight, Calendar, MessageSquare
+  CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2, User, FileText, ArrowRight, Calendar, MessageSquare,
+  Tag, ChevronDown, ChevronRight
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -774,22 +775,39 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
     printWin.document.close();
   };
 
-  const getPriorityColor = (p) => {
+  const getPriorityMeta = (p) => {
     switch (p) {
-      case 'Urgent': return '#f87171';
-      case 'High': return '#fbbf24';
-      case 'Medium': return '#60a5fa';
-      default: return '#9ca3af';
+      case 'Urgent':
+        return { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca', dot: '#ef4444', label: 'Urgent' };
+      case 'High':
+        return { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa', dot: '#f97316', label: 'High' };
+      case 'Medium':
+        return { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', dot: '#3b82f6', label: 'Medium' };
+      case 'Low':
+      default:
+        return { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', dot: '#94a3b8', label: p || 'Low' };
     }
+  };
+
+  const getPriorityColor = (p) => {
+    return getPriorityMeta(p).dot;
   };
 
   const getStatusBadge = (s) => {
     switch (s) {
-      case 'Open': case 'Pending': return { bg: 'rgba(234,179,8,0.15)', color: '#eab308', border: 'rgba(234,179,8,0.3)', icon: <Clock size={12} /> };
-      case 'Hold': case 'In Progress': return { bg: 'rgba(249,115,22,0.15)', color: '#f97316', border: 'rgba(249,115,22,0.3)', icon: <AlertCircle size={12} /> };
-      case 'Close': case 'Resolved': return { bg: 'rgba(34,197,94,0.15)', color: '#4ade80', border: 'rgba(34,197,94,0.3)', icon: <CheckCircle2 size={12} /> };
-      case 'Feedback': return { bg: 'rgba(168,85,247,0.15)', color: '#c084fc', border: 'rgba(168,85,247,0.3)', icon: <FileText size={12} /> };
-      default: return { bg: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: 'var(--border-light)', icon: null };
+      case 'Open':
+      case 'Pending':
+        return { bg: '#fffbeb', color: '#b45309', border: '#fde68a', dot: '#f59e0b', icon: <Clock size={12} /> };
+      case 'Hold':
+      case 'In Progress':
+        return { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', dot: '#3b82f6', icon: <AlertCircle size={12} /> };
+      case 'Close':
+      case 'Resolved':
+        return { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', dot: '#22c55e', icon: <CheckCircle2 size={12} /> };
+      case 'Feedback':
+        return { bg: '#faf5ff', color: '#7e22ce', border: '#e9d5ff', dot: '#a855f7', icon: <FileText size={12} /> };
+      default:
+        return { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', dot: '#94a3b8', icon: <Clock size={12} /> };
     }
   };
 
@@ -973,168 +991,460 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>There are no quality complaints matching your selected filters.</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.25rem' }}>
               {complaints.map(item => {
-                const statusMeta = getStatusBadge(item?.status) || { bg: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: 'var(--border-light)' };
-                const priorityColor = getPriorityColor(item?.priority);
+                const statusMeta = getStatusBadge(item?.status) || { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', dot: '#94a3b8' };
+                const priorityMeta = getPriorityMeta(item?.priority);
                 const statusOptions = Array.from(new Set([...STATUSES, item?.status].filter(Boolean)));
 
                 return (
                   <div
                     key={item._id}
-                    className="glass-panel"
-                    style={{
-                      padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
-                      borderTop: `4px solid ${priorityColor}`, position: 'relative'
-                    }}
+                    className="complaint-modern-card"
                   >
+                    {/* Priority Accent Stripe */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      background: priorityMeta.dot
+                    }} />
+
                     {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>{item.complaintNo}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <span style={{
-                            fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                            background: `${priorityColor}20`, color: priorityColor, border: `1px solid ${priorityColor}40`
+                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                            fontSize: '1rem',
+                            fontWeight: 800,
+                            color: '#0f172a',
+                            letterSpacing: '-0.02em',
+                            whiteSpace: 'nowrap'
                           }}>
-                            {item.priority}
+                            {item.complaintNo}
+                          </span>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            background: priorityMeta.bg,
+                            color: priorityMeta.color,
+                            border: `1px solid ${priorityMeta.border}`,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: priorityMeta.dot }} />
+                            {item.priority || 'Medium'}
                           </span>
                         </div>
-                        <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span>{item.date ? new Date(item.date).toLocaleDateString('en-IN') : ''}</span>
-                          <span style={{ fontSize: '0.7rem', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                            👤 By: {item.createdByName || item.createdBy || 'Staff User'}
+                        
+                        {/* Submitter & Date */}
+                        <div style={{
+                          fontSize: '0.73rem',
+                          color: '#64748b',
+                          marginTop: '5px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          flexWrap: 'wrap'
+                        }}>
+                          {item.date && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                              <Calendar size={12} style={{ color: '#94a3b8' }} />
+                              {new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                          <span style={{ color: '#cbd5e1' }}>•</span>
+                          <span style={{
+                            fontSize: '0.7rem',
+                            color: '#0369a1',
+                            background: '#f0f9ff',
+                            border: '1px solid #e0f2fe',
+                            padding: '1px 7px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <User size={11} /> {item.createdByName || item.createdBy || 'Staff User'}
                           </span>
                           {item.updatedByName && item.updatedByName !== (item.createdByName || item.createdBy) && (
-                            <span style={{ fontSize: '0.68rem', color: '#475569', background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>
-                              ✏️ Edit: {item.updatedByName}
+                            <span style={{
+                              fontSize: '0.68rem',
+                              color: '#475569',
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              padding: '1px 6px',
+                              borderRadius: '6px'
+                            }}>
+                              Edited: {item.updatedByName}
                             </span>
                           )}
                         </div>
                       </div>
 
                       {/* Interactive Status Select Dropdown on Card Header */}
-                      <select
-                        value={item.status || 'Open'}
-                        onChange={e => handleQuickStatusUpdate(item, e.target.value)}
-                        onClick={e => e.stopPropagation()}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                          fontSize: '0.75rem', fontWeight: 800, padding: '0.25rem 0.6rem', borderRadius: '20px',
-                          background: statusMeta.bg, color: statusMeta.color, border: `1.5px solid ${statusMeta.border}`,
-                          cursor: 'pointer', outline: 'none'
-                        }}
-                      >
-                        {statusOptions.map(st => (
-                          <option key={st} value={st} style={{ background: '#ffffff', color: '#0f172a' }}>
-                            {st}
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                        <span style={{
+                          position: 'absolute',
+                          left: '10px',
+                          width: '7px',
+                          height: '7px',
+                          borderRadius: '50%',
+                          background: statusMeta.dot,
+                          pointerEvents: 'none'
+                        }} />
+                        <select
+                          className="complaint-status-select"
+                          value={item.status || 'Open'}
+                          onChange={e => handleQuickStatusUpdate(item, e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          style={{
+                            background: statusMeta.bg,
+                            color: statusMeta.color,
+                            border: `1.5px solid ${statusMeta.border}`,
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                          }}
+                        >
+                          {statusOptions.map(st => (
+                            <option key={st} value={st} style={{ background: '#ffffff', color: '#0f172a' }}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} style={{ position: 'absolute', right: '8px', pointerEvents: 'none', color: statusMeta.color, opacity: 0.8 }} />
+                      </div>
                     </div>
 
                     {/* Customer, Assigned To & Responsible Person */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', fontSize: '0.78rem' }}>
-                      <div>
-                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.66rem' }}>Customer:</span>
-                        <strong style={{ color: 'var(--text-primary)' }}>{item.partyName || 'N/A'}</strong>
+                    <div style={{
+                      background: '#f8fafc',
+                      borderRadius: '10px',
+                      border: '1px solid #f1f5f9',
+                      padding: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.45rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Customer:</span>
+                          <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700 }}>{item.partyName || 'N/A'}</strong>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Assigned By:</span>
+                          <span style={{
+                            fontSize: '0.73rem',
+                            fontWeight: 600,
+                            color: '#1d4ed8',
+                            background: '#eff6ff',
+                            border: '1px solid #dbeafe',
+                            padding: '1px 8px',
+                            borderRadius: '6px'
+                          }}>
+                            {item.assignedTo || 'Unassigned'}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.66rem' }}>Assigned By:</span>
-                        <strong style={{ color: '#60a5fa' }}>{item.assignedTo || 'Unassigned'}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#f43f5e', display: 'block', fontSize: '0.66rem', fontWeight: 800 }}>Responsible Person:</span>
-                        <strong style={{ color: '#f43f5e' }}>
-                          {Array.isArray(item.responsiblePersons) && item.responsiblePersons.length > 0
-                            ? item.responsiblePersons.join(', ')
-                            : (item.responsiblePerson || 'Unassigned')}
-                        </strong>
+
+                      {/* Responsible Person Tags */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingTop: '5px', borderTop: '1px dashed #e2e8f0' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#be123c', fontWeight: 700 }}>Responsible:</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {(() => {
+                            const persons = Array.isArray(item.responsiblePersons) && item.responsiblePersons.length > 0
+                              ? item.responsiblePersons
+                              : (item.responsiblePerson ? item.responsiblePerson.split(',').map(s => s.trim()).filter(Boolean) : []);
+                            if (persons.length === 0) {
+                              return (
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic' }}>Unassigned</span>
+                              );
+                            }
+                            return persons.map((person, pIdx) => (
+                              <span
+                                key={pIdx}
+                                style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  color: '#be123c',
+                                  background: '#fff1f2',
+                                  border: '1px solid #ffe4e6',
+                                  padding: '1px 8px',
+                                  borderRadius: '6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#f43f5e' }} />
+                                {person}
+                              </span>
+                            ));
+                          })()}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Linkage Info */}
-                    <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.73rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                      {item.jobCardNo && <span>Job Card: <strong style={{ color: 'var(--text-primary)' }}>{item.jobCardNo}</strong></span>}
-                      {item.challanNo && <span>Challan: <strong style={{ color: '#60a5fa' }}>{item.challanNo}</strong></span>}
-                      {item.invoiceNo && <span>Invoice: <strong style={{ color: 'var(--text-primary)' }}>{item.invoiceNo}</strong></span>}
-                      {item.defectiveMeters > 0 && (
-                        <span style={{ background: 'rgba(239,68,68,0.12)', padding: '2px 6px', borderRadius: '4px', color: '#f87171', fontWeight: 700 }}>
-                          ⚠️ {item.defectiveMeters} Mtr
-                        </span>
-                      )}
-                      {item.expectedAmount > 0 && (
-                        <span style={{ background: 'rgba(34,197,94,0.12)', padding: '2px 6px', borderRadius: '4px', color: '#4ade80', fontWeight: 700 }}>
-                          💰 ₹{item.expectedAmount}
-                        </span>
-                      )}
-                    </div>
+                    {/* Linkage Info Badges */}
+                    {(item.jobCardNo || item.challanNo || item.invoiceNo || item.defectiveMeters > 0 || item.expectedAmount > 0) && (
+                      <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.72rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {item.jobCardNo && (
+                          <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '6px', color: '#475569' }}>
+                            Job: <strong style={{ color: '#0f172a' }}>{item.jobCardNo}</strong>
+                          </span>
+                        )}
+                        {item.challanNo && (
+                          <span style={{ background: '#eff6ff', border: '1px solid #dbeafe', padding: '2px 8px', borderRadius: '6px', color: '#1e40af' }}>
+                            Challan: <strong style={{ color: '#1d4ed8' }}>{item.challanNo}</strong>
+                          </span>
+                        )}
+                        {item.invoiceNo && (
+                          <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '6px', color: '#475569' }}>
+                            Invoice: <strong style={{ color: '#0f172a' }}>{item.invoiceNo}</strong>
+                          </span>
+                        )}
+                        {item.defectiveMeters > 0 && (
+                          <span style={{ background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 8px', borderRadius: '6px', color: '#dc2626', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <AlertTriangle size={11} /> {item.defectiveMeters} Mtr
+                          </span>
+                        )}
+                        {item.expectedAmount > 0 && (
+                          <span style={{ background: '#f0fdf4', border: '1px solid #dcfce7', padding: '2px 8px', borderRadius: '6px', color: '#16a34a', fontWeight: 700 }}>
+                            ₹{Number(item.expectedAmount).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Category & Sub-Category & Description */}
-                    <div style={{ fontSize: '0.78rem', background: 'var(--bg-main, #111827)', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', marginBottom: 2 }}>
-                        {item.category} {item.subCategory ? `› ${item.subCategory}` : ''}
+                    <div style={{
+                      background: '#f8fafc',
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0',
+                      padding: '0.75rem 0.85rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.35rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: '#4f46e5',
+                          background: '#eef2ff',
+                          border: '1px solid #e0e7ff',
+                          padding: '1px 7px',
+                          borderRadius: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.03em'
+                        }}>
+                          <Tag size={10} />
+                          {item.category}
+                        </span>
+                        {item.subCategory && (
+                          <>
+                            <ChevronRight size={12} style={{ color: '#94a3b8' }} />
+                            <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#334155' }}>
+                              {item.subCategory}
+                            </span>
+                          </>
+                        )}
                       </div>
-                      <div style={{ color: 'var(--text-primary)', lineClamp: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <p style={{
+                        margin: 0,
+                        fontSize: '0.82rem',
+                        lineHeight: 1.45,
+                        color: '#1e293b',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
                         {item.description || 'No description provided.'}
-                      </div>
+                      </p>
                     </div>
 
                     {/* Photos Thumbnails */}
                     {item.photoUrls && item.photoUrls.length > 0 && (
-                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Proof ({item.photoUrls.length}):</span>
-                        {item.photoUrls.slice(0, 3).map((url, idx) => (
-                          <img
-                            key={idx}
-                            src={url}
-                            alt="Defect proof"
-                            onClick={() => setZoomImg(url)}
-                            style={{ width: 30, height: 30, borderRadius: 4, objectFit: 'cover', cursor: 'zoom-in', border: '1px solid var(--border-light)' }}
-                          />
-                        ))}
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <ImageIcon size={12} /> Proof ({item.photoUrls.length}):
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          {item.photoUrls.slice(0, 4).map((url, idx) => (
+                            <img
+                              key={idx}
+                              src={url}
+                              alt="Defect proof"
+                              onClick={() => setZoomImg(url)}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 6,
+                                objectFit: 'cover',
+                                cursor: 'zoom-in',
+                                border: '1px solid #cbd5e1',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                transition: 'transform 0.15s ease'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+                              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                            />
+                          ))}
+                        </div>
                       </div>
                     )}
 
                     {/* Resolution Summary if Action Taken */}
                     {item.actionTaken && (
-                      <div style={{ fontSize: '0.73rem', color: '#4ade80', background: 'rgba(34,197,94,0.08)', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(34,197,94,0.2)' }}>
-                        <strong>Action Taken:</strong> {item.actionTaken}
+                      <div style={{
+                        fontSize: '0.74rem',
+                        color: '#15803d',
+                        background: '#f0fdf4',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '8px',
+                        border: '1px solid #bbf7d0',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '6px'
+                      }}>
+                        <CheckCircle2 size={13} style={{ marginTop: '2px', flexShrink: 0, color: '#16a34a' }} />
+                        <div>
+                          <strong style={{ color: '#166534' }}>Action Taken:</strong> {item.actionTaken}
+                        </div>
                       </div>
                     )}
 
                     {/* Actions Footer */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)', marginTop: 'auto' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: '0.65rem',
+                      borderTop: '1px solid #f1f5f9',
+                      marginTop: 'auto'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <button
                           onClick={() => handleOpenViewModal(item)}
-                          style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#0284c7',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '5px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#0369a1'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#0284c7'}
                         >
-                          <Eye size={14} /> View & Resolve
+                          <Eye size={13} /> View & Resolve
                         </button>
                         <button
                           onClick={() => handleOpenViewModal(item)}
-                          style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', fontSize: '0.7rem', fontWeight: 700, borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            color: '#475569',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            borderRadius: '8px',
+                            padding: '4px 10px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = '#f8fafc';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                          }}
                         >
-                          <MessageSquare size={12} /> {item.comments?.length || 0} Comments
+                          <MessageSquare size={12} style={{ color: '#64748b' }} />
+                          <span>{item.comments?.length || 0}</span>
                         </button>
                       </div>
 
                       {canCreateComplaint && (
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                           <button
                             onClick={() => handleOpenEdit(item)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              color: '#64748b',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.background = '#f8fafc';
+                              e.currentTarget.style.color = '#0284c7';
+                              e.currentTarget.style.borderColor = '#bae6fd';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.background = '#ffffff';
+                              e.currentTarget.style.color = '#64748b';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                            }}
                             title="Edit Complaint"
                           >
-                            <Edit2 size={14} />
+                            <Edit2 size={13} />
                           </button>
                           <button
                             onClick={() => handleDelete(item._id, item.complaintNo)}
-                            style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '6px',
+                              border: '1px solid #fee2e2',
+                              background: '#ffffff',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.background = '#fef2f2';
+                              e.currentTarget.style.borderColor = '#fca5a5';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.background = '#ffffff';
+                              e.currentTarget.style.borderColor = '#fee2e2';
+                            }}
                             title="Delete Ticket"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       )}
