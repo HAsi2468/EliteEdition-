@@ -2459,6 +2459,7 @@ const getCompanySettings = async (req, res) => {
         expenseInCategories: masterConfig.expenseInCategories || ['Petty Cash Top-up', 'Client Payment / Advance', 'Scrap / Waste Sale', 'Refund / Cashback', 'Other Receipt'],
         expenseOutCategories: masterConfig.expenseOutCategories || ['Machine Maintenance & Service', 'Ink & Consumables', 'Spare Parts & Repairs', 'Paper & Transfer Film', 'Tea & Refreshments', 'Carriage & Freight', 'Salary / Daily Wages', 'Electricity & Utility', 'Stationery & Office', 'Other Expense'],
         expensePaymentModes: masterConfig.expensePaymentModes || ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other']
+      });
     }
     const defaultChallanDesign = {
       title: 'DELIVERY CHALLAN',
