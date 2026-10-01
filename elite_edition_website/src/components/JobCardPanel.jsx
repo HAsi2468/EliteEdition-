@@ -3,8 +3,10 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
-  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt, Loader, User
+  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt, Loader, User,
+  Building2, Scissors, SlidersHorizontal
 } from 'lucide-react';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
 import JobCardTracking from './JobCardTracking';
@@ -2032,6 +2034,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [selectedParty, setSelectedParty] = useState([]);
+  const [selectedMachine, setSelectedMachine] = useState([]);
+  const [selectedFabric, setSelectedFabric] = useState([]);
+  const [selectedDesigner, setSelectedDesigner] = useState([]);
   const [sortBy, setSortBy] = useState('jobNo');
   const [sortOrder, setSortOrder] = useState('desc');
   const [datePreset, setDatePreset] = useState('all');
@@ -2039,6 +2045,108 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
   const [dateEnd, setDateEnd] = useState('');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
+
+  // Dynamically compute options from cards for Unified Filter Popover
+  const availableParties = useMemo(() => {
+    const set = new Set();
+    cards.forEach(c => { if (c.party && String(c.party).trim()) set.add(String(c.party).trim()); });
+    return Array.from(set).sort();
+  }, [cards]);
+
+  const availableMachines = useMemo(() => {
+    const set = new Set();
+    cards.forEach(c => { if (c.machineName && String(c.machineName).trim()) set.add(String(c.machineName).trim()); });
+    return Array.from(set).sort();
+  }, [cards]);
+
+  const availableFabrics = useMemo(() => {
+    const set = new Set();
+    cards.forEach(c => { if (c.fabric && String(c.fabric).trim()) set.add(String(c.fabric).trim()); });
+    return Array.from(set).sort();
+  }, [cards]);
+
+  const availableDesigners = useMemo(() => {
+    const set = new Set();
+    cards.forEach(c => { if (c.designer && String(c.designer).trim()) set.add(String(c.designer).trim()); });
+    return Array.from(set).sort();
+  }, [cards]);
+
+  const jobCardFilters = useMemo(() => [
+    {
+      id: 'status',
+      label: 'Stage / Status',
+      options: ['Pending', 'Printing', 'Fusing', 'Delivery']
+    },
+    {
+      id: 'party',
+      label: 'Party (Client)',
+      icon: User,
+      options: availableParties
+    },
+    {
+      id: 'machine',
+      label: 'Machine',
+      icon: Building2,
+      options: availableMachines
+    },
+    {
+      id: 'fabric',
+      label: 'Fabric',
+      icon: Scissors,
+      options: availableFabrics
+    },
+    {
+      id: 'designer',
+      label: 'Designer',
+      icon: User,
+      options: availableDesigners
+    }
+  ], [availableParties, availableMachines, availableFabrics, availableDesigners]);
+
+  const jobCardFilterValues = useMemo(() => ({
+    status: statusFilter && statusFilter !== 'All' ? [statusFilter] : [],
+    party: selectedParty,
+    machine: selectedMachine,
+    fabric: selectedFabric,
+    designer: selectedDesigner
+  }), [statusFilter, selectedParty, selectedMachine, selectedFabric, selectedDesigner]);
+
+  const handleJobCardFilterChange = (newVals) => {
+    const nextStatuses = newVals.status || [];
+    setStatusFilter(nextStatuses.length === 1 ? nextStatuses[0] : (nextStatuses.length > 1 ? nextStatuses[0] : 'All'));
+    setSelectedParty(newVals.party || []);
+    setSelectedMachine(newVals.machine || []);
+    setSelectedFabric(newVals.fabric || []);
+    setSelectedDesigner(newVals.designer || []);
+    setPage(1);
+  };
+
+  const handleClearAllJobCardFilters = () => {
+    setStatusFilter('All');
+    setSelectedParty([]);
+    setSelectedMachine([]);
+    setSelectedFabric([]);
+    setSelectedDesigner([]);
+    setPage(1);
+  };
+
+  // Client-side multi-filter refinement for cards display
+  const displayedCards = useMemo(() => {
+    let result = cards;
+    if (selectedParty.length > 0) {
+      result = result.filter(c => c.party && selectedParty.some(p => p.toLowerCase() === c.party.toLowerCase()));
+    }
+    if (selectedMachine.length > 0) {
+      result = result.filter(c => c.machineName && selectedMachine.some(m => m.toLowerCase() === c.machineName.toLowerCase()));
+    }
+    if (selectedFabric.length > 0) {
+      result = result.filter(c => c.fabric && selectedFabric.some(f => f.toLowerCase() === c.fabric.toLowerCase()));
+    }
+    if (selectedDesigner.length > 0) {
+      result = result.filter(c => c.designer && selectedDesigner.some(d => d.toLowerCase() === c.designer.toLowerCase()));
+    }
+    return result;
+  }, [cards, selectedParty, selectedMachine, selectedFabric, selectedDesigner]);
   const [formCard, setFormCard] = useState(null);   // null=closed, {}=new, {...}=edit
   const [showForm, setShowForm] = useState(false);
   const [historyModalCard, setHistoryModalCard] = useState(null);
@@ -2636,33 +2744,15 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
               setCustomDateEnd(e);
             }}
           />
-          {['All', 'Pending', 'Printing', 'Fusing', 'Delivery'].map(s => {
-            const count = statusCounts[s]?.count;
-            return (
-              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-                style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)',
-                  fontFamily: 'var(--font-sans)', fontWeight: 600, cursor: 'pointer', border: '1px solid',
-                  borderColor: statusFilter === s ? 'var(--primary)' : 'var(--border-light)',
-                  background: statusFilter === s ? 'var(--nav-active-bg)' : 'transparent',
-                  color: statusFilter === s ? 'var(--primary)' : 'var(--text-muted)',
-                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                  transition: 'all 0.15s' }}>
-                <span>{s}</span>
-                {count != null && (
-                  <span style={{
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    padding: '1px 5px',
-                    borderRadius: '999px',
-                    background: statusFilter === s ? 'var(--primary)' : 'rgba(255,255,255,0.08)',
-                    color: statusFilter === s ? '#ffffff' : 'var(--text-muted)'
-                  }}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {/* Unified Filter Popover */}
+          <UnifiedFilterPopover
+            filters={jobCardFilters}
+            values={jobCardFilterValues}
+            onChange={handleJobCardFilterChange}
+            onClear={handleClearAllJobCardFilters}
+            triggerLabel="Filters"
+            showChips={true}
+          />
           
           <div style={{
             display: 'inline-flex',
@@ -2992,7 +3082,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))', gap:'1.25rem' }}>
-              {cards.map(c => {
+              {displayedCards.map(c => {
                 const pStatus = (c.printStatus || '').toLowerCase();
                 const isPrintDone = pStatus.includes('done') || parseFloat(c.printMtr || 0) > 0;
                 const fStatus = (c.fusingStatus || '').toLowerCase();

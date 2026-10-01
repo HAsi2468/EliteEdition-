@@ -35,6 +35,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
+import { triggerEliteConfirm } from './EliteModalDialog';
 
 // Available design workflow stages
 export const DESIGN_STAGES = [
@@ -618,7 +619,14 @@ export default function DesignerModule({ currentUser, isAdmin = false, onNavigat
 
   // Delete Task
   const handleDeleteTask = async (task) => {
-    if (!window.confirm(`Are you sure you want to delete design task "${task.taskNo} - ${task.designName}"? This action cannot be undone.`)) {
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Design Task',
+      message: `Are you sure you want to delete design task "${task.taskNo} - ${task.designName}"? This action cannot be undone.`,
+      confirmText: 'Delete Task',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!confirmed) {
       return;
     }
     try {

@@ -20,6 +20,7 @@ import {
 import '../styles/fabricEnterprise.css';
 import { SmartActionGroup } from './common/SmartActionGroup';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
@@ -180,6 +181,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Challan state
   const [challans, setChallans] = useState([]);
   const [challanSearch, setChallanSearch] = useState('');
+  const [challanFilters, setChallanFilters] = useState({ status: [], party: [] });
   const [challanStatusFilter, setChallanStatusFilter] = useState('All');
   const [challanVisibleCount, setChallanVisibleCount] = useState(50);
   const [challanLoadingMore, setChallanLoadingMore] = useState(false);
@@ -204,7 +206,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [deliveryByOptions, setDeliveryByOptions] = useState([]);
   const [lotPartyMap, setLotPartyMap] = useState({});
 
-  const emptyTpRows = () => [{ tpNo: 1, tpMeter: '' }];
+  const emptyTpRows = () => [{ tpNo: 1, freshMtr: '', westMtr: '', tpMeter: '' }];
   const [challanForm, setChallanForm] = useState({
     date: new Date().toISOString().split('T')[0],
     partyName: '',
@@ -649,6 +651,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // Lot-Wise Management state
   const [lotSearch, setLotSearch] = useState('');
+  const [lotFilters, setLotFilters] = useState({ status: [], fabric: [], vendor: [] });
   const [lotStatusFilter, setLotStatusFilter] = useState('All');
   const [lotDatePreset, setLotDatePreset] = useState('all');
   const [lotDateStart, setLotDateStart] = useState('');
@@ -1275,7 +1278,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           designNo: cleanDesignNameString(d.designNo || d.designName || ''),
           lotNo: d.lotNo || '',
           vendorChallanNo: d.partyChallan || d.vendorChallanNo || '',
-          tpDetails: totalMtrVal ? [{ id: 1, tpNo: 1, tpMeter: String(totalMtrVal) }] : emptyTpRows()
+          tpDetails: totalMtrVal ? [{ id: 1, tpNo: 1, freshMtr: String(totalMtrVal), westMtr: '0', tpMeter: String(totalMtrVal) }] : emptyTpRows()
         }));
       }
       setIsChallanOpen(true);
@@ -1340,8 +1343,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Keep ref in sync with state so fetchChallans always reads current values.
   // Debounce search input: wait 400ms after user stops typing before firing API.
   // Date changes fire immediately (no delay). Cleanup cancels stale requests.
+  const effectiveChallanStatus = challanFilters.status && challanFilters.status.length > 0
+    ? challanFilters.status.join(',')
+    : (challanStatusFilter !== 'All' ? challanStatusFilter : 'All');
+
   useEffect(() => {
-    challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd, status: challanStatusFilter };
+    challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd, status: effectiveChallanStatus };
     setChallanVisibleCount(50);
     // No debounce for date/status filter changes, only for text search
     const delay = challanSearch !== challanFiltersRef.current.search ? 400 : 0;
@@ -1349,7 +1356,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       fetchChallans();
     }, challanSearch ? 400 : 0); // Instant clear when search is emptied, 400ms delay while typing
     return () => clearTimeout(debounceTimer); // Cancel previous timer on next keystroke
-  }, [challanDateStart, challanDateEnd, challanSearch, challanStatusFilter]);
+  }, [challanDateStart, challanDateEnd, challanSearch, effectiveChallanStatus]);
 
   const getVendorShortForm = (name) => {
     if (!name) return '';
@@ -1530,6 +1537,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
       // If partial quantities available, auto-set TP meter to remaining fused meters if empty
       const defaultMtr = remainingFused > 0 ? remainingFused : (parseFloat(primaryJob.totalMtr) || '');
+      const defaultFresh = parseFloat(primaryJob.freshMtr || 0);
+      const defaultWest = parseFloat(primaryJob.totalWastageMtr || primaryJob.fabricWastageMtr || primaryJob.wasteMtr || 0);
+      const finalFresh = defaultFresh > 0 ? defaultFresh : (defaultMtr || '');
+      const finalWest = defaultWest > 0 ? defaultWest : '0';
+      const finalTotal = defaultMtr || ((parseFloat(finalFresh) || 0) + (parseFloat(finalWest) || 0)) || '';
 
       setChallanForm(prev => {
         const needsTpUpdate = prev.tpDetails.length <= 1 && (!prev.tpDetails[0]?.tpMeter || prev.tpDetails[0]?.tpMeter === '0' || prev.tpDetails[0]?.tpMeter === '');
@@ -1543,7 +1555,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           partyName: primaryJob.party || prev.partyName,
           billTo: primaryJob.billTo || prev.billTo || '',
           shipTo: primaryJob.shipTo || prev.shipTo || '',
-          tpDetails: needsTpUpdate && defaultMtr ? [{ id: 1, tpNo: 1, tpMeter: String(defaultMtr), lotNo: prev.lotNo || '' }] : prev.tpDetails
+          tpDetails: needsTpUpdate && (finalTotal || finalFresh) ? [{
+            id: 1,
+            tpNo: 1,
+            freshMtr: String(finalFresh),
+            westMtr: String(finalWest),
+            tpMeter: String(finalTotal),
+            lotNo: prev.lotNo || ''
+          }] : prev.tpDetails
         };
       });
 
@@ -1655,7 +1674,26 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const updateTpRow = (index, field, value) => {
     setChallanForm(prev => {
       const tpDetails = [...prev.tpDetails];
-      tpDetails[index] = { ...tpDetails[index], [field]: value };
+      const row = { ...tpDetails[index], [field]: value };
+
+      // Auto-compute Total Mtr when Fresh or West changes
+      if (field === 'freshMtr' || field === 'westMtr') {
+        const freshStr = field === 'freshMtr' ? value : row.freshMtr;
+        const westStr = field === 'westMtr' ? value : row.westMtr;
+        const freshVal = parseFloat(freshStr);
+        const westVal = parseFloat(westStr);
+        const hasFresh = !isNaN(freshVal) && freshStr !== '';
+        const hasWest = !isNaN(westVal) && westStr !== '';
+
+        if (hasFresh || hasWest) {
+          const sum = (hasFresh ? freshVal : 0) + (hasWest ? westVal : 0);
+          row.tpMeter = String(parseFloat(sum.toFixed(3)));
+        } else if (freshStr === '' && westStr === '') {
+          row.tpMeter = '';
+        }
+      }
+
+      tpDetails[index] = row;
       return { ...prev, tpDetails };
     });
   };
@@ -1669,7 +1707,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         .map(s => s.trim())
         .filter(s => s.length > 0);
       const defaultLot = lots[0] || '';
-      return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot }] };
+      return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, freshMtr: '', westMtr: '', tpMeter: '', lotNo: defaultLot }] };
     });
     setChallanMobileTab('tp');
   };
@@ -1683,8 +1721,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   };
 
   // Computed totals from tpDetails
-  const challanTotalMtr = challanForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0);
-  const challanTotalTp = challanForm.tpDetails.filter(r => parseFloat(r.tpMeter) > 0).length;
+  const challanTotalFreshMtr = challanForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.freshMtr) || 0), 0);
+  const challanTotalWestMtr = challanForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.westMtr) || 0), 0);
+  const challanTotalMtr = challanForm.tpDetails.reduce((sum, r) => {
+    const m = parseFloat(r.tpMeter);
+    if (!isNaN(m) && m > 0) return sum + m;
+    const fw = (parseFloat(r.freshMtr) || 0) + (parseFloat(r.westMtr) || 0);
+    return sum + fw;
+  }, 0);
+  const challanTotalTp = challanForm.tpDetails.filter(r => (parseFloat(r.tpMeter) > 0 || parseFloat(r.freshMtr) > 0)).length;
 
   const handleChallanSubmit = async (e, forceAdminOverride = false) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -1784,12 +1829,19 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         totalTp: challanTotalTp,
         adminOverride: forceAdminOverride || (isAdmin && needsOverride),
         tpDetails: challanForm.tpDetails
-          .filter(r => r.tpMeter !== '' && r.tpMeter != null)
-          .map((r, i) => ({
-            tpNo: i + 1,
-            tpMeter: parseFloat(r.tpMeter) || 0,
-            lotNo: r.lotNo || (challanForm.lotNo ? String(challanForm.lotNo).split(/[,\s&]+/)[0] : '') || ''
-          })),
+          .filter(r => (r.tpMeter !== '' && r.tpMeter != null) || (r.freshMtr !== '' && r.freshMtr != null))
+          .map((r, i) => {
+            const fresh = parseFloat(r.freshMtr) || 0;
+            const west = parseFloat(r.westMtr) || 0;
+            const total = parseFloat(r.tpMeter) || (fresh + west);
+            return {
+              tpNo: i + 1,
+              freshMtr: fresh,
+              westMtr: west,
+              tpMeter: total,
+              lotNo: r.lotNo || (challanForm.lotNo ? String(challanForm.lotNo).split(/[,\s&]+/)[0] : '') || ''
+            };
+          }),
       };
       if (editingChallan) {
         await api.updateFabricChallan(editingChallan._id, payload);
@@ -1826,7 +1878,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const startEditChallan = (c) => {
     setEditingChallan(c);
     const tpRows = c.tpDetails && c.tpDetails.length > 0
-      ? c.tpDetails.map((r, idx) => ({ tpNo: idx + 1, tpMeter: String(r.tpMeter != null ? r.tpMeter : ''), lotNo: r.lotNo || '' }))
+      ? c.tpDetails.map((r, idx) => ({
+          tpNo: idx + 1,
+          freshMtr: String(r.freshMtr ?? r.freshMeter ?? ''),
+          westMtr: String(r.westMtr ?? r.wasteMtr ?? r.wasteMeter ?? ''),
+          tpMeter: String(r.tpMeter != null ? r.tpMeter : ''),
+          lotNo: r.lotNo || ''
+        }))
       : emptyTpRows();
     setChallanForm({
       date: c.date ? new Date(c.date).toISOString().split('T')[0] : '',
@@ -2305,8 +2363,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   }, [lotRecords, lotDateStart, lotDateEnd]);
 
   const filteredLots = dateFilteredLots.filter(l => {
-    if (lotStatusFilter === 'InStock' && l.currentStock <= 0) return false;
-    if (lotStatusFilter === 'Exhausted' && l.currentStock > 0) return false;
+    if (lotFilters.status && lotFilters.status.length > 0) {
+      const hasInStock = lotFilters.status.includes('InStock');
+      const hasExhausted = lotFilters.status.includes('Exhausted');
+      if (hasInStock && !hasExhausted && l.currentStock <= 0) return false;
+      if (hasExhausted && !hasInStock && l.currentStock > 0) return false;
+    } else if (lotStatusFilter !== 'All') {
+      if (lotStatusFilter === 'InStock' && l.currentStock <= 0) return false;
+      if (lotStatusFilter === 'Exhausted' && l.currentStock > 0) return false;
+    }
+    if (lotFilters.fabric && lotFilters.fabric.length > 0) {
+      if (!lotFilters.fabric.includes(l.fabricQuality)) return false;
+    }
+    if (lotFilters.vendor && lotFilters.vendor.length > 0) {
+      if (!lotFilters.vendor.includes(l.vendorName)) return false;
+    }
     if (!lotSearch) return true;
     const s = lotSearch.toLowerCase();
     return String(l.lotNo).toLowerCase().includes(s) ||
@@ -2314,6 +2385,48 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       (l.vendorName || '').toLowerCase().includes(s) ||
       l.outwardTxs.some(ot => (ot.partyName || '').toLowerCase().includes(s) || (ot.jobNo || '').toLowerCase().includes(s));
   });
+
+  const lotFilterCategories = React.useMemo(() => [
+    {
+      id: 'status',
+      name: 'Stock Status',
+      multi: true,
+      options: [
+        { value: 'InStock', label: 'In-Stock Only' },
+        { value: 'Exhausted', label: 'Exhausted Only' }
+      ]
+    },
+    {
+      id: 'fabric',
+      name: 'Fabric Quality',
+      multi: true,
+      options: Array.from(new Set(dateFilteredLots.map(l => l.fabricQuality).filter(Boolean))).sort().map(f => ({ value: f, label: f }))
+    },
+    {
+      id: 'vendor',
+      name: 'Vendor',
+      multi: true,
+      options: Array.from(new Set(dateFilteredLots.map(l => l.vendorName).filter(Boolean))).sort().map(v => ({ value: v, label: v }))
+    }
+  ], [dateFilteredLots]);
+
+  const challanFilterCategories = React.useMemo(() => [
+    {
+      id: 'status',
+      name: 'Status',
+      multi: true,
+      options: [
+        { value: 'PENDING', label: 'Pending' },
+        { value: 'INVOICED', label: 'Invoiced' }
+      ]
+    },
+    {
+      id: 'party',
+      name: 'Party / Customer',
+      multi: true,
+      options: Array.from(new Set(challans.map(c => c.partyName || c.billTo).filter(Boolean))).sort().map(p => ({ value: p, label: p }))
+    }
+  ], [challans]);
 
   const availableTransferFabrics = React.useMemo(() => {
     const set = new Set();
@@ -2804,15 +2917,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   )}
                 </div>
 
-                <select
-                  value={lotStatusFilter}
-                  onChange={e => setLotStatusFilter(e.target.value)}
-                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem', minWidth: '140px' }}
-                >
-                  <option value="All">All Statuses ({dateFilteredLots.length})</option>
-                  <option value="InStock">In-Stock Only ({dateFilteredLots.filter(l => l.currentStock > 0).length})</option>
-                  <option value="Exhausted">Exhausted Only ({dateFilteredLots.filter(l => l.currentStock <= 0).length})</option>
-                </select>
+                <UnifiedFilterPopover
+                  categories={lotFilterCategories}
+                  activeFilters={lotFilters}
+                  onChange={setLotFilters}
+                  placeholder="Filters"
+                />
 
                 <DateRangePicker
                   preset={lotDatePreset}
@@ -4460,18 +4570,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input type="text" placeholder="Search challan no, party, job, fabric..." value={challanSearch} onChange={e => setChallanSearch(e.target.value)} style={{ ...inputStyle, width: '230px', paddingLeft: '2rem' }} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Status:</span>
-                <select
-                  value={challanStatusFilter}
-                  onChange={e => setChallanStatusFilter(e.target.value)}
-                  style={{ ...inputStyle, width: '120px', padding: '0.35rem 0.5rem', cursor: 'pointer', fontWeight: 700, color: 'var(--text-primary)', background: 'var(--bg-input, rgba(15, 23, 42, 0.6))' }}
-                >
-                  <option value="All">All Status</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="INVOICED">Invoiced</option>
-                </select>
-              </div>
+              <UnifiedFilterPopover
+                categories={challanFilterCategories}
+                activeFilters={challanFilters}
+                onChange={setChallanFilters}
+                placeholder="Filters"
+              />
               <DateRangePicker
                 preset={challanDatePreset}
                 onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
@@ -4540,7 +4644,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           <div className="table-responsive-wrapper" style={{ padding: 0, border: '1px solid var(--border-light)' }}>
             <div className="table-responsive" style={{ width: '100%' }}>
               {(() => {
-                const displayedChallans = challans.slice(0, challanVisibleCount);
+                const filteredChallans = challans.filter(c => {
+                  if (challanFilters.party && challanFilters.party.length > 0) {
+                    const p = c.partyName || c.billTo;
+                    if (!challanFilters.party.includes(p)) return false;
+                  }
+                  return true;
+                });
+                const displayedChallans = filteredChallans.slice(0, challanVisibleCount);
 
                 return (
                   <table className="data-table" style={{ width: '100%', minWidth: '950px', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
@@ -4825,9 +4936,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
             {/* TP Details List - Full Breakdown with Assigned Lot & Percentage */}
             {viewChallanModal.tpDetails && viewChallanModal.tpDetails.length > 0 && (() => {
-              const activeTps = viewChallanModal.tpDetails.filter(tp => (parseFloat(tp.tpMeter) || 0) > 0);
+              const activeTps = viewChallanModal.tpDetails.filter(tp => (parseFloat(tp.tpMeter) || 0) > 0 || (parseFloat(tp.freshMtr) || 0) > 0);
               const displayList = activeTps.length > 0 ? activeTps : viewChallanModal.tpDetails;
               const totalRolls = displayList.length;
+              const hasDetailedMeters = displayList.some(tp => (parseFloat(tp.freshMtr) || 0) > 0 || (parseFloat(tp.westMtr) || 0) > 0);
+              const sumFresh = displayList.reduce((acc, r) => acc + (parseFloat(r.freshMtr) || 0), 0);
+              const sumWest = displayList.reduce((acc, r) => acc + (parseFloat(r.westMtr) || 0), 0);
               const sumMtr = displayList.reduce((acc, r) => acc + (parseFloat(r.tpMeter) || 0), 0) || parseFloat(viewChallanModal.totalMtr || 0);
 
               return (
@@ -4848,21 +4962,23 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <table style={{ width: '100%', fontSize: '0.84rem', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ background: '#eff6ff', borderBottom: '1.5px solid #bfdbfe', textAlign: 'left', color: '#1e40af', position: 'sticky', top: 0, zIndex: 2 }}>
-                          <th style={{ padding: '0.6rem 0.85rem', fontWeight: '800', width: '22%' }}>TP #</th>
-                          <th style={{ padding: '0.6rem 0.85rem', fontWeight: '800', width: '32%' }}>Assigned Lot</th>
-                          <th style={{ padding: '0.6rem 0.85rem', textAlign: 'right', fontWeight: '800', width: '28%' }}>Meters</th>
-                          <th style={{ padding: '0.6rem 0.85rem', textAlign: 'right', fontWeight: '800', width: '18%' }}>Share</th>
+                          <th style={{ padding: '0.6rem 0.75rem', fontWeight: '800' }}>TP #</th>
+                          <th style={{ padding: '0.6rem 0.75rem', fontWeight: '800' }}>Assigned Lot</th>
+                          {hasDetailedMeters && <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#059669' }}>Fresh Mtr</th>}
+                          {hasDetailedMeters && <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#d97706' }}>West Mtr</th>}
+                          <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800' }}>Total Mtr</th>
+                          <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800' }}>Share</th>
                         </tr>
                       </thead>
                       <tbody>
                         {displayList.map((tp, idx) => {
-                          const mtrVal = parseFloat(tp.tpMeter) || 0;
+                          const mtrVal = parseFloat(tp.tpMeter) || ((parseFloat(tp.freshMtr) || 0) + (parseFloat(tp.westMtr) || 0));
                           const sharePct = sumMtr > 0 ? ((mtrVal / sumMtr) * 100).toFixed(1) : '0.0';
                           const assignedLot = tp.lotNo || viewChallanModal.lotNo || '—';
 
                           return (
                             <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', transition: 'background 0.15s ease' }}>
-                              <td style={{ padding: '0.55rem 0.85rem' }}>
+                              <td style={{ padding: '0.55rem 0.75rem' }}>
                                 <span style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -4877,7 +4993,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   TP-{idx + 1}
                                 </span>
                               </td>
-                              <td style={{ padding: '0.55rem 0.85rem', fontWeight: '700', color: '#334155' }}>
+                              <td style={{ padding: '0.55rem 0.75rem', fontWeight: '700', color: '#334155' }}>
                                 {assignedLot !== '—' ? (
                                   <span style={{
                                     display: 'inline-flex',
@@ -4897,10 +5013,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   <span style={{ color: '#94a3b8' }}>—</span>
                                 )}
                               </td>
-                              <td style={{ padding: '0.55rem 0.85rem', textAlign: 'right', fontWeight: '800', color: '#16a34a', fontSize: '0.88rem' }}>
+                              {hasDetailedMeters && (
+                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#059669', fontSize: '0.86rem' }}>
+                                  {(parseFloat(tp.freshMtr) || 0).toFixed(2)}m
+                                </td>
+                              )}
+                              {hasDetailedMeters && (
+                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#d97706', fontSize: '0.86rem' }}>
+                                  {(parseFloat(tp.westMtr) || 0).toFixed(2)}m
+                                </td>
+                              )}
+                              <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#16a34a', fontSize: '0.88rem' }}>
                                 {mtrVal.toFixed(2)} mtr
                               </td>
-                              <td style={{ padding: '0.55rem 0.85rem', textAlign: 'right', color: '#64748b', fontSize: '0.78rem', fontWeight: 600 }}>
+                              <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', color: '#64748b', fontSize: '0.78rem', fontWeight: 600 }}>
                                 {sharePct}%
                               </td>
                             </tr>
@@ -4909,13 +5035,23 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       </tbody>
                       <tfoot>
                         <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0', fontWeight: 800 }}>
-                          <td colSpan={2} style={{ padding: '0.6rem 0.85rem', color: '#1e40af' }}>
+                          <td colSpan={2} style={{ padding: '0.6rem 0.75rem', color: '#1e40af' }}>
                             Total Breakdown ({totalRolls} Rolls)
                           </td>
-                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'right', color: '#16a34a', fontSize: '0.92rem' }}>
+                          {hasDetailedMeters && (
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#059669', fontSize: '0.88rem' }}>
+                              {sumFresh.toFixed(2)}m
+                            </td>
+                          )}
+                          {hasDetailedMeters && (
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#d97706', fontSize: '0.88rem' }}>
+                              {sumWest.toFixed(2)}m
+                            </td>
+                          )}
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#16a34a', fontSize: '0.92rem' }}>
                             {sumMtr.toFixed(2)} mtr
                           </td>
-                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'right', color: '#64748b', fontSize: '0.8rem' }}>
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#64748b', fontSize: '0.8rem' }}>
                             100%
                           </td>
                         </tr>
@@ -5603,7 +5739,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <div className="challan-tp-header">
                   <div>
                     <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP METERS VALUES</span>
-                    <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700 }}>Manual Lot No &amp; TP meters entry per row</div>
+                    <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700 }}>Manual Lot No &amp; Fresh, West, Total meters entry per row</div>
                   </div>
                   <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
                     <PlusCircle size={14} /> Add TP Row
@@ -5617,7 +5753,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <div className="challan-tp-grid-header">
                     <span>TP No</span>
                     <span>Assigned Lot</span>
-                    <span>TP Meters (mtr)</span>
+                    <span>Fresh Mtr</span>
+                    <span>West Mtr</span>
+                    <span>Total Mtr</span>
                     <span></span>
                   </div>
 
@@ -5630,7 +5768,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       const isCustom = row.isCustomLot;
                       return (
                         <div key={idx} className="challan-tp-row">
-                          <div className="challan-tp-badge" style={{ padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#0369a1', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div className="challan-tp-badge" style={{ padding: '0.5rem 0.3rem', fontSize: '0.82rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#0369a1', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             TP {idx + 1}
                           </div>
                           <div className="challan-tp-lot-container" style={{ position: 'relative', width: '100%' }}>
@@ -5647,7 +5785,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 }}
                                 style={{
                                   width: '100%',
-                                  padding: '0.5rem 0.35rem',
+                                  padding: '0.5rem 0.3rem',
                                   fontSize: '0.82rem',
                                   fontWeight: 800,
                                   color: '#0f172a',
@@ -5705,7 +5843,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   autoFocus
                                   style={{
                                     width: '100%',
-                                    padding: '0.5rem 0.35rem',
+                                    padding: '0.5rem 0.3rem',
                                     fontSize: '0.82rem',
                                     fontWeight: 800,
                                     color: '#0f172a',
@@ -5742,19 +5880,86 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                               </div>
                             )}
                           </div>
-                          <div className="challan-tp-meter-wrapper" style={{ position: 'relative', width: '100%' }}>
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              autoFocus={idx === 0}
-                              value={row.tpMeter}
-                              onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', background: '#ffffff', border: '2px solid #0284c7', borderRadius: '6px', boxSizing: 'border-box' }}
-                              placeholder="Enter TP meters…"
-                            />
+
+                          <div className="challan-tp-meters-subgrid">
+                            {/* Fresh Meter */}
+                            <div className="challan-tp-fresh-wrapper" style={{ position: 'relative', width: '100%' }}>
+                              <input
+                                type="number"
+                                step="0.001"
+                                min="0"
+                                autoFocus={idx === 0}
+                                value={row.freshMtr ?? ''}
+                                onChange={e => updateTpRow(idx, 'freshMtr', e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.45rem',
+                                  fontSize: '0.88rem',
+                                  fontWeight: 800,
+                                  color: '#047857',
+                                  background: '#f0fdf4',
+                                  border: '1.5px solid #86efac',
+                                  borderRadius: '6px',
+                                  boxSizing: 'border-box',
+                                  textAlign: 'right'
+                                }}
+                                placeholder="Fresh mtr"
+                                title="Fresh meters"
+                              />
+                            </div>
+
+                            {/* West Mtr (Waste) */}
+                            <div className="challan-tp-west-wrapper" style={{ position: 'relative', width: '100%' }}>
+                              <input
+                                type="number"
+                                step="0.001"
+                                min="0"
+                                value={row.westMtr ?? ''}
+                                onChange={e => updateTpRow(idx, 'westMtr', e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.45rem',
+                                  fontSize: '0.88rem',
+                                  fontWeight: 800,
+                                  color: '#b45309',
+                                  background: '#fffbeb',
+                                  border: '1.5px solid #fde68a',
+                                  borderRadius: '6px',
+                                  boxSizing: 'border-box',
+                                  textAlign: 'right'
+                                }}
+                                placeholder="West mtr"
+                                title="West / Waste meters"
+                              />
+                            </div>
+
+                            {/* Total Mtr (Auto-calculated: Fresh + West) */}
+                            <div className="challan-tp-meter-wrapper" style={{ position: 'relative', width: '100%' }}>
+                              <input
+                                type="number"
+                                step="0.001"
+                                min="0"
+                                value={row.tpMeter ?? ''}
+                                onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.45rem',
+                                  fontSize: '0.92rem',
+                                  fontWeight: 900,
+                                  color: '#0f172a',
+                                  background: '#ffffff',
+                                  border: '2px solid #0284c7',
+                                  borderRadius: '6px',
+                                  boxSizing: 'border-box',
+                                  textAlign: 'right'
+                                }}
+                                placeholder="Total mtr"
+                                title="Total meters (auto: Fresh + West)"
+                              />
+                            </div>
                           </div>
-                          <button type="button" className="challan-tp-remove-btn" onClick={() => removeTpRow(idx)} style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', height: '36px', width: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
+
+                          <button type="button" className="challan-tp-remove-btn" onClick={() => removeTpRow(idx)} style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', height: '36px', width: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
                             <X size={16} />
                           </button>
                         </div>
@@ -5767,14 +5972,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <div className="challan-tp-footer">
 
                   {/* Total Summary Row */}
-                  <div style={{ display: 'flex', gap: '1rem', padding: '0.6rem 1rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total TPs</span>
-                      <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#0284c7' }}>{challanTotalTp} Rows</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total TPs</span>
+                      <div style={{ fontWeight: 900, fontSize: '1rem', color: '#0284c7' }}>{challanTotalTp} Rolls</div>
                     </div>
-                    <div style={{ flex: 1.5, textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total Meters</span>
-                      <div style={{ fontWeight: 900, fontSize: '1.35rem', color: '#059669' }}>{challanTotalMtr.toFixed(2)} mtr</div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.65rem', color: '#059669', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Fresh Mtr</span>
+                      <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#059669' }}>{challanTotalFreshMtr.toFixed(2)}m</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.65rem', color: '#d97706', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>West Mtr</span>
+                      <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#d97706' }}>{challanTotalWestMtr.toFixed(2)}m</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.65rem', color: '#0f172a', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total Mtr</span>
+                      <div style={{ fontWeight: 900, fontSize: '1.15rem', color: '#0284c7' }}>{challanTotalMtr.toFixed(2)}m</div>
                     </div>
                   </div>
 

@@ -8,10 +8,24 @@ const getAll = async (req, res) => {
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') {
-      const escaped = String(category).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.category = { $regex: `^${escaped}$`, $options: 'i' };
+      const catItems = String(category).split(',').map(c => c.trim()).filter(Boolean);
+      if (catItems.length > 1) {
+        filter.category = { $in: catItems.map(c => new RegExp(`^${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) };
+      } else if (catItems.length === 1) {
+        const escaped = catItems[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        filter.category = { $regex: `^${escaped}$`, $options: 'i' };
+      }
     }
-    if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
+    if (colors && colors !== 'All') {
+      const colorItems = String(colors).split(',').map(c => c.trim()).filter(Boolean);
+      if (colorItems.length > 1) {
+        const colorOrs = colorItems.map(c => ({ colors: { $regex: c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }));
+        if (!filter.$and) filter.$and = [];
+        filter.$and.push({ $or: colorOrs });
+      } else if (colorItems.length === 1) {
+        filter.colors = { $regex: colorItems[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+      }
+    }
     if (party && party !== 'All') {
       const partyItems = String(party)
         .split(',')

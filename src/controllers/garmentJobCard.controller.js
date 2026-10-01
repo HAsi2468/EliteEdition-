@@ -70,8 +70,22 @@ const getAll = async (req, res) => {
     const { dateStart, dateEnd, design_number, label, vendor_name, search, status, stage, page = 1, limit = 50 } = req.query;
     const filter = { department: 'stitching' };
 
-    if (status && status !== 'All') filter.status = status;
-    if (stage && stage !== 'All') filter.current_stage = Number(stage);
+    if (status && status !== 'All') {
+      const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length > 1) {
+        filter.status = { $in: statuses };
+      } else if (statuses.length === 1) {
+        filter.status = statuses[0];
+      }
+    }
+    if (stage && stage !== 'All') {
+      const stages = String(stage).split(',').map(s => Number(s.trim())).filter(n => !isNaN(n));
+      if (stages.length > 1) {
+        filter.current_stage = { $in: stages };
+      } else if (stages.length === 1) {
+        filter.current_stage = stages[0];
+      }
+    }
     if (design_number) filter.design_number = { $regex: design_number, $options: 'i' };
     if (label) filter.label = { $regex: label, $options: 'i' };
     if (vendor_name) {

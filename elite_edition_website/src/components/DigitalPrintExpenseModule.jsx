@@ -8,6 +8,7 @@ import {
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import { triggerGlobalDataRefresh } from './NotificationToast';
 
 const DEFAULT_IN_CATEGORIES = [
@@ -232,8 +233,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   // Filters
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('All'); // 'All', 'IN', 'OUT'
-  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [expenseFilters, setExpenseFilters] = useState({ type: [], category: [], paymentMode: [] });
   const [datePreset, setDatePreset] = useState('this_month');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
@@ -276,16 +276,21 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     };
     window.addEventListener('elite-data-refresh', handleDataRefresh);
     return () => window.removeEventListener('elite-data-refresh', handleDataRefresh);
-  }, [search, typeFilter, categoryFilter, dateStart, dateEnd, companyEntity]);
+  }, [search, expenseFilters, dateStart, dateEnd, companyEntity]);
 
   const fetchExpenses = async () => {
     setLoading(true);
     try {
+      const effectiveType = expenseFilters.type && expenseFilters.type.length > 0 ? expenseFilters.type.join(',') : 'All';
+      const effectiveCategory = expenseFilters.category && expenseFilters.category.length > 0 ? expenseFilters.category.join(',') : 'All';
+      const effectivePaymentMode = expenseFilters.paymentMode && expenseFilters.paymentMode.length > 0 ? expenseFilters.paymentMode.join(',') : undefined;
+
       const params = {
         companyEntity,
         search,
-        type: typeFilter,
-        category: categoryFilter,
+        type: effectiveType,
+        category: effectiveCategory,
+        paymentMode: effectivePaymentMode,
         dateStart,
         dateEnd,
         limit: 500
@@ -471,7 +476,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     const pdfTotalOut = expenses.filter(e => e.type === 'OUT').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const pdfNetBalance = pdfTotalIn - pdfTotalOut;
 
-    const typeLabel = typeFilter === 'All' ? 'All Ledger (IN & OUT)' : typeFilter === 'IN' ? '🟢 Cash IN Only' : '🔴 Cash OUT Only';
+    const typeLabel = (expenseFilters.type && expenseFilters.type.length > 0)
+      ? expenseFilters.type.join(', ')
+      : 'All Ledger (IN & OUT)';
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -604,6 +611,33 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   const categories = formVal.type === 'IN' ? inCategories : outCategories;
 
+  const expenseFilterCategories = React.useMemo(() => [
+    {
+      id: 'type',
+      name: 'Ledger Type',
+      multi: true,
+      options: [
+        { value: 'IN', label: '🟢 Cash IN (Receipt)' },
+        { value: 'OUT', label: '🔴 Cash OUT (Expense)' }
+      ]
+    },
+    {
+      id: 'category',
+      name: 'Category',
+      multi: true,
+      options: [
+        ...inCategories.map(c => ({ value: c, label: `🟢 ${c}` })),
+        ...outCategories.map(c => ({ value: c, label: `🔴 ${c}` }))
+      ]
+    },
+    {
+      id: 'paymentMode',
+      name: 'Payment Mode',
+      multi: true,
+      options: (paymentModes || []).map(m => ({ value: m, label: m }))
+    }
+  ], [inCategories, outCategories, paymentModes]);
+
   // Calculate Cash IN vs Bank IN & Cash OUT vs Bank OUT breakdowns
   const cashInAmount = expenses
     .filter(e => e.type === 'IN' && (e.paymentMode || '').toLowerCase() === 'cash')
@@ -720,38 +754,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 }}
               />
 
-              {/* Type Filter Buttons */}
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)', height: '32px', boxSizing: 'border-box', alignItems: 'center' }}>
-                {['All', 'IN', 'OUT'].map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTypeFilter(t)}
-                    style={{
-                      padding: '0.2rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, borderRadius: '4px', border: 'none',
-                      background: typeFilter === t ? (t === 'IN' ? '#10b981' : t === 'OUT' ? '#ef4444' : 'var(--primary)') : 'transparent',
-                      color: typeFilter === t ? '#ffffff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.15s', height: '26px'
-                    }}
-                  >
-                    {t === 'All' ? 'All Ledger' : t === 'IN' ? '🟢 Cash IN' : '🔴 Cash OUT'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Category Filter */}
-              <select
-                value={categoryFilter}
-                onChange={e => setCategoryFilter(e.target.value)}
-                style={{ fontSize: '0.78rem', padding: '0.25rem 0.65rem', height: '32px', borderRadius: '6px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
-              >
-                <option value="All">All Categories</option>
-                <optgroup label="Income (IN)">
-                  {inCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                </optgroup>
-                <optgroup label="Expense (OUT)">
-                  {outCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                </optgroup>
-              </select>
+              {/* Unified Filters Popover */}
+              <UnifiedFilterPopover
+                categories={expenseFilterCategories}
+                activeFilters={expenseFilters}
+                onChange={setExpenseFilters}
+                placeholder="Filters"
+              />
 
               {/* PDF Download Button (Icon with tooltip) */}
               <button

@@ -10,6 +10,7 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DateRangePicker from './DateRangePicker';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 
 const PIPELINE_STAGES = [
   { stage_number: 1, key: '1_fabric_order', name: 'Fabric Order', icon: '🧵', color: '#60a5fa', desc: 'Fabric Procurement & Requisition' },
@@ -39,6 +40,7 @@ export default function GarmentJobCardDashboard() {
   const [dateEnd, setDateEnd] = useState('');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
+  const [garmentFilters, setGarmentFilters] = useState({ status: [], stage: [], vendor: [], design: [] });
   const [designFilter, setDesignFilter] = useState('');
   const [vendorFilter, setVendorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -89,14 +91,19 @@ export default function GarmentJobCardDashboard() {
     setError('');
     try {
       const effectivePage = targetPage;
+      const effectiveStatus = garmentFilters.status && garmentFilters.status.length > 0 ? garmentFilters.status.join(',') : (statusFilter !== 'All' ? statusFilter : undefined);
+      const effectiveStage = garmentFilters.stage && garmentFilters.stage.length > 0 ? garmentFilters.stage.join(',') : (stageFilter !== 'All' ? stageFilter : undefined);
+      const effectiveVendor = garmentFilters.vendor && garmentFilters.vendor.length > 0 ? garmentFilters.vendor.join(',') : (vendorFilter || undefined);
+      const effectiveDesign = garmentFilters.design && garmentFilters.design.length > 0 ? garmentFilters.design.join(',') : (designFilter || undefined);
+
       const res = await api.getGarmentJobCards({
         search: debouncedSearch,
         dateStart,
         dateEnd,
-        design_number: designFilter,
-        vendor_name: vendorFilter,
-        status: statusFilter,
-        stage: stageFilter !== 'All' ? stageFilter : undefined,
+        design_number: effectiveDesign,
+        vendor_name: effectiveVendor,
+        status: effectiveStatus,
+        stage: effectiveStage,
         page: effectivePage,
         limit: 25
       });
@@ -112,7 +119,7 @@ export default function GarmentJobCardDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter]);
+  }, [debouncedSearch, dateStart, dateEnd, garmentFilters, designFilter, vendorFilter, statusFilter, stageFilter]);
 
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current || pageRef.current >= pages) return;
@@ -120,14 +127,19 @@ export default function GarmentJobCardDashboard() {
     setLoadingMore(true);
     try {
       const nextPage = pageRef.current + 1;
+      const effectiveStatus = garmentFilters.status && garmentFilters.status.length > 0 ? garmentFilters.status.join(',') : (statusFilter !== 'All' ? statusFilter : undefined);
+      const effectiveStage = garmentFilters.stage && garmentFilters.stage.length > 0 ? garmentFilters.stage.join(',') : (stageFilter !== 'All' ? stageFilter : undefined);
+      const effectiveVendor = garmentFilters.vendor && garmentFilters.vendor.length > 0 ? garmentFilters.vendor.join(',') : (vendorFilter || undefined);
+      const effectiveDesign = garmentFilters.design && garmentFilters.design.length > 0 ? garmentFilters.design.join(',') : (designFilter || undefined);
+
       const res = await api.getGarmentJobCards({
         search: debouncedSearch,
         dateStart,
         dateEnd,
-        design_number: designFilter,
-        vendor_name: vendorFilter,
-        status: statusFilter,
-        stage: stageFilter !== 'All' ? stageFilter : undefined,
+        design_number: effectiveDesign,
+        vendor_name: effectiveVendor,
+        status: effectiveStatus,
+        stage: effectiveStage,
         page: nextPage,
         limit: 25
       });
@@ -149,14 +161,15 @@ export default function GarmentJobCardDashboard() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [pages, debouncedSearch, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter]);
+  }, [pages, debouncedSearch, dateStart, dateEnd, garmentFilters, designFilter, vendorFilter, statusFilter, stageFilter]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
+      const effectiveDesign = garmentFilters.design && garmentFilters.design.length > 0 ? garmentFilters.design.join(',') : (designFilter || undefined);
       const res = await api.getGarmentJobCardAnalytics({
         dateStart,
         dateEnd,
-        design_number: designFilter
+        design_number: effectiveDesign
       });
       if (res && res.success) {
         setAnalytics({
@@ -167,7 +180,38 @@ export default function GarmentJobCardDashboard() {
     } catch (e) {
       console.warn('Failed to load garment analytics', e);
     }
-  }, [dateStart, dateEnd, designFilter]);
+  }, [dateStart, dateEnd, garmentFilters.design, designFilter]);
+
+  const garmentFilterCategories = React.useMemo(() => [
+    {
+      id: 'status',
+      name: 'Status',
+      multi: true,
+      options: [
+        { value: 'Pending', label: 'Pending' },
+        { value: 'In Production', label: 'In Production' },
+        { value: 'Completed', label: 'Completed' }
+      ]
+    },
+    {
+      id: 'stage',
+      name: 'Pipeline Stage',
+      multi: true,
+      options: PIPELINE_STAGES.map(s => ({ value: String(s.stage_number), label: `${s.icon} ${s.name}` }))
+    },
+    {
+      id: 'vendor',
+      name: 'Vendor',
+      multi: true,
+      options: Array.from(new Set(cards.map(c => c.vendor_details?.vendor_name).filter(Boolean))).sort().map(v => ({ value: v, label: v }))
+    },
+    {
+      id: 'design',
+      name: 'Design Number',
+      multi: true,
+      options: Array.from(new Set(cards.map(c => c.design_number).filter(Boolean))).sort().map(d => ({ value: d, label: d }))
+    }
+  ], [cards]);
 
   useEffect(() => {
     fetchCards();
@@ -490,41 +534,13 @@ export default function GarmentJobCardDashboard() {
           }}
         />
 
-        <input
-          type="text"
-          placeholder="Filter Design No..."
-          value={designFilter}
-          onChange={e => setDesignFilter(e.target.value)}
-          style={filterInputStyle}
+        {/* Unified Filters Popover */}
+        <UnifiedFilterPopover
+          categories={garmentFilterCategories}
+          activeFilters={garmentFilters}
+          onChange={setGarmentFilters}
+          placeholder="Filters"
         />
-
-        <input
-          type="text"
-          placeholder="Filter Vendor..."
-          value={vendorFilter}
-          onChange={e => setVendorFilter(e.target.value)}
-          style={filterInputStyle}
-        />
-
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          style={filterInputStyle}
-        >
-          <option value="All">All Statuses</option>
-          <option value="Pending">Pending</option>
-          <option value="In Production">In Production</option>
-          <option value="Completed">Completed</option>
-        </select>
-
-        {(search || dateStart || dateEnd || designFilter || vendorFilter || statusFilter !== 'All' || stageFilter !== 'All') && (
-          <button
-            onClick={() => { setSearch(''); setDateStart(''); setDateEnd(''); setDesignFilter(''); setVendorFilter(''); setStatusFilter('All'); setStageFilter('All'); }}
-            style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-          >
-            Reset Filters
-          </button>
-        )}
       </div>
 
       {/* Tab Switcher */}

@@ -3,7 +3,7 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Plus, Search, RefreshCw, Edit2, Trash2, X, Save, Image,
   Eye, FileText, ChevronLeft, ChevronRight, CheckCircle, AlertCircle,
-  Layers, BookOpen, ChevronDown, Check, Sparkles, ShieldAlert
+  Layers, BookOpen, ChevronDown, Check, Sparkles, ShieldAlert, Palette, User, SlidersHorizontal
 } from 'lucide-react';
 import { COLOR_NAMES, getColorHex, detectDominantColors } from '../utils/colors';
 import imageCompression from 'browser-image-compression';
@@ -11,6 +11,7 @@ import { triggerPushNotification, triggerGlobalDataRefresh } from './Notificatio
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
@@ -764,6 +765,57 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allDesignsList, designs]);
 
+  // Unified Filter Popover Categories Definition for Design Catalogue
+  const catalogueFilters = useMemo(() => [
+    {
+      id: 'category',
+      label: 'Category',
+      icon: Layers,
+      options: availableCategories
+    },
+    {
+      id: 'color',
+      label: 'Color',
+      icon: Palette,
+      options: availableColors
+    },
+    {
+      id: 'party',
+      label: 'Party (Client)',
+      icon: User,
+      options: availableParties
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      multi: false,
+      options: ['Active', 'Inactive', 'All']
+    }
+  ], [availableCategories, availableColors, availableParties]);
+
+  const catalogueFilterValues = useMemo(() => ({
+    category: Array.isArray(categoryFilter) ? categoryFilter : (categoryFilter && categoryFilter !== 'All' ? [categoryFilter] : []),
+    color: Array.isArray(colorFilter) ? colorFilter : (colorFilter && colorFilter !== 'All' ? [colorFilter] : []),
+    party: Array.isArray(partyFilter) ? partyFilter : (partyFilter && partyFilter !== 'All' ? [partyFilter] : []),
+    status: statusFilter
+  }), [categoryFilter, colorFilter, partyFilter, statusFilter]);
+
+  const handleFilterChange = (newVals) => {
+    setCategoryFilter(newVals.category || []);
+    setColorFilter(newVals.color || []);
+    setPartyFilter(newVals.party || []);
+    if (newVals.status) setStatusFilter(newVals.status);
+    setPage(1);
+  };
+
+  const handleClearAllFilters = () => {
+    setCategoryFilter([]);
+    setColorFilter([]);
+    setPartyFilter([]);
+    setStatusFilter('All');
+    setPage(1);
+  };
+
   // Real-time unique design name check
   const isDuplicateName = useMemo(() => {
     const trimmed = String(formVal.designName || '').trim().toLowerCase();
@@ -852,9 +904,9 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       const effectivePage = targetPage;
       const res = await api.getDesigns({
         search,
-        category: categoryFilter,
-        colors: colorFilter,
-        party: partyFilter,
+        category: Array.isArray(categoryFilter) ? (categoryFilter.length > 0 ? categoryFilter.join(',') : 'All') : categoryFilter,
+        colors: Array.isArray(colorFilter) ? (colorFilter.length > 0 ? colorFilter.join(',') : 'All') : colorFilter,
+        party: Array.isArray(partyFilter) ? (partyFilter.length > 0 ? partyFilter.join(',') : 'All') : partyFilter,
         status: statusFilter,
         department,
         sortBy,
@@ -884,9 +936,9 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       const nextPage = pageRef.current + 1;
       const res = await api.getDesigns({
         search,
-        category: categoryFilter,
-        colors: colorFilter,
-        party: partyFilter,
+        category: Array.isArray(categoryFilter) ? (categoryFilter.length > 0 ? categoryFilter.join(',') : 'All') : categoryFilter,
+        colors: Array.isArray(colorFilter) ? (colorFilter.length > 0 ? colorFilter.join(',') : 'All') : colorFilter,
+        party: Array.isArray(partyFilter) ? (partyFilter.length > 0 ? partyFilter.join(',') : 'All') : partyFilter,
         status: statusFilter,
         department,
         sortBy,
@@ -1312,83 +1364,15 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             />
           </div>
 
-          {/* Categories select filter */}
-          <div style={{ minWidth: 150 }}>
-            <label htmlFor="catalogue-category-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-              Filter by Category
-            </label>
-            <select
-              id="catalogue-category-filter"
-              name="catalogueCategory"
-              aria-label="Filter by Category"
-              value={categoryFilter}
-              onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-            >
-              <option value="All">All Categories</option>
-              {availableCategories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Colors select filter */}
-          <div style={{ minWidth: 150 }}>
-            <label htmlFor="catalogue-color-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-              Filter by Color
-            </label>
-            <select
-              id="catalogue-color-filter"
-              name="catalogueColor"
-              aria-label="Filter by Color"
-              value={colorFilter}
-              onChange={e => { setColorFilter(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-            >
-              <option value="All">All Colors</option>
-              {availableColors.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Party (Client) select filter */}
-          <div style={{ minWidth: 160 }}>
-            <label htmlFor="catalogue-party-filter" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-              Filter by Party
-            </label>
-            <select
-              id="catalogue-party-filter"
-              name="catalogueParty"
-              aria-label="Filter by Party (Clients)"
-              value={partyFilter}
-              onChange={e => { setPartyFilter(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-            >
-              <option value="All">All Parties (Clients)</option>
-              {availableParties.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status Buttons */}
-          {['Active', 'Inactive', 'All'].map(s => (
-            <button
-              key={s}
-              onClick={() => { setStatusFilter(s); setPage(1); }}
-              style={{
-                padding: '0.45rem 0.9rem', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)',
-                fontWeight: 600, cursor: 'pointer', border: '1px solid',
-                borderColor: statusFilter === s ? 'var(--primary)' : 'var(--border-light)',
-                background: statusFilter === s ? 'var(--nav-active-bg)' : 'transparent',
-                color: statusFilter === s ? 'var(--primary)' : 'var(--text-muted)',
-                transition: 'all 0.15s'
-              }}
-            >
-              {s}
-            </button>
-          ))}
+          {/* Unified Filter Popover */}
+          <UnifiedFilterPopover
+            filters={catalogueFilters}
+            values={catalogueFilterValues}
+            onChange={handleFilterChange}
+            onClear={handleClearAllFilters}
+            triggerLabel="Filters"
+            showChips={true}
+          />
 
           {/* Sorting */}
           <div style={{ minWidth: 140 }}>

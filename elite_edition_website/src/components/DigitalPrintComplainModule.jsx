@@ -8,6 +8,7 @@ import {
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 
 const CATEGORIES = [
   'Printing Defect',
@@ -212,9 +213,28 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [priorityFilter, setPriorityFilter] = useState('All');
-  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [complaintFilters, setComplaintFilters] = useState({ status: [], priority: [], category: [] });
+
+  const complaintFilterCategories = React.useMemo(() => [
+    {
+      id: 'status',
+      name: 'Status',
+      multi: true,
+      options: (STATUSES || []).map(st => ({ value: st, label: st }))
+    },
+    {
+      id: 'priority',
+      name: 'Priority',
+      multi: true,
+      options: (PRIORITIES || []).map(p => ({ value: p, label: p }))
+    },
+    {
+      id: 'category',
+      name: 'Category',
+      multi: true,
+      options: (Array.isArray(dynamicCategories) && dynamicCategories.length > 0 ? dynamicCategories : CATEGORIES).map(c => ({ value: c, label: c }))
+    }
+  ], [dynamicCategories]);
   const [datePreset, setDatePreset] = useState('all');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
@@ -301,7 +321,7 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
     fetchComplaints();
     fetchAnalytics();
     fetchParties();
-  }, [search, statusFilter, priorityFilter, categoryFilter, dateStart, dateEnd, companyEntity]);
+  }, [search, complaintFilters, dateStart, dateEnd, companyEntity]);
 
   const fetchComplaints = async () => {
     setLoading(true);
@@ -310,12 +330,16 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
       const isAdmin = !currentUser || currentUser.role === 'admin';
       const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || '') : '';
 
+      const effectiveStatus = complaintFilters.status && complaintFilters.status.length > 0 ? complaintFilters.status.join(',') : 'All';
+      const effectivePriority = complaintFilters.priority && complaintFilters.priority.length > 0 ? complaintFilters.priority.join(',') : 'All';
+      const effectiveCategory = complaintFilters.category && complaintFilters.category.length > 0 ? complaintFilters.category.join(',') : 'All';
+
       const params = {
         companyEntity,
         search,
-        status: statusFilter,
-        priority: priorityFilter,
-        category: categoryFilter,
+        status: effectiveStatus,
+        priority: effectivePriority,
+        category: effectiveCategory,
         dateStart,
         dateEnd,
         limit: 500
@@ -939,42 +963,13 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                 }}
               />
 
-              {/* Status Filter Buttons */}
-              <div style={{ display: 'flex', gap: '0.3rem', background: 'var(--bg-main, #111827)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                {['All', ...STATUSES].map(st => (
-                  <button
-                    key={st}
-                    onClick={() => setStatusFilter(st)}
-                    style={{
-                      padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', border: 'none',
-                      background: statusFilter === st ? 'var(--primary)' : 'transparent',
-                      color: statusFilter === st ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
-                    }}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-
-              {/* Priority Select */}
-              <select
-                value={priorityFilter}
-                onChange={e => setPriorityFilter(e.target.value)}
-                style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', minWidth: 120 }}
-              >
-                <option value="All">All Priorities</option>
-                {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-
-              {/* Category Select */}
-              <select
-                value={categoryFilter}
-                onChange={e => setCategoryFilter(e.target.value)}
-                style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', minWidth: 150 }}
-              >
-                <option value="All">All Categories</option>
-                {(Array.isArray(dynamicCategories) ? dynamicCategories : CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              {/* Unified Filters Popover */}
+              <UnifiedFilterPopover
+                categories={complaintFilterCategories}
+                activeFilters={complaintFilters}
+                onChange={setComplaintFilters}
+                placeholder="Filters"
+              />
             </div>
           </div>
 

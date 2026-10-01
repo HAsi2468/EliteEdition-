@@ -1,0 +1,524 @@
+/* ══════════════════════════════════════════════════════════════════════
+   UNIFIED ENTERPRISE FILTER POPOVER — DESIGN SYSTEM
+   Modern, responsive, glassmorphism multi-select filter suite
+   ══════════════════════════════════════════════════════════════════════ */
+
+.ufp-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* ── Trigger Button ── */
+.ufp-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  min-height: 36px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  font-family: var(--font-family, inherit);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary, #334155);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.ufp-trigger-btn:hover {
+  background: var(--bg-card-hover, #eff6ff);
+  border-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
+}
+
+.ufp-trigger-btn.ufp-active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.ufp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4);
+}
+
+/* ── Popover Backdrop ── */
+.ufp-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.15);
+  backdrop-filter: blur(2px);
+  z-index: 9998;
+  animation: ufpFadeIn 0.15s ease-out;
+}
+
+/* ── Popover Dropdown Card ── */
+.ufp-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 580px;
+  max-width: 95vw;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  border-radius: 14px;
+  box-shadow: 
+    0 20px 45px -10px rgba(15, 23, 42, 0.22),
+    0 10px 20px -5px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  z-index: 9999;
+  overflow: hidden;
+  animation: ufpSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.ufp-popover.ufp-align-right {
+  left: auto;
+  right: 0;
+}
+
+@keyframes ufpFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ufpSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Popover Header ── */
+.ufp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.15rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ufp-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ufp-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.ufp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ufp-reset-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.ufp-reset-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #dc2626;
+}
+
+.ufp-reset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ufp-close-btn {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.ufp-close-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* ── Popover Body: Two-Column Multi-Filter Grid ── */
+.ufp-body {
+  display: flex;
+  min-height: 330px;
+  max-height: 440px;
+  overflow: hidden;
+}
+
+/* Left Category Navigation */
+.ufp-nav {
+  width: 175px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ufp-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.ufp-nav-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.ufp-nav-item.ufp-nav-active {
+  background: #ffffff;
+  color: #2563eb;
+  border-color: #cbd5e1;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ufp-nav-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ufp-nav-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+/* Right Options Panel */
+.ufp-options-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.ufp-options-header {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ufp-search-box {
+  position: relative;
+  flex: 1;
+}
+
+.ufp-search-input {
+  width: 100%;
+  padding: 0.35rem 0.6rem 0.35rem 1.8rem;
+  font-size: 0.78rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ufp-search-input:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.ufp-quick-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.ufp-text-action {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.ufp-text-action:hover {
+  background: #eff6ff;
+}
+
+.ufp-options-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ufp-option-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #1e293b;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+
+.ufp-option-item:hover {
+  background: #f8fafc;
+}
+
+.ufp-option-item.ufp-selected {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.ufp-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.ufp-selected .ufp-checkbox {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.ufp-option-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ufp-option-badge {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.ufp-empty-msg {
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* ── Popover Footer ── */
+.ufp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.15rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.ufp-footer-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ufp-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border: none;
+  padding: 0.45rem 1rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  transition: all 0.15s ease;
+}
+
+.ufp-apply-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-0.5px);
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* ── Active Filter Chips Row ── */
+.ufp-chips-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0;
+  animation: ufpFadeIn 0.18s ease-out;
+}
+
+.ufp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
+  transition: all 0.12s;
+}
+
+.ufp-chip:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.ufp-chip-category {
+  color: #60a5fa;
+  font-weight: 500;
+}
+
+.ufp-chip-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #93c5fd;
+  transition: color 0.12s;
+}
+
+.ufp-chip-remove:hover {
+  color: #dc2626;
+}
+
+.ufp-clear-all-chips {
+  background: none;
+  border: none;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  text-decoration: underline;
+  transition: all 0.12s;
+}
+
+.ufp-clear-all-chips:hover {
+  background: #fef2f2;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 640px) {
+  .ufp-popover {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100vw;
+    border-radius: 16px 16px 0 0;
+    max-height: 80vh;
+  }
+
+  .ufp-body {
+    flex-direction: column;
+    min-height: auto;
+    max-height: 60vh;
+  }
+
+  .ufp-nav {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.4rem;
+  }
+
+  .ufp-nav-item {
+    white-space: nowrap;
+    padding: 0.4rem 0.65rem;
+  }
+}

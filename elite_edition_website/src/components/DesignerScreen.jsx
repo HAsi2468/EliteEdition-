@@ -45,6 +45,8 @@ import {
   Building2
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
+import { triggerEliteConfirm } from './EliteModalDialog';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignImage from './DesignImage';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 
@@ -468,6 +470,88 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [tasks]);
 
+  // Unified Filter Popover Categories Definition
+  const sampleDesignFilters = useMemo(() => [
+    ...(!isUserRestricted ? [{
+      id: 'designer',
+      label: 'Assign Design',
+      icon: User,
+      options: availableDesigners
+    }] : []),
+    {
+      id: 'colourMatcher',
+      label: 'Colour Matching',
+      icon: Palette,
+      options: availableColourMatchers
+    },
+    {
+      id: 'fabric',
+      label: 'Fabric',
+      icon: Scissors,
+      options: availableFabrics
+    },
+    {
+      id: 'priority',
+      label: 'Priority',
+      icon: Sparkles,
+      options: [
+        { value: 'Urgent', label: 'Urgent', badge: '🔴' },
+        { value: 'High', label: 'High', badge: '🟠' },
+        { value: 'Medium', label: 'Medium', badge: '🟡' },
+        { value: 'Low', label: 'Low', badge: '🟢' }
+      ]
+    },
+    ...(availableMachines.length > 0 ? [{
+      id: 'machine',
+      label: 'Machine',
+      icon: Building2,
+      options: availableMachines
+    }] : []),
+    ...(availableCreatedBy.length > 0 ? [{
+      id: 'createdBy',
+      label: 'Created By',
+      icon: User,
+      options: availableCreatedBy
+    }] : []),
+    ...(availableParties.length > 0 ? [{
+      id: 'party',
+      label: 'Party',
+      icon: Layers,
+      options: availableParties
+    }] : [])
+  ], [isUserRestricted, availableDesigners, availableColourMatchers, availableFabrics, availableMachines, availableCreatedBy, availableParties]);
+
+  // Normalized values for UnifiedFilterPopover
+  const filterValues = useMemo(() => ({
+    designer: Array.isArray(selectedDesigner) ? selectedDesigner : (selectedDesigner && selectedDesigner !== 'All' ? [selectedDesigner] : []),
+    colourMatcher: Array.isArray(selectedColourMatcher) ? selectedColourMatcher : (selectedColourMatcher && selectedColourMatcher !== 'All' ? [selectedColourMatcher] : []),
+    fabric: Array.isArray(selectedFabric) ? selectedFabric : (selectedFabric && selectedFabric !== 'All' ? [selectedFabric] : []),
+    priority: Array.isArray(selectedPriority) ? selectedPriority : (selectedPriority && selectedPriority !== 'All' ? [selectedPriority] : []),
+    machine: Array.isArray(selectedMachine) ? selectedMachine : (selectedMachine && selectedMachine !== 'All' ? [selectedMachine] : []),
+    createdBy: Array.isArray(selectedCreatedBy) ? selectedCreatedBy : (selectedCreatedBy && selectedCreatedBy !== 'All' ? [selectedCreatedBy] : []),
+    party: Array.isArray(partyFilter) ? partyFilter : (partyFilter && partyFilter !== 'All' ? [partyFilter] : [])
+  }), [selectedDesigner, selectedColourMatcher, selectedFabric, selectedPriority, selectedMachine, selectedCreatedBy, partyFilter]);
+
+  const handleFilterChange = (newVals) => {
+    setSelectedDesigner(newVals.designer || []);
+    setSelectedColourMatcher(newVals.colourMatcher || []);
+    setSelectedFabric(newVals.fabric || []);
+    setSelectedPriority(newVals.priority || []);
+    setSelectedMachine(newVals.machine || []);
+    setSelectedCreatedBy(newVals.createdBy || []);
+    setPartyFilter(newVals.party || []);
+  };
+
+  const handleClearAllFilters = () => {
+    setSelectedDesigner([]);
+    setSelectedColourMatcher([]);
+    setSelectedFabric([]);
+    setSelectedPriority([]);
+    setSelectedMachine([]);
+    setSelectedCreatedBy([]);
+    setPartyFilter([]);
+  };
+
   // Create / Edit Design Task Modal State
   const initialTaskForm = {
     date: new Date().toISOString().split('T')[0],
@@ -721,57 +805,78 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       });
     }
 
-    // Filter by fabric
+    // Filter by fabric (supports multi-selection)
     if (selectedFabric && selectedFabric !== 'All') {
-      result = result.filter(t => {
-        const fabrics = Array.isArray(t.fabrics) ? t.fabrics : (t.fabricName || '').split(',').map(s => s.trim());
-        return fabrics.some(f => f && f.toLowerCase() === selectedFabric.toLowerCase());
-      });
+      const activeFabrics = Array.isArray(selectedFabric) ? selectedFabric : [selectedFabric];
+      if (activeFabrics.length > 0) {
+        result = result.filter(t => {
+          const fabrics = Array.isArray(t.fabrics) ? t.fabrics : (t.fabricName || '').split(',').map(s => s.trim());
+          return fabrics.some(f => f && activeFabrics.some(af => af.toLowerCase() === f.toLowerCase()));
+        });
+      }
     }
 
-    // Filter by designer
+    // Filter by designer (supports multi-selection)
     if (selectedDesigner && selectedDesigner !== 'All') {
-      result = result.filter(t => {
-        const designers = Array.isArray(t.designers) ? t.designers : (t.designerName || '').split(',').map(s => s.trim());
-        return designers.some(d => d && d.toLowerCase() === selectedDesigner.toLowerCase());
-      });
+      const activeDesigners = Array.isArray(selectedDesigner) ? selectedDesigner : [selectedDesigner];
+      if (activeDesigners.length > 0) {
+        result = result.filter(t => {
+          const designers = Array.isArray(t.designers) ? t.designers : (t.designerName || '').split(',').map(s => s.trim());
+          return designers.some(d => d && activeDesigners.some(ad => ad.toLowerCase() === d.toLowerCase()));
+        });
+      }
     }
 
-    // Filter by colour matching
+    // Filter by colour matching (supports multi-selection)
     if (selectedColourMatcher && selectedColourMatcher !== 'All') {
-      result = result.filter(t => {
-        const matchers = Array.isArray(t.colourMatches) ? t.colourMatches : (t.colourMatching || '').split(',').map(s => s.trim());
-        return matchers.some(m => m && m.toLowerCase() === selectedColourMatcher.toLowerCase());
-      });
+      const activeCMs = Array.isArray(selectedColourMatcher) ? selectedColourMatcher : [selectedColourMatcher];
+      if (activeCMs.length > 0) {
+        result = result.filter(t => {
+          const matchers = Array.isArray(t.colourMatches) ? t.colourMatches : (t.colourMatching || '').split(',').map(s => s.trim());
+          return matchers.some(m => m && activeCMs.some(acm => acm.toLowerCase() === m.toLowerCase()));
+        });
+      }
     }
 
-    // Filter by priority
+    // Filter by priority (supports multi-selection)
     if (selectedPriority && selectedPriority !== 'All') {
-      result = result.filter(t => String(t.priority || 'Medium').toLowerCase() === selectedPriority.toLowerCase());
+      const activePriorities = Array.isArray(selectedPriority) ? selectedPriority : [selectedPriority];
+      if (activePriorities.length > 0) {
+        result = result.filter(t => activePriorities.some(ap => ap.toLowerCase() === String(t.priority || 'Medium').toLowerCase()));
+      }
     }
 
-    // Filter by machine
+    // Filter by machine (supports multi-selection)
     if (selectedMachine && selectedMachine !== 'All') {
-      result = result.filter(t => {
-        const m = t.machineName || t.machine || '';
-        return String(m).toLowerCase() === selectedMachine.toLowerCase();
-      });
+      const activeMachines = Array.isArray(selectedMachine) ? selectedMachine : [selectedMachine];
+      if (activeMachines.length > 0) {
+        result = result.filter(t => {
+          const m = t.machineName || t.machine || '';
+          return activeMachines.some(am => am.toLowerCase() === String(m).toLowerCase());
+        });
+      }
     }
 
-    // Filter by createdBy
+    // Filter by createdBy (supports multi-selection)
     if (selectedCreatedBy && selectedCreatedBy !== 'All') {
-      result = result.filter(t => {
-        const c = t.createdByName || t.createdBy || '';
-        return String(c).toLowerCase().includes(selectedCreatedBy.toLowerCase());
-      });
+      const activeCreated = Array.isArray(selectedCreatedBy) ? selectedCreatedBy : [selectedCreatedBy];
+      if (activeCreated.length > 0) {
+        result = result.filter(t => {
+          const c = t.createdByName || t.createdBy || '';
+          return activeCreated.some(ac => String(c).toLowerCase().includes(ac.toLowerCase()));
+        });
+      }
     }
 
-    // Filter by Party (if filtered)
+    // Filter by Party (supports multi-selection)
     if (partyFilter && partyFilter !== 'All') {
-      result = result.filter(t => {
-        const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : []);
-        return pList.some(p => p && String(p).toLowerCase().includes(partyFilter.toLowerCase()));
-      });
+      const activeParties = Array.isArray(partyFilter) ? partyFilter : [partyFilter];
+      if (activeParties.length > 0) {
+        result = result.filter(t => {
+          const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : []);
+          return pList.some(p => p && activeParties.some(ap => String(p).toLowerCase().includes(ap.toLowerCase())));
+        });
+      }
     }
 
     // Search query
@@ -892,7 +997,14 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   };
 
   const handleDeleteTask = async (task) => {
-    if (!window.confirm(`Are you sure you want to delete design task "${task.taskNo} - ${task.designName}"? This action cannot be undone.`)) {
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Design Task',
+      message: `Are you sure you want to delete design task "${task.taskNo} - ${task.designName}"? This action cannot be undone.`,
+      confirmText: 'Delete Task',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!confirmed) {
       return;
     }
     try {
@@ -1896,181 +2008,37 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             />
           </div>
 
-          {/* Assign Design (Designer) Filter */}
-          <div style={{ minWidth: '150px' }}>
-            {isUserRestricted ? (
-              <div
-                style={{
-                  padding: '0.45rem 0.75rem',
-                  borderRadius: '8px',
-                  border: '1.5px solid #bfdbfe',
-                  fontSize: '0.8rem',
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  fontWeight: 800,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                }}
-                title="Locked to your assigned designs"
-              >
-                <User size={13} color="#2563eb" />
-                <span>👤 {userAssignedName || 'My Designs'}</span>
-              </div>
-            ) : (
-              <select
-                value={selectedDesigner}
-                onChange={(e) => setSelectedDesigner(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.45rem 0.7rem',
-                  fontSize: '0.82rem',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: selectedDesigner !== 'All' ? 'rgba(37, 99, 235, 0.08)' : '#ffffff',
-                  color: selectedDesigner !== 'All' ? '#1d4ed8' : '#0f172a',
-                  fontWeight: selectedDesigner !== 'All' ? 700 : 500,
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="All">👤 Assign Design: All</option>
-                {availableDesigners.map((d, i) => (
-                  <option key={i} value={d}>{d}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Colour Matching Filter */}
-          <div style={{ minWidth: '150px' }}>
-            <select
-              value={selectedColourMatcher}
-              onChange={(e) => setSelectedColourMatcher(e.target.value)}
+          {/* User Restricted Badge (if non-admin) */}
+          {isUserRestricted && (
+            <div
               style={{
-                width: '100%',
-                padding: '0.45rem 0.7rem',
-                fontSize: '0.82rem',
+                padding: '0.45rem 0.75rem',
                 borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: selectedColourMatcher !== 'All' ? 'rgba(219, 39, 119, 0.08)' : '#ffffff',
-                color: selectedColourMatcher !== 'All' ? '#be185d' : '#0f172a',
-                fontWeight: selectedColourMatcher !== 'All' ? 700 : 500,
-                cursor: 'pointer',
-                outline: 'none',
+                border: '1.5px solid #bfdbfe',
+                fontSize: '0.8rem',
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
               }}
+              title="Locked to your assigned designs"
             >
-              <option value="All">🎨 Colour Match: All</option>
-              {availableColourMatchers.map((cm, i) => (
-                <option key={i} value={cm}>{cm}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Fabric Filter */}
-          <div style={{ minWidth: '140px' }}>
-            <select
-              value={selectedFabric}
-              onChange={(e) => setSelectedFabric(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.45rem 0.7rem',
-                fontSize: '0.82rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: selectedFabric !== 'All' ? 'rgba(5, 150, 105, 0.08)' : '#ffffff',
-                color: selectedFabric !== 'All' ? '#047857' : '#0f172a',
-                fontWeight: selectedFabric !== 'All' ? 700 : 500,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
-            >
-              <option value="All">🧵 Fabric: All</option>
-              {availableFabrics.map((f, i) => (
-                <option key={i} value={f}>{f}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Priority Filter */}
-          <div style={{ minWidth: '130px' }}>
-            <select
-              value={selectedPriority}
-              onChange={(e) => setSelectedPriority(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.45rem 0.7rem',
-                fontSize: '0.82rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: selectedPriority !== 'All' ? 'rgba(234, 88, 12, 0.08)' : '#ffffff',
-                color: selectedPriority !== 'All' ? '#c2410c' : '#0f172a',
-                fontWeight: selectedPriority !== 'All' ? 700 : 500,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
-            >
-              <option value="All">⚡ Priority: All</option>
-              <option value="Urgent">🔴 Urgent</option>
-              <option value="High">🟠 High</option>
-              <option value="Medium">🟡 Medium</option>
-              <option value="Low">🟢 Low</option>
-            </select>
-          </div>
-
-          {/* Machine Filter */}
-          {availableMachines.length > 0 && (
-            <div style={{ minWidth: '130px' }}>
-              <select
-                value={selectedMachine}
-                onChange={(e) => setSelectedMachine(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.45rem 0.7rem',
-                  fontSize: '0.82rem',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: selectedMachine !== 'All' ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
-                  color: selectedMachine !== 'All' ? '#4338ca' : '#0f172a',
-                  fontWeight: selectedMachine !== 'All' ? 700 : 500,
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="All">🖨️ Machine: All</option>
-                {availableMachines.map((m, i) => (
-                  <option key={i} value={m}>{m}</option>
-                ))}
-              </select>
+              <User size={13} color="#2563eb" />
+              <span>👤 {userAssignedName || 'My Designs'}</span>
             </div>
           )}
 
-          {/* Created By Filter */}
-          {availableCreatedBy.length > 0 && (
-            <div style={{ minWidth: '140px' }}>
-              <select
-                value={selectedCreatedBy}
-                onChange={(e) => setSelectedCreatedBy(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.45rem 0.7rem',
-                  fontSize: '0.82rem',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: selectedCreatedBy !== 'All' ? 'rgba(79, 70, 229, 0.08)' : '#ffffff',
-                  color: selectedCreatedBy !== 'All' ? '#3730a3' : '#0f172a',
-                  fontWeight: selectedCreatedBy !== 'All' ? 700 : 500,
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="All">✍️ Created By: All</option>
-                {availableCreatedBy.map((c, i) => (
-                  <option key={i} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Unified Multi-Select Filter Popover */}
+          <UnifiedFilterPopover
+            filters={sampleDesignFilters}
+            values={filterValues}
+            onChange={handleFilterChange}
+            onClear={handleClearAllFilters}
+            triggerLabel="Filters"
+            showChips={true}
+          />
 
           {/* Sorting */}
           <div style={{ minWidth: '130px' }}>

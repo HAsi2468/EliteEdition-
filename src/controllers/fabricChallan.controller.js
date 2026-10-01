@@ -7,7 +7,7 @@ function computeTotals(tpDetails = []) {
   let totalMtr = 0;
   let totalTp = 0;
   for (const tp of tpDetails) {
-    const m = parseFloat(tp.tpMeter) || 0;
+    const m = parseFloat(tp.tpMeter) || ((parseFloat(tp.freshMtr) || 0) + (parseFloat(tp.westMtr) || 0));
     if (m > 0) {
       totalMtr += m;
       totalTp += 1;
@@ -591,12 +591,15 @@ const getChallans = async (req, res) => {
     const andConditions = [];
 
     if (status && status !== 'All') {
-      if (status.toUpperCase() === 'PENDING') {
+      const statuses = String(status).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      const hasPending = statuses.includes('PENDING');
+      const hasInvoiced = statuses.includes('INVOICED');
+      if (hasPending && !hasInvoiced) {
         andConditions.push({ status: { $ne: 'INVOICED' } });
-      } else if (status.toUpperCase() === 'INVOICED') {
+      } else if (hasInvoiced && !hasPending) {
         andConditions.push({ status: 'INVOICED' });
-      } else {
-        andConditions.push({ status });
+      } else if (!hasPending && !hasInvoiced && statuses.length > 0) {
+        andConditions.push({ status: { $in: statuses } });
       }
     }
 

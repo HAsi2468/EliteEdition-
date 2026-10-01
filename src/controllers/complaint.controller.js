@@ -57,13 +57,28 @@ function buildComplaintFilter(params = {}) {
   }
 
   if (status && status !== 'All') {
-    andConditions.push({ status });
+    const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean);
+    if (statuses.length > 1) {
+      andConditions.push({ status: { $in: statuses } });
+    } else if (statuses.length === 1) {
+      andConditions.push({ status: statuses[0] });
+    }
   }
   if (priority && priority !== 'All') {
-    andConditions.push({ priority });
+    const priorities = String(priority).split(',').map(p => p.trim()).filter(Boolean);
+    if (priorities.length > 1) {
+      andConditions.push({ priority: { $in: priorities } });
+    } else if (priorities.length === 1) {
+      andConditions.push({ priority: priorities[0] });
+    }
   }
   if (category && category !== 'All') {
-    andConditions.push({ category });
+    const categories = String(category).split(',').map(c => c.trim()).filter(Boolean);
+    if (categories.length > 1) {
+      andConditions.push({ category: { $in: categories } });
+    } else if (categories.length === 1) {
+      andConditions.push({ category: categories[0] });
+    }
   }
 
   if (dateStart || dateEnd) {

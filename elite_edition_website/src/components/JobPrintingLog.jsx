@@ -14,6 +14,7 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { openPrintOptionsDialog } from '../utils/printService';
 import JobCardTooltip from './JobCardTooltip';
 import DateRangePicker from './DateRangePicker';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 
 // Automatic Shift Calculator:
 // Morning Shift: 9:00 AM (09:00) to 8:59 PM (20:59)
@@ -62,7 +63,7 @@ export default function JobPrintingLog() {
 
   // Filters State
   const [searchJob, setSearchJob] = useState('');
-  const [filterMachine, setFilterMachine] = useState('');
+  const [printFilters, setPrintFilters] = useState({ machine: [], operator: [], shift: [], pass: [] });
   const [datePreset, setDatePreset] = useState('today');
   const [dateStart, setDateStart] = useState(() => toLocalYMD());
   const [dateEnd, setDateEnd] = useState(() => toLocalYMD());
@@ -724,12 +725,20 @@ export default function JobPrintingLog() {
     try {
       const res = await api.getJobPrintLogs({
         jobNo: searchJob,
-        machineName: filterMachine,
+        machineName: printFilters.machine && printFilters.machine.length > 0 ? printFilters.machine.join(',') : undefined,
+        operatorName: printFilters.operator && printFilters.operator.length > 0 ? printFilters.operator.join(',') : undefined,
+        shift: printFilters.shift && printFilters.shift.length > 0 ? printFilters.shift.join(',') : undefined,
         dateStart: ds,
         dateEnd: de,
         limit: 500
       });
-      if (res && res.data) setLogs(res.data);
+      if (res && res.data) {
+        let fetchedLogs = res.data;
+        if (printFilters.pass && printFilters.pass.length > 0) {
+          fetchedLogs = fetchedLogs.filter(l => printFilters.pass.includes(l.pass));
+        }
+        setLogs(fetchedLogs);
+      }
       await fetchRawMaterialSummary(ds, de);
     } catch (err) {
       setError(err.message || 'Failed to load printing logs.');
@@ -754,7 +763,46 @@ export default function JobPrintingLog() {
 
   useEffect(() => {
     fetchLogs();
-  }, [searchJob, filterMachine, dateStart, dateEnd]);
+  }, [searchJob, printFilters, dateStart, dateEnd]);
+
+  const printFilterCategories = useMemo(() => [
+    {
+      id: 'machine',
+      name: 'Machine Name',
+      multi: true,
+      options: (machinesList || []).map(m => ({ value: m, label: m }))
+    },
+    {
+      id: 'operator',
+      name: 'Operator',
+      multi: true,
+      options: (operatorsList && operatorsList.length > 0
+        ? operatorsList
+        : Array.from(new Set(logs.map(l => l.operatorName).filter(Boolean)))
+      ).map(o => ({ value: o, label: o }))
+    },
+    {
+      id: 'shift',
+      name: 'Shift',
+      multi: true,
+      options: [
+        { value: 'Morning', label: 'Morning Shift' },
+        { value: 'Night', label: 'Night Shift' },
+        { value: 'Day', label: 'Day Shift' }
+      ]
+    },
+    {
+      id: 'pass',
+      name: 'Print Pass',
+      multi: true,
+      options: [
+        { value: '2 Pass', label: '2 Pass' },
+        { value: '4 Pass', label: '4 Pass' },
+        { value: '6 Pass', label: '6 Pass' },
+        { value: '8 Pass', label: '8 Pass' }
+      ]
+    }
+  ], [machinesList, operatorsList, logs]);
 
   // Recalculate auto shift every minute or when date changes
   useEffect(() => {
@@ -2107,14 +2155,12 @@ export default function JobPrintingLog() {
             />
           </div>
 
-          <select
-            value={filterMachine}
-            onChange={e => setFilterMachine(e.target.value)}
-            style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 6, color: 'var(--text-primary)' }}
-          >
-            <option value="">All Machines</option>
-            {machinesList.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <UnifiedFilterPopover
+            categories={printFilterCategories}
+            activeFilters={printFilters}
+            onChange={setPrintFilters}
+            placeholder="Filters"
+          />
 
           <DateRangePicker
             preset={datePreset}

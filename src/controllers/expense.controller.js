@@ -29,6 +29,7 @@ const getAll = async (req, res) => {
       search = '',
       type = 'All',
       category = 'All',
+      paymentMode = 'All',
       dateStart = '',
       dateEnd = '',
       page = 1,
@@ -44,11 +45,30 @@ const getAll = async (req, res) => {
     }
 
     if (type && type !== 'All') {
-      conditions.push({ type: type.toUpperCase() });
+      const types = String(type).split(',').map(t => t.trim().toUpperCase()).filter(Boolean);
+      if (types.length > 1) {
+        conditions.push({ type: { $in: types } });
+      } else if (types.length === 1) {
+        conditions.push({ type: types[0] });
+      }
     }
 
     if (category && category !== 'All') {
-      conditions.push({ category });
+      const cats = String(category).split(',').map(c => c.trim()).filter(Boolean);
+      if (cats.length > 1) {
+        conditions.push({ category: { $in: cats } });
+      } else if (cats.length === 1) {
+        conditions.push({ category: cats[0] });
+      }
+    }
+
+    if (paymentMode && paymentMode !== 'All') {
+      const modes = String(paymentMode).split(',').map(m => m.trim()).filter(Boolean);
+      if (modes.length > 1) {
+        conditions.push({ paymentMode: { $in: modes } });
+      } else if (modes.length === 1) {
+        conditions.push({ paymentMode: modes[0] });
+      }
     }
 
     if (dateStart || dateEnd) {

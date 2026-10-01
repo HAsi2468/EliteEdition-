@@ -13,6 +13,7 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
@@ -80,6 +81,7 @@ export default function FusingDepartment() {
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [fusingFilters, setFusingFilters] = useState({ status: [], machine: [], operator: [], fabric: [], party: [] });
   const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Ready for Fusing', 'Fusing Pending', 'Fusing In Progress', 'Fusing Done', 'Rejected'
   const [filterMachine, setFilterMachine] = useState('');
   const [filterOperator, setFilterOperator] = useState('');
@@ -1058,7 +1060,29 @@ export default function FusingDepartment() {
       if (debouncedSearch && !matchSearchQuery(c, debouncedSearch, ['jobNo', 'party', 'designName', 'fabric', 'fusingOperator', 'fusingMachine'])) {
         return false;
       }
-      if (statusFilter !== 'All') {
+      // Status filtering with multi-select support
+      if (fusingFilters.status && fusingFilters.status.length > 0) {
+        const curStatus = c.fusingStatus || 'Fusing Pending';
+        const matchesAnyStatus = fusingFilters.status.some(st => {
+          if (st === 'Ready for Fusing') {
+            return c.printStatus === 'Printing Done' && curStatus !== 'Fusing Done';
+          }
+          if (st === 'Fusing Pending' || st === 'Pending') {
+            return curStatus !== 'Fusing Done' && curStatus !== 'Fusing In Progress' && curStatus !== 'Partial Complete';
+          }
+          if (st === 'Fusing In Progress' || st === 'In-Process') {
+            return curStatus === 'Fusing In Progress' || curStatus === 'Partial Complete';
+          }
+          if (st === 'Fusing Done' || st === 'Completed') {
+            return curStatus === 'Fusing Done';
+          }
+          if (st === 'Rejected') {
+            return parseFloat(c.totalWastageMtr || 0) > 0;
+          }
+          return curStatus === st;
+        });
+        if (!matchesAnyStatus) return false;
+      } else if (statusFilter !== 'All') {
         const curStatus = c.fusingStatus || 'Fusing Pending';
         if (statusFilter === 'Ready for Fusing') {
           if (c.printStatus !== 'Printing Done' || curStatus === 'Fusing Done') return false;
@@ -1073,11 +1097,25 @@ export default function FusingDepartment() {
           if (waste <= 0) return false;
         }
       }
-      if (filterMachine && (c.fusingMachine || '') !== filterMachine) {
+      // Machine filtering
+      if (fusingFilters.machine && fusingFilters.machine.length > 0) {
+        if (!fusingFilters.machine.includes(c.fusingMachine || '')) return false;
+      } else if (filterMachine && (c.fusingMachine || '') !== filterMachine) {
         return false;
       }
-      if (filterOperator && (c.fusingOperator || '') !== filterOperator) {
+      // Operator filtering
+      if (fusingFilters.operator && fusingFilters.operator.length > 0) {
+        if (!fusingFilters.operator.includes(c.fusingOperator || '')) return false;
+      } else if (filterOperator && (c.fusingOperator || '') !== filterOperator) {
         return false;
+      }
+      // Fabric filtering
+      if (fusingFilters.fabric && fusingFilters.fabric.length > 0) {
+        if (!fusingFilters.fabric.includes(c.fabric || '')) return false;
+      }
+      // Party filtering
+      if (fusingFilters.party && fusingFilters.party.length > 0) {
+        if (!fusingFilters.party.includes(c.party || '')) return false;
       }
       const cDate = c.fusingDate || c.date;
       if (activeDateRange.start && cDate && cDate < activeDateRange.start) return false;
@@ -1085,7 +1123,46 @@ export default function FusingDepartment() {
 
       return true;
     });
-  }, [cards, debouncedSearch, statusFilter, filterMachine, filterOperator, activeDateRange]);
+  }, [cards, debouncedSearch, fusingFilters, statusFilter, filterMachine, filterOperator, activeDateRange]);
+
+  const fusingFilterCategories = useMemo(() => [
+    {
+      id: 'status',
+      name: 'Fusing Status',
+      multi: true,
+      options: [
+        { value: 'Ready for Fusing', label: '🔥 Ready for Fusing' },
+        { value: 'Pending', label: '⏳ Pending' },
+        { value: 'In-Process', label: '⚡ In-Process' },
+        { value: 'Completed', label: '✅ Completed' },
+        { value: 'Rejected', label: '⚠️ Has Wastage / Rejections' }
+      ]
+    },
+    {
+      id: 'machine',
+      name: 'Fusing Machine',
+      multi: true,
+      options: (uniqueMachines || []).map(m => ({ value: m, label: m }))
+    },
+    {
+      id: 'operator',
+      name: 'Operator',
+      multi: true,
+      options: (uniqueOperators || []).map(op => ({ value: op, label: op }))
+    },
+    {
+      id: 'fabric',
+      name: 'Fabric',
+      multi: true,
+      options: Array.from(new Set(cards.map(c => c.fabric).filter(Boolean))).sort().map(f => ({ value: f, label: f }))
+    },
+    {
+      id: 'party',
+      name: 'Party / Customer',
+      multi: true,
+      options: Array.from(new Set(cards.map(c => c.party).filter(Boolean))).sort().map(p => ({ value: p, label: p }))
+    }
+  ], [uniqueMachines, uniqueOperators, cards]);
 
   // Paginated Chunking / Infinite Accumulation for INP < 100ms
   const paginatedCards = useMemo(() => {
@@ -2502,75 +2579,13 @@ export default function FusingDepartment() {
             }}
           />
 
-          {/* Machine Filter Dropdown */}
-          <select
-            className="fusing-filter-select"
-            value={filterMachine}
-            onChange={e => { setFilterMachine(e.target.value); setCurrentPage(1); }}
-            aria-label="Filter by Fusing Machine"
-          >
-            <option value="">All Machines ({uniqueMachines.length})</option>
-            {uniqueMachines.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-
-          {/* Operator Filter Dropdown */}
-          <select
-            className="fusing-filter-select"
-            value={filterOperator}
-            onChange={e => { setFilterOperator(e.target.value); setCurrentPage(1); }}
-            aria-label="Filter by Operator"
-          >
-            <option value="">All Operators ({uniqueOperators.length})</option>
-            {uniqueOperators.map(op => (
-              <option key={op} value={op}>{op}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Fast Filter Status Tags */}
-        <div className="fusing-status-tags" role="group" aria-label="Status filter tags">
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--ee-fusing-text-muted)', textTransform: 'uppercase', marginRight: '4px' }}>
-            Status:
-          </span>
-
-          {[
-            { id: 'All', label: 'All Jobs', count: cards.length },
-            { id: 'Ready for Fusing', label: 'Ready for Fusing', count: stats.readyForFusingCount, badgeClass: 'active-amber' },
-            { id: 'Pending', label: 'Pending', count: stats.pendingCount },
-            { id: 'In-Process', label: 'In-Process' },
-            { id: 'Completed', label: 'Completed', count: stats.doneCount, badgeClass: 'active-emerald' },
-            { id: 'Rejected', label: 'Has Wastage / Rejections' }
-          ].map(tag => {
-            const isActive = statusFilter === tag.id || (tag.id === 'Pending' && statusFilter === 'Fusing Pending') || (tag.id === 'In-Process' && statusFilter === 'Fusing In Progress') || (tag.id === 'Completed' && statusFilter === 'Fusing Done');
-            return (
-              <button
-                key={tag.id}
-                type="button"
-                className={`fusing-tag-pill ${isActive ? (tag.badgeClass || 'active') : ''}`}
-                onClick={() => { setStatusFilter(tag.id); setCurrentPage(1); }}
-                aria-pressed={isActive}
-              >
-                {tag.id === 'Ready for Fusing' && <Flame size={13} />}
-                {tag.id === 'Completed' && <CheckCircle2 size={13} />}
-                {tag.id === 'Pending' && <Clock size={13} />}
-                <span>{tag.label}</span>
-                {tag.count !== undefined && (
-                  <span style={{
-                    fontSize: '0.7rem',
-                    padding: '1px 6px',
-                    borderRadius: '10px',
-                    background: isActive ? 'rgba(255,255,255,0.25)' : '#F1F5F9',
-                    color: isActive ? '#FFFFFF' : '#475569',
-                    fontWeight: 800
-                  }}>
-                    {tag.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {/* Unified Filters Popover */}
+          <UnifiedFilterPopover
+            categories={fusingFilterCategories}
+            activeFilters={fusingFilters}
+            onChange={(filters) => { setFusingFilters(filters); setCurrentPage(1); }}
+            placeholder="Filters"
+          />
         </div>
       </section>
 

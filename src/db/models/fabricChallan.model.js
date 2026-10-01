@@ -4,6 +4,8 @@ const tpDetailSchema = new mongoose.Schema(
   {
     tpNo: { type: Number, required: true },
     tpMeter: { type: Number, default: 0 },
+    freshMtr: { type: Number, default: 0 },
+    westMtr: { type: Number, default: 0 },
     lotNo: { type: String, default: '' },
   },
   { _id: false }

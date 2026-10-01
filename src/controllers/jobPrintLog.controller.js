@@ -146,17 +146,35 @@ function parseFlexibleDate(dateInput, isEnd = false) {
 // 2. Get all Print Logs with pagination & filters
 const getPrintLogs = async (req, res) => {
   try {
-    const { jobNo, machineName, operatorName, dateStart, dateEnd, page = 1, limit = 500 } = req.query;
+    const { jobNo, machineName, operatorName, shift, dateStart, dateEnd, page = 1, limit = 500 } = req.query;
 
     const filter = {};
     if (jobNo) {
       filter.jobNo = { $regex: jobNo.trim(), $options: 'i' };
     }
     if (machineName) {
-      filter.machineName = { $regex: machineName.trim(), $options: 'i' };
+      const machines = String(machineName).split(',').map(m => m.trim()).filter(Boolean);
+      if (machines.length > 1) {
+        filter.machineName = { $in: machines.map(m => new RegExp(`^${m.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')) };
+      } else if (machines.length === 1) {
+        filter.machineName = { $regex: machines[0], $options: 'i' };
+      }
     }
     if (operatorName) {
-      filter.operatorName = { $regex: operatorName.trim(), $options: 'i' };
+      const operators = String(operatorName).split(',').map(o => o.trim()).filter(Boolean);
+      if (operators.length > 1) {
+        filter.operatorName = { $in: operators.map(o => new RegExp(`^${o.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')) };
+      } else if (operators.length === 1) {
+        filter.operatorName = { $regex: operators[0], $options: 'i' };
+      }
+    }
+    if (shift) {
+      const shifts = String(shift).split(',').map(s => s.trim()).filter(Boolean);
+      if (shifts.length > 1) {
+        filter.shift = { $in: shifts.map(s => new RegExp(`^${s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')) };
+      } else if (shifts.length === 1) {
+        filter.shift = { $regex: shifts[0], $options: 'i' };
+      }
     }
 
     if (dateStart || dateEnd) {
