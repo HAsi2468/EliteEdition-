@@ -374,25 +374,13 @@ const getLotStock = async (req, res) => {
       {
         $group: {
           _id: '$lotNo',
-          fabricQuality: {
-            $ifNull: [
-              { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$fabricQuality', null] } },
-              { $first: '$fabricQuality' }
-            ]
-          },
-          panna: {
-            $ifNull: [
-              { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$panna', null] } },
-              { $first: '$panna' }
-            ]
-          },
+          inwardFabricQuality: { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$fabricQuality', null] } },
+          firstFabricQuality: { $first: '$fabricQuality' },
+          inwardPanna: { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$panna', null] } },
+          firstPanna: { $first: '$panna' },
           vendorName: { $max: '$vendorName' },
-          vendorChallanNo: {
-            $ifNull: [
-              { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$challanNo', null] } },
-              { $first: '$challanNo' }
-            ]
-          },
+          inwardVendorChallanNo: { $max: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$challanNo', null] } },
+          firstVendorChallanNo: { $first: '$challanNo' },
           totalInward: {
             $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
           },
@@ -404,10 +392,10 @@ const getLotStock = async (req, res) => {
       {
         $project: {
           lotNo: '$_id',
-          fabricQuality: 1,
-          panna: 1,
+          fabricQuality: { $ifNull: ['$inwardFabricQuality', '$firstFabricQuality'] },
+          panna: { $ifNull: ['$inwardPanna', '$firstPanna'] },
           vendorName: 1,
-          vendorChallanNo: 1,
+          vendorChallanNo: { $ifNull: ['$inwardVendorChallanNo', '$firstVendorChallanNo'] },
           totalInward: 1,
           totalOutward: 1,
           currentStock: { $subtract: ['$totalInward', '$totalOutward'] },

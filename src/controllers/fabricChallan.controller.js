@@ -353,25 +353,27 @@ const createChallan = async (req, res) => {
     const normP = normalizePanna(panna || '', normFabric);
     const details = Array.isArray(tpDetails) ? tpDetails : [];
 
+    const initialTotals = computeTotals(details);
+    const sMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
+    let parsedPct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
+    let parsedMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;
+
+    if (sMode === 'mtr' && parsedMtr != null && initialTotals.totalMtr > 0) {
+      parsedPct = parseFloat(((parsedMtr / initialTotals.totalMtr) * 100).toFixed(2));
+    } else if (sMode === 'pct' && parsedPct != null && initialTotals.totalMtr > 0) {
+      parsedMtr = parseFloat(((initialTotals.totalMtr * parsedPct) / 100).toFixed(2));
+    }
+
     // Program-side automated lot allocation
     const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
       normFabric,
       normP,
       lotNo ? String(lotNo) : '',
-      details
+      details,
+      parsedPct != null ? parsedPct : 0
     );
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
-
-    const sMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
-    let parsedPct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
-    let parsedMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;
-
-    if (sMode === 'mtr' && parsedMtr != null && totalMtr > 0) {
-      parsedPct = parseFloat(((parsedMtr / totalMtr) * 100).toFixed(2));
-    } else if (sMode === 'pct' && parsedPct != null && totalMtr > 0) {
-      parsedMtr = parseFloat(((totalMtr * parsedPct) / 100).toFixed(2));
-    }
 
     // ── Workflow Pipeline Validation: Job Card -> Printing -> Fusing -> Delivery Challan ──
     const userRole = String(req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
@@ -506,13 +508,15 @@ const createChallan = async (req, res) => {
             const totalOut = outwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
             const availRaw = Math.max(0, totalIn - totalOut);
 
-            if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null) {
+            if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null && !isNaN(parseFloat(inwardTxs[0].shortagePct))) {
               lotShortage = parseFloat(inwardTxs[0].shortagePct) || 0;
               rawMtr = computeRawMeters(groupMtr, lotShortage);
             }
 
             // EXACT ZEROING GUARANTEE
             if (availRaw > 0 && Math.abs(rawMtr - availRaw) <= 2.0) {
+              rawMtr = parseFloat(availRaw.toFixed(3));
+            } else if (availRaw > 0 && rawMtr > availRaw && (rawMtr - availRaw) <= 5.0) {
               rawMtr = parseFloat(availRaw.toFixed(3));
             }
           }
@@ -535,6 +539,7 @@ const createChallan = async (req, res) => {
           createdTxIds.push(outwardTx._id);
         }
         challan.fabricOutwardIds = createdTxIds;
+        await FabricChallan.findByIdAndUpdate(challan._id, { $set: { fabricOutwardIds: createdTxIds } });
       } catch (txErr) {
         console.error('Warning: Failed to auto-create fabric outward transactions:', txErr.message);
       }
@@ -706,13 +711,15 @@ const updateChallan = async (req, res) => {
 
     const details = tpDetails !== undefined ? (Array.isArray(tpDetails) ? tpDetails : []) : challan.tpDetails;
     const rawLotStr = lotNo !== undefined ? String(lotNo) : challan.lotNo;
+    const effShortage = challan.shortagePct != null ? challan.shortagePct : (challan.shortageMtr && challan.totalMtr > 0 ? (challan.shortageMtr / challan.totalMtr) * 100 : 0);
 
     // Run program-side automated lot allocation
     const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
       challan.fabricName,
       challan.panna,
       rawLotStr,
-      details
+      details,
+      effShortage
     );
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
@@ -758,13 +765,15 @@ const updateChallan = async (req, res) => {
             const totalOut = outwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
             const availRaw = Math.max(0, totalIn - totalOut);
 
-            if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null) {
+            if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null && !isNaN(parseFloat(inwardTxs[0].shortagePct))) {
               lotShortage = parseFloat(inwardTxs[0].shortagePct) || 0;
               rawMtr = computeRawMeters(groupMtr, lotShortage);
             }
 
             // EXACT ZEROING GUARANTEE
             if (availRaw > 0 && Math.abs(rawMtr - availRaw) <= 2.0) {
+              rawMtr = parseFloat(availRaw.toFixed(3));
+            } else if (availRaw > 0 && rawMtr > availRaw && (rawMtr - availRaw) <= 5.0) {
               rawMtr = parseFloat(availRaw.toFixed(3));
             }
           }
@@ -787,7 +796,7 @@ const updateChallan = async (req, res) => {
           createdTxIds.push(outwardTx._id);
         }
         challan.fabricOutwardIds = createdTxIds;
-        await challan.save();
+        await FabricChallan.findByIdAndUpdate(challan._id, { $set: { fabricOutwardIds: createdTxIds } });
       }
     } catch (txErr) {
       console.error('Warning: Failed to sync fabric outward transactions on update:', txErr.message);
