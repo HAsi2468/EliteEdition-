@@ -932,43 +932,65 @@ const downloadChallanPdf = async (req, res) => {
     const tpSectionY = MR + 98 + 68 + 34 + 34 + 10;
     const tpTableStartY = tpSectionY + 16;
 
-    // Case-insensitive image path or base64 buffer resolver
-    const resolveImagePath = (urlOrPath) => {
-      if (!urlOrPath) return null;
-      let str = String(urlOrPath).trim();
-      if (!str) return null;
+    // Case-insensitive image path, base64 buffer, or remote CDN/R2 buffer resolver
+    const resolveImagePath = async (urlOrPath, designNameHint = '') => {
+      if (!urlOrPath && !designNameHint) return null;
+      let str = urlOrPath ? String(urlOrPath).trim() : '';
       if (str.startsWith('data:image/')) {
         try {
           const base64Data = str.split(',')[1];
           if (base64Data) return Buffer.from(base64Data, 'base64');
         } catch (e) {}
       }
-      let filename = str.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
-      try { filename = decodeURIComponent(filename); } catch (e) {}
 
-      const possibleDirs = [
-        path.join(__dirname, '../../elite_edition_images'),
-        path.join(__dirname, '../../../elite_edition_images'),
-        '/home/ubuntu/elite_edition_images',
-        path.join(__dirname, '../elite_edition_images'),
-        path.join(__dirname, '../../Digital print'),
-        path.join(__dirname, '../../../Digital print'),
-        '/home/ubuntu/Digital print'
-      ];
+      if (str) {
+        let filename = str.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
+        try { filename = decodeURIComponent(filename); } catch (e) {}
 
-      for (const pDir of possibleDirs) {
-        if (fs.existsSync(pDir)) {
-          const direct = path.join(pDir, filename);
-          if (fs.existsSync(direct)) return direct;
+        const possibleDirs = [
+          path.join(__dirname, '../../elite_edition_images'),
+          path.join(__dirname, '../../../elite_edition_images'),
+          '/home/ubuntu/elite_edition_images',
+          path.join(__dirname, '../elite_edition_images'),
+          path.join(__dirname, '../../Digital print'),
+          path.join(__dirname, '../../../Digital print'),
+          '/home/ubuntu/Digital print'
+        ];
 
-          try {
-            const files = fs.readdirSync(pDir);
-            const lowerFilename = filename.toLowerCase();
-            const matched = files.find(f => f.toLowerCase() === lowerFilename);
-            if (matched) return path.join(pDir, matched);
-          } catch (e) {}
+        for (const pDir of possibleDirs) {
+          if (fs.existsSync(pDir)) {
+            const direct = path.join(pDir, filename);
+            if (fs.existsSync(direct)) return direct;
+
+            try {
+              const files = fs.readdirSync(pDir);
+              const lowerFilename = filename.toLowerCase();
+              const matched = files.find(f => f.toLowerCase() === lowerFilename);
+              if (matched) return path.join(pDir, matched);
+            } catch (e) {}
+          }
         }
       }
+
+      // Remote HTTP/HTTPS URL (Cloudflare R2 or CDN)
+      const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+      let targetUrl = str;
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = normalizeImageUrl(str, designNameHint);
+      }
+
+      if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        try {
+          const axios = require('axios');
+          const r = await axios.get(targetUrl, {
+            responseType: 'arraybuffer',
+            timeout: 8000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          if (r.data) return Buffer.from(r.data);
+        } catch (netErr) {}
+      }
+
       return null;
     };
 
@@ -1084,11 +1106,11 @@ const downloadChallanPdf = async (req, res) => {
       const dNoStr = job.designNo || job.designName || 'Design';
 
       if (job.imageUrl1) {
-        const p = resolveImagePath(job.imageUrl1);
+        const p = await resolveImagePath(job.imageUrl1, dNoStr);
         if (p) addImageItem(p, dNoStr, jNoStr, cStr);
       }
       if (job.imageUrl2) {
-        const p = resolveImagePath(job.imageUrl2);
+        const p = await resolveImagePath(job.imageUrl2, dNoStr);
         if (p) addImageItem(p, `${dNoStr} (Alt)`, jNoStr, cStr);
       }
     }
@@ -1109,11 +1131,11 @@ const downloadChallanPdf = async (req, res) => {
         if (dDoc) {
           const finalColor = specificColor !== '—' ? specificColor : (dDoc.colors || dDoc.colourMatching || '—');
           if (dDoc.imageUrl) {
-            const p = resolveImagePath(dDoc.imageUrl);
+            const p = await resolveImagePath(dDoc.imageUrl, dDoc.designName || dDoc.designNo || dName);
             if (p) addImageItem(p, dDoc.designName || dDoc.designNo || dName, specificJobNo, finalColor);
           }
           if (dDoc.imageUrl2) {
-            const p = resolveImagePath(dDoc.imageUrl2);
+            const p = await resolveImagePath(dDoc.imageUrl2, dDoc.designName || dDoc.designNo || dName);
             if (p) addImageItem(p, `${dDoc.designName || dDoc.designNo || dName} (Alt)`, specificJobNo, finalColor);
           }
         }
@@ -1122,6 +1144,11 @@ const downloadChallanPdf = async (req, res) => {
       const foundFile = findImageByDesignToken(dName);
       if (foundFile) {
         addImageItem(foundFile, dName, specificJobNo, specificColor);
+      } else {
+        try {
+          const p = await resolveImagePath('', dName);
+          if (p) addImageItem(p, dName, specificJobNo, specificColor);
+        } catch (e) {}
       }
     }
 
@@ -1520,27 +1547,56 @@ const downloadBulkChallansPdf = async (req, res) => {
     const selectedLogoName = 'Logo.png';
     const logoPath = path.join(__dirname, selectedLogoName);
 
-    const resolveImagePath = (urlOrPath) => {
-      if (!urlOrPath) return null;
-      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
-      try { filename = decodeURIComponent(filename); } catch (e) {}
-      const dirs = [
-        path.join(__dirname, '../../elite_edition_images'),
-        path.join(__dirname, '../../../elite_edition_images'),
-        '/home/ubuntu/elite_edition_images',
-        path.join(__dirname, '../elite_edition_images'),
-        path.join(__dirname, '../../Digital print'),
-        '/home/ubuntu/Digital print'
-      ];
-      for (const d of dirs) {
-        if (!fs.existsSync(d)) continue;
-        const direct = path.join(d, filename);
-        if (fs.existsSync(direct)) return direct;
+    const resolveImagePath = async (urlOrPath, designNameHint = '') => {
+      if (!urlOrPath && !designNameHint) return null;
+      let str = urlOrPath ? String(urlOrPath).trim() : '';
+      if (str.startsWith('data:image/')) {
         try {
-          const f = fs.readdirSync(d).find(x => x.toLowerCase() === filename.toLowerCase());
-          if (f) return path.join(d, f);
-        } catch(e) {}
+          const base64Data = str.split(',')[1];
+          if (base64Data) return Buffer.from(base64Data, 'base64');
+        } catch (e) {}
       }
+
+      if (str) {
+        let filename = str.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
+        try { filename = decodeURIComponent(filename); } catch (e) {}
+        const dirs = [
+          path.join(__dirname, '../../elite_edition_images'),
+          path.join(__dirname, '../../../elite_edition_images'),
+          '/home/ubuntu/elite_edition_images',
+          path.join(__dirname, '../elite_edition_images'),
+          path.join(__dirname, '../../Digital print'),
+          '/home/ubuntu/Digital print'
+        ];
+        for (const d of dirs) {
+          if (!fs.existsSync(d)) continue;
+          const direct = path.join(d, filename);
+          if (fs.existsSync(direct)) return direct;
+          try {
+            const f = fs.readdirSync(d).find(x => x.toLowerCase() === filename.toLowerCase());
+            if (f) return path.join(d, f);
+          } catch(e) {}
+        }
+      }
+
+      const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+      let targetUrl = str;
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = normalizeImageUrl(str, designNameHint);
+      }
+
+      if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        try {
+          const axios = require('axios');
+          const r = await axios.get(targetUrl, {
+            responseType: 'arraybuffer',
+            timeout: 8000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          if (r.data) return Buffer.from(r.data);
+        } catch (netErr) {}
+      }
+
       return null;
     };
 
@@ -1580,14 +1636,30 @@ const downloadBulkChallansPdf = async (req, res) => {
 
       let imageWidth = 0;
       let imageHeight = 0;
-      let finalImgPath = resolveImagePath(challan.imageUrl);
+      let finalImgPath = await resolveImagePath(challan.imageUrl, challan.designNo);
 
       if (!finalImgPath && challan.jobNo) {
         try {
-          const jobDoc = await JobCard.findOne({ jobNo: challan.jobNo }).select('imageUrl1 imageUrl2 proofing.artworkUrl').lean();
+          const jobDoc = await JobCard.findOne({ jobNo: challan.jobNo }).select('imageUrl1 imageUrl2 proofing.artworkUrl designNo designName').lean();
           if (jobDoc) {
             const jobUrl = jobDoc.imageUrl1 || jobDoc.imageUrl2 || jobDoc.proofing?.artworkUrl;
-            if (jobUrl) finalImgPath = resolveImagePath(jobUrl);
+            if (jobUrl) finalImgPath = await resolveImagePath(jobUrl, jobDoc.designNo || jobDoc.designName);
+          }
+        } catch (e) {}
+      }
+
+      if (!finalImgPath && challan.designNo) {
+        try {
+          const Design = require('../db/models/design.model');
+          const cleanD = String(challan.designNo).trim().replace(/^ED-/i, '');
+          const dDoc = await Design.findOne({
+            $or: [
+              { designName: { $regex: new RegExp(`^(ED-)?${cleanD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+              { designNo: { $regex: new RegExp(`^(ED-)?${cleanD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+            ]
+          }).lean();
+          if (dDoc && (dDoc.imageUrl || dDoc.imageUrl2)) {
+            finalImgPath = await resolveImagePath(dDoc.imageUrl || dDoc.imageUrl2, challan.designNo);
           }
         } catch (e) {}
       }
