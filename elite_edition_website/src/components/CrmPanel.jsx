@@ -78,6 +78,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
+  const [triggerAddProfile, setTriggerAddProfile] = useState(0);
   const [editingLead, setEditingLead] = useState(null);
 
   // Form state
@@ -434,7 +435,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
               boxShadow: '0 8px 16px rgba(37, 99, 235, 0.35)'
             }}
           >
-            {subTab === 'profiles' ? <Users size={28} /> : <FileText size={28} />}
+            <Users size={28} />
           </div>
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
@@ -469,6 +470,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: 'none',
+                outline: 'none',
                 background: subTab === 'leads' ? '#2563eb' : 'transparent',
                 color: subTab === 'leads' ? '#ffffff' : 'var(--text-muted, #64748b)',
                 fontWeight: subTab === 'leads' ? 700 : 600,
@@ -504,6 +506,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: 'none',
+                outline: 'none',
                 background: subTab === 'profiles' ? '#2563eb' : 'transparent',
                 color: subTab === 'profiles' ? '#ffffff' : 'var(--text-muted, #64748b)',
                 fontWeight: subTab === 'profiles' ? 700 : 600,
@@ -530,27 +533,53 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
             </button>
           </div>
 
-          <button
-            onClick={() => openAddModal()}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <UserPlus size={17} />
-            Add New Lead
-          </button>
+          {subTab === 'leads' ? (
+            <button
+              onClick={() => openAddModal()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                color: '#fff',
+                border: 'none',
+                outline: 'none',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <UserPlus size={17} />
+              Add New Lead
+            </button>
+          ) : (
+            <button
+              onClick={() => setTriggerAddProfile(prev => prev + 1)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                color: '#fff',
+                border: 'none',
+                outline: 'none',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <UserPlus size={17} />
+              Add New Profile
+            </button>
+          )}
         </div>
       </div>
 
@@ -559,6 +588,7 @@ export default function CrmPanel({ currentUser, initialSubTab }) {
           currentUser={currentUser}
           onSwitchToLeads={() => setSubTab('leads')}
           onAddNewLeadForCustomer={handleAddNewLeadForCustomer}
+          triggerCreateModal={triggerAddProfile}
         />
       ) : (
         <>

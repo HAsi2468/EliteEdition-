@@ -51,7 +51,7 @@ const STATUS_CONFIG = {
   'Inactive': { bg: '#f8fafc', color: '#64748b', border: '#cbd5e1', badge: '⚪ Inactive' }
 };
 
-export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, onAddNewLeadForCustomer }) {
+export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, onAddNewLeadForCustomer, triggerCreateModal }) {
   const [profiles, setProfiles] = useState([]);
   const [stats, setStats] = useState({ total: 0, active: 0, leads: 0, vip: 0, totalPipelineValue: 0, totalOrders: 0 });
   const [loading, setLoading] = useState(true);
@@ -158,6 +158,12 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
     });
     setShowEditModal(true);
   };
+
+  useEffect(() => {
+    if (triggerCreateModal) {
+      openCreateModal();
+    }
+  }, [triggerCreateModal]);
 
   const openEditModal = (profile) => {
     setEditingProfile(profile);
