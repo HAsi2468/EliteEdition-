@@ -2,6 +2,7 @@
    ELITE EDITION ENTERPRISE ERP — MINIMAL DESIGN SYSTEM
    Brand Accent: #0f172a | 8px Grid | Mobile First & Responsive
    ═══════════════════════════════════════════════════ */
+@import './styles/tokens.css';
 @import './styles/communication.css';
 
 /* Self-Hosted Inter WOFF2 Fonts (Weights 400, 500, 600) */
@@ -29,11 +30,11 @@
 
 :root {
   color-scheme: light;
-  /* Typography: Inter, fallback to system-ui */
+  /* Fluid Typography: Scaled across 360px - 1920px baseline */
   --font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-size-meta: 0.75rem;    /* 12px */
-  --font-size-body: 0.9375rem;  /* 15px */
-  --font-size-title: 1.125rem;  /* 18px */
+  --font-size-meta: var(--erp-font-xs, 0.75rem);    /* Fluid 11px - 12px */
+  --font-size-body: var(--erp-font-base, 0.9375rem);  /* Fluid 14px - 16px */
+  --font-size-title: var(--erp-font-xl, 1.125rem);  /* Fluid 18px - 22px */
 
   /* Palette: Clean White & Professional Blue Surfaces */
   --bg-main:        #f8fafc;    /* Slate-50 canvas */
@@ -168,6 +169,38 @@ td,
 input[type="number"],
 .metric-value {
   font-variant-numeric: tabular-nums;
+}
+
+/* Dynamic Density & Target Sizing (Adaptive based on pointer hardware & density tokens) */
+table tr {
+  min-height: var(--erp-row-height);
+}
+
+table th,
+table td {
+  padding: var(--erp-cell-padding-y) var(--erp-cell-padding-x);
+}
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="date"],
+select,
+.form-input,
+.phoenix-form-select,
+.phoenix-form-input {
+  min-height: var(--erp-input-height);
+}
+
+/* Touch targets for touch mode (WCAG 2.5.5 touch target accuracy) */
+html[data-pointer-mode="touch"] button,
+html[data-pointer-mode="touch"] input,
+html[data-pointer-mode="touch"] select,
+html[data-pointer-mode="touch"] .btn,
+html[data-pointer-mode="touch"] .smart-icon-btn {
+  min-height: var(--erp-btn-min-height);
 }
 
 /* Compact Table Density */

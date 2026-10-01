@@ -1,13 +1,16 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import './styles/tokens.css'
 import './index.css'
 import App from './App.jsx'
 import { SocketProvider } from './contexts/SocketContext.jsx'
 import { RootErrorBoundary } from './components/RootErrorBoundary'
 import { installGlobalDialogInterceptors } from './services/dialogService.js'
 import { setupGlobalCrashListeners } from './utils/globalCrashListeners'
+import { initERPTelemetry } from './telemetry/deviceTelemetry'
 
-// Initialize enterprise dialog & global error and unhandled rejection interceptors
+// Initialize device & hardware telemetry, enterprise dialog & global error and rejection listeners
+initERPTelemetry()
 installGlobalDialogInterceptors()
 setupGlobalCrashListeners()
 

@@ -654,7 +654,7 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
   };
 
   return (
-    <div className="digital-print-ops-root">
+    <div className="digital-print-ops-root erp-container-context">
       {/* Scoped CSS for responsive cards, micro-interactions, and animations */}
       <style>{`
         .digital-print-ops-root {
