@@ -601,6 +601,57 @@ input::placeholder, textarea::placeholder {
   position: relative;
 }
 
+.smart-action-group.smart-action-group-2rows {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.smart-action-group-2rows .smart-action-row {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Universal Action Column 2-Row Layout: Trigger if > 4 Buttons
+   If an action column or table cell contains more than 4 buttons,
+   automatically format into a 2-row layout with up to 4 per row.
+───────────────────────────────────────────────────────────── */
+td > div:has(> button:nth-child(5)),
+td > div:has(> .smart-icon-btn:nth-child(5)),
+td > div:has(> a:nth-child(5)),
+td > div.action-buttons-group:has(> :nth-child(5)),
+td > div.actions-container:has(> :nth-child(5)),
+div.table-action-cell:has(> button:nth-child(5)) {
+  display: inline-grid !important;
+  grid-template-columns: repeat(4, max-content) !important;
+  gap: 4px 6px !important;
+  align-items: center !important;
+  max-width: max-content !important;
+}
+
+/* Maintain right-alignment if parent td is right-aligned */
+td[style*="text-align: right"] > div:has(> button:nth-child(5)),
+td[style*="text-align: right"] > div.smart-action-group-2rows,
+td.text-right > div:has(> button:nth-child(5)),
+td.text-right > div.smart-action-group-2rows {
+  justify-content: end !important;
+  justify-items: end !important;
+  margin-left: auto !important;
+}
+
+/* Maintain center-alignment if parent td is center-aligned */
+td[style*="text-align: center"] > div:has(> button:nth-child(5)),
+td[style*="text-align: center"] > div.smart-action-group-2rows,
+td.text-center > div:has(> button:nth-child(5)),
+td.text-center > div.smart-action-group-2rows {
+  justify-content: center !important;
+  justify-items: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
 .smart-icon-btn {
   display: inline-flex;
   align-items: center;

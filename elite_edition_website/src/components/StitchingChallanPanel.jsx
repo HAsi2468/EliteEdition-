@@ -538,46 +538,50 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                       </span>
                     </td>
                     <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
-                        <button
-                          onClick={() => setSelectedStitchingHistory(c)}
-                          className="btn-secondary"
-                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', color: '#fbbf24', borderColor: '#fde68a', background: '#fffbeb' }}
-                          title="View Audit History"
-                        >
-                          <Clock size={13} /> History
-                        </button>
-                        <button
-                          onClick={() => handleDownloadPdf(c)}
-                          className="btn-secondary"
-                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
-                          title="Download PDF"
-                        >
-                          <FileText size={13} /> PDF
-                        </button>
-                        <button
-                          onClick={() => onNavigateToBilling && onNavigateToBilling(c)}
-                          className="btn-secondary"
-                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', borderColor: 'rgba(124,58,237,0.4)' }}
-                          title="Generate Bill"
-                        >
-                          <Receipt size={13} /> Bill
-                        </button>
-                        <button
-                          onClick={() => openEdit(c)}
-                          className="btn-secondary"
-                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
-                          title="Edit"
-                        >
-                          <Edit size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(c._id, c.challanNo)}
-                          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5', padding: '0.35rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                          title="Delete"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                      <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => setSelectedStitchingHistory(c)}
+                            className="btn-secondary"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', color: '#fbbf24', borderColor: '#fde68a', background: '#fffbeb' }}
+                            title="View Audit History"
+                          >
+                            <Clock size={13} /> History
+                          </button>
+                          <button
+                            onClick={() => handleDownloadPdf(c)}
+                            className="btn-secondary"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
+                            title="Download PDF"
+                          >
+                            <FileText size={13} /> PDF
+                          </button>
+                          <button
+                            onClick={() => onNavigateToBilling && onNavigateToBilling(c)}
+                            className="btn-secondary"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', borderColor: 'rgba(124,58,237,0.4)' }}
+                            title="Generate Bill"
+                          >
+                            <Receipt size={13} /> Bill
+                          </button>
+                          <button
+                            onClick={() => openEdit(c)}
+                            className="btn-secondary"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
+                            title="Edit"
+                          >
+                            <Edit size={13} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleDelete(c._id, c.challanNo)}
+                            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5', padding: '0.35rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                            title="Delete"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     </td>
                   </tr>

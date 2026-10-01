@@ -50,6 +50,7 @@ export function SmartIconButton({
 export function SmartActionGroup({
   actions = [],
   maxInlineMobile = 2,
+  maxPerRow = 4,
   align = 'center',
   style = {}
 }) {
@@ -89,6 +90,56 @@ export function SmartActionGroup({
   const visibleActions = actions.filter(a => !a.hidden);
 
   if (!isMobile || visibleActions.length <= maxInlineMobile) {
+    // If more than 4 buttons in the action column, convert to a 2nd row on that cell
+    if (visibleActions.length > maxPerRow) {
+      const rows = [];
+      for (let i = 0; i < visibleActions.length; i += maxPerRow) {
+        rows.push(visibleActions.slice(i, i + maxPerRow));
+      }
+
+      return (
+        <div
+          className="smart-action-group smart-action-group-2rows"
+          style={{
+            display: 'inline-flex',
+            flexDirection: 'column',
+            gap: '4px',
+            alignItems: align === 'right' ? 'flex-end' : align === 'left' ? 'flex-start' : 'center',
+            ...style
+          }}
+        >
+          {rows.map((rowActions, rIdx) => (
+            <div
+              key={rIdx}
+              className="smart-action-row"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                justifyContent: align === 'right' ? 'flex-end' : align === 'left' ? 'flex-start' : 'center'
+              }}
+            >
+              {rowActions.map((action, idx) => (
+                <SmartIconButton
+                  key={action.id || (rIdx * maxPerRow + idx)}
+                  icon={action.icon}
+                  label={action.label}
+                  tooltip={action.tooltip}
+                  onClick={action.onClick}
+                  variant={action.variant || 'default'}
+                  color={action.color}
+                  bgColor={action.bgColor}
+                  borderColor={action.borderColor}
+                  disabled={action.disabled}
+                  style={action.style}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     return (
       <div
         className="smart-action-group"

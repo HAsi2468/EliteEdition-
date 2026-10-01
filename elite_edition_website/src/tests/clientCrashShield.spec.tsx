@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { RootErrorBoundary, generateIncidentId } from '../components/RootErrorBoundary';
 import { RouteErrorBoundary } from '../components/RouteErrorBoundary';
+import { SmartActionGroup } from '../components/common/SmartActionGroup';
 import {
   setupGlobalCrashListeners,
   normalizeToError,
@@ -291,4 +292,63 @@ describe('Phase 1: Silent Client-Side Crashes & Resilient Error Telemetry', () =
       expect(id1.length).toBeGreaterThan(15);
     });
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // TC-ACTION-01: Multi-Row Table Action Column (Max 4 Per Row)
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('TC-ACTION-01: Table Action Column Multi-Row Layout (Max 4 Buttons Per Row)', () => {
+    it('renders actions in a single row when action count is 4 or less', () => {
+      const fourActions = [
+        { id: 'view', label: 'View', onClick: vi.fn() },
+        { id: 'edit', label: 'Edit', onClick: vi.fn() },
+        { id: 'print', label: 'Print', onClick: vi.fn() },
+        { id: 'delete', label: 'Delete', onClick: vi.fn() },
+      ];
+
+      const { container } = render(<SmartActionGroup actions={fourActions} />);
+
+      const multiRowContainer = container.querySelector('.smart-action-group-2rows');
+      expect(multiRowContainer).toBeNull();
+
+      const rows = container.querySelectorAll('.smart-action-row');
+      expect(rows.length).toBe(0);
+
+      const buttons = screen.getAllByRole('button');
+      expect(buttons.length).toBe(4);
+    });
+
+    it('automatically converts to a 2nd row on that cell when more than 4 buttons exist (e.g. 7 in Job Card Panel)', () => {
+      const sevenActions = [
+        { id: 'challan', label: 'Billing / Challan', onClick: vi.fn() },
+        { id: 'print', label: 'Print / PDF', onClick: vi.fn() },
+        { id: 'preview', label: 'Preview', onClick: vi.fn() },
+        { id: 'history', label: 'Audit Log', onClick: vi.fn() },
+        { id: 'edit', label: 'Edit', onClick: vi.fn() },
+        { id: 'share', label: 'Share', onClick: vi.fn() },
+        { id: 'delete', label: 'Delete', onClick: vi.fn() },
+      ];
+
+      const { container } = render(<SmartActionGroup actions={sevenActions} />);
+
+      // Must render the 2-row container
+      const multiRowContainer = container.querySelector('.smart-action-group-2rows');
+      expect(multiRowContainer).toBeTruthy();
+
+      // Must have 2 distinct action rows
+      const rows = container.querySelectorAll('.smart-action-row');
+      expect(rows.length).toBe(2);
+
+      // Row 1 must have exactly 4 buttons
+      const row1Buttons = rows[0].querySelectorAll('button');
+      expect(row1Buttons.length).toBe(4);
+
+      // Row 2 must have the remaining 3 buttons
+      const row2Buttons = rows[1].querySelectorAll('button');
+      expect(row2Buttons.length).toBe(3);
+
+      // Total buttons must still be 7
+      expect(screen.getAllByRole('button').length).toBe(7);
+    });
+  });
 });
+
