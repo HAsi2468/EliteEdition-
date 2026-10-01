@@ -5215,74 +5215,67 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </div>
                   <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="e.g. JOB-2252, JOB-2253..." />
                   <datalist id="challan-jobs">
-                    {inProgressJobCards.map(j => {
-                      const pDone = (j.printStatus || '').toLowerCase().includes('done') || parseFloat(j.printMtr || 0) > 0;
-                      const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
-                      const dMtr = parseFloat(j.deliveredMtr || 0);
-                      const fDone = (j.fusingStatus || '').toLowerCase().includes('done') || fMtr > 0;
-                      const avail = Math.max(0, fMtr - dMtr);
-                      const tag = !pDone ? '[🖨️ Printing Pend]' : !fDone ? '[🔥 Fusing Pend]' : `[📦 Ready: ${avail.toFixed(0)}m]`;
-                      return (
-                        <option key={j._id} value={j.jobNo}>
-                          {j.jobNo} {tag} — {j.party} ({j.designNo || ''})
-                        </option>
-                      );
-                    })}
-                  </datalist>
-
-                  {/* Interactive Job Pills */}
-                  <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '85px', overflowY: 'auto' }}>
                     {inProgressJobCards
-                      .filter(j => !challanForm.partyName || (j.party && j.party.toLowerCase().trim() === challanForm.partyName.toLowerCase().trim()))
-                      .slice(0, 25)
+                      .filter(j => {
+                        const fStatus = (j.fusingStatus || '').toLowerCase();
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        return fStatus.includes('done') || fMtr > 0;
+                      })
                       .map(j => {
-                        const isSelected = String(challanForm.jobNo || '').toUpperCase().includes(String(j.jobNo).toUpperCase());
-                        const pDone = (j.printStatus || '').toLowerCase().includes('done') || parseFloat(j.printMtr || 0) > 0;
                         const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
                         const dMtr = parseFloat(j.deliveredMtr || 0);
-                        const fDone = (j.fusingStatus || '').toLowerCase().includes('done') || fMtr > 0;
                         const avail = Math.max(0, fMtr - dMtr);
-                        const isReady = pDone && fDone && avail > 0;
+                        return (
+                          <option key={j._id} value={j.jobNo}>
+                            {j.jobNo} [🔥 Fused: {fMtr.toFixed(1)}m{avail > 0 ? `, Avail: ${avail.toFixed(0)}m` : ''}] — {j.party} ({j.designNo || ''})
+                          </option>
+                        );
+                      })}
+                  </datalist>
 
-                        let badgeText = '';
-                        let pillBorder = '#cbd5e1';
-                        let pillBg = '#ffffff';
-                        let pillColor = '#475569';
-
-                        if (isSelected) {
-                          pillBg = '#0284c7';
-                          pillColor = '#ffffff';
-                          pillBorder = '#0284c7';
-                        } else if (isReady) {
-                          pillBorder = '#86efac';
-                          pillBg = '#f0fdf4';
-                          pillColor = '#166534';
-                          badgeText = `📦 ${avail.toFixed(0)}m`;
-                        } else if (!pDone) {
-                          pillBorder = '#fde68a';
-                          pillBg = '#fffbeb';
-                          pillColor = '#92400e';
-                          badgeText = '🖨️';
-                        } else if (!fDone) {
-                          pillBorder = '#fed7aa';
-                          pillBg = '#fff7ed';
-                          pillColor = '#9a3412';
-                          badgeText = '🔥';
+                  {/* Interactive Job Pills - Only show Job Cards that are Done in Fusing */}
+                  <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '85px', overflowY: 'auto' }}>
+                    {(() => {
+                      const fusedJobs = inProgressJobCards.filter(j => {
+                        const fStatus = (j.fusingStatus || '').toLowerCase();
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        const isDone = fStatus.includes('done') || fMtr > 0;
+                        if (!isDone) return false;
+                        if (challanForm.partyName && (!j.party || j.party.toLowerCase().trim() !== challanForm.partyName.toLowerCase().trim())) {
+                          return false;
                         }
+                        return true;
+                      });
+
+                      if (fusedJobs.length === 0) {
+                        return (
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.2rem 0.3rem' }}>
+                            {challanForm.partyName
+                              ? `No Fusing-completed job cards found for ${challanForm.partyName}.`
+                              : 'No Fusing-completed job cards available.'}
+                          </div>
+                        );
+                      }
+
+                      return fusedJobs.slice(0, 30).map(j => {
+                        const isSelected = String(challanForm.jobNo || '').toUpperCase().includes(String(j.jobNo).toUpperCase());
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        const dMtr = parseFloat(j.deliveredMtr || 0);
+                        const avail = Math.max(0, fMtr - dMtr);
 
                         return (
                           <button
                             key={j._id}
                             type="button"
                             onClick={() => toggleChallanJobPill(j.jobNo)}
-                            title={isReady ? `Ready for delivery: ${avail.toFixed(1)}m available fused fabric` : !pDone ? 'Printing Pending' : 'Fusing Pending'}
+                            title={`Fusing Done: ${fMtr.toFixed(1)}m fused${avail > 0 ? ` (${avail.toFixed(1)}m available)` : ''}`}
                             style={{
                               padding: '0.22rem 0.55rem',
                               fontSize: '0.72rem',
                               borderRadius: '10px',
-                              border: `1px solid ${pillBorder}`,
-                              background: pillBg,
-                              color: pillColor,
+                              border: `1px solid ${isSelected ? '#0284c7' : '#86efac'}`,
+                              background: isSelected ? '#0284c7' : '#f0fdf4',
+                              color: isSelected ? '#ffffff' : '#166534',
                               cursor: 'pointer',
                               fontWeight: 700,
                               display: 'inline-flex',
@@ -5292,14 +5285,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             }}
                           >
                             <span>{isSelected ? '✓ ' : '+ '} {j.jobNo}</span>
-                            {badgeText && (
-                              <span style={{ fontSize: '0.62rem', opacity: isSelected ? 0.9 : 0.85, fontWeight: 800 }}>
-                                {badgeText}
-                              </span>
-                            )}
+                            <span style={{ fontSize: '0.62rem', opacity: isSelected ? 0.9 : 0.85, fontWeight: 800 }}>
+                              🔥 {fMtr > 0 ? `${fMtr.toFixed(0)}m` : 'Done'}
+                            </span>
                           </button>
                         );
-                      })}
+                      });
+                    })()}
                   </div>
                 </div>
 
