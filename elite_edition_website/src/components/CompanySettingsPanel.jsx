@@ -3,10 +3,11 @@ import { api } from '../services/api';
 import { 
   Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon, 
   Trash2, Plus, Sliders, CheckCircle2, Users, User, UserPlus, Shield, Key, 
-  Lock, Check, X, Search, Edit2
+  Lock, Check, X, Search, Edit2, Palette
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
+import CompanyDesignStudio from './CompanyDesignStudio';
 
 const getCompanyAccentColor = (entity) => {
   return 'var(--primary)';
@@ -31,6 +32,39 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     invoicePrefix: companyEntity === 'Elite Fabtex' ? 'EF-2627-' : companyEntity === 'Elite Edition' ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : 'EDP/26-27/',
     startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
     companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
+    challanDesign: {
+      title: 'DELIVERY CHALLAN',
+      prefix: companyEntity === 'Elite Fabtex' ? 'EF/DC/' : companyEntity === 'Elite Stitching' ? 'ES/SC/' : companyEntity === 'Elite Edition' ? 'EE/DC/' : 'EDP/DC/',
+      startingNo: 1,
+      paperSize: 'A4',
+      orientation: 'portrait',
+      copies: ['Original for Consignee', 'Duplicate for Transporter', 'Triplicate for Supplier'],
+      showLogo: true,
+      showGstin: true,
+      showPhoneEmail: true,
+      showBankDetails: false,
+      showDesignImage: true,
+      showHsnCode: true,
+      showRateAndAmount: true,
+      showRemarks: true,
+      signatureLeft: "Receiver's Signature",
+      signatureCenter: "Prepared / Checked By",
+      signatureRight: "Authorized Signatory",
+      termsAndConditions: '1. Goods received in good condition and as per specification.\n2. Dispute if any subject to Surat jurisdiction only.\n3. Goods once dispatched/delivered will not be taken back.',
+      footerNote: 'This is a computer generated delivery challan.'
+    },
+    reportDesign: {
+      themeColor: '#0284c7',
+      paperSize: 'A4',
+      orientation: 'landscape',
+      density: 'compact',
+      showLogo: true,
+      showKpiSummary: true,
+      showGeneratedBy: true,
+      showTimestamp: true,
+      watermarkText: '',
+      footerDisclaimer: 'Confidential ERP Report - For Internal Operations Only.'
+    },
     categories: [],
     paperTypes: [],
     fabrics: [],
@@ -46,7 +80,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     passes: ''
   });
 
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'users', 'tags'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'users', 'tags', 'design'
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
@@ -186,6 +220,14 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
         setForm(f => ({
           ...f,
           ...res.data,
+          challanDesign: {
+            ...f.challanDesign,
+            ...(res.data.challanDesign || {})
+          },
+          reportDesign: {
+            ...f.reportDesign,
+            ...(res.data.reportDesign || {})
+          },
           categories: Array.isArray(res.data.categories) ? res.data.categories : [],
           paperTypes: Array.isArray(res.data.paperTypes) ? res.data.paperTypes : [],
           fabrics: Array.isArray(res.data.fabrics) ? res.data.fabrics : [],
@@ -198,6 +240,26 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleChallanDesignChange = (field, value) => {
+    setForm(prev => ({
+      ...prev,
+      challanDesign: {
+        ...(prev.challanDesign || {}),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleReportDesignChange = (field, value) => {
+    setForm(prev => ({
+      ...prev,
+      reportDesign: {
+        ...(prev.reportDesign || {}),
+        [field]: value
+      }
+    }));
   };
 
   const handleLogoUpload = (e) => {
@@ -334,6 +396,15 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
         >
           <Sliders size={16} /> ⚙️ Dynamic Dropdowns & Tags
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('design')}
+          className={activeTab === 'design' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
+        >
+          <Palette size={16} /> 🎨 Challan & Report Design Studio
         </button>
       </div>
 
@@ -879,6 +950,21 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           </button>
         </div>
       </form>
+      )}
+
+      {/* TAB 4: CHALLAN & REPORT DESIGN STUDIO */}
+      {activeTab === 'design' && (
+        <CompanyDesignStudio
+          companyEntity={companyEntity}
+          accentColor={accentColor}
+          companyForm={form}
+          challanDesign={form.challanDesign || {}}
+          reportDesign={form.reportDesign || {}}
+          onChangeChallan={handleChallanDesignChange}
+          onChangeReport={handleReportDesignChange}
+          onSave={handleSubmit}
+          saving={saving}
+        />
       )}
     </div>
   );

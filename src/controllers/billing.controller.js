@@ -2459,8 +2459,45 @@ const getCompanySettings = async (req, res) => {
         expenseInCategories: masterConfig.expenseInCategories || ['Petty Cash Top-up', 'Client Payment / Advance', 'Scrap / Waste Sale', 'Refund / Cashback', 'Other Receipt'],
         expenseOutCategories: masterConfig.expenseOutCategories || ['Machine Maintenance & Service', 'Ink & Consumables', 'Spare Parts & Repairs', 'Paper & Transfer Film', 'Tea & Refreshments', 'Carriage & Freight', 'Salary / Daily Wages', 'Electricity & Utility', 'Stationery & Office', 'Other Expense'],
         expensePaymentModes: masterConfig.expensePaymentModes || ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other']
-      });
     }
+    const defaultChallanDesign = {
+      title: 'DELIVERY CHALLAN',
+      prefix: 'DC-2627-',
+      startingNo: 1,
+      paperSize: 'A4',
+      orientation: 'portrait',
+      copies: ['Original for Consignee', 'Duplicate for Transporter', 'Triplicate for Supplier'],
+      showLogo: true,
+      showGstin: true,
+      showPhoneEmail: true,
+      showBankDetails: false,
+      showDesignImage: true,
+      showHsnCode: true,
+      showRateAndAmount: true,
+      showRemarks: true,
+      signatureLeft: "Receiver's Signature",
+      signatureCenter: "Prepared / Checked By",
+      signatureRight: "Authorized Signatory",
+      termsAndConditions: '1. Goods received in good condition and as per specification.\n2. Dispute if any subject to Surat jurisdiction only.\n3. Goods once dispatched/delivered will not be taken back.',
+      footerNote: 'This is a computer generated delivery challan.'
+    };
+
+    const defaultReportDesign = {
+      themeColor: '#0284c7',
+      paperSize: 'A4',
+      orientation: 'landscape',
+      density: 'compact',
+      showLogo: true,
+      showKpiSummary: true,
+      showGeneratedBy: true,
+      showTimestamp: true,
+      watermarkText: '',
+      footerDisclaimer: 'Confidential ERP Report - For Internal Operations Only.'
+    };
+
+    config.challanDesign = { ...defaultChallanDesign, ...(config.challanDesign || {}) };
+    config.reportDesign = { ...defaultReportDesign, ...(config.reportDesign || {}) };
+
     res.json({ success: true, data: config });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
