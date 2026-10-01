@@ -5519,11 +5519,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 <span style={{ color: isOver ? '#dc2626' : '#0284c7' }}>
                                   {effectiveTakenMtr.toFixed(2)}m taken in Outward
                                 </span>
-                                {(proportionalWasteMtr > 0 || shortageMtrVal > 0) && (
-                                  <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 600 }}>
-                                    {' '}({dispatchedMtr.toFixed(2)}m{proportionalWasteMtr > 0 ? ` + ${proportionalWasteMtr.toFixed(2)}m west` : ''}{shortageMtrVal > 0 ? ` + ${shortageMtrVal.toFixed(2)}m short` : ''})
-                                  </span>
-                                )}
                                 <span style={{ color: '#64748b' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
                               </div>
                             </div>
@@ -5797,25 +5792,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       </div>
                     </div>
                   </div>
-
-                  {/* Proportional Outward Deduction Preview */}
-                  {challanFusingStats && challanFusingStats.westMtr > 0 && challanTotalMtr > 0 && (() => {
-                    const dispatched = challanTotalMtr;
-                    const baseFresh = challanFusingStats.freshMtr > 0 ? challanFusingStats.freshMtr : dispatched;
-                    const ratio = Math.min(1.0, dispatched / baseFresh);
-                    const propWest = parseFloat((ratio * challanFusingStats.westMtr).toFixed(2));
-                    const totalWithWest = parseFloat((dispatched + propWest).toFixed(2));
-                    return (
-                      <div style={{ marginTop: '0.45rem', padding: '0.35rem 0.65rem', background: '#ffffff', borderRadius: '7px', border: '1px solid #bae6fd', fontSize: '0.72rem', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                        <span>
-                          <strong>Outward Deduction:</strong> {dispatched.toFixed(2)}m + {propWest.toFixed(2)}m (west share) = <strong style={{ color: '#0284c7', fontSize: '0.8rem' }}>{totalWithWest.toFixed(2)}m</strong> + shortage
-                        </span>
-                        <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '1px 7px', borderRadius: '4px' }}>
-                          {(ratio * 100).toFixed(0)}% job share
-                        </span>
-                      </div>
-                    );
-                  })()}
                 </div>
 
                 {/* TP Meters Entry Scrollable Area */}
