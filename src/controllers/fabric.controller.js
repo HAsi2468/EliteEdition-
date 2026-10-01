@@ -362,7 +362,7 @@ const getLotStock = async (req, res) => {
 
       if (panna && panna.trim()) {
         const cleanP = panna.trim().replace(/['"]/g, '');
-        andConds.push({ panna: new RegExp(`^${cleanP}$`, 'i') });
+        andConds.push({ panna: new RegExp(`^${cleanP}["']?$`, 'i') });
       }
 
       matchStage.$and = andConds;
