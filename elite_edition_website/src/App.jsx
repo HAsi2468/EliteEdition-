@@ -2233,16 +2233,19 @@ export default function App() {
                       type="button"
                       onClick={() => handleNavClick(tabKey)}
                       title={label}
+                      className="sidebar-nav-collapsed-btn"
                       style={{
                         background: isActive ? '#eff6ff' : 'transparent',
                         border: 'none',
+                        outline: 'none',
+                        boxSizing: 'border-box',
                         width: '100%',
                         padding: '8px 4px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '3px',
+                        gap: '4px',
                         borderRadius: '6px',
                         color: isActive ? '#1d4ed8' : '#64748b',
                         cursor: 'pointer',

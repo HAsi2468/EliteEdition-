@@ -97,6 +97,9 @@ html[data-motion="reduced"] *::after {
 .erp-pane-slot {
   container-type: inline-size;
   container-name: erp-slot;
+  width: 100% !important;
+  max-width: 100%;
+  box-sizing: border-box !important;
 }
 
 /* Self-Measuring Slot-Responsive Layout Rules */

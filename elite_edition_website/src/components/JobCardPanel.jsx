@@ -2515,7 +2515,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
   const MACHINE_COLOR = { GRANDO:'#3b82f6', PRINTDOT:'#ef4444' };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:'1.2rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', width: '100%', alignItems: 'stretch' }}>
       {department === 'stitching' && (effectiveSubTab === 'dashboard' || effectiveSubTab === 'list' || effectiveSubTab === 'jobcards' || !effectiveSubTab) ? (
         <GarmentJobCardDashboard />
       ) : department === 'stitching' && (effectiveSubTab === 'challan' || effectiveSubTab === 'fabric_challan' || effectiveSubTab === 'stitching_challan') ? (

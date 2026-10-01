@@ -658,11 +658,67 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
       {/* Scoped CSS for responsive cards, micro-interactions, and animations */}
       <style>{`
         .digital-print-ops-root {
+          width: 100% !important;
           max-width: 1440px;
           margin: 0 auto;
+          box-sizing: border-box !important;
           padding: 0.5rem 0.25rem 2rem;
           color: #141824;
           font-family: inherit;
+        }
+        .phoenix-hero-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+          gap: 1.5rem;
+          margin-bottom: 1.75rem;
+          align-items: stretch;
+        }
+        @container erp-slot (max-width: 1024px) {
+          .phoenix-hero-row {
+            grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 1024px) {
+          .phoenix-hero-row {
+            grid-template-columns: 1fr;
+          }
+        }
+        .phoenix-kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.85rem;
+        }
+        @container erp-slot (max-width: 520px) {
+          .phoenix-kpi-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 520px) {
+          .phoenix-kpi-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        .phoenix-kpi-card {
+          background: #ffffff;
+          border: 1px solid #e3e6ed;
+          border-radius: 12px;
+          padding: 1.1rem 1.25rem;
+          display: flex;
+          flex-direction: column;
+          justifyContent: space-between;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .phoenix-kpi-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+        .phoenix-bullet-item {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          display: inline-block;
+          flex-shrink: 0;
         }
         .phoenix-card {
           background: #ffffff;

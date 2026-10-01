@@ -195,7 +195,7 @@ select,
 }
 
 /* Touch targets for touch mode (WCAG 2.5.5 touch target accuracy) */
-html[data-pointer-mode="touch"] button,
+html[data-pointer-mode="touch"] button:not(.sidebar-wrap button):not(.sidebar-nav-collapsed-btn):not(.ops-action-btn):not(.compact-btn),
 html[data-pointer-mode="touch"] input,
 html[data-pointer-mode="touch"] select,
 html[data-pointer-mode="touch"] .btn,
