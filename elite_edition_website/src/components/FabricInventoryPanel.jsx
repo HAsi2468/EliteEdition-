@@ -2462,15 +2462,16 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
          (parseFloat(j.genuineFaultMtr) || 0)) ||
         0
       );
-      const fused = parseFloat(j.fusingMtr || 0) || (fresh + waste);
+      const fused = parseFloat(j.fusingMtr || 0);
 
       if (fresh > 0 || waste > 0 || fused > 0) {
         hasAnyData = true;
       }
 
+      const calculatedItemTotal = (fresh > 0 || waste > 0) ? (fresh + waste) : fused;
       totalFresh += fresh > 0 ? fresh : (fused > 0 && waste === 0 ? fused : 0);
       totalWest += waste;
-      totalFused += fused > 0 ? fused : (fresh + waste);
+      totalFused += calculatedItemTotal;
     });
 
     return {
@@ -5457,15 +5458,26 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     }}>
                       {/* Mathematical Progress Calculations (Including Shortage) */}
                       {(() => {
-                        const rawMtr = challanTotalMtr > 0 ? challanTotalMtr : (parseFloat(challanForm.totalMtr) || 0);
+                        const dispatchedMtr = challanTotalMtr > 0 ? challanTotalMtr : (parseFloat(challanForm.totalMtr) || 0);
+
+                        // Proportional wastage share from fusing
+                        let proportionalWasteMtr = 0;
+                        if (challanFusingStats && challanFusingStats.freshMtr > 0 && challanFusingStats.westMtr > 0) {
+                          const baseFresh = challanFusingStats.freshMtr;
+                          const ratio = Math.min(1.0, dispatchedMtr / baseFresh);
+                          proportionalWasteMtr = parseFloat((ratio * challanFusingStats.westMtr).toFixed(2));
+                        }
+
+                        const fabricWithWasteMtr = dispatchedMtr + proportionalWasteMtr;
+
                         let shortageMtrVal = 0;
                         if (challanForm.shortageMode === 'mtr') {
                           shortageMtrVal = parseFloat(challanForm.shortageMtr) || 0;
                         } else if (challanForm.shortagePct !== '' && challanForm.shortagePct != null) {
                           const p = parseFloat(challanForm.shortagePct) || 0;
-                          shortageMtrVal = (rawMtr * p) / 100;
+                          shortageMtrVal = (fabricWithWasteMtr * p) / 100;
                         }
-                        const effectiveTakenMtr = rawMtr + shortageMtrVal;
+                        const effectiveTakenMtr = fabricWithWasteMtr + shortageMtrVal;
 
                         const hasStock = selectedLotsTotalStock > 0;
                         const realPct = hasStock ? Math.round((effectiveTakenMtr / selectedLotsTotalStock) * 100) : (effectiveTakenMtr > 0 ? 999 : 0);
@@ -5505,10 +5517,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                               <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
                                 <span style={{ color: isOver ? '#dc2626' : '#0284c7' }}>
-                                  {effectiveTakenMtr.toFixed(2)}m taken
+                                  {effectiveTakenMtr.toFixed(2)}m taken in Outward
                                 </span>
-                                {shortageMtrVal > 0 && (
-                                  <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 600 }}> ({rawMtr.toFixed(2)}m + {shortageMtrVal.toFixed(2)}m short)</span>
+                                {(proportionalWasteMtr > 0 || shortageMtrVal > 0) && (
+                                  <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 600 }}>
+                                    {' '}({dispatchedMtr.toFixed(2)}m{proportionalWasteMtr > 0 ? ` + ${proportionalWasteMtr.toFixed(2)}m west` : ''}{shortageMtrVal > 0 ? ` + ${shortageMtrVal.toFixed(2)}m short` : ''})
+                                  </span>
                                 )}
                                 <span style={{ color: '#64748b' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
                               </div>
@@ -5783,6 +5797,25 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       </div>
                     </div>
                   </div>
+
+                  {/* Proportional Outward Deduction Preview */}
+                  {challanFusingStats && challanFusingStats.westMtr > 0 && challanTotalMtr > 0 && (() => {
+                    const dispatched = challanTotalMtr;
+                    const baseFresh = challanFusingStats.freshMtr > 0 ? challanFusingStats.freshMtr : dispatched;
+                    const ratio = Math.min(1.0, dispatched / baseFresh);
+                    const propWest = parseFloat((ratio * challanFusingStats.westMtr).toFixed(2));
+                    const totalWithWest = parseFloat((dispatched + propWest).toFixed(2));
+                    return (
+                      <div style={{ marginTop: '0.45rem', padding: '0.35rem 0.65rem', background: '#ffffff', borderRadius: '7px', border: '1px solid #bae6fd', fontSize: '0.72rem', color: '#0369a1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                        <span>
+                          <strong>Outward Deduction:</strong> {dispatched.toFixed(2)}m + {propWest.toFixed(2)}m (west share) = <strong style={{ color: '#0284c7', fontSize: '0.8rem' }}>{totalWithWest.toFixed(2)}m</strong> + shortage
+                        </span>
+                        <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '1px 7px', borderRadius: '4px' }}>
+                          {(ratio * 100).toFixed(0)}% job share
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* TP Meters Entry Scrollable Area */}

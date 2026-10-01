@@ -85,6 +85,48 @@ function parseLotNo(lotStr) {
   return undefined;
 }
 
+// ── Helper: compute total fusing fresh & wastage across linked job card(s) ──
+async function getLinkedJobFusingMetrics(jobNoStr) {
+  if (!jobNoStr) return { totalFresh: 0, totalWaste: 0 };
+  const rawJobTokens = String(jobNoStr)
+    .split(/[,\s&]+/)
+    .map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, ''))
+    .filter(Boolean);
+
+  let totalFresh = 0;
+  let totalWaste = 0;
+
+  for (const tok of rawJobTokens) {
+    const cleanNo = tok.replace(/\D/g, '');
+    const jCard = await JobCard.findOne({
+      $or: [
+        { jobNo: tok },
+        { jobNo: new RegExp('^' + tok + '$', 'i') },
+        ...(cleanNo ? [{ jobNo: new RegExp(cleanNo + '$', 'i') }] : [])
+      ]
+    }).lean();
+
+    if (jCard) {
+      const fresh = parseFloat(jCard.freshMtr || 0);
+      const waste = parseFloat(
+        jCard.totalWastageMtr ||
+        jCard.fabricWastageMtr ||
+        ((parseFloat(jCard.fabricFaultMtr) || 0) +
+         (parseFloat(jCard.fusingFaultMtr) || 0) +
+         (parseFloat(jCard.printFaultMtr) || 0) +
+         (parseFloat(jCard.genuineFaultMtr) || 0)) ||
+        0
+      );
+      const fused = parseFloat(jCard.fusingMtr || 0);
+      const effFresh = fresh > 0 ? fresh : (fused > 0 && waste === 0 ? fused : 0);
+      totalFresh += effFresh;
+      totalWaste += waste;
+    }
+  }
+
+  return { totalFresh, totalWaste };
+}
+
 // ── Helper: Automated Lot Allocation Program Logic ─────────────────────────
 // Automatically allocates lot numbers across TP details sequentially:
 // First lot is consumed until stock becomes EXACTLY ZERO (accounting for shortage),
@@ -494,11 +536,34 @@ const createChallan = async (req, res) => {
             challanNo: 'EDP-' + challan.challanNo
           });
         }
+
+        // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
+        let challanProportionalWaste = 0;
+        if (jobNo && totalMtr > 0) {
+          try {
+            const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(jobNo);
+            if (totalWaste > 0) {
+              const baseFresh = totalFresh > 0 ? totalFresh : totalMtr;
+              const ratio = Math.min(1.0, totalMtr / baseFresh);
+              challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
+            }
+          } catch (wErr) {
+            console.warn('Failed to calculate proportional fusing wastage for challan:', wErr.message);
+          }
+        }
+
         const createdTxIds = [];
         for (const [lot, groupMtr] of Object.entries(lotGroups)) {
           const lotNum = parseLotNo(lot);
           let lotShortage = challan.shortagePct != null ? challan.shortagePct : 0;
-          let rawMtr = computeRawMeters(groupMtr, lotShortage);
+
+          // Proportional share of wastage for this lot
+          const lotWasteShare = totalMtr > 0
+            ? parseFloat(((groupMtr / totalMtr) * challanProportionalWaste).toFixed(3))
+            : 0;
+          const lotFinishedMtr = parseFloat((groupMtr + lotWasteShare).toFixed(3));
+
+          let rawMtr = computeRawMeters(lotFinishedMtr, lotShortage, challan.shortageMtr, challan.shortageMode);
 
           if (lotNum) {
             const inwardTxs = await FabricTransaction.find({ type: 'INWARD', lotNo: lotNum }).lean();
@@ -510,7 +575,7 @@ const createChallan = async (req, res) => {
 
             if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null && !isNaN(parseFloat(inwardTxs[0].shortagePct))) {
               lotShortage = parseFloat(inwardTxs[0].shortagePct) || 0;
-              rawMtr = computeRawMeters(groupMtr, lotShortage);
+              rawMtr = computeRawMeters(lotFinishedMtr, lotShortage, challan.shortageMtr, challan.shortageMode);
             }
 
             // EXACT ZEROING GUARANTEE
@@ -533,13 +598,19 @@ const createChallan = async (req, res) => {
             partyName: partyName || '',
             billTo: billTo || partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${lotShortage}% shortage = ${rawMtr}m raw`,
+            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
           createdTxIds.push(outwardTx._id);
         }
         challan.fabricOutwardIds = createdTxIds;
-        await FabricChallan.findByIdAndUpdate(challan._id, { $set: { fabricOutwardIds: createdTxIds } });
+        challan.proportionalWasteMtr = challanProportionalWaste;
+        await FabricChallan.findByIdAndUpdate(challan._id, { 
+          $set: { 
+            fabricOutwardIds: createdTxIds,
+            proportionalWasteMtr: challanProportionalWaste
+          } 
+        });
       } catch (txErr) {
         console.error('Warning: Failed to auto-create fabric outward transactions:', txErr.message);
       }
@@ -754,11 +825,33 @@ const updateChallan = async (req, res) => {
       }
 
       if (challan.fabricName && challan.totalMtr > 0 && Object.keys(lotGroups).length > 0) {
+        // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
+        let challanProportionalWaste = 0;
+        if (challan.jobNo && challan.totalMtr > 0) {
+          try {
+            const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(challan.jobNo);
+            if (totalWaste > 0) {
+              const baseFresh = totalFresh > 0 ? totalFresh : challan.totalMtr;
+              const ratio = Math.min(1.0, challan.totalMtr / baseFresh);
+              challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
+            }
+          } catch (wErr) {
+            console.warn('Failed to calculate proportional fusing wastage for challan on update:', wErr.message);
+          }
+        }
+
         const createdTxIds = [];
         for (const [lot, groupMtr] of Object.entries(lotGroups)) {
           const lotNum = parseLotNo(lot);
           let lotShortage = challan.shortagePct != null ? challan.shortagePct : 0;
-          let rawMtr = computeRawMeters(groupMtr, lotShortage);
+
+          // Proportional share of wastage for this lot
+          const lotWasteShare = challan.totalMtr > 0
+            ? parseFloat(((groupMtr / challan.totalMtr) * challanProportionalWaste).toFixed(3))
+            : 0;
+          const lotFinishedMtr = parseFloat((groupMtr + lotWasteShare).toFixed(3));
+
+          let rawMtr = computeRawMeters(lotFinishedMtr, lotShortage, challan.shortageMtr, challan.shortageMode);
 
           if (lotNum) {
             const inwardTxs = await FabricTransaction.find({ type: 'INWARD', lotNo: lotNum }).lean();
@@ -770,7 +863,7 @@ const updateChallan = async (req, res) => {
 
             if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null && !isNaN(parseFloat(inwardTxs[0].shortagePct))) {
               lotShortage = parseFloat(inwardTxs[0].shortagePct) || 0;
-              rawMtr = computeRawMeters(groupMtr, lotShortage);
+              rawMtr = computeRawMeters(lotFinishedMtr, lotShortage, challan.shortageMtr, challan.shortageMode);
             }
 
             // EXACT ZEROING GUARANTEE
@@ -793,13 +886,19 @@ const updateChallan = async (req, res) => {
             partyName: challan.partyName || '',
             billTo: challan.billTo || challan.partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${lotShortage}% shortage = ${rawMtr}m raw`,
+            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
           createdTxIds.push(outwardTx._id);
         }
         challan.fabricOutwardIds = createdTxIds;
-        await FabricChallan.findByIdAndUpdate(challan._id, { $set: { fabricOutwardIds: createdTxIds } });
+        challan.proportionalWasteMtr = challanProportionalWaste;
+        await FabricChallan.findByIdAndUpdate(challan._id, { 
+          $set: { 
+            fabricOutwardIds: createdTxIds,
+            proportionalWasteMtr: challanProportionalWaste
+          } 
+        });
       }
     } catch (txErr) {
       console.error('Warning: Failed to sync fabric outward transactions on update:', txErr.message);

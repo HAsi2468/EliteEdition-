@@ -102,6 +102,10 @@ const fabricChallanSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    proportionalWasteMtr: {
+      type: Number,
+      default: 0,
+    },
     totalTp: {
       type: Number,
       default: 0,
