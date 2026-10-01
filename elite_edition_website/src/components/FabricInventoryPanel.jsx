@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../services/api';
 import CatalogManagerModal from './CatalogManagerModal';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
@@ -2437,7 +2437,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const jobMtrNeeded = activeJob ? parseFloat(activeJob.totalMtr) || 0 : 0;
 
   // Fusing department output metrics for the selected job card(s)
-  const challanFusingStats = useMemo(() => {
+  const challanFusingStats = React.useMemo(() => {
     if (!challanForm.jobNo) return null;
     const rawTokens = String(challanForm.jobNo || '')
       .split(/[,\s&]+/)
