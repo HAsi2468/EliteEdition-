@@ -46,6 +46,9 @@ function evaluateStageVariances({
   deliveredMtr,
   overageReason = '',
   operatorOverride = false,
+  printStatus = '',
+  fusingStatus = '',
+  deliveryStatus = '',
 }) {
   const errors = [];
   const warnings = [];
@@ -59,7 +62,17 @@ function evaluateStageVariances({
   const stage4 = Math.max(0, parseFloat(deliveredMtr) || 0);
 
   // ── Stage 1 -> Stage 2: Printing Overage Watchdog ──
-  if (stage1 > 0 && stage2 > 0) {
+  // If the job card is explicitly marked as Printing Pending / unprinted and not advancing to fusing or delivery,
+  // do not block general updates. Only enforce when printing is marked done, or advancing to next stage,
+  // or print log entry is being submitted.
+  const isExplicitlyUnprinted =
+    typeof printStatus === 'string' &&
+    printStatus !== '' &&
+    (printStatus.toLowerCase().includes('pending') || printStatus.toLowerCase() === 'draft');
+
+  const isAdvancingNextStage = stage3Total > 0 || stage4 > 0;
+
+  if ((!isExplicitlyUnprinted || isAdvancingNextStage) && stage1 > 0 && stage2 > 0) {
     const ratio = stage2 / stage1;
     if (ratio > ANOMALOUS_PRINT_OVERAGE_RATIO && !operatorOverride) {
       errors.push(
@@ -174,6 +187,9 @@ function productionVarianceMiddleware(req, res, next) {
     deliveredMtr,
     overageReason: body.overageReason || req.headers['x-overage-reason'],
     operatorOverride: body.operatorOverride === true || req.headers['x-operator-override'] === 'true',
+    printStatus: body.printStatus !== undefined ? body.printStatus : existingDoc.printStatus,
+    fusingStatus: body.fusingStatus !== undefined ? body.fusingStatus : existingDoc.fusingStatus,
+    deliveryStatus: body.deliveryStatus !== undefined ? body.deliveryStatus : existingDoc.deliveryStatus,
   });
 
   if (!evaluation.isValid) {

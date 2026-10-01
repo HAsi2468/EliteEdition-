@@ -60,6 +60,17 @@ describe('Phase 2: 4-Stage Production Meter Variance Sentinel & Database Non-Neg
       assert.ok(result.auditTags.includes('ANOMALOUS_PRINT_REJECTED'));
     });
 
+    it('should allow updating an unprinted job card (Printing Pending) even if draft print meters differ', () => {
+      const result = evaluateStageVariances({
+        totalMtr: 19,
+        printMtr: 40,
+        printStatus: 'Printing Pending',
+      });
+
+      assert.strictEqual(result.isValid, true);
+      assert.strictEqual(result.errors.length, 0);
+    });
+
     it('should permit anomalous meters if explicit supervisor operatorOverride is true', () => {
       const result = evaluateStageVariances({
         totalMtr: 100,

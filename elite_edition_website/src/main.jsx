@@ -3,21 +3,24 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { SocketProvider } from './contexts/SocketContext.jsx'
-import { ErrorBoundary } from './ErrorBoundary.jsx'
+import { RootErrorBoundary } from './components/RootErrorBoundary'
 import { installGlobalDialogInterceptors } from './services/dialogService.js'
+import { setupGlobalCrashListeners } from './utils/globalCrashListeners'
 
-// Initialize enterprise dialog & global error interceptors
+// Initialize enterprise dialog & global error and unhandled rejection interceptors
 installGlobalDialogInterceptors()
+setupGlobalCrashListeners()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ErrorBoundary>
+    <RootErrorBoundary>
       <SocketProvider>
         <App />
       </SocketProvider>
-    </ErrorBoundary>
+    </RootErrorBoundary>
   </StrictMode>,
 )
+
 
 // Strict Host Verification: Ensure users are never stranded on raw IP address
 if (window.location.hostname === '3.7.174.180' || /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname)) {
