@@ -314,50 +314,38 @@
 /* Desktop Grid for TP Row */
 .challan-tp-grid-header {
   display: grid;
-  grid-template-columns: 56px 130px 1fr 1fr 1fr 34px;
-  gap: 0.45rem;
-  font-size: 0.73rem;
+  grid-template-columns: 65px 150px 1fr 36px;
+  gap: 0.5rem;
+  font-size: 0.75rem;
   color: #64748b;
   font-weight: 800;
   text-transform: uppercase;
   padding-left: 0.25rem;
   margin-bottom: 0.2rem;
-  align-items: center;
 }
 
 .challan-tp-row {
   display: grid;
-  grid-template-columns: 56px 130px 1fr 1fr 1fr 34px;
-  gap: 0.45rem;
+  grid-template-columns: 65px 150px 1fr 36px;
+  grid-template-areas: "badge lot meter remove";
+  gap: 0.5rem;
   align-items: center;
 }
 
-.challan-tp-meters-subgrid {
-  display: contents;
-}
-
 .challan-tp-badge {
-  /* fits in grid */
+  grid-area: badge;
 }
 
 .challan-tp-lot-container {
-  /* fits in grid */
-}
-
-.challan-tp-fresh-wrapper {
-  /* fits in grid */
-}
-
-.challan-tp-west-wrapper {
-  /* fits in grid */
+  grid-area: lot;
 }
 
 .challan-tp-meter-wrapper {
-  /* fits in grid */
+  grid-area: meter;
 }
 
 .challan-tp-remove-btn {
-  /* fits in grid */
+  grid-area: remove;
 }
 
 .challan-tp-footer {
@@ -460,38 +448,16 @@
   }
 
   .challan-tp-row {
-    display: grid !important;
     grid-template-columns: 56px 1fr 36px !important;
+    grid-template-areas:
+      "badge lot remove"
+      "meter meter meter" !important;
     gap: 0.45rem !important;
     background: #f8fafc !important;
     border: 1.5px solid #e2e8f0 !important;
     border-radius: 10px !important;
     padding: 0.6rem 0.7rem !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
-  }
-
-  .challan-tp-badge {
-    grid-column: 1 / 2;
-    grid-row: 1;
-  }
-
-  .challan-tp-lot-container {
-    grid-column: 2 / 3;
-    grid-row: 1;
-  }
-
-  .challan-tp-remove-btn {
-    grid-column: 3 / 4;
-    grid-row: 1;
-  }
-
-  .challan-tp-meters-subgrid {
-    grid-column: 1 / 4;
-    grid-row: 2;
-    display: grid !important;
-    grid-template-columns: 1fr 1fr 1fr !important;
-    gap: 0.45rem !important;
-    width: 100% !important;
   }
 
   .challan-tp-footer {
