@@ -75,6 +75,7 @@ export default function AdminPanel() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null); // null means "Add Mode"
   const [availableDesigners, setAvailableDesigners] = useState([]);
+  const [permissionSearchTerm, setPermissionSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -516,6 +517,7 @@ export default function AdminPanel() {
     setEditingUser(null);
     setShowUserModal(false);
     setModalError('');
+    setPermissionSearchTerm('');
     setFormData({
       name: '',
       email: '',
@@ -1483,7 +1485,7 @@ export default function AdminPanel() {
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
                             <label style={styles.microLabel(formData.canInputNewDesign)}>
                               <input type="checkbox" checked={formData.canInputNewDesign} onChange={e => setFormData(p => ({ ...p, canInputNewDesign: e.target.checked }))} />
-                              <span>➕ Input New Design & Upload Sample Image (Sample Screen)</span>
+                              <span>➕ "+ New Sample Design" Button & Sample Image Upload</span>
                             </label>
                             <label style={styles.microLabel(formData.canCreateDesigns)}>
                               <input type="checkbox" checked={formData.canCreateDesigns} onChange={e => setFormData(p => ({ ...p, canCreateDesigns: e.target.checked }))} />
@@ -1718,70 +1720,124 @@ export default function AdminPanel() {
                         Select which operational modules and screens this user is authorized to open.
                       </p>
 
-                      {Array.from(new Set(AVAILABLE_SCREENS.map(s => s.category))).map(cat => {
-                        const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
-                        const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
-                        const catTitle = cat === 'General' ? '⚙️ Core & General' :
-                                         cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
-                                         cat === 'Elite Edition' ? '🏢 Elite Edition' :
-                                         cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
-                                         cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
-                                         cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
+                      {/* Real-Time Permission Search Filter */}
+                      <div style={{ position: 'relative', marginBottom: '0.65rem' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                        <input
+                          type="text"
+                          placeholder="Search screens & buttons (e.g. 'sample design', 'catalog', 'inward')..."
+                          value={permissionSearchTerm}
+                          onChange={e => setPermissionSearchTerm(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.45rem 2rem 0.45rem 2.1rem',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.8rem',
+                            boxSizing: 'border-box',
+                            background: '#ffffff'
+                          }}
+                        />
+                        {permissionSearchTerm && (
+                          <button
+                            type="button"
+                            onClick={() => setPermissionSearchTerm('')}
+                            style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
 
-                        return (
-                          <div key={cat} style={{ marginBottom: '0.85rem', background: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                {catTitle}
-                              </span>
-                              {formData.role !== 'admin' && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const ids = catScreens.map(s => s.id);
-                                    setFormData(prev => {
-                                      const hasAll = ids.every(id => prev.permissions.includes(id));
-                                      const updated = hasAll
-                                        ? prev.permissions.filter(id => !ids.includes(id))
-                                        : Array.from(new Set([...prev.permissions, ...ids]));
-                                      return { ...prev, permissions: updated };
-                                    });
-                                  }}
-                                  style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
-                                >
-                                  {allChecked ? 'Deselect Category' : 'Select Category'}
-                                </button>
-                              )}
+                      {(() => {
+                        const term = permissionSearchTerm.trim().toLowerCase();
+                        const matchingScreens = term
+                          ? AVAILABLE_SCREENS.filter(s =>
+                              s.label.toLowerCase().includes(term) ||
+                              s.id.toLowerCase().includes(term) ||
+                              s.category.toLowerCase().includes(term) ||
+                              (s.id === 'jobcards_sample' && 'new sample design'.includes(term))
+                            )
+                          : AVAILABLE_SCREENS;
+
+                        const categories = Array.from(new Set(matchingScreens.map(s => s.category)));
+
+                        if (categories.length === 0) {
+                          return (
+                            <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              No screens found matching "{permissionSearchTerm}".
                             </div>
+                          );
+                        }
 
-                            <div style={styles.checkboxGrid}>
-                              {catScreens.map(screen => {
-                                const isChecked = formData.permissions.includes(screen.id);
-                                return (
-                                  <label
-                                    key={screen.id}
-                                    style={{
-                                      ...styles.checkboxLabel,
-                                      background: isChecked ? '#eff6ff' : '#ffffff',
-                                      borderColor: isChecked ? '#2563eb' : '#e2e8f0',
-                                      ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
+                        return categories.map(cat => {
+                          const catScreens = matchingScreens.filter(s => s.category === cat);
+                          const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
+                          const catTitle = cat === 'General' ? '⚙️ Core & General' :
+                                           cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
+                                           cat === 'Elite Edition' ? '🏢 Elite Edition' :
+                                           cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
+                                           cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
+                                           cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
+
+                          return (
+                            <div key={cat} style={{ marginBottom: '0.85rem', background: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  {catTitle}
+                                </span>
+                                {formData.role !== 'admin' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const ids = catScreens.map(s => s.id);
+                                      setFormData(prev => {
+                                        const hasAll = ids.every(id => prev.permissions.includes(id));
+                                        const updated = hasAll
+                                          ? prev.permissions.filter(id => !ids.includes(id))
+                                          : Array.from(new Set([...prev.permissions, ...ids]));
+                                        return { ...prev, permissions: updated };
+                                      });
                                     }}
+                                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
                                   >
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      disabled={formData.role === 'admin'}
-                                      onChange={() => handlePermissionCheckbox(screen.id)}
-                                      style={styles.checkbox}
-                                    />
-                                    <span style={{ fontSize: '0.82rem', fontWeight: isChecked ? 700 : 500, color: isChecked ? '#1d4ed8' : '#334155' }}>{screen.label}</span>
-                                  </label>
-                                );
-                              })}
+                                    {allChecked ? 'Deselect Category' : 'Select Category'}
+                                  </button>
+                                )}
+                              </div>
+
+                              <div style={styles.checkboxGrid}>
+                                {catScreens.map(screen => {
+                                  const isChecked = formData.permissions.includes(screen.id);
+                                  const isSample = screen.id === 'jobcards_sample';
+                                  return (
+                                    <label
+                                      key={screen.id}
+                                      style={{
+                                        ...styles.checkboxLabel,
+                                        background: isChecked ? '#eff6ff' : isSample ? '#fffbeb' : '#ffffff',
+                                        borderColor: isChecked ? '#2563eb' : isSample ? '#f59e0b' : '#e2e8f0',
+                                        ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        disabled={formData.role === 'admin'}
+                                        onChange={() => handlePermissionCheckbox(screen.id)}
+                                        style={styles.checkbox}
+                                      />
+                                      <span style={{ fontSize: '0.82rem', fontWeight: isChecked || isSample ? 700 : 500, color: isChecked ? '#1d4ed8' : isSample ? '#92400e' : '#334155' }}>
+                                        {screen.label}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
 
