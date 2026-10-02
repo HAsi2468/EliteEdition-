@@ -273,6 +273,25 @@ httpClient.interceptors.response.use(
       }
     }
 
+    // Handle 401 Unauthorized via SilentAuthInterceptor queue and replay
+    const is401 = status === 401;
+    const isAuthRoute =
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/refresh') ||
+      originalRequest.url?.includes('/auth/register');
+
+    if (is401 && !originalRequest._retry && !isAuthRoute) {
+      originalRequest._retry = true;
+      try {
+        const { silentAuth } = await import('./authInterceptor');
+        const freshAccessToken = await silentAuth.getFreshAccessToken();
+        originalRequest.headers.set('Authorization', `Bearer ${freshAccessToken}`);
+        return httpClient(originalRequest);
+      } catch (refreshErr) {
+        return Promise.reject(refreshErr);
+      }
+    }
+
     return Promise.reject(error);
   }
 );

@@ -20,6 +20,10 @@ mongoose.connection.on('disconnected', () => {
 
 mongoose.connect(config.mongoose.url, {
   serverSelectionTimeoutMS: 5000, // Fail fast if Atlas is unreachable
+  maxPoolSize: 50,                // Strict upper bound matching CPU/DB limits
+  minPoolSize: 10,                // Pre-warmed standby connections
+  socketTimeoutMS: 45000,         // Prevent socket hangs during network partitions
+  connectTimeoutMS: 10000,
 })
   .catch((error) => {
     logger.error('Connect to mongodb error on initial connection:', error);

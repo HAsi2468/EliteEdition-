@@ -121,7 +121,8 @@ const jobCardSchema = new mongoose.Schema(
         changesSummary: { type: String, default: '' }
       }
     ],
-    orderChatRoomId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom' }
+    orderChatRoomId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom' },
+    version: { type: Number, default: 1 }
   },
   {
     timestamps: {

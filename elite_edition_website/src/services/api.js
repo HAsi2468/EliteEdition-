@@ -1,4 +1,5 @@
 import { downloadOrPreviewPdf } from '../utils/pdfDownloadService';
+import { silentAuth } from './authInterceptor';
 
 // API Base URL management
 const DEFAULT_URL = '/v1';
@@ -64,9 +65,46 @@ export const fetchCsrfToken = async () => {
   return csrfRefreshPromise;
 };
 
+/**
+ * Generates a cryptographically strong UUIDv4 for Idempotency-Key headers
+ */
+export const generateIdempotencyKey = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'idem_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+};
+
+/**
+ * Calculates exponential backoff with full randomized jitter
+ * Attempt 1: 500ms, Attempt 2: 1500ms, Attempt 3: 4000ms
+ */
+const getBackoffDelay = (attempt) => {
+  const baseDelays = [500, 1500, 4000];
+  const base = baseDelays[attempt - 1] || 4000;
+  const jitter = Math.floor(Math.random() * (base * 0.2)); // 20% random jitter
+  return base + jitter;
+};
+
 // Generic request wrapper with Auto-Retry, Timeout & Safe Error Parser
 const request = async (path, options = {}) => {
-  const maxRetries = options.maxRetries ?? (options.method && options.method !== 'GET' ? 2 : 3);
+  const method = (options.method || 'GET').toUpperCase();
+  const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  
+  // Resolve or generate Idempotency-Key for mutating requests
+  let idempotencyKey =
+    options.headers?.['Idempotency-Key'] ||
+    options.headers?.['idempotency-key'] ||
+    options.idempotencyKey ||
+    null;
+
+  if (isMutating && !idempotencyKey) {
+    idempotencyKey = generateIdempotencyKey();
+  }
+
+  // Idempotent requests (GET, HEAD, OPTIONS) or mutations backed by an Idempotency-Key may be retried
+  const canRetry = !isMutating || Boolean(idempotencyKey);
+  const maxRetries = options.maxRetries ?? (canRetry ? 3 : 0);
   let attempt = 0;
 
   while (attempt <= maxRetries) {
@@ -89,9 +127,6 @@ const request = async (path, options = {}) => {
 
     const activeCompanyId = localStorage.getItem('elite_active_department') || '';
 
-    const method = (options.method || 'GET').toUpperCase();
-    const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-
     let csrfToken = null;
     if (isMutating) {
       csrfToken = inMemoryCsrfToken || getCsrfTokenFromCookie();
@@ -108,6 +143,7 @@ const request = async (path, options = {}) => {
       ...(uRole ? { 'X-User-Role': uRole } : {}),
       ...(activeCompanyId ? { 'X-Company-Id': activeCompanyId } : {}),
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Pragma': 'no-cache',
       ...options.headers,
@@ -145,8 +181,8 @@ const request = async (path, options = {}) => {
         err.message.includes('Load failed')
       );
 
-      if (isTransient && attempt <= maxRetries) {
-        const delay = attempt * 800; // 800ms, 1600ms, 2400ms
+      if (isTransient && attempt <= maxRetries && canRetry) {
+        const delay = getBackoffDelay(attempt);
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
@@ -163,15 +199,33 @@ const request = async (path, options = {}) => {
         if (errJson?.error && typeof errJson.error === 'string' && errJson.error.startsWith('CSRF_TOKEN_')) {
           inMemoryCsrfToken = null;
           await fetchCsrfToken();
-          return request(path, { ...options, _csrfRetried: true });
+          return request(path, { ...options, _csrfRetried: true, headers: { ...options.headers, 'Idempotency-Key': idempotencyKey } });
         }
       } catch (e) {}
     }
 
+    // Auto-refresh expired JWT via SilentAuthInterceptor on 401 Unauthorized
+    const isAuthRoute = path.includes('/auth/login') || path.includes('/auth/refresh') || path.includes('/auth/register');
+    if (response.status === 401 && !options._authRetried && !isAuthRoute) {
+      try {
+        const freshAccessToken = await silentAuth.getFreshAccessToken();
+        return request(path, {
+          ...options,
+          _authRetried: true,
+          headers: {
+            ...options.headers,
+            'Authorization': `Bearer ${freshAccessToken}`,
+            ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
+          }
+        });
+      } catch (refreshErr) {
+        throw new Error('Your session has expired. Please log in again.');
+      }
+    }
     
     // If server is reloading during deployment, status code is 502, 503, or 504
-    if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt <= maxRetries) {
-      const delay = attempt * 1000; // 1s, 2s
+    if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt <= maxRetries && canRetry) {
+      const delay = getBackoffDelay(attempt);
       await new Promise(r => setTimeout(r, delay));
       continue;
     }
@@ -2438,6 +2492,17 @@ export const api = {
     if (q) qs.set('q', q);
     if (companyId) qs.set('companyId', companyId);
     return request(`/search/global?${qs.toString()}`);
+  },
+
+  async triggerAsyncExport(type, params = {}) {
+    return request('/jobs/export', {
+      method: 'POST',
+      body: JSON.stringify({ type, params })
+    });
+  },
+
+  async getJobStatus(jobId) {
+    return request(`/jobs/${jobId}`);
   }
 };
 

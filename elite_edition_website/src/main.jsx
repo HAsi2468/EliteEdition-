@@ -8,6 +8,7 @@ import { RootErrorBoundary } from './components/RootErrorBoundary'
 import { installGlobalDialogInterceptors } from './services/dialogService.js'
 import { setupGlobalCrashListeners } from './utils/globalCrashListeners'
 import { initERPTelemetry } from './telemetry/deviceTelemetry'
+import './services/telemetryService.ts'
 
 // Initialize device & hardware telemetry, enterprise dialog & global error and rejection listeners
 initERPTelemetry()

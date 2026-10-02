@@ -23,6 +23,8 @@ router.post(
 );
 router.post('/login', validate(authValidation.login), authController.login);
 router.post('/refresh-tokens', authController.refreshTokens);
+router.post('/refresh', authController.refreshTokens);
+router.post('/logout', authController.logout);
 router.post(
   '/forgot-password',
   validate(authValidation.forgotPassword),

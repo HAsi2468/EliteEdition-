@@ -58,12 +58,16 @@ const inventorySchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.Mixed],
       default: [],
     },
-    facility: {
-      type: String,
-      trim: true,
-      default: 'Pankhudi',
+      facility: {
+        type: String,
+        trim: true,
+        default: 'Pankhudi',
+      },
+      version: {
+        type: Number,
+        default: 1,
+      },
     },
-  },
   {
     timestamps: {
       createdAt: 'created_date_time',

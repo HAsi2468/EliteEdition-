@@ -1,4 +1,13 @@
-const { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const config = require('../config/config');
 const logger = require('../config/logger');
@@ -154,6 +163,90 @@ async function deleteR2Object(key) {
 }
 
 /**
+ * Initiates an S3/R2 Multipart Upload for large files exceeding 10MB
+ */
+async function initiateMultipartR2Upload({ fileName, fileType, folder = 'uploads' }) {
+  const client = getR2Client();
+  if (!client || !config.r2.bucketName) {
+    throw new Error('Cloudflare R2 is not configured');
+  }
+
+  const cleanFolder = folder.replace(/^\/+|\/+$/g, '');
+  const key = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
+
+  const command = new CreateMultipartUploadCommand({
+    Bucket: config.r2.bucketName,
+    Key: key,
+    ContentType: fileType || 'application/octet-stream',
+  });
+
+  const res = await client.send(command);
+  return {
+    uploadId: res.UploadId,
+    key,
+  };
+}
+
+/**
+ * Generates a pre-signed URL for a specific chunk part
+ */
+async function getMultipartR2PartUrl({ key, uploadId, partNumber, expiresIn = 300 }) {
+  const client = getR2Client();
+  if (!client || !config.r2.bucketName) {
+    throw new Error('Cloudflare R2 is not configured');
+  }
+
+  const command = new UploadPartCommand({
+    Bucket: config.r2.bucketName,
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: Number(partNumber),
+  });
+
+  const partUploadUrl = await getSignedUrl(client, command, { expiresIn });
+  return {
+    partUploadUrl,
+    partNumber: Number(partNumber),
+  };
+}
+
+/**
+ * Finalizes and completes a multipart upload
+ */
+async function completeMultipartR2Upload({ key, uploadId, parts }) {
+  const client = getR2Client();
+  if (!client || !config.r2.bucketName) {
+    throw new Error('Cloudflare R2 is not configured');
+  }
+
+  const sortedParts = parts
+    .map(p => ({ PartNumber: Number(p.PartNumber || p.partNumber), ETag: p.ETag || p.etag }))
+    .sort((a, b) => a.PartNumber - b.PartNumber);
+
+  const command = new CompleteMultipartUploadCommand({
+    Bucket: config.r2.bucketName,
+    Key: key,
+    UploadId: uploadId,
+    MultipartUpload: {
+      Parts: sortedParts,
+    },
+  });
+
+  await client.send(command);
+
+  let publicBase = (config.r2.publicUrl || '').trim().replace(/\/+$/, '');
+  if (!publicBase) {
+    publicBase = `https://${config.r2.bucketName}.${config.r2.accountId}.r2.cloudflarestorage.com`;
+  }
+
+  const finalUrl = `${publicBase}/${key}`;
+  return {
+    fileUrl: finalUrl,
+    key,
+  };
+}
+
+/**
  * Delete all objects under a specified R2 folder (e.g. "Complaints/Digital_Print")
  * @param {string} folder
  */
@@ -172,6 +265,9 @@ module.exports = {
   isR2Configured,
   uploadToR2,
   getPresignedR2UploadUrl,
+  initiateMultipartR2Upload,
+  getMultipartR2PartUrl,
+  completeMultipartR2Upload,
   listR2Objects,
   deleteR2Object,
   deleteR2Folder,

@@ -812,9 +812,7 @@ const updateChallan = async (req, res) => {
         challan.fabricOutwardId = null;
       }
       if (challan.fabricOutwardIds && challan.fabricOutwardIds.length > 0) {
-        for (const txId of challan.fabricOutwardIds) {
-          await FabricTransaction.findByIdAndDelete(txId);
-        }
+        await FabricTransaction.deleteMany({ _id: { $in: challan.fabricOutwardIds } });
         challan.fabricOutwardIds = [];
       }
       if (challan.challanNo) {
@@ -928,12 +926,10 @@ const deleteChallan = async (req, res) => {
       }
     }
     if (challan.fabricOutwardIds && challan.fabricOutwardIds.length > 0) {
-      for (const txId of challan.fabricOutwardIds) {
-        try {
-          await FabricTransaction.findByIdAndDelete(txId);
-        } catch (txErr) {
-          console.error('Warning: Failed to delete linked fabric outward:', txErr.message);
-        }
+      try {
+        await FabricTransaction.deleteMany({ _id: { $in: challan.fabricOutwardIds } });
+      } catch (txErr) {
+        console.error('Warning: Failed to delete linked fabric outward:', txErr.message);
       }
     }
 

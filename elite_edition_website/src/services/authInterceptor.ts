@@ -7,8 +7,11 @@
  * Capabilities:
  * 1. Mutex / Promise Lock: Prevents 10 concurrent requests from triggering 10 refresh calls.
  * 2. Transparent Replay: Re-executes paused 401 calls with the newly minted access token.
- * 3. Graceful Fallback: Cleans session and notifies UI only if the refresh token is genuinely invalid.
+ * 3. Graceful Fallback: Cleans session, flushes memory, and redirects to login if refresh fails.
+ * 4. Dual Transport Support: Integrates seamlessly with both Fetch and Axios (httpClient).
  */
+
+import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 export interface TokenRefreshResponse {
   tokens?: {
@@ -25,13 +28,52 @@ interface QueuedRequest {
   init: RequestInit;
 }
 
+interface QueuedAxiosRequest {
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}
+
 export class SilentAuthInterceptor {
   private isRefreshing = false;
   private failedQueue: QueuedRequest[] = [];
+  private failedAxiosQueue: QueuedAxiosRequest[] = [];
   private refreshEndpoint = '/v1/auth/refresh-tokens';
+  private refreshPromise: Promise<string> | null = null;
 
   constructor(endpoint?: string) {
     if (endpoint) this.refreshEndpoint = endpoint;
+  }
+
+  public setEndpoint(endpoint: string): void {
+    this.refreshEndpoint = endpoint;
+  }
+
+  /**
+   * Acquire a fresh access token via mutex.
+   * If a refresh is already in progress, waits on the single active refresh promise.
+   */
+  public async getFreshAccessToken(): Promise<string> {
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const token = await this.performSilentRefresh();
+        this.drainQueue(null, token);
+        return token;
+      } catch (err) {
+        this.drainQueue(err, null);
+        this.handleSessionTermination();
+        throw err;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   /**
@@ -39,7 +81,7 @@ export class SilentAuthInterceptor {
    */
   public async interceptFetch(url: string, init: RequestInit = {}): Promise<Response> {
     // 1. If currently refreshing tokens, queue this incoming request immediately
-    if (this.isRefreshing && !url.includes(this.refreshEndpoint)) {
+    if (this.isRefreshing && !url.includes(this.refreshEndpoint) && !url.includes('/auth/login')) {
       return new Promise<Response>((resolve, reject) => {
         this.failedQueue.push({ resolve, reject, url, init });
       });
@@ -53,27 +95,18 @@ export class SilentAuthInterceptor {
     }
 
     // 2. Check for 401 Unauthorized (Expired Access Token)
-    if (response.status === 401 && !url.includes(this.refreshEndpoint) && !url.includes('/auth/login')) {
+    if (response.status === 401 && !url.includes(this.refreshEndpoint) && !url.includes('/auth/login') && !url.includes('/auth/register')) {
       if (!this.isRefreshing) {
-        this.isRefreshing = true;
-
         try {
-          const newAccessToken = await this.performSilentRefresh();
+          const newAccessToken = await this.getFreshAccessToken();
 
           // 3. Replay the original request with the new access token
           const updatedHeaders = new Headers(init.headers || {});
           updatedHeaders.set('Authorization', `Bearer ${newAccessToken}`);
           const retriedInit: RequestInit = { ...init, headers: updatedHeaders };
 
-          // 4. Drain and replay all queued pending requests
-          this.drainQueue(null, newAccessToken);
-          this.isRefreshing = false;
-
           return fetch(url, retriedInit);
         } catch (refreshError) {
-          this.drainQueue(refreshError, null);
-          this.isRefreshing = false;
-          this.handleSessionTermination();
           throw refreshError;
         }
       } else {
@@ -90,7 +123,7 @@ export class SilentAuthInterceptor {
   /**
    * Executes the silent token refresh call
    */
-  private async performSilentRefresh(): Promise<string> {
+  public async performSilentRefresh(): Promise<string> {
     const refreshToken = typeof localStorage !== 'undefined'
       ? localStorage.getItem('elite_refresh_token')
       : null;
@@ -100,7 +133,7 @@ export class SilentAuthInterceptor {
       headers: {
         'Content-Type': 'application/json',
       },
-      credentials: 'include', // Includes HTTP-only cookies if configured
+      credentials: 'include', // Includes HTTP-only cookies
       body: JSON.stringify({ refreshToken }),
     });
 
@@ -130,6 +163,7 @@ export class SilentAuthInterceptor {
    * Replays or rejects all queued requests that were paused during the token refresh
    */
   private drainQueue(error: unknown | null, newAccessToken: string | null): void {
+    // 1. Drain fetch queue
     for (const item of this.failedQueue) {
       if (error) {
         item.reject(error);
@@ -144,16 +178,35 @@ export class SilentAuthInterceptor {
       }
     }
     this.failedQueue = [];
+
+    // 2. Drain axios queue
+    for (const item of this.failedAxiosQueue) {
+      if (error) {
+        item.reject(error);
+      } else if (newAccessToken) {
+        item.resolve(newAccessToken);
+      }
+    }
+    this.failedAxiosQueue = [];
   }
 
   /**
-   * Gracefully notifies application that refresh has failed and session must end
+   * Gracefully notifies application that refresh has failed, wipes storage, and ends session
    */
-  private handleSessionTermination(): void {
+  public handleSessionTermination(): void {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('elite_auth_token');
       localStorage.removeItem('elite_refresh_token');
       localStorage.removeItem('elite_user');
+      localStorage.removeItem('elite_is_client');
+      localStorage.removeItem('elite_client_data');
+      localStorage.removeItem('elite_active_department');
+    }
+
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.clear();
+      } catch {}
     }
 
     if (typeof window !== 'undefined') {
@@ -165,8 +218,43 @@ export class SilentAuthInterceptor {
     }
   }
 
+  /**
+   * Attaches response interceptor to an Axios instance for seamless 401 handling
+   */
+  public attachAxiosInterceptor(client: AxiosInstance): void {
+    client.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+
+        if (!originalRequest) {
+          return Promise.reject(error);
+        }
+
+        const is401 = error.response?.status === 401;
+        const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
+                               originalRequest.url?.includes(this.refreshEndpoint) ||
+                               originalRequest.url?.includes('/auth/register');
+
+        if (is401 && !originalRequest._retry && !isAuthEndpoint) {
+          originalRequest._retry = true;
+
+          try {
+            const freshAccessToken = await this.getFreshAccessToken();
+            originalRequest.headers.set('Authorization', `Bearer ${freshAccessToken}`);
+            return client(originalRequest);
+          } catch (refreshErr) {
+            return Promise.reject(refreshErr);
+          }
+        }
+
+        return Promise.reject(error);
+      }
+    );
+  }
+
   public getPendingQueueSize(): number {
-    return this.failedQueue.length;
+    return this.failedQueue.length + this.failedAxiosQueue.length;
   }
 
   public isRefreshInProgress(): boolean {

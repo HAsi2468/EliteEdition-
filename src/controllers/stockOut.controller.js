@@ -61,18 +61,41 @@ const createStockOut = async (req, res) => {
       
       if (!inventoryItem) continue;
 
-      if (inventoryItem.currentlyAvailableStock >= qty) {
-        inventoryItem.currentlyAvailableStock -= qty;
-        await inventoryItem.save();
+      // Atomic conditional decrement query at the database engine level (eliminates read-modify-write race)
+      const updatedInventory = await db.Inventory.findOneAndUpdate(
+        {
+          _id: inventoryItem._id,
+          currentlyAvailableStock: { $gte: qty }
+        },
+        {
+          $inc: { currentlyAvailableStock: -qty, qty: -qty, version: 1 }
+        },
+        { new: true }
+      );
 
-        const stockOutLog = await db.StockOut.create({
-          skuCode: inventoryItem.skuCode,
-          party,
-          qtyOut: qty,
-          facility: facility || inventoryItem.facility || 'Pankhudi',
+      if (!updatedInventory) {
+        return res.status(422).json({
+          success: false,
+          code: 'INSUFFICIENT_STOCK',
+          message: `Insufficient stock for SKU ${inventoryItem.skuCode}. Required: ${qty}, available: ${inventoryItem.currentlyAvailableStock}.`
         });
-        results.push(stockOutLog);
       }
+
+      const stockOutLog = await db.StockOut.create({
+        skuCode: updatedInventory.skuCode,
+        party,
+        qtyOut: qty,
+        facility: facility || updatedInventory.facility || 'Pankhudi',
+      });
+      results.push(stockOutLog);
+
+      // Emit real-time WebSocket stock sync event
+      emitSocketEvent(req, 'inventory-stock-updated', {
+        inventoryId: updatedInventory._id,
+        skuCode: updatedInventory.skuCode,
+        currentlyAvailableStock: updatedInventory.currentlyAvailableStock,
+        version: updatedInventory.version
+      });
     }
 
     if (results.length === 0) {

@@ -222,6 +222,34 @@ export default function App() {
     return () => window.removeEventListener('chat-unread-count-change', handleUnreadEvent);
   }, []);
 
+  // Listen for broadcast session expiration (silent refresh failure / 401 unrecoverable)
+  useEffect(() => {
+    const handleExpired = () => {
+      socketManager.disconnect();
+      api.logout();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      setItems([]);
+      setCatalogItems([]);
+      setSales([]);
+      setParties([]);
+      try {
+        if ('caches' in window) {
+          caches.keys().then((keys) => {
+            keys.forEach((key) => {
+              if (key.includes('runtime') || key.includes('user') || key.includes('api')) {
+                caches.delete(key);
+              }
+            });
+          });
+        }
+        sessionStorage.clear();
+      } catch (e) {}
+    };
+    window.addEventListener('elite-session-expired', handleExpired);
+    return () => window.removeEventListener('elite-session-expired', handleExpired);
+  }, []);
+
   // Department state (digital_print vs elite_edition vs stitching)
   const [activeDepartment, setActiveDepartment] = useState(initialNav.dept);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

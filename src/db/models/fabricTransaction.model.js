@@ -96,6 +96,10 @@ const fabricTransactionSchema = new mongoose.Schema(
       default: 'digital_print',
       trim: true,
     },
+    version: {
+      type: Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,

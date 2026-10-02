@@ -113,66 +113,70 @@ const getSuperAdminSummary = async (req, res) => {
       });
     }
 
-    const summary = [];
     const now = new Date();
 
-    for (const comp of COMPANIES) {
-      const compFilter = buildCompanyFilter(comp.id);
+    // Parallelize metrics retrieval across companies to eliminate serial N+1 query loop
+    const summary = await Promise.all(
+      COMPANIES.map(async (comp) => {
+        const compFilter = buildCompanyFilter(comp.id);
 
-      // Invoices & Sales
-      const invoices = await BillingInvoice.find(compFilter, 'totalAmount dueAmount balanceAmount paymentStatus').lean();
-      let totalSales = 0;
-      let outstanding = 0;
+        const [invoices, jobs] = await Promise.all([
+          BillingInvoice.find(compFilter, 'totalAmount dueAmount balanceAmount paymentStatus').lean(),
+          comp.id === 'stitching'
+            ? GarmentJobCard.find({}, 'status targetDate deliveryDate created_date_time').lean()
+            : JobCard.find(compFilter, 'status expTime deliveryStatus created_date_time').lean(),
+        ]);
 
-      for (const inv of invoices) {
-        totalSales += Number(inv.totalAmount) || 0;
-        const due = inv.dueAmount !== undefined ? Number(inv.dueAmount) : Number(inv.balanceAmount) || 0;
-        if (inv.paymentStatus !== 'Paid') {
-          outstanding += due > 0 ? due : (Number(inv.totalAmount) || 0);
-        }
-      }
+        let totalSales = 0;
+        let outstanding = 0;
 
-      // Jobs (JobCard or GarmentJobCard depending on company)
-      let activeJobsCount = 0;
-      let delayedJobsCount = 0;
-
-      if (comp.id === 'stitching') {
-        const garmentJobs = await GarmentJobCard.find({}, 'status targetDate deliveryDate created_date_time').lean();
-        for (const gj of garmentJobs) {
-          if (gj.status !== 'Done' && gj.status !== 'Completed') {
-            activeJobsCount++;
-            const due = gj.targetDate || gj.deliveryDate;
-            if (due && new Date(due) < now) {
-              delayedJobsCount++;
-            }
+        for (const inv of invoices) {
+          totalSales += Number(inv.totalAmount) || 0;
+          const due = inv.dueAmount !== undefined ? Number(inv.dueAmount) : Number(inv.balanceAmount) || 0;
+          if (inv.paymentStatus !== 'Paid') {
+            outstanding += due > 0 ? due : (Number(inv.totalAmount) || 0);
           }
         }
-      } else {
-        const jobCards = await JobCard.find(compFilter, 'status expTime deliveryStatus created_date_time').lean();
-        for (const jc of jobCards) {
-          if (jc.status !== 'Done') {
-            activeJobsCount++;
-            if (jc.expTime) {
-              const expDate = new Date(jc.expTime);
-              if (!isNaN(expDate.getTime()) && expDate < now) {
+
+        let activeJobsCount = 0;
+        let delayedJobsCount = 0;
+
+        if (comp.id === 'stitching') {
+          for (const gj of jobs) {
+            if (gj.status !== 'Done' && gj.status !== 'Completed') {
+              activeJobsCount++;
+              const due = gj.targetDate || gj.deliveryDate;
+              if (due && new Date(due) < now) {
                 delayedJobsCount++;
               }
             }
           }
+        } else {
+          for (const jc of jobs) {
+            if (jc.status !== 'Done') {
+              activeJobsCount++;
+              if (jc.expTime) {
+                const expDate = new Date(jc.expTime);
+                if (!isNaN(expDate.getTime()) && expDate < now) {
+                  delayedJobsCount++;
+                }
+              }
+            }
+          }
         }
-      }
 
-      summary.push({
-        company_id: comp.id,
-        code: comp.code,
-        name: comp.name,
-        type: comp.type,
-        sales: Math.round(totalSales * 100) / 100,
-        outstanding: Math.round(outstanding * 100) / 100,
-        activeJobs: activeJobsCount,
-        delayedJobs: delayedJobsCount,
-      });
-    }
+        return {
+          company_id: comp.id,
+          code: comp.code,
+          name: comp.name,
+          type: comp.type,
+          sales: Math.round(totalSales * 100) / 100,
+          outstanding: Math.round(outstanding * 100) / 100,
+          activeJobs: activeJobsCount,
+          delayedJobs: delayedJobsCount,
+        };
+      })
+    );
 
     return res.json({
       success: true,

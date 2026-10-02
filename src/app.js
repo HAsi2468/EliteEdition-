@@ -60,7 +60,9 @@ app.use((req, res, next) => {
 
   next();
 });
-// ─────────────────────────────────────────────────────────────────────────────
+// Injects correlation ID (req.id / X-Request-ID) and tracks request start time
+const requestIdMiddleware = require('./middlewares/requestId.middleware');
+app.use(requestIdMiddleware);
 
 if (config.env !== 'test') {
 	app.use(morgan.successHandler);
@@ -572,7 +574,17 @@ const distCandidates = [
 	path.join(process.cwd(), 'elite_edition_website/dist'),
 ];
 const websiteDistPath = distCandidates.find(p => fs.existsSync(p)) || distCandidates[0];
-app.use(express.static(websiteDistPath));
+app.use(express.static(websiteDistPath, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('sw.js') || filePath.endsWith('manifest.json') || filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (filePath.includes('/assets/')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
 
 // Safe REST Semantics Guard: architectural protection against mutations on GET/HEAD
 app.use(safeRestGuard);
@@ -589,6 +601,10 @@ app.post(
 
 // Anti-CSRF Verification Middleware: protects all state-changing endpoints (POST/PUT/PATCH/DELETE)
 app.use(['/v1', '/api/v1'], verifyCsrfToken);
+
+// Distributed Redis Idempotency Engine: prevents duplicate submission & network replay races
+const redisIdempotencyMiddleware = require('./middlewares/redisIdempotency.middleware');
+app.use(['/v1', '/api/v1'], redisIdempotencyMiddleware({ required: false }));
 
 // v1 and api/v1 api routes
 app.use('/v1', routes);
