@@ -609,12 +609,14 @@ const addTaskComment = async (req, res) => {
     const authorName = req.body.authorName || req.user?.name || req.headers['x-user-name'] || 'Admin';
     const authorId = req.body.authorId || req.user?._id || req.headers['x-user-id'] || '';
     const authorRole = req.body.authorRole || req.user?.role || req.headers['x-user-role'] || 'User';
+    const images = Array.isArray(req.body.images) ? req.body.images.filter(Boolean) : [];
 
     const newComment = {
       text,
       authorId: String(authorId),
       authorName,
       authorRole,
+      images,
       createdAt: new Date(),
     };
 
@@ -622,6 +624,16 @@ const addTaskComment = async (req, res) => {
       task.comments = [];
     }
     task.comments.push(newComment);
+
+    if (images.length > 0) {
+      if (!Array.isArray(task.outputImages)) {
+        task.outputImages = [];
+      }
+      task.outputImages = Array.from(new Set([...task.outputImages, ...images]));
+      if (!task.outputImage && task.outputImages.length > 0) {
+        task.outputImage = task.outputImages[0];
+      }
+    }
 
     if (!Array.isArray(task.stageHistory)) {
       task.stageHistory = [];
@@ -634,6 +646,7 @@ const addTaskComment = async (req, res) => {
       updatedByName: authorName,
       updatedAt: new Date(),
       note: text,
+      images,
     });
 
     task.notes = text;

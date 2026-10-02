@@ -337,16 +337,18 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [], categories: [], parties: [] });
 
-  // View Mode & Operational Stage Tabs
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  // Operational Stage Tabs & Status Dropdowns (Table View is the primary high-density view)
+  const [viewMode, setViewMode] = useState('table'); // 'table' view
   const [stageTab, setStageTab] = useState('ALL'); // 'ALL' | 'DROW' | 'CM' | 'STAGE_3' | 'APPROVED' | 'REVISION'
   const [openStatusDropdownId, setOpenStatusDropdownId] = useState(null);
 
-  // Table view: Multiple image upload and comment inline editing states
+  // Comment & Image Upload states
   const [uploadingRowId, setUploadingRowId] = useState(null);
   const [uploadRowProgress, setUploadRowProgress] = useState(0);
   const [editingCommentTaskId, setEditingCommentTaskId] = useState(null);
   const [commentDraft, setCommentDraft] = useState('');
+  const [commentDraftImages, setCommentDraftImages] = useState([]);
+  const [modalCommentImages, setModalCommentImages] = useState([]);
   const [savingCommentId, setSavingCommentId] = useState(null);
 
   // Dedicated Drag & Drop and Clipboard Paste Multiple Upload Modal
@@ -1272,13 +1274,15 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     }
   };
 
-  // Save comment/note for task directly with author and multiple history support
-  const handleSaveComment = async (taskId, textToSave = null) => {
+  // Save comment/note for task directly with author, attached images, and multiple history support
+  const handleSaveComment = async (taskId, textToSave = null, imageFilesOrUrls = null) => {
     if (!taskId) return;
     const text = (textToSave !== null ? textToSave : commentDraft).trim();
-    if (!text) {
+    const imgsToProcess = imageFilesOrUrls !== null ? imageFilesOrUrls : commentDraftImages;
+    if (!text && (!imgsToProcess || imgsToProcess.length === 0)) {
       setEditingCommentTaskId(null);
       setCommentDraft('');
+      setCommentDraftImages([]);
       return;
     }
     setSavingCommentId(taskId);
@@ -1287,11 +1291,38 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       const authorRole = currentUser?.role || 'Designer';
       const authorId = currentUser?._id || currentUser?.id || '';
 
+      // Upload any new image files to Cloudflare R2
+      const uploadedUrls = [];
+      if (Array.isArray(imgsToProcess) && imgsToProcess.length > 0) {
+        for (const item of imgsToProcess) {
+          const file = item?.file || (item instanceof File ? item : null);
+          if (file) {
+            let fileToUpload = file;
+            if (file.type && file.type.startsWith('image/')) {
+              try {
+                fileToUpload = await imageCompression(file, { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true });
+              } catch (e) {
+                console.warn('Compression skipped', e);
+              }
+            }
+            const res = await api.uploadImage(fileToUpload, 'designs/outputs');
+            if (res && res.url) {
+              uploadedUrls.push(res.url);
+            }
+          } else if (typeof item === 'string' && item.startsWith('http')) {
+            uploadedUrls.push(item);
+          } else if (item?.previewUrl && typeof item.previewUrl === 'string' && item.previewUrl.startsWith('http')) {
+            uploadedUrls.push(item.previewUrl);
+          }
+        }
+      }
+
       const res = await api.addDesignerTaskComment(taskId, {
-        text,
+        text: text || (uploadedUrls.length > 0 ? `${uploadedUrls.length} image(s) uploaded` : 'Comment'),
         authorName,
         authorRole,
         authorId,
+        images: uploadedUrls,
       });
 
       const updatedTask = res?.data;
@@ -1307,13 +1338,22 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         }
       } else {
         // Optimistic local update
-        const newC = { text, authorName, authorRole, authorId, createdAt: new Date() };
+        const newC = {
+          text: text || `${uploadedUrls.length} image(s) uploaded`,
+          authorName,
+          authorRole,
+          authorId,
+          images: uploadedUrls,
+          createdAt: new Date(),
+        };
         setTasks((prev) =>
           prev.map((t) =>
             t._id === taskId
               ? {
                   ...t,
-                  notes: text,
+                  notes: text || t.notes,
+                  outputImages: Array.from(new Set([...(t.outputImages || []), ...uploadedUrls])),
+                  outputImage: uploadedUrls[0] || t.outputImage,
                   comments: [...(t.comments || []), newC],
                   stageHistory: [
                     ...(t.stageHistory || []),
@@ -1324,7 +1364,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       updatedBy: authorId,
                       updatedByName: authorName,
                       updatedAt: new Date(),
-                      note: text,
+                      note: text || `${uploadedUrls.length} image(s) uploaded`,
+                      images: uploadedUrls,
                     },
                   ],
                 }
@@ -1334,8 +1375,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       }
       setEditingCommentTaskId(null);
       setCommentDraft('');
+      setCommentDraftImages([]);
       setModalCommentDraft('');
+      setModalCommentImages([]);
       triggerPushNotification('💬 Comment Added', `Comment recorded by ${authorName}`, 'success');
+      loadData(true);
     } catch (err) {
       console.error('Failed to save comment:', err);
       alert('Failed to save comment: ' + (err.message || 'Error'));
@@ -1842,63 +1886,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             </div>
           </div>
 
-          <div className="ent-header-actions">
-            {/* View Mode Toggle (Cards / Table) */}
-            <div
-              style={{
-                display: 'inline-flex',
-                background: '#f1f5f9',
-                padding: '2px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.35rem 0.7rem',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  background: viewMode === 'grid' ? '#ffffff' : 'transparent',
-                  color: viewMode === 'grid' ? '#2563eb' : '#64748b',
-                  boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-                title="Cards Grid View"
-              >
-                <LayoutGrid size={13} /> <span>Cards</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.35rem 0.7rem',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  background: viewMode === 'table' ? '#ffffff' : 'transparent',
-                  color: viewMode === 'table' ? '#2563eb' : '#64748b',
-                  boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-                title="High-Density Table View"
-              >
-                <List size={13} /> <span>Table</span>
-              </button>
-            </div>
-          </div>
+
         </div>
       )}
 
@@ -2125,63 +2113,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             {sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}
           </button>
 
-          {/* View Mode Switcher: Cards vs Table */}
-          <div
-            style={{
-              display: 'inline-flex',
-              background: '#f1f5f9',
-              padding: '3px',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              marginLeft: 'auto',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.38rem 0.7rem',
-                borderRadius: '6px',
-                border: 'none',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                background: viewMode === 'grid' ? '#ffffff' : 'transparent',
-                color: viewMode === 'grid' ? '#2563eb' : '#64748b',
-                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-              title="Cards Grid View"
-            >
-              <LayoutGrid size={13} /> <span>Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.38rem 0.7rem',
-                borderRadius: '6px',
-                border: 'none',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                background: viewMode === 'table' ? '#ffffff' : 'transparent',
-                color: viewMode === 'table' ? '#2563eb' : '#64748b',
-                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-              title="Table List View"
-            >
-              <List size={13} /> <span>Table</span>
-            </button>
-          </div>
-
           {/* Reset Filters Button */}
           {(datePreset !== 'all' ||
             (!isDesignerRestricted && selectedDesigner !== 'All') ||
@@ -2217,6 +2148,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 fontWeight: 700,
                 color: '#dc2626',
                 cursor: 'pointer',
+                marginLeft: 'auto',
               }}
               title="Reset all filters"
             >
@@ -2375,9 +2307,103 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   : 'No design tasks found matching the selected filters.')}
           </p>
         </div>
-      ) : viewMode === 'table' ? (
-        /* ─── TABLE VIEW ──────────────────────────────────────────────── */
-        <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+      ) : (
+        /* ─── HIGH-DENSITY TABLE VIEW (ONLY VIEW) ───────────────────────── */
+        <div>
+          {/* Total Designs Count & Sort Toolbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Designs:</span>
+              <span style={{
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                color: '#ffffff',
+                background: '#2563eb',
+                padding: '2px 10px',
+                borderRadius: '20px',
+                minWidth: '28px',
+                textAlign: 'center',
+              }}>
+                {filteredTasks.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Quick Sort:</span>
+              <button
+                type="button"
+                onClick={() => setSortBy('designName')}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: sortBy === 'designName' ? '#2563eb' : '#cbd5e1',
+                  background: sortBy === 'designName' ? '#eff6ff' : '#f8fafc',
+                  color: sortBy === 'designName' ? '#1d4ed8' : '#64748b',
+                }}
+              >
+                Name
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortBy('createdAt')}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: sortBy === 'createdAt' ? '#2563eb' : '#cbd5e1',
+                  background: sortBy === 'createdAt' ? '#eff6ff' : '#f8fafc',
+                  color: sortBy === 'createdAt' ? '#1d4ed8' : '#64748b',
+                }}
+              >
+                Date
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortBy('priority')}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: sortBy === 'priority' ? '#2563eb' : '#cbd5e1',
+                  background: sortBy === 'priority' ? '#eff6ff' : '#f8fafc',
+                  color: sortBy === 'priority' ? '#1d4ed8' : '#64748b',
+                }}
+              >
+                Priority
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                title={sortOrder === 'asc' ? 'Currently Ascending - click for Descending' : 'Currently Descending - click for Ascending'}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid #2563eb',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                }}
+              >
+                <span>{sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
           <div style={{ overflowX: 'auto', minHeight: '360px', paddingBottom: openStatusDropdownId ? '160px' : '20px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
               <thead>
@@ -2386,8 +2412,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   <th style={{ padding: '0.85rem 0.75rem', fontWeight: 800, minWidth: '85px' }}>Sample Ref</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Assigned Team</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Stage / Status</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Image upload multiple</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Comment</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Comment &amp; Images</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -2780,7 +2805,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         })()}
                       </td>
 
-                      {/* Image upload multiple Column (Supports Drag & Drop, Paste & Click) */}
+                      {/* Comment & Images Column (Unified: Comments, Thumbnails, Quick Upload & Drag-Drop) */}
                       <td
                         onDragOver={(e) => {
                           e.preventDefault();
@@ -2801,195 +2826,184 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                           }
                         }}
                         style={{
-                          padding: '0.85rem 1rem',
+                          padding: '0.75rem 0.85rem',
                           verticalAlign: 'middle',
-                          minWidth: '180px',
+                          minWidth: '220px',
+                          maxWidth: '320px',
                           background: dragOverTaskId === task._id ? '#ecfdf5' : 'transparent',
                           outline: dragOverTaskId === task._id ? '2px dashed #10b981' : 'none',
-                          borderRadius: dragOverTaskId === task._id ? '6px' : '0',
+                          borderRadius: dragOverTaskId === task._id ? '8px' : '0',
                           transition: 'all 0.15s ease',
                         }}
                       >
                         {dragOverTaskId === task._id ? (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#059669', fontWeight: 800, fontSize: '0.74rem', padding: '0.35rem' }}>
-                            <Upload size={14} /> <span>Drop images here to upload!</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#059669', fontWeight: 800, fontSize: '0.75rem', padding: '0.75rem', background: '#ecfdf5', borderRadius: '8px' }}>
+                            <Upload size={15} /> <span>Drop images here to attach to design!</span>
                           </div>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            {/* Display existing uploaded images */}
-                            {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
-                              <div
-                                key={imgIdx}
-                                onClick={() => handleOpenLightbox(taskImages, imgIdx, `Uploaded Images: ${task.designName}`)}
-                                style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  borderRadius: '6px',
-                                  overflow: 'hidden',
-                                  border: '1px solid #cbd5e1',
-                                  cursor: 'pointer',
-                                  position: 'relative',
-                                  background: '#f1f5f9',
-                                  flexShrink: 0,
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                                }}
-                                title="Click to view image"
-                              >
-                                <img
-                                  src={imgUrl}
-                                  alt={`Uploaded ${imgIdx + 1}`}
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                              </div>
-                            ))}
-
-                            {/* +N More indicator if > 3 images */}
-                            {taskImages.length > 3 && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenLightbox(taskImages, 3, `Uploaded Images: ${task.designName}`)}
-                                style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  borderRadius: '6px',
-                                  background: '#f1f5f9',
-                                  border: '1px solid #cbd5e1',
-                                  color: '#475569',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  flexShrink: 0,
-                                }}
-                                title={`View all ${taskImages.length} images`}
-                              >
-                                +{taskImages.length - 3}
-                              </button>
-                            )}
-
-                            {/* Multiple Image Upload Button (Opens Dedicated Drag & Drop / Paste Modal) */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMultipleUploadModalTask(task);
-                                setMultiUploadFiles([]);
-                                setMultiUploadPreviews([]);
-                              }}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                padding: '0.35rem 0.55rem',
-                                borderRadius: '6px',
-                                background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
-                                border: uploadingRowId === task._id ? '1px dashed #6366f1' : '1px dashed #86efac',
-                                color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
-                                transition: 'all 0.15s ease',
-                                userSelect: 'none',
-                                flexShrink: 0,
-                              }}
-                              title="Click to open image uploader (supports Drag & Drop and Copy/Paste)"
-                            >
-                              {uploadingRowId === task._id ? (
-                                <>
-                                  <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                                  <span>{uploadRowProgress}%</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Upload size={11} />
-                                  <span>+ Upload</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Comment Column (Directly Editable) */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', minWidth: '190px', maxWidth: '270px' }}>
-                        {editingCommentTaskId === task._id ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        ) : editingCommentTaskId === task._id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: '#ffffff', padding: '0.5rem', borderRadius: '8px', border: '1.5px solid #2563eb', boxShadow: '0 2px 8px rgba(37,99,235,0.12)' }}>
                             <textarea
                               value={commentDraft}
                               onChange={(e) => setCommentDraft(e.target.value)}
-                              placeholder="Write comment... (Enter to save, Shift+Enter for new line)"
+                              placeholder="Write comment... (Ctrl+Enter or Enter to save, paste image with Ctrl+V)"
                               rows={2}
                               style={{
                                 width: '100%',
                                 fontSize: '0.75rem',
-                                padding: '0.35rem 0.5rem',
+                                padding: '0.4rem 0.5rem',
                                 borderRadius: '6px',
-                                border: '1.5px solid #2563eb',
+                                border: '1px solid #cbd5e1',
                                 outline: 'none',
                                 fontFamily: 'inherit',
                                 resize: 'vertical',
                                 background: '#ffffff',
                                 color: '#1e293b',
-                                boxShadow: '0 0 0 2px rgba(37,99,235,0.1)',
+                                boxSizing: 'border-box',
                               }}
                               autoFocus
+                              onPaste={(e) => {
+                                const items = e.clipboardData?.items;
+                                if (items) {
+                                  for (let i = 0; i < items.length; i++) {
+                                    if (items[i].type.indexOf('image') !== -1) {
+                                      const file = items[i].getAsFile();
+                                      if (file) {
+                                        const previewUrl = URL.createObjectURL(file);
+                                        setCommentDraftImages((prev) => [...prev, { file, previewUrl }]);
+                                      }
+                                    }
+                                  }
+                                }
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                   e.preventDefault();
-                                  handleSaveComment(task._id);
+                                  handleSaveComment(task._id, commentDraft, commentDraftImages);
                                 } else if (e.key === 'Escape') {
                                   setEditingCommentTaskId(null);
                                   setCommentDraft('');
+                                  setCommentDraftImages([]);
                                 }
                               }}
                             />
-                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.62rem', color: '#94a3b8', marginRight: 'auto' }}>↵ Enter to save</span>
-                              <button
-                                type="button"
-                                onClick={() => handleSaveComment(task._id)}
-                                disabled={savingCommentId === task._id}
+
+                            {/* Pending Attached Images Preview in Inline Editor */}
+                            {commentDraftImages.length > 0 && (
+                              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', padding: '0.2rem 0' }}>
+                                {commentDraftImages.map((img, iIdx) => (
+                                  <div key={iIdx} style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+                                    <img src={img.previewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <button
+                                      type="button"
+                                      onClick={() => setCommentDraftImages((prev) => prev.filter((_, idx) => idx !== iIdx))}
+                                      style={{
+                                        position: 'absolute',
+                                        top: 1,
+                                        right: 1,
+                                        background: 'rgba(0,0,0,0.65)',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '50%',
+                                        width: '14px',
+                                        height: '14px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        padding: 0,
+                                      }}
+                                    >
+                                      <X size={9} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                              {/* File Input trigger to attach images */}
+                              <label
                                 style={{
-                                  padding: '0.25rem 0.55rem',
-                                  borderRadius: '5px',
-                                  background: '#2563eb',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '3px',
-                                }}
-                              >
-                                {savingCommentId === task._id ? (
-                                  <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                                ) : (
-                                  <Check size={11} />
-                                )}
-                                <span>Save</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingCommentTaskId(null);
-                                  setCommentDraft('');
-                                }}
-                                style={{
-                                  padding: '0.25rem 0.45rem',
+                                  gap: '0.25rem',
+                                  padding: '0.25rem 0.5rem',
                                   borderRadius: '5px',
                                   background: '#f1f5f9',
-                                  color: '#64748b',
-                                  border: '1px solid #cbd5e1',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 600,
+                                  color: '#334155',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
                                   cursor: 'pointer',
+                                  border: '1px solid #cbd5e1',
                                 }}
+                                title="Attach one or more images from your computer"
                               >
-                                Cancel
-                              </button>
+                                <ImageIcon size={11} color="#2563eb" />
+                                <span>+ Image</span>
+                                <input
+                                  type="file"
+                                  multiple
+                                  accept="image/*"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                      const newFiles = Array.from(e.target.files).map((f) => ({
+                                        file: f,
+                                        previewUrl: URL.createObjectURL(f),
+                                      }));
+                                      setCommentDraftImages((prev) => [...prev, ...newFiles]);
+                                    }
+                                  }}
+                                />
+                              </label>
+
+                              <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveComment(task._id, commentDraft, commentDraftImages)}
+                                  disabled={savingCommentId === task._id}
+                                  style={{
+                                    padding: '0.25rem 0.55rem',
+                                    borderRadius: '5px',
+                                    background: '#2563eb',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                  }}
+                                >
+                                  {savingCommentId === task._id ? (
+                                    <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                                  ) : (
+                                    <Check size={11} />
+                                  )}
+                                  <span>Save</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCommentTaskId(null);
+                                    setCommentDraft('');
+                                    setCommentDraftImages([]);
+                                  }}
+                                  style={{
+                                    padding: '0.25rem 0.45rem',
+                                    borderRadius: '5px',
+                                    background: '#f1f5f9',
+                                    color: '#64748b',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ) : (() => {
@@ -3000,107 +3014,231 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
                           return (
                             <div
-                              onClick={() => {
-                                setEditingCommentTaskId(task._id);
-                                setCommentDraft(displayText);
-                              }}
                               style={{
-                                cursor: 'pointer',
-                                padding: '0.45rem 0.65rem',
+                                padding: '0.45rem 0.6rem',
                                 borderRadius: '8px',
                                 background: displayText ? '#f8fafc' : '#fbfcfd',
                                 border: displayText ? '1px solid #cbd5e1' : '1.5px dashed #94a3b8',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '0.25rem',
+                                gap: '0.3rem',
                                 transition: 'all 0.15s ease',
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = '#2563eb';
-                                e.currentTarget.style.background = '#f0f7ff';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = displayText ? '#cbd5e1' : '#94a3b8';
-                                e.currentTarget.style.background = displayText ? '#f8fafc' : '#fbfcfd';
-                              }}
-                              title="Click to edit comment directly"
                             >
-                              {displayText ? (
-                                <>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
-                                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>
-                                        {displayAuthor || 'Note'}
-                                      </span>
-                                      {latestComment?.authorRole && (
-                                        <span style={{ fontSize: '0.6rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                                          {latestComment.authorRole}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                                      {commentsList.length > 1 && (
-                                        <span
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setCommentModalTask(task);
-                                          }}
-                                          style={{
-                                            fontSize: '0.62rem',
-                                            fontWeight: 800,
-                                            background: '#eff6ff',
-                                            color: '#2563eb',
-                                            border: '1px solid #bfdbfe',
-                                            borderRadius: '10px',
-                                            padding: '1px 5px',
-                                            cursor: 'pointer',
-                                          }}
-                                          title="View complete comments thread"
-                                        >
-                                          💬 {commentsList.length}
-                                        </span>
-                                      )}
-                                      <Edit2
-                                        size={12}
-                                        color="#2563eb"
-                                        title="Click to edit comment inline"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: '0.74rem',
-                                      color: '#1e293b',
-                                      wordBreak: 'break-word',
-                                      whiteSpace: 'pre-wrap',
-                                      maxHeight: '44px',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      lineHeight: '1.3',
-                                    }}
-                                  >
-                                    {displayText}
-                                  </div>
-                                  <div style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                                    <span>{latestComment?.createdAt ? new Date(latestComment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                              {/* Header: Author + Role + Thread Count + Edit & Upload Quick Actions */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>
+                                    {displayAuthor || 'Note'}
+                                  </span>
+                                  {latestComment?.authorRole && (
+                                    <span style={{ fontSize: '0.6rem', color: '#64748b', background: '#f1f5f9', padding: '1px 4px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                                      {latestComment.authorRole}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                                  {commentsList.length > 1 && (
                                     <span
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setCommentModalTask(task);
                                       }}
-                                      style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.64rem', cursor: 'pointer' }}
-                                      title="Open full discussion thread modal"
+                                      style={{
+                                        fontSize: '0.62rem',
+                                        fontWeight: 800,
+                                        background: '#eff6ff',
+                                        color: '#2563eb',
+                                        border: '1px solid #bfdbfe',
+                                        borderRadius: '10px',
+                                        padding: '1px 5px',
+                                        cursor: 'pointer',
+                                      }}
+                                      title="View complete comments thread"
                                     >
-                                      View history & reply →
+                                      💬 {commentsList.length}
                                     </span>
-                                  </div>
-                                </>
+                                  )}
+
+                                  {/* Direct Image Upload button inside comment */}
+                                  <label
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '2px',
+                                      padding: '2px 5px',
+                                      borderRadius: '4px',
+                                      background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
+                                      border: uploadingRowId === task._id ? '1px solid #6366f1' : '1px solid #bbf7d0',
+                                      color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
+                                      fontSize: '0.64rem',
+                                      fontWeight: 800,
+                                      cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
+                                    }}
+                                    title="Upload image(s) from comment"
+                                  >
+                                    {uploadingRowId === task._id ? (
+                                      <RefreshCw size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                                    ) : (
+                                      <Upload size={10} />
+                                    )}
+                                    <span>+Img</span>
+                                    <input
+                                      type="file"
+                                      multiple
+                                      accept="image/*"
+                                      disabled={uploadingRowId === task._id}
+                                      style={{ display: 'none' }}
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files.length > 0) {
+                                          handleTableMultipleImageUpload(task, e.target.files);
+                                        }
+                                      }}
+                                    />
+                                  </label>
+
+                                  {/* Inline Edit Pencil */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingCommentTaskId(task._id);
+                                      setCommentDraft(displayText);
+                                      setCommentDraftImages([]);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: '2px',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      color: '#2563eb',
+                                    }}
+                                    title="Click to write/edit comment"
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Comment Body Text */}
+                              {displayText ? (
+                                <div
+                                  onClick={() => {
+                                    setEditingCommentTaskId(task._id);
+                                    setCommentDraft(displayText);
+                                    setCommentDraftImages([]);
+                                  }}
+                                  style={{
+                                    fontSize: '0.74rem',
+                                    color: '#1e293b',
+                                    wordBreak: 'break-word',
+                                    whiteSpace: 'pre-wrap',
+                                    maxHeight: '44px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    lineHeight: '1.3',
+                                    cursor: 'pointer',
+                                  }}
+                                  title="Click to edit comment inline"
+                                >
+                                  {displayText}
+                                </div>
                               ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#475569', padding: '0.1rem 0' }}>
-                                  <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#2563eb' }}>+ Click to add comment...</span>
-                                  <Edit2 size={12} color="#2563eb" />
+                                <div
+                                  onClick={() => {
+                                    setEditingCommentTaskId(task._id);
+                                    setCommentDraft('');
+                                    setCommentDraftImages([]);
+                                  }}
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    color: '#64748b',
+                                    cursor: 'pointer',
+                                    padding: '2px 0',
+                                  }}
+                                >
+                                  + Click to add comment...
                                 </div>
                               )}
+
+                              {/* Uploaded Image Thumbnails (Integrated directly in comment) */}
+                              {taskImages.length > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '2px' }}>
+                                  {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
+                                    <div
+                                      key={imgIdx}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenLightbox(taskImages, imgIdx, `Images: ${task.designName}`);
+                                      }}
+                                      style={{
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '5px',
+                                        overflow: 'hidden',
+                                        border: '1px solid #cbd5e1',
+                                        cursor: 'pointer',
+                                        background: '#f1f5f9',
+                                        flexShrink: 0,
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                      }}
+                                      title="Click to view image"
+                                    >
+                                      <img
+                                        src={imgUrl}
+                                        alt={`Image ${imgIdx + 1}`}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      />
+                                    </div>
+                                  ))}
+
+                                  {taskImages.length > 3 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenLightbox(taskImages, 3, `Images: ${task.designName}`);
+                                      }}
+                                      style={{
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '5px',
+                                        background: '#f1f5f9',
+                                        border: '1px solid #cbd5e1',
+                                        color: '#475569',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                      }}
+                                      title={`View all ${taskImages.length} images`}
+                                    >
+                                      +{taskImages.length - 3}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Footer: Time & Open Thread Link */}
+                              <div style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                                <span>{latestComment?.createdAt ? new Date(latestComment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCommentModalTask(task);
+                                  }}
+                                  style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.64rem', cursor: 'pointer' }}
+                                  title="Open full discussion & image upload thread"
+                                >
+                                  Thread &amp; Images →
+                                </span>
+                              </div>
                             </div>
                           );
                         })()}
@@ -3173,1468 +3311,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               </tbody>
             </table>
           </div>
-        </div>
-      ) : (
-        /* ─── CARDS GRID VIEW ─────────────────────────────────────────── */
-        <div>
-          {/* Total count & Sort bar - only show in standalone view */}
-          {!embedded && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Samples:</span>
-                <span style={{
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
-                  color: '#ffffff',
-                  background: '#2563eb',
-                  padding: '2px 10px',
-                  borderRadius: '20px',
-                  minWidth: '28px',
-                  textAlign: 'center',
-                }}>
-                  {filteredTasks.length}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Sort:</span>
-                <button
-                  type="button"
-                  onClick={() => setSortBy('designName')}
-                  style={{
-                    padding: '0.3rem 0.65rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    border: '1px solid',
-                    borderColor: sortBy === 'designName' ? '#2563eb' : '#cbd5e1',
-                    background: sortBy === 'designName' ? '#eff6ff' : '#f8fafc',
-                    color: sortBy === 'designName' ? '#1d4ed8' : '#64748b',
-                  }}
-                >
-                  Name
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSortBy('createdAt')}
-                  style={{
-                    padding: '0.3rem 0.65rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    border: '1px solid',
-                    borderColor: sortBy === 'createdAt' ? '#2563eb' : '#cbd5e1',
-                    background: sortBy === 'createdAt' ? '#eff6ff' : '#f8fafc',
-                    color: sortBy === 'createdAt' ? '#1d4ed8' : '#64748b',
-                  }}
-                >
-                  Date
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-                  title={sortOrder === 'asc' ? 'Currently Ascending - click for Descending' : 'Currently Descending - click for Ascending'}
-                  style={{
-                    padding: '0.3rem 0.65rem',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    border: '1px solid #2563eb',
-                    background: '#eff6ff',
-                    color: '#1d4ed8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.2rem',
-                  }}
-                >
-                  {sortOrder === 'asc' ? 'A' : 'D'}
-                  <span style={{ fontSize: '0.7rem' }}>{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
-                </button>
-              </div>
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
-          {filteredTasks.map((task) => {
-            const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
-            const progress = getTaskStageProgress(task);
-
-            const allFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
-              ? task.fabrics
-              : task.fabricName ? task.fabricName.split(',').map((s) => s.trim()).filter(Boolean) : [];
-
-            const allDesigners = Array.isArray(task.designers) && task.designers.length > 0
-              ? task.designers
-              : task.designerName ? task.designerName.split(',').map((s) => s.trim()).filter(Boolean) : [];
-
-            const allColourMatches = Array.isArray(task.colourMatches) && task.colourMatches.length > 0
-              ? task.colourMatches
-              : task.colourMatching ? task.colourMatching.split(',').map((s) => s.trim()).filter(Boolean) : [];
-
-            const drowImgs = task.drowDesignImages || [];
-            const cmImgs = task.colourMatchingImages || [];
-            const stage3Imgs = task.stage3Images || [];
-            const finalImgs = task.finalDesignImages || [];
-
-            if (embedded) {
-              const heroImg = task.sampleImage || finalImgs[0] || stage3Imgs[0] || cmImgs[0] || drowImgs[0] || task.outputImage || task.sampleLink || '';
-              const isApproved = task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE' || task.status === 'Approved';
-              const isRevision = String(task.finalDesignStatus || '').toLowerCase().startsWith('reject');
-
-              let processBadge = {
-                label: '1. Drawing',
-                color: '#0284c7',
-                bg: 'rgba(2, 132, 199, 0.12)',
-                border: '1px solid rgba(2, 132, 199, 0.3)',
-              };
-
-              if (isApproved) {
-                processBadge = {
-                  label: 'Approved',
-                  color: '#16a34a',
-                  bg: 'rgba(22, 163, 74, 0.12)',
-                  border: '1px solid rgba(22, 163, 74, 0.3)',
-                };
-              } else if (isRevision) {
-                processBadge = {
-                  label: 'Reject / Revisions',
-                  color: '#dc2626',
-                  bg: 'rgba(220, 38, 38, 0.12)',
-                  border: '1px solid rgba(220, 38, 38, 0.3)',
-                };
-              } else if (task.stage3Status === 'Hold') {
-                processBadge = {
-                  label: '3. Hold',
-                  color: '#ea580c',
-                  bg: 'rgba(234, 88, 12, 0.12)',
-                  border: '1px solid rgba(234, 88, 12, 0.3)',
-                };
-              } else if (task.stage3Status === 'Continue') {
-                processBadge = {
-                  label: '3. Continue',
-                  color: '#0284c7',
-                  bg: 'rgba(2, 132, 199, 0.12)',
-                  border: '1px solid rgba(2, 132, 199, 0.3)',
-                };
-              } else if (task.colourMatchingStatus) {
-                processBadge = {
-                  label: '2. Colour Match',
-                  color: '#db2777',
-                  bg: 'rgba(219, 39, 119, 0.12)',
-                  border: '1px solid rgba(219, 39, 119, 0.3)',
-                };
-              } else {
-                processBadge = {
-                  label: '1. Drawing',
-                  color: '#0284c7',
-                  bg: 'rgba(2, 132, 199, 0.12)',
-                  border: '1px solid rgba(2, 132, 199, 0.3)',
-                };
-              }
-
-              return (
-                <div
-                  key={task._id}
-                  className="glass-panel"
-                  style={{
-                    padding: '1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.8rem',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = '';
-                    e.currentTarget.style.boxShadow = '';
-                  }}
-                >
-                  {/* Category / Fabric badge (Top-Left) */}
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: 16,
-                      left: 16,
-                      background: 'rgba(139,92,246,0.25)',
-                      color: '#a78bfa',
-                      fontSize: '0.65rem',
-                      fontWeight: 800,
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.02em',
-                      zIndex: 2,
-                    }}
-                  >
-                    {allFabrics[0] || task.category || 'ALLOWER'}
-                  </span>
-
-                  {/* Current Process / Stage badge (Top-Right) */}
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: 16,
-                      right: 16,
-                      background: processBadge.bg,
-                      color: processBadge.color,
-                      fontSize: '0.65rem',
-                      fontWeight: 800,
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      border: processBadge.border,
-                      zIndex: 2,
-                      letterSpacing: '0.02em',
-                      textTransform: 'uppercase',
-                    }}
-                    title={`Current Process: ${processBadge.label}`}
-                  >
-                    {processBadge.label}
-                  </span>
-
-                  {/* Main Image View (180px, #04070d, identical to Design Catalog Image) */}
-                  <div
-                    style={{
-                      height: '180px',
-                      background: '#f8fafc',
-                      borderRadius: 'var(--radius-sm)',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      border: '1px solid var(--border-light)',
-                      marginTop: '1.25rem',
-                    }}
-                  >
-                    <DesignImage
-                      rawUrl={heroImg}
-                      designName={task.designName}
-                      category={allFabrics[0] || task.category || 'ALLOWER'}
-                      thumbnail={true}
-                      width={360}
-                      onZoom={(src) => handleOpenLightbox([src], 0, `Design: ${task.designName}`)}
-                      style={{ width: '100%', height: '100%' }}
-                    />
-                  </div>
-
-                  {/* Design Info */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {task.designName}
-                      </span>
-                      {task.sampleLink && (
-                        <a
-                          href={task.sampleLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            color: '#2563eb',
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            textDecoration: 'none',
-                            flexShrink: 0
-                          }}
-                          title={`Open link: ${task.sampleLink}`}
-                        >
-                          <ExternalLink size={11} /> Link
-                        </a>
-                      )}
-                    </div>
-
-                    {/* Parameters grid: Exactly 3 rows as requested */}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '0.3rem 0.5rem',
-                        fontSize: '0.78rem',
-                        borderTop: '1px dashed var(--border-light)',
-                        paddingTop: '0.5rem',
-                      }}
-                    >
-                      {/* 1 row: Assign Design , Colour matching */}
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assign Design</span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={allDesigners.join(', ') || task.designerName || '--'}>
-                          {allDesigners.join(', ') || task.designerName || '--'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Colour Matching</span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={allColourMatches.join(', ') || task.colourMatching || '--'}>
-                          {allColourMatches.join(', ') || task.colourMatching || '--'}
-                        </span>
-                      </div>
-
-                      {/* 2 row: Priority , Machine */}
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Priority</span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {task.priority || 'Medium'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Machine</span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.machineName || task.machine || '--'}>
-                          {task.machineName || task.machine || '--'}
-                        </span>
-                      </div>
-
-                      {/* 3 row: created by */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gridColumn: 'span 2' }}>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Created By</span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.createdByName || task.createdBy || '--'}>
-                          {task.createdByName || task.createdBy || '--'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions identical to Design Catalog */}
-                  <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.7rem', marginTop: 'auto' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(task)}
-                      className="btn-secondary"
-                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.78rem', justifyContent: 'center' }}
-                    >
-                      <Edit2 size={13} /> Edit Design
-                    </button>
-                    {isUserAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTask(task)}
-                        style={{
-                          padding: '0.4rem 0.7rem',
-                          fontSize: '0.78rem',
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'rgba(239,68,68,0.08)',
-                          border: '1px solid rgba(239,68,68,0.2)',
-                          color: '#f87171',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          fontFamily: 'var(--font-sans)',
-                          transition: 'all 0.15s',
-                        }}
-                        title="Delete Design"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            const allParties = Array.isArray(task.parties) && task.parties.length > 0
-              ? task.parties
-              : task.partyName ? task.partyName.split(',').map((s) => s.trim()).filter(Boolean) : (task.party ? [task.party] : []);
-
-            const taskImages = Array.from(
-              new Set([
-                ...(Array.isArray(task.outputImages) ? task.outputImages : []),
-                ...(task.outputImage ? [task.outputImage] : []),
-                ...(Array.isArray(task.finalDesignImages) ? task.finalDesignImages : []),
-                ...(Array.isArray(task.drowDesignImages) ? task.drowDesignImages : []),
-                ...(Array.isArray(task.colourMatchingImages) ? task.colourMatchingImages : []),
-                ...(Array.isArray(task.stage3Images) ? task.stage3Images : []),
-              ])
-            ).filter(Boolean);
-
-            const currentBadge = getTaskCurrentStatusBadge(task);
-            const statusOpts = getStatusDropdownOptions(task);
-            const isStatusDropdownOpen = openStatusDropdownId === task._id;
-            const CurrentIcon = currentBadge.icon;
-
-            const cardComments = Array.isArray(task.comments) ? task.comments : [];
-            const latestComment = cardComments.length > 0 ? cardComments[cardComments.length - 1] : null;
-            const fallbackNote = (!latestComment && task.notes && !task.sampleImage && !task.sampleLink) ? task.notes : '';
-            const displayText = latestComment ? latestComment.text : fallbackNote;
-
-            return (
-              <div
-                key={task._id}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (dragOverTaskId !== task._id) setDragOverTaskId(task._id);
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setDragOverTaskId(null);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setDragOverTaskId(null);
-                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    handleTableMultipleImageUpload(task, e.dataTransfer.files);
-                  }
-                }}
-                style={{
-                  background: dragOverTaskId === task._id ? '#ecfdf5' : '#ffffff',
-                  border: dragOverTaskId === task._id ? '2px dashed #10b981' : '1px solid #e2e8f0',
-                  borderRadius: '16px',
-                  padding: '1.1rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
-                  boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  position: 'relative',
-                }}
-                onMouseEnter={(e) => {
-                  if (dragOverTaskId !== task._id) {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
-                    e.currentTarget.style.boxShadow = '0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (dragOverTaskId !== task._id) {
-                    e.currentTarget.style.transform = '';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(15, 23, 42, 0.04)';
-                  }
-                }}
-              >
-                {/* Drag & Drop Overlay Indicator */}
-                {dragOverTaskId === task._id && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'rgba(236, 253, 245, 0.95)',
-                      borderRadius: '16px',
-                      zIndex: 10,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      color: '#059669',
-                      fontWeight: 800,
-                      fontSize: '0.9rem',
-                    }}
-                  >
-                    <Upload size={28} />
-                    <span>Drop images here to upload to {task.designName}!</span>
-                  </div>
-                )}
-
-                {/* ── Direct Status Dropdown Menu ── */}
-                <div className="status-dropdown-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: isStatusDropdownOpen ? 30 : 1 }}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenStatusDropdownId(isStatusDropdownOpen ? null : task._id)}
-                    style={{
-                      padding: '0.32rem 0.65rem',
-                      borderRadius: '7px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      border: `1.5px solid ${currentBadge.border}`,
-                      background: currentBadge.bg,
-                      color: currentBadge.color,
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      transition: 'all 0.15s ease',
-                      width: '100%',
-                      justifyContent: 'space-between'
-                    }}
-                    title="Click to select / change status directly"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      {CurrentIcon && <CurrentIcon size={12} />}
-                      <span>{currentBadge.label}</span>
-                    </div>
-                    <ChevronDown size={12} style={{ transform: isStatusDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                  </button>
-
-                  {/* Floating Dropdown Menu with 5 options */}
-                  {isStatusDropdownOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 4px)',
-                        left: 0,
-                        right: 0,
-                        zIndex: 9999,
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                        minWidth: '220px',
-                        padding: '0.35rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.2rem',
-                      }}
-                    >
-                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
-                        Select Stage Status
-                      </div>
-                      {statusOpts.map((opt) => {
-                        const OptIcon = opt.icon;
-                        return (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => handleDirectStatusChange(task, opt)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.45rem',
-                              width: '100%',
-                              padding: '0.42rem 0.55rem',
-                              borderRadius: '6px',
-                              border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
-                              background: opt.isActive ? opt.bg : 'transparent',
-                              color: opt.color,
-                              fontSize: '0.74rem',
-                              fontWeight: opt.isActive ? 800 : 600,
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                            }}
-                          >
-                            {OptIcon && <OptIcon size={12} />}
-                            <span style={{ flex: 1 }}>{opt.label}</span>
-                            {opt.isActive && <span>✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Workflow Progress Pipeline Stepper ── */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    background: '#f8fafc',
-                    padding: '0.42rem 0.65rem',
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                  }}
-                >
-                  {/* Step 1: Drow */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.3rem',
-                      color: progress.s1 === 'done' ? '#16a34a' : progress.s1 === 'active' ? '#2563eb' : '#94a3b8',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                    }}
-                    title={`Stage 1 Drow: ${task.drowDesignStatus || 'Pending'}`}
-                  >
-                    <span
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: progress.s1 === 'done' ? '#16a34a' : progress.s1 === 'active' ? '#2563eb' : '#e2e8f0',
-                        color: progress.s1 === 'done' || progress.s1 === 'active' ? '#ffffff' : '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {progress.s1 === 'done' ? '✓' : '1'}
-                    </span>
-                    <span>Drow</span>
-                  </button>
-
-                  <div style={{ flex: 1, height: '2px', background: progress.s1 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 5px', borderRadius: '1px' }} />
-
-                  {/* Step 2: C.M. */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.3rem',
-                      color: progress.s2 === 'done' ? '#16a34a' : progress.s2 === 'active' ? '#db2777' : '#94a3b8',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                    }}
-                    title={`Stage 2 Colour Match: ${task.colourMatchingStatus || 'Pending'}`}
-                  >
-                    <span
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: progress.s2 === 'done' ? '#16a34a' : progress.s2 === 'active' ? '#db2777' : '#e2e8f0',
-                        color: progress.s2 === 'done' || progress.s2 === 'active' ? '#ffffff' : '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {progress.s2 === 'done' ? '✓' : '2'}
-                    </span>
-                    <span>C.M.</span>
-                  </button>
-
-                  <div style={{ flex: 1, height: '2px', background: progress.s2 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 5px', borderRadius: '1px' }} />
-
-                  {/* Step 3: Hold / Continue */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.3rem',
-                      color: progress.s3 === 'done' ? '#16a34a' : progress.s3 === 'hold' ? '#ea580c' : progress.s3 === 'active' ? '#0284c7' : '#94a3b8',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                    }}
-                    title={`Stage 3: ${task.stage3Status || 'Pending'}`}
-                  >
-                    <span
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: progress.s3 === 'done' ? '#16a34a' : progress.s3 === 'hold' ? '#ea580c' : progress.s3 === 'active' ? '#0284c7' : '#e2e8f0',
-                        color: progress.s3 === 'done' || progress.s3 === 'hold' || progress.s3 === 'active' ? '#ffffff' : '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {progress.s3 === 'done' ? '✓' : progress.s3 === 'hold' ? '⏸' : '3'}
-                    </span>
-                    <span>{progress.s3 === 'hold' ? 'Hold' : progress.s3 === 'done' ? 'Continue' : 'Stage 3'}</span>
-                  </button>
-
-                  <div style={{ flex: 1, height: '2px', background: progress.s3 === 'done' ? '#16a34a' : '#e2e8f0', margin: '0 5px', borderRadius: '1px' }} />
-
-                  {/* Step 4: Final Approval */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.3rem',
-                      color: progress.s4 === 'approved' ? '#16a34a' : progress.s4 === 'rejected' ? '#dc2626' : progress.s4 === 'active' ? '#4f46e5' : '#94a3b8',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                    }}
-                    title={`Stage 4: ${task.finalDesignStatus || 'Pending'}`}
-                  >
-                    <span
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: progress.s4 === 'approved' ? '#16a34a' : progress.s4 === 'rejected' ? '#dc2626' : progress.s4 === 'active' ? '#4f46e5' : '#e2e8f0',
-                        color: progress.s4 === 'approved' || progress.s4 === 'rejected' || progress.s4 === 'active' ? '#ffffff' : '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {progress.s4 === 'approved' ? '✓' : progress.s4 === 'rejected' ? '✕' : '4'}
-                    </span>
-                    <span>{progress.s4 === 'approved' ? 'Approved' : progress.s4 === 'rejected' ? 'Reject' : 'Approval'}</span>
-                  </button>
-                </div>
-
-                {/* ── Card Header: Date, Priority & Action Controls ── */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
-                    {task.taskNumber && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#3b82f6', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '1px 6px', whiteSpace: 'nowrap' }}>
-                        #{task.taskNumber}
-                      </span>
-                    )}
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
-                      <Calendar size={11} /> {task.date}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                    <span
-                      style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        padding: '0.18rem 0.5rem',
-                        borderRadius: '6px',
-                        background: priorityConfig.bg,
-                        color: priorityConfig.color,
-                        border: `1px solid ${priorityConfig.border}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.2rem',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <span>{priorityConfig.badge}</span>
-                      <span>{task.priority || 'Medium'}</span>
-                    </span>
-
-                    <button
-                      onClick={() => setHistoryTask(task)}
-                      title="View Complete Stage History"
-                      style={{
-                        padding: '0.25rem 0.45rem',
-                        background: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        color: '#475569',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.2rem',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                      }}
-                    >
-                      <History size={12} />
-                      <span>{task.stageHistory?.length || 0}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setCommentModalTask(task)}
-                      title="View & Add Comments"
-                      style={{
-                        padding: '0.25rem 0.5rem',
-                        background: '#eff6ff',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '6px',
-                        color: '#1d4ed8',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.2rem',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                      }}
-                    >
-                      <MessageSquare size={12} />
-                      <span>{task.comments?.length || (task.notes ? 1 : 0)}</span>
-                    </button>
-
-                    {isUserAdmin && !embedded && (
-                      <>
-                        <button
-                          onClick={() => handleOpenEdit(task)}
-                          title="Edit Task"
-                          style={{
-                            padding: '0.25rem 0.45rem',
-                            background: '#f8fafc',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '6px',
-                            color: '#1d4ed8',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTask(task)}
-                          title="Delete Task"
-                          style={{
-                            padding: '0.25rem 0.45rem',
-                            background: '#fef2f2',
-                            border: '1px solid #fecaca',
-                            borderRadius: '6px',
-                            color: '#dc2626',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── Design Name Header ── */}
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: '1.25rem',
-                    fontWeight: 800,
-                    color: '#0f172a',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    letterSpacing: '-0.01em',
-                  }}
-                  title={task.designName}
-                >
-                  {task.designName}
-                </h3>
-
-                {/* ── Team, Fabric & Party Badges ── */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                  {allDesigners.map((d, i) => (
-                    <span
-                      key={`des-${i}`}
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#1e40af',
-                        background: '#eff6ff',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '6px',
-                        padding: '0.18rem 0.5rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      <User size={11} /> {d}
-                    </span>
-                  ))}
-                  {allFabrics.map((f, i) => (
-                    <span
-                      key={`fab-${i}`}
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#0f766e',
-                        background: '#f0fdfa',
-                        border: '1px solid #99f6e4',
-                        borderRadius: '6px',
-                        padding: '0.18rem 0.5rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      <Scissors size={11} /> {f}
-                    </span>
-                  ))}
-                  {allColourMatches.map((c, i) => (
-                    <span
-                      key={`cm-${i}`}
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#9d174d',
-                        background: '#fdf2f8',
-                        border: '1px solid #fbcfe8',
-                        borderRadius: '6px',
-                        padding: '0.18rem 0.5rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      <Palette size={11} /> {c}
-                    </span>
-                  ))}
-                  {allParties.map((p, i) => (
-                    <span
-                      key={`pty-${i}`}
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#7e22ce',
-                        background: '#faf5ff',
-                        border: '1px solid #e9d5ff',
-                        borderRadius: '6px',
-                        padding: '0.18rem 0.5rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      <Building2 size={11} /> {p}
-                    </span>
-                  ))}
-                </div>
-
-                {/* ── Media Showcase: Sample Reference + Multiple Uploaded Proofs ── */}
-                <div
-                  style={{
-                    background: '#f8fafc',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    padding: '0.65rem 0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                  }}
-                >
-                  {/* Left: Sample Reference */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                    {task.sampleImage ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                        <div
-                          onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
-                          style={{
-                            width: '56px',
-                            height: '56px',
-                            borderRadius: '8px',
-                            overflow: 'hidden',
-                            border: '1.5px solid #cbd5e1',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            background: '#ffffff',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
-                            transition: 'transform 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                          title="Click to zoom sample image"
-                        >
-                          <img src={task.sampleImage} alt="Sample" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              background: 'rgba(0,0,0,0.25)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#ffffff',
-                              opacity: 0,
-                              transition: 'opacity 0.15s',
-                            }}
-                            className="hover:opacity-100"
-                          >
-                            <Eye size={14} />
-                          </div>
-                        </div>
-                        {task.sampleLink && (
-                          <a
-                            href={task.sampleLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '2px',
-                              fontSize: '0.62rem',
-                              fontWeight: 700,
-                              color: '#2563eb',
-                              background: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              textDecoration: 'none'
-                            }}
-                            title={task.sampleLink}
-                          >
-                            <ExternalLink size={10} /> Link
-                          </a>
-                        )}
-                      </div>
-                    ) : task.sampleLink ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                        <div
-                          onClick={() => handleOpenLightbox([task.sampleLink], 0, `Sample: ${task.designName}`)}
-                          style={{
-                            width: '56px',
-                            height: '56px',
-                            borderRadius: '8px',
-                            overflow: 'hidden',
-                            border: '1.5px solid #cbd5e1',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            background: '#ffffff',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
-                          }}
-                          title="Click to zoom sample preview"
-                        >
-                          <DesignImage
-                            rawUrl={task.sampleLink}
-                            designName={task.designName}
-                            thumbnail={true}
-                            width={100}
-                            style={{ width: '100%', height: '100%' }}
-                          />
-                        </div>
-                        <a
-                          href={task.sampleLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '2px',
-                            fontSize: '0.62rem',
-                            fontWeight: 700,
-                            color: '#2563eb',
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            textDecoration: 'none'
-                          }}
-                          title="Open reference link"
-                        >
-                          <ExternalLink size={10} /> Link
-                        </a>
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          width: '56px',
-                          height: '56px',
-                          borderRadius: '8px',
-                          border: '1px dashed #cbd5e1',
-                          background: '#ffffff',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#94a3b8',
-                          gap: '2px',
-                        }}
-                        title="No sample reference provided"
-                      >
-                        <ImageIcon size={16} />
-                        <span style={{ fontSize: '0.58rem', fontWeight: 700 }}>No Ref</span>
-                      </div>
-                    )}
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Sample Ref</span>
-                  </div>
-
-                  <div style={{ width: '1px', alignSelf: 'stretch', background: '#e2e8f0' }} />
-
-                  {/* Right: Uploaded Images & Proofs (with + Upload button & drag/drop) */}
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                        Uploaded Proofs ({taskImages.length})
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMultipleUploadModalTask(task);
-                          setMultiUploadFiles([]);
-                          setMultiUploadPreviews([]);
-                        }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.2rem',
-                          padding: '0.22rem 0.5rem',
-                          borderRadius: '6px',
-                          background: uploadingRowId === task._id ? '#e0e7ff' : '#f0fdf4',
-                          border: uploadingRowId === task._id ? '1px dashed #6366f1' : '1px dashed #86efac',
-                          color: uploadingRowId === task._id ? '#4338ca' : '#16a34a',
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          cursor: uploadingRowId === task._id ? 'wait' : 'pointer',
-                        }}
-                        title="Click to open image uploader (supports Drag & Drop and Copy/Paste)"
-                      >
-                        {uploadingRowId === task._id ? (
-                          <>
-                            <RefreshCw size={10} style={{ animation: 'spin 1s linear infinite' }} />
-                            <span>{uploadRowProgress}%</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload size={10} />
-                            <span>+ Upload</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Thumbnails strip */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                      {taskImages.length === 0 ? (
-                        <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                          Drop images or paste to upload
-                        </span>
-                      ) : (
-                        <>
-                          {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
-                            <div
-                              key={`thumb-${imgIdx}`}
-                              onClick={() => handleOpenLightbox(taskImages, imgIdx, `Uploaded Images: ${task.designName}`)}
-                              style={{
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '6px',
-                                overflow: 'hidden',
-                                border: '1px solid #cbd5e1',
-                                cursor: 'pointer',
-                                position: 'relative',
-                                background: '#ffffff',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                                flexShrink: 0,
-                              }}
-                              title="Click to view image"
-                            >
-                              <img src={imgUrl} alt={`Proof ${imgIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            </div>
-                          ))}
-
-                          {taskImages.length > 3 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(taskImages, 3, `Uploaded Images: ${task.designName}`)}
-                              style={{
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '6px',
-                                background: '#f1f5f9',
-                                border: '1px solid #cbd5e1',
-                                color: '#475569',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                              }}
-                              title={`View all ${taskImages.length} images`}
-                            >
-                              +{taskImages.length - 3}
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Status & Time Taken Controller (No status update dropdown) ── */}
-                {(() => {
-                  const currentBadge = getTaskCurrentStatusBadge(task);
-                  const CurrentIcon = currentBadge.icon;
-                  const timeInfo = getTaskStatusTimeInfo(task);
-
-                  return (
-                    <div
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '10px',
-                        padding: '0.45rem 0.65rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.35rem',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        <span
-                          style={{
-                            padding: '0.3rem 0.6rem',
-                            borderRadius: '7px',
-                            fontSize: '0.74rem',
-                            fontWeight: 800,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            border: `1.5px solid ${currentBadge.border}`,
-                            background: currentBadge.bg,
-                            color: currentBadge.color,
-                          }}
-                        >
-                          {CurrentIcon && <CurrentIcon size={12} />}
-                          <span>{currentBadge.label}</span>
-                        </span>
-
-                        {/* Stage Proof Counters */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          {drowImgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
-                              style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#0284c7', fontSize: '0.68rem', fontWeight: 700 }}
-                              title={`${drowImgs.length} Drow proof image(s)`}
-                            >
-                              🖼️ {drowImgs.length}
-                            </button>
-                          )}
-                          {cmImgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
-                              style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#db2777', fontSize: '0.68rem', fontWeight: 700 }}
-                              title={`${cmImgs.length} Colour proof image(s)`}
-                            >
-                              🎨 {cmImgs.length}
-                            </button>
-                          )}
-                          {stage3Imgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
-                              style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#ea580c', fontSize: '0.68rem', fontWeight: 700 }}
-                              title={`${stage3Imgs.length} Stage 3 proof image(s)`}
-                            >
-                              ⏸️ {stage3Imgs.length}
-                            </button>
-                          )}
-                          {finalImgs.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
-                              style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '5px', padding: '2px 5px', cursor: 'pointer', color: '#16a34a', fontSize: '0.68rem', fontWeight: 700 }}
-                              title={`${finalImgs.length} Final proof image(s)`}
-                            >
-                              ✨ {finalImgs.length}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Time taken */}
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          fontSize: '0.66rem',
-                          fontWeight: 700,
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          color: '#334155',
-                          padding: '0.18rem 0.45rem',
-                          borderRadius: '5px',
-                        }}
-                      >
-                        <Clock size={11} color="#2563eb" />
-                        <span style={{ color: '#1e40af', fontWeight: 800 }}>{timeInfo.currentDurationStr} taken</span>
-                        <span style={{ color: '#cbd5e1' }}>•</span>
-                        <span style={{ color: '#64748b' }}>Total: {timeInfo.totalDurationStr}</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* ── Card Comments & Editable Thread Bar ── */}
-                {editingCommentTaskId === task._id ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    <textarea
-                      value={commentDraft}
-                      onChange={(e) => setCommentDraft(e.target.value)}
-                      placeholder="Write comment... (Enter to save, Shift+Enter for new line)"
-                      rows={2}
-                      style={{
-                        width: '100%',
-                        fontSize: '0.75rem',
-                        padding: '0.35rem 0.5rem',
-                        borderRadius: '6px',
-                        border: '1.5px solid #2563eb',
-                        outline: 'none',
-                        fontFamily: 'inherit',
-                        resize: 'vertical',
-                        background: '#ffffff',
-                        color: '#1e293b',
-                        boxShadow: '0 0 0 2px rgba(37,99,235,0.1)',
-                      }}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSaveComment(task._id);
-                        } else if (e.key === 'Escape') {
-                          setEditingCommentTaskId(null);
-                          setCommentDraft('');
-                        }
-                      }}
-                    />
-                    <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.62rem', color: '#94a3b8', marginRight: 'auto' }}>↵ Enter to save</span>
-                      <button
-                        type="button"
-                        onClick={() => handleSaveComment(task._id)}
-                        disabled={savingCommentId === task._id}
-                        style={{
-                          padding: '0.25rem 0.55rem',
-                          borderRadius: '5px',
-                          background: '#2563eb',
-                          color: '#ffffff',
-                          border: 'none',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                        }}
-                      >
-                        {savingCommentId === task._id ? (
-                          <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                        ) : (
-                          <Check size={11} />
-                        )}
-                        <span>Save</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCommentTaskId(null);
-                          setCommentDraft('');
-                        }}
-                        style={{
-                          padding: '0.25rem 0.45rem',
-                          borderRadius: '5px',
-                          background: '#f1f5f9',
-                          color: '#64748b',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => {
-                      setEditingCommentTaskId(task._id);
-                      setCommentDraft(displayText);
-                    }}
-                    style={{
-                      background: displayText ? '#f8fafc' : '#ffffff',
-                      border: displayText ? '1px solid #cbd5e1' : '1.5px dashed #94a3b8',
-                      borderRadius: '8px',
-                      padding: '0.45rem 0.65rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.5rem',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#2563eb';
-                      e.currentTarget.style.background = '#f0f7ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = displayText ? '#cbd5e1' : '#94a3b8';
-                      e.currentTarget.style.background = displayText ? '#f8fafc' : '#ffffff';
-                    }}
-                    title="Click to edit comment directly"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, flex: 1 }}>
-                      <div
-                        style={{
-                          width: '22px',
-                          height: '22px',
-                          borderRadius: '50%',
-                          background: latestComment ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#e2e8f0',
-                          color: latestComment ? '#ffffff' : '#64748b',
-                          fontSize: '0.62rem',
-                          fontWeight: 800,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {latestComment ? (latestComment.authorName || 'U').charAt(0).toUpperCase() : <MessageSquare size={11} />}
-                      </div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: latestComment ? '#1e293b' : '#64748b', whiteSpace: 'nowrap' }}>
-                            {latestComment ? (latestComment.authorName || 'User') : 'Discussion & Notes'}
-                          </span>
-                          {latestComment?.authorRole && (
-                            <span style={{ fontSize: '0.58rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', borderRadius: '3px', padding: '0 4px', whiteSpace: 'nowrap' }}>
-                              {latestComment.authorRole}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: displayText ? '#334155' : '#2563eb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: displayText ? 'normal' : 'italic' }}>
-                          {displayText || '+ Click to add comment...'}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                      {cardComments.length > 0 && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCommentModalTask(task);
-                          }}
-                          style={{
-                            fontSize: '0.62rem',
-                            fontWeight: 800,
-                            background: '#eff6ff',
-                            color: '#2563eb',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '10px',
-                            padding: '1px 6px',
-                            cursor: 'pointer',
-                          }}
-                          title="Open full discussion thread modal"
-                        >
-                          💬 {cardComments.length}
-                        </span>
-                      )}
-                      <Edit2 size={11} color="#2563eb" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
         </div>
         </div>
       )}
@@ -5659,22 +4335,81 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     <div style={{ fontSize: '0.82rem', color: '#334155', lineHeight: '1.4', whiteSpace: 'pre-wrap', wordBreak: 'break-word', paddingLeft: '28px' }}>
                       {cmt.text}
                     </div>
+
+                    {/* Comment Attached Images */}
+                    {Array.isArray(cmt.images) && cmt.images.length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', paddingLeft: '28px', marginTop: '0.35rem' }}>
+                        {cmt.images.map((imgUrl, imgIdx) => (
+                          <div
+                            key={imgIdx}
+                            onClick={() => handleOpenLightbox(cmt.images, imgIdx, `Attached by ${cmt.authorName || 'User'}`)}
+                            style={{
+                              width: '46px',
+                              height: '46px',
+                              borderRadius: '6px',
+                              overflow: 'hidden',
+                              border: '1px solid #cbd5e1',
+                              cursor: 'pointer',
+                              background: '#f1f5f9',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                            }}
+                            title="Click to view full image"
+                          >
+                            <img src={imgUrl} alt="attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ));
               })()}
             </div>
 
-            {/* Add New Comment Box */}
+            {/* Add New Comment & Image Upload Box */}
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Commenting as <strong style={{ color: '#0f172a' }}>{currentUser?.name || currentUser?.username || 'You'}</strong></span>
-                <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Press Ctrl+Enter to send</span>
+                <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Paste image with Ctrl+V or attach below</span>
               </div>
+
+              {/* Attached Images Previews in Modal */}
+              {modalCommentImages.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', background: '#f8fafc', padding: '0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  {modalCommentImages.map((img, iIdx) => (
+                    <div key={iIdx} style={{ position: 'relative', width: '44px', height: '44px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+                      <img src={img.previewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button
+                        type="button"
+                        onClick={() => setModalCommentImages((prev) => prev.filter((_, idx) => idx !== iIdx))}
+                        style={{
+                          position: 'absolute',
+                          top: 1,
+                          right: 1,
+                          background: 'rgba(0,0,0,0.7)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '15px',
+                          height: '15px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
                 <textarea
                   value={modalCommentDraft}
                   onChange={(e) => setModalCommentDraft(e.target.value)}
-                  placeholder="Type a new comment..."
+                  placeholder="Type a new comment... (Paste images directly with Ctrl+V)"
                   rows={2}
                   autoFocus
                   style={{
@@ -5688,40 +4423,94 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     resize: 'none',
                     boxSizing: 'border-box',
                   }}
+                  onPaste={(e) => {
+                    const items = e.clipboardData?.items;
+                    if (items) {
+                      for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.indexOf('image') !== -1) {
+                          const file = items[i].getAsFile();
+                          if (file) {
+                            const previewUrl = URL.createObjectURL(file);
+                            setModalCommentImages((prev) => [...prev, { file, previewUrl }]);
+                          }
+                        }
+                      }
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
-                      if (modalCommentDraft.trim() && !isPostingModalComment) {
+                      if ((modalCommentDraft.trim() || modalCommentImages.length > 0) && !isPostingModalComment) {
                         setIsPostingModalComment(true);
-                        handleSaveComment(commentModalTask._id, modalCommentDraft)
+                        handleSaveComment(commentModalTask._id, modalCommentDraft, modalCommentImages)
                           .finally(() => setIsPostingModalComment(false));
                       }
                     }
                   }}
                 />
+
+                {/* Attach Image button */}
+                <label
+                  style={{
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: '8px',
+                    background: '#f1f5f9',
+                    color: '#334155',
+                    border: '1.5px solid #cbd5e1',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    height: '42px',
+                    boxSizing: 'border-box',
+                  }}
+                  title="Attach images from computer"
+                >
+                  <ImageIcon size={15} color="#2563eb" />
+                  <span>Image</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        const newFiles = Array.from(e.target.files).map((f) => ({
+                          file: f,
+                          previewUrl: URL.createObjectURL(f),
+                        }));
+                        setModalCommentImages((prev) => [...prev, ...newFiles]);
+                      }
+                    }}
+                  />
+                </label>
+
                 <button
                   type="button"
-                  disabled={!modalCommentDraft.trim() || isPostingModalComment}
+                  disabled={(!modalCommentDraft.trim() && modalCommentImages.length === 0) || isPostingModalComment}
                   onClick={() => {
-                    if (modalCommentDraft.trim() && !isPostingModalComment) {
+                    if ((modalCommentDraft.trim() || modalCommentImages.length > 0) && !isPostingModalComment) {
                       setIsPostingModalComment(true);
-                      handleSaveComment(commentModalTask._id, modalCommentDraft)
+                      handleSaveComment(commentModalTask._id, modalCommentDraft, modalCommentImages)
                         .finally(() => setIsPostingModalComment(false));
                     }
                   }}
                   style={{
                     padding: '0.6rem 1rem',
                     borderRadius: '8px',
-                    background: modalCommentDraft.trim() ? '#2563eb' : '#94a3b8',
+                    background: (modalCommentDraft.trim() || modalCommentImages.length > 0) ? '#2563eb' : '#94a3b8',
                     color: '#ffffff',
                     border: 'none',
                     fontWeight: 800,
                     fontSize: '0.8rem',
-                    cursor: modalCommentDraft.trim() ? 'pointer' : 'not-allowed',
+                    cursor: (modalCommentDraft.trim() || modalCommentImages.length > 0) ? 'pointer' : 'not-allowed',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
                     height: '42px',
+                    boxSizing: 'border-box',
                   }}
                 >
                   {isPostingModalComment ? (

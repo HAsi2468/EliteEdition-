@@ -21,6 +21,10 @@ const commentSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    images: {
+      type: [String],
+      default: [],
+    },
     createdAt: {
       type: Date,
       default: Date.now,
