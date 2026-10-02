@@ -394,7 +394,6 @@ export default function SignedDocumentPreviewModal({
                 borderRadius: '6px',
                 padding: '4px 10px',
                 fontSize: '0.75rem',
-                color: '#334155',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',

@@ -48,6 +48,7 @@ import { triggerPushNotification } from './NotificationToast';
 import { triggerEliteConfirm } from './EliteModalDialog';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignImage from './DesignImage';
+import { getDisplayImageUrl, isTiffFile } from '../utils/imageUrlHelper';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 
 // ─── Status Definitions ────────────────────────────────────────────────────────
@@ -3167,33 +3168,81 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                               {/* Uploaded Image Thumbnails (Integrated directly in comment) */}
                               {taskImages.length > 0 && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '2px' }}>
-                                  {taskImages.slice(0, 3).map((imgUrl, imgIdx) => (
-                                    <div
-                                      key={imgIdx}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenLightbox(taskImages, imgIdx, `Images: ${task.designName}`);
-                                      }}
-                                      style={{
-                                        width: '34px',
-                                        height: '34px',
-                                        borderRadius: '5px',
-                                        overflow: 'hidden',
-                                        border: '1px solid #cbd5e1',
-                                        cursor: 'pointer',
-                                        background: '#f1f5f9',
-                                        flexShrink: 0,
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                      }}
-                                      title="Click to view image"
-                                    >
-                                      <img
-                                        src={imgUrl}
-                                        alt={`Image ${imgIdx + 1}`}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                      />
-                                    </div>
-                                  ))}
+                                  {taskImages.slice(0, 3).map((imgUrl, imgIdx) => {
+                                    const isTiff = isTiffFile(imgUrl);
+                                    const displaySrc = getDisplayImageUrl(imgUrl);
+                                    return (
+                                      <div
+                                        key={imgIdx}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenLightbox(taskImages, imgIdx, `Images: ${task.designName}`);
+                                        }}
+                                        style={{
+                                          position: 'relative',
+                                          width: '34px',
+                                          height: '34px',
+                                          borderRadius: '5px',
+                                          overflow: 'hidden',
+                                          border: '1px solid #cbd5e1',
+                                          cursor: 'pointer',
+                                          background: '#f1f5f9',
+                                          flexShrink: 0,
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                        }}
+                                        title={isTiff ? "TIFF Artwork (Click to view preview)" : "Click to view image"}
+                                      >
+                                        <img
+                                          src={displaySrc}
+                                          alt={`Image ${imgIdx + 1}`}
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const parent = e.currentTarget.parentElement;
+                                            if (parent) {
+                                              const fb = parent.querySelector('.img-fallback-badge');
+                                              if (fb) fb.style.display = 'flex';
+                                            }
+                                          }}
+                                        />
+                                        <div
+                                          className="img-fallback-badge"
+                                          style={{
+                                            display: 'none',
+                                            width: '100%',
+                                            height: '100%',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            background: isTiff ? '#eff6ff' : '#f8fafc',
+                                            color: isTiff ? '#2563eb' : '#64748b',
+                                            fontSize: '0.62rem',
+                                            fontWeight: 800,
+                                          }}
+                                        >
+                                          {isTiff ? 'TIFF' : 'IMG'}
+                                        </div>
+                                        {isTiff && (
+                                          <span
+                                            style={{
+                                              position: 'absolute',
+                                              bottom: 0,
+                                              right: 0,
+                                              background: 'rgba(37, 99, 235, 0.9)',
+                                              color: '#fff',
+                                              fontSize: '7px',
+                                              fontWeight: 800,
+                                              padding: '1px 2px',
+                                              borderRadius: '2px 0 0 0',
+                                              lineHeight: 1,
+                                              pointerEvents: 'none',
+                                            }}
+                                          >
+                                            TIF
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
 
                                   {taskImages.length > 3 && (
                                     <button
@@ -3998,7 +4047,40 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                           }}
                           title="Click to view image in full screen"
                         >
-                          <img src={imgUrl} alt={`Attached ${imgIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img
+                            src={getDisplayImageUrl(imgUrl)}
+                            alt={`Attached ${imgIdx + 1}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const p = e.currentTarget.parentElement;
+                              if (p) {
+                                const fb = p.querySelector('.img-fb');
+                                if (fb) fb.style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div
+                            className="img-fb"
+                            style={{
+                              display: 'none',
+                              width: '100%',
+                              height: '100%',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                            }}
+                          >
+                            {isTiffFile(imgUrl) ? 'TIFF' : 'IMG'}
+                          </div>
+                          {isTiffFile(imgUrl) && (
+                            <span style={{ position: 'absolute', bottom: 0, right: 0, background: '#2563eb', color: '#fff', fontSize: '8px', fontWeight: 800, padding: '1px 3px', borderRadius: '3px 0 0 0' }}>
+                              TIF
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -4193,6 +4275,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                               key={i}
                               onClick={() => handleOpenLightbox(entry.images, i, `History Proof (${entry.stage})`)}
                               style={{
+                                position: 'relative',
                                 width: '44px',
                                 height: '44px',
                                 borderRadius: '6px',
@@ -4200,8 +4283,42 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                 border: '1px solid #cbd5e1',
                                 cursor: 'pointer',
                               }}
+                              title={isTiffFile(imgUrl) ? "TIFF Proof (Click to view preview)" : "Click to view image"}
                             >
-                              <img src={imgUrl} alt="proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img
+                                src={getDisplayImageUrl(imgUrl)}
+                                alt="proof"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const p = e.currentTarget.parentElement;
+                                  if (p) {
+                                    const fb = p.querySelector('.img-fb');
+                                    if (fb) fb.style.display = 'flex';
+                                  }
+                                }}
+                              />
+                              <div
+                                className="img-fb"
+                                style={{
+                                  display: 'none',
+                                  width: '100%',
+                                  height: '100%',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: '#eff6ff',
+                                  color: '#2563eb',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 800,
+                                }}
+                              >
+                                {isTiffFile(imgUrl) ? 'TIFF' : 'IMG'}
+                              </div>
+                              {isTiffFile(imgUrl) && (
+                                <span style={{ position: 'absolute', bottom: 0, right: 0, background: '#2563eb', color: '#fff', fontSize: '7px', fontWeight: 800, padding: '1px 3px', borderRadius: '3px 0 0 0' }}>
+                                  TIF
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -4344,6 +4461,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                             key={imgIdx}
                             onClick={() => handleOpenLightbox(cmt.images, imgIdx, `Attached by ${cmt.authorName || 'User'}`)}
                             style={{
+                              position: 'relative',
                               width: '46px',
                               height: '46px',
                               borderRadius: '6px',
@@ -4353,9 +4471,42 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                               background: '#f1f5f9',
                               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                             }}
-                            title="Click to view full image"
+                            title={isTiffFile(imgUrl) ? "TIFF Artwork (Click to view full preview)" : "Click to view full image"}
                           >
-                            <img src={imgUrl} alt="attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img
+                              src={getDisplayImageUrl(imgUrl)}
+                              alt="attachment"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const p = e.currentTarget.parentElement;
+                                if (p) {
+                                  const fb = p.querySelector('.img-fb');
+                                  if (fb) fb.style.display = 'flex';
+                                }
+                              }}
+                            />
+                            <div
+                              className="img-fb"
+                              style={{
+                                display: 'none',
+                                width: '100%',
+                                height: '100%',
+                                alignItems: 'center',
+                                justifyCenter: 'center',
+                                background: '#eff6ff',
+                                color: '#2563eb',
+                                fontSize: '0.65rem',
+                                fontWeight: 800,
+                              }}
+                            >
+                              {isTiffFile(imgUrl) ? 'TIFF' : 'IMG'}
+                            </div>
+                            {isTiffFile(imgUrl) && (
+                              <span style={{ position: 'absolute', bottom: 0, right: 0, background: '#2563eb', color: '#fff', fontSize: '7px', fontWeight: 800, padding: '1px 3px', borderRadius: '3px 0 0 0' }}>
+                                TIF
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -4527,120 +4678,137 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       )}
 
       {/* ─── MODAL: FULL RESOLUTION IMAGE LIGHTBOX ─────────────────────── */}
-      {lightboxImages && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.9)',
-            zIndex: 10000,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1rem',
-          }}
-          onClick={() => setLightboxImages(null)}
-        >
+      {lightboxImages && (() => {
+        const activeImg = lightboxImages.images[lightboxImages.activeIndex];
+        const isTiff = isTiffFile(activeImg);
+        const displayActiveSrc = getDisplayImageUrl(activeImg);
+
+        return (
           <div
             style={{
-              position: 'absolute',
-              top: '1rem',
-              right: '1rem',
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.92)',
+              zIndex: 10000,
               display: 'flex',
-              gap: '0.75rem',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
             }}
+            onClick={() => setLightboxImages(null)}
           >
-            <a
-              href={lightboxImages.images[lightboxImages.activeIndex]}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-              onClick={(e) => e.stopPropagation()}
+            <div
               style={{
-                color: '#ffffff',
-                background: 'rgba(255,255,255,0.2)',
-                padding: '0.4rem 0.75rem',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                textDecoration: 'none',
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
                 display: 'flex',
+                gap: '0.75rem',
                 alignItems: 'center',
-                gap: '0.35rem',
+                zIndex: 10001,
               }}
             >
-              <Download size={14} /> Open Full
-            </a>
-            <button
-              onClick={() => setLightboxImages(null)}
+              {isTiff && (
+                <span style={{ background: '#2563eb', color: '#fff', fontSize: '0.72rem', fontWeight: 800, padding: '4px 8px', borderRadius: '6px' }}>
+                  TIFF Artwork Preview
+                </span>
+              )}
+              <a
+                href={activeImg}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  color: '#ffffff',
+                  background: 'rgba(255,255,255,0.2)',
+                  padding: '0.4rem 0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+              >
+                <Download size={14} /> Download Original {isTiff ? 'TIFF' : 'File'}
+              </a>
+              <button
+                onClick={() => setLightboxImages(null)}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div
               style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: '#ffffff',
-                borderRadius: '8px',
-                width: '32px',
-                height: '32px',
+                maxWidth: '90vw',
+                maxHeight: '80vh',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                background: '#0f172a',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div
-            style={{
-              maxWidth: '90vw',
-              maxHeight: '80vh',
-              borderRadius: '10px',
-              overflow: 'hidden',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={lightboxImages.images[lightboxImages.activeIndex]}
-              alt={lightboxImages.title}
-              style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', display: 'block' }}
-            />
-          </div>
-
-          {lightboxImages.images.length > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginTop: '1rem',
-                background: 'rgba(0,0,0,0.5)',
-                padding: '0.5rem',
-                borderRadius: '10px',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {lightboxImages.images.map((img, i) => (
-                <div
-                  key={i}
-                  onClick={() => setLightboxImages((prev) => ({ ...prev, activeIndex: i }))}
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '6px',
-                    overflow: 'hidden',
-                    border: i === lightboxImages.activeIndex ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.4)',
-                    cursor: 'pointer',
-                    opacity: i === lightboxImages.activeIndex ? 1 : 0.6,
-                  }}
-                >
-                  <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              ))}
+              <img
+                src={displayActiveSrc}
+                alt={lightboxImages.title}
+                style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', display: 'block' }}
+              />
             </div>
-          )}
-        </div>
-      )}
+
+            {lightboxImages.images.length > 1 && (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  marginTop: '1rem',
+                  background: 'rgba(0,0,0,0.5)',
+                  padding: '0.5rem',
+                  borderRadius: '10px',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {lightboxImages.images.map((img, i) => (
+                  <div
+                    key={i}
+                    onClick={() => setLightboxImages((prev) => ({ ...prev, activeIndex: i }))}
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      border: i === lightboxImages.activeIndex ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.4)',
+                      cursor: 'pointer',
+                      opacity: i === lightboxImages.activeIndex ? 1 : 0.6,
+                    }}
+                  >
+                    <img src={getDisplayImageUrl(img)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── Create / Edit Design Task Modal ─────────────────────────────── */}
       {showCreateModal && (

@@ -40,16 +40,31 @@ export function extractCleanFilename(raw) {
   return str.trim();
 }
 
+export function isTiffFile(url) {
+  if (!url || typeof url !== 'string') return false;
+  return /\.tiff?($|\?)/i.test(url.trim());
+}
+
+export function getDisplayImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const clean = url.trim();
+  if (isTiffFile(clean)) {
+    return `/v1/upload/preview?url=${encodeURIComponent(clean)}`;
+  }
+  return clean;
+}
+
 /**
  * Generates an ordered list of candidate URLs to load for a design.
  * The browser tries these sequentially on error until one succeeds.
  * 
  * Order of candidates:
- * 1. Exact direct Cloudflare R2 link from rawUrl (with clean URI encoding).
- * 2. Extension swap variations on filename (.jpg, .jpeg, .png, .webp).
- * 3. Variations based on designName (.jpg, .jpeg, .png).
- * 4. Stripped designName (removing suffixes like ' D', ' F', '(1)', 'jpg', etc.).
- * 5. Backend smart fallback route `/v1/designs/${cleanName}.jpg?fallback=1` which guarantees an SVG badge.
+ * 1. For TIFF files: on-the-fly backend JPEG conversion preview (/v1/upload/preview?url=...).
+ * 2. Exact direct Cloudflare R2 link from rawUrl (with clean URI encoding).
+ * 3. Extension swap variations on filename (.jpg, .jpeg, .png, .webp).
+ * 4. Variations based on designName (.jpg, .jpeg, .png).
+ * 5. Stripped designName (removing suffixes like ' D', ' F', '(1)', 'jpg', etc.).
+ * 6. Backend smart fallback route `/v1/designs/${cleanName}.jpg?fallback=1` which guarantees an SVG badge.
  */
 export function getImageCandidates(rawUrl, designName, options = {}) {
   const isThumb = options.thumbnail !== false; // default true
@@ -76,7 +91,19 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     return [raw];
   }
 
-  // 2. Google Drive Links: convert to direct Google CDN lh3 embed links (use s400 for thumbnails, s1600 for HD)
+  // 2. TIFF files: browsers cannot decode TIFF natively in <img> tags.
+  // Prioritize server-side on-the-fly Sharp conversion to JPEG.
+  if (isTiffFile(raw)) {
+    add(`/v1/upload/preview?url=${encodeURIComponent(raw)}&w=${width}`);
+    add(`/v1/upload/preview?url=${encodeURIComponent(raw)}`);
+    // Companion preview file if saved alongside
+    const companionJpg = raw.replace(/\.tiff?($|\?)/i, '-preview.jpg$1');
+    if (companionJpg !== raw) {
+      add(companionJpg);
+    }
+  }
+
+  // 3. Google Drive Links: convert to direct Google CDN lh3 embed links (use s400 for thumbnails, s1600 for HD)
   if (raw.includes('drive.google.com') || raw.includes('googleusercontent') || raw.includes('lh3.google')) {
     let fid = '';
     const m1 = raw.match(/\/d\/([-\w]{20,})/);
@@ -95,16 +122,19 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     }
   }
 
-  // 3. Direct absolute HTTP/HTTPS URL (prioritize original uploaded Cloudflare R2 / CDN link)
+  // 4. Direct absolute HTTP/HTTPS URL (prioritize original uploaded Cloudflare R2 / CDN link)
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     add(raw);
   }
 
   const rawFilename = extractCleanFilename(raw);
-  const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '').trim();
+  const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif|tiff?)$/i, '').trim();
 
-  // 4. Direct Cloudflare R2 links (and master fallbacks)
+  // 5. Direct Cloudflare R2 links (and master fallbacks)
   if (rawFilename) {
+    if (isTiffFile(rawFilename)) {
+      add(`/v1/upload/preview?url=${encodeURIComponent(rawFilename)}`);
+    }
     if (rawFilename.startsWith('design_samples/') || rawFilename.startsWith('designs/')) {
       add(`${R2_PUBLIC_BASE}/${rawFilename}`);
     } else {
