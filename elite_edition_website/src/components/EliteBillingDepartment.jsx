@@ -1886,6 +1886,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     }
   };
 
+  const fetchInvoices = loadData;
+
   useEffect(() => {
     loadData();
   }, [search, statusFilter, companyEntity]);
@@ -4985,7 +4987,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           docNumber={signedUploadTarget.docNumber}
           partyName={signedUploadTarget.partyName}
           existingSignedCopy={signedUploadTarget.existingSignedCopy}
-          onSuccess={() => fetchInvoices && fetchInvoices()}
+          onSuccess={() => { loadData(); fetchDigitalChallans(); }}
         />
       )}
 
@@ -4995,7 +4997,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           onClose={() => setSignedPreviewTarget(null)}
           documentData={signedPreviewTarget}
           isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
-          onStatusUpdated={() => fetchInvoices && fetchInvoices()}
+          onStatusUpdated={() => { loadData(); fetchDigitalChallans(); }}
         />
       )}
 
