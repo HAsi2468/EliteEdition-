@@ -317,15 +317,29 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   );
   const isUserAdmin = isAdmin || isMasterAdmin;
   const userAssignedName = (currentUser?.designerName || currentUser?.name || '').trim();
-  const isUserRestricted = !isUserAdmin && !embedded;
+  const userPerms = currentUser?.permissions || [];
+  const hasFullCatalogAccess = isUserAdmin ||
+    userPerms.includes('jobcards_sample') ||
+    userPerms.includes('designer_screen') ||
+    userPerms.includes('designer_module') ||
+    userPerms.includes('jobcards_catalogue') ||
+    userPerms.includes('jobcards') ||
+    Boolean(currentUser?.canCreateDesigns) ||
+    Boolean(currentUser?.canInputNewDesign);
+
+  const isUserRestricted = !hasFullCatalogAccess && !embedded;
   const isDesignerRestricted = isUserRestricted;
   const canInputNewDesign = isUserAdmin ||
     embedded ||
     !currentUser ||
     Boolean(currentUser?.canInputNewDesign) ||
-    currentUser?.permissions?.includes('input_new_design') ||
-    currentUser?.permissions?.includes('jobcards_catalogue') ||
-    currentUser?.permissions?.includes('jobcards');
+    Boolean(currentUser?.canCreateDesigns) ||
+    userPerms.includes('input_new_design') ||
+    userPerms.includes('jobcards_sample') ||
+    userPerms.includes('designer_screen') ||
+    userPerms.includes('designer_module') ||
+    userPerms.includes('jobcards_catalogue') ||
+    userPerms.includes('jobcards');
 
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [], categories: [], parties: [] });
@@ -1100,7 +1114,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   // Open the Status & Image Modal
   const handleOpenStatusModal = (task, category, statusType, statusValue = '') => {
-    if (embedded) return;
     setActiveModalData({
       task,
       category,

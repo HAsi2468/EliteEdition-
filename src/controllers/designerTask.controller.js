@@ -147,7 +147,16 @@ const getNextTaskNo = async () => {
 const createDesignerTask = async (req, res) => {
   try {
     if (req.user && req.user.role !== 'admin' && !req.user.isMainAdmin) {
-      const allowed = req.user.canInputNewDesign || req.user.permissions?.includes('input_new_design');
+      const perms = req.user.permissions || [];
+      const allowed =
+        req.user.canInputNewDesign ||
+        req.user.canCreateDesigns ||
+        perms.includes('input_new_design') ||
+        perms.includes('jobcards_sample') ||
+        perms.includes('designer_screen') ||
+        perms.includes('designer_module') ||
+        perms.includes('jobcards_catalogue') ||
+        perms.includes('jobcards');
       if (!allowed) {
         return res.status(403).json({ error: 'Access denied: You do not have permission to input new designs.' });
       }
@@ -284,7 +293,19 @@ const getDesignerTasks = async (req, res) => {
     // Assigned User filter (matches if user is in Designer OR in Colour Matching)
     const activeAssignedUser = (req.query.assignedUser || req.query.assignedName || '').trim();
     if (activeAssignedUser === '__NO_NAME_ASSIGNED__') {
-      return res.status(200).json({ success: true, count: 0, total: 0, data: [] });
+      const perms = req.user?.permissions || [];
+      const hasAccess = req.user?.role === 'admin' ||
+        req.user?.isMainAdmin ||
+        perms.includes('jobcards_sample') ||
+        perms.includes('designer_screen') ||
+        perms.includes('designer_module') ||
+        perms.includes('jobcards_catalogue') ||
+        perms.includes('jobcards') ||
+        req.user?.canInputNewDesign ||
+        req.user?.canCreateDesigns;
+      if (!hasAccess) {
+        return res.status(200).json({ success: true, count: 0, total: 0, data: [] });
+      }
     }
 
     if (activeAssignedUser && activeAssignedUser !== 'All') {

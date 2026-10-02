@@ -495,7 +495,7 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
@@ -520,7 +520,7 @@ export default function App() {
 
   const getFirstJobCardsTab = () => {
     if (!currentUser || currentUser.role === 'admin') return 'jobcards';
-    const subTabs = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
+    const subTabs = ['jobcards', 'jobcards_sample', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
     const allowed = subTabs.filter(t => currentUser.permissions?.includes(t));
     return allowed[0] || 'jobcards';
   };
@@ -2083,13 +2083,13 @@ export default function App() {
                         Job Card
                       </button>
                     )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) && (
-                      <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'jobcards_catalogue' || activeTab === 'jobcards_master') ? 'active' : ''}`}>
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master') || currentUser.permissions?.includes('jobcards_sample')) && (
+                      <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'jobcards_catalogue' || activeTab === 'jobcards_master' || activeTab === 'jobcards_sample') ? 'active' : ''}`}>
                         Design Catalog
                       </button>
                     )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_screen') || currentUser.permissions?.includes('designer_module')) && (
-                      <button onClick={() => { setActiveTab('designer_screen'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'designer_screen' ? 'active' : ''}`}>
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_screen') || currentUser.permissions?.includes('designer_module') || currentUser.permissions?.includes('jobcards_sample')) && (
+                      <button onClick={() => { setActiveTab('designer_screen'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'designer_screen' || activeTab === 'jobcards_sample') ? 'active' : ''}`}>
                         Designer Screen
                       </button>
                     )}
@@ -2463,10 +2463,10 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
                       renderNavItem('jobcards_list', 'Job Card', FileText, null, 'Job Card')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) &&
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master') || currentUser.permissions?.includes('jobcards_sample')) &&
                       renderNavItem('jobcards_catalogue', 'Design Catalog', BookOpen, null, 'Catalog')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_screen') || currentUser.permissions?.includes('designer_module')) &&
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_screen') || currentUser.permissions?.includes('designer_module') || currentUser.permissions?.includes('jobcards_sample')) &&
                       renderNavItem('designer_screen', 'Designer Screen', Palette, null, 'Designer')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) &&

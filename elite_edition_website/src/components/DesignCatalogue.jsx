@@ -664,7 +664,18 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
 }
 
 export default function DesignCatalogue({ department, initialSubTab = 'catalogue', currentUser }) {
-  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
+  const userPerms = currentUser?.permissions || [];
+  const hasSampleOnly = currentUser &&
+    currentUser.role !== 'admin' &&
+    (userPerms.includes('jobcards_sample') || userPerms.includes('designer_screen')) &&
+    !userPerms.includes('jobcards_catalogue');
+  const defaultSubTab = hasSampleOnly ? 'sample' : initialSubTab;
+  const [activeSubTab, setActiveSubTab] = useState(defaultSubTab);
+
+  useEffect(() => {
+    if (initialSubTab) setActiveSubTab(initialSubTab);
+  }, [initialSubTab]);
+
   const designerScreenRef = useRef(null);
   const [designs, setDesigns] = useState([]);
   const [failedImages, setFailedImages] = useState(new Set());

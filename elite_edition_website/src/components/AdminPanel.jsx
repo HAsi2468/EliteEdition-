@@ -283,9 +283,15 @@ export default function AdminPanel() {
       } else {
         updatedPerms = [...prev.permissions, screenId];
       }
+      const isGrantingDesignAccess = !isChecked && (
+        screenId === 'jobcards_sample' ||
+        screenId === 'designer_screen' ||
+        screenId === 'jobcards_catalogue'
+      );
       return {
         ...prev,
-        permissions: updatedPerms
+        permissions: updatedPerms,
+        ...(isGrantingDesignAccess ? { canInputNewDesign: true, canCreateDesigns: true } : {})
       };
     });
   };
@@ -1477,11 +1483,11 @@ export default function AdminPanel() {
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
                             <label style={styles.microLabel(formData.canInputNewDesign)}>
                               <input type="checkbox" checked={formData.canInputNewDesign} onChange={e => setFormData(p => ({ ...p, canInputNewDesign: e.target.checked }))} />
-                              <span>➕ Input New Design (Designer Screen)</span>
+                              <span>➕ Input New Design & Upload Sample Image (Sample Screen)</span>
                             </label>
                             <label style={styles.microLabel(formData.canCreateDesigns)}>
                               <input type="checkbox" checked={formData.canCreateDesigns} onChange={e => setFormData(p => ({ ...p, canCreateDesigns: e.target.checked }))} />
-                              <span>🎨 Create & Upload Designs</span>
+                              <span>🎨 Create & Upload Catalog Designs</span>
                             </label>
                             <label style={styles.microLabel(formData.canEditDesigns)}>
                               <input type="checkbox" checked={formData.canEditDesigns} onChange={e => setFormData(p => ({ ...p, canEditDesigns: e.target.checked }))} />
