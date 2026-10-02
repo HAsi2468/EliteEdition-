@@ -614,6 +614,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const expenseFilterCategories = React.useMemo(() => [
     {
       id: 'type',
+      label: 'Ledger Type',
       name: 'Ledger Type',
       multi: true,
       options: [
@@ -623,6 +624,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     },
     {
       id: 'category',
+      label: 'Category',
       name: 'Category',
       multi: true,
       options: [
@@ -632,6 +634,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     },
     {
       id: 'paymentMode',
+      label: 'Payment Mode',
       name: 'Payment Mode',
       multi: true,
       options: (paymentModes || []).map(m => ({ value: m, label: m }))

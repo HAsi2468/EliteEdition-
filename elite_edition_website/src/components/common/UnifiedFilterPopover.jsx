@@ -34,16 +34,36 @@ import './UnifiedFilterPopover.css';
  * @param {boolean} [showChips=true] - Whether to render active filter chips below toolbar
  * @param {'left'|'right'} [align='left'] - Popover alignment relative to trigger
  */
-export default function UnifiedFilterPopover({
-  filters = [],
-  values = {},
-  onChange = () => {},
-  onClear = null,
-  triggerLabel = 'Filters',
-  showChips = true,
-  align = 'left',
-  id = 'unified-filter-popover'
-}) {
+export default function UnifiedFilterPopover(props) {
+  const {
+    filters: rawFilters,
+    categories: rawCategories,
+    values: rawValues,
+    activeFilters: rawActiveFilters,
+    onChange = () => {},
+    onClear = null,
+    triggerLabel: rawTriggerLabel,
+    placeholder: rawPlaceholder,
+    showChips = true,
+    align = 'left',
+    id = 'unified-filter-popover'
+  } = props;
+
+  // Support both filters and categories props, and normalize label/name
+  const filters = useMemo(() => {
+    const list = rawFilters || rawCategories || [];
+    return list.map((f) => ({
+      ...f,
+      label: f.label || f.name || f.id || ''
+    }));
+  }, [rawFilters, rawCategories]);
+
+  // Support both values and activeFilters props
+  const values = rawValues || rawActiveFilters || {};
+
+  // Support both triggerLabel and placeholder props
+  const triggerLabel = rawTriggerLabel || rawPlaceholder || 'Filters';
+
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState(filters[0]?.id || '');
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
@@ -52,8 +72,11 @@ export default function UnifiedFilterPopover({
 
   // Set default active category when filters change
   useEffect(() => {
-    if (!activeCategoryId && filters.length > 0) {
-      setActiveCategoryId(filters[0].id);
+    if (filters.length > 0) {
+      const exists = filters.some((f) => f.id === activeCategoryId);
+      if (!exists) {
+        setActiveCategoryId(filters[0].id);
+      }
     }
   }, [filters, activeCategoryId]);
 
@@ -347,7 +370,7 @@ export default function UnifiedFilterPopover({
                           type="text"
                           value={categorySearchQuery}
                           onChange={(e) => setCategorySearchQuery(e.target.value)}
-                          placeholder={`Search ${activeCategory.label.toLowerCase()}...`}
+                          placeholder={`Search ${(activeCategory?.label || activeCategory?.name || 'options').toLowerCase()}...`}
                           className="ufp-search-input"
                         />
                         {categorySearchQuery && (
