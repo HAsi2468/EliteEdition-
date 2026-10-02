@@ -55,6 +55,15 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
+    const fileExt = path.extname(req.file.originalname || '').toLowerCase();
+    const fileMime = (req.file.mimetype || '').toLowerCase();
+    if (fileExt === '.tif' || fileExt === '.tiff' || fileMime === 'image/tiff' || fileMime === 'image/tif') {
+      return res.status(400).json({
+        success: false,
+        message: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
+      });
+    }
+
     const targetFolder = (req.body?.folder || req.query?.folder || 'Chat').trim();
 
     // If R2 is configured and file was stored in memory/disk, upload to R2

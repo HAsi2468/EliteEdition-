@@ -119,6 +119,15 @@ router.post('/', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: 'No image or attachment file provided' });
   }
 
+  // Check and disallow TIFF files
+  const fileExt = path.extname(req.file.originalname || '').toLowerCase();
+  const fileMime = (req.file.mimetype || '').toLowerCase();
+  if (fileExt === '.tif' || fileExt === '.tiff' || fileMime === 'image/tiff' || fileMime === 'image/tif') {
+    return res.status(400).json({
+      error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
+    });
+  }
+
   const folder = (req.body?.folder || req.query?.folder || 'designs').trim();
   const designName = (req.body?.designName || req.query?.designName || '').trim();
 
@@ -206,6 +215,15 @@ router.post('/presign', async (req, res) => {
     return res.status(400).json({ error: 'fileName and fileType are required' });
   }
 
+  // Reject TIFF
+  const extCheck = path.extname(fileName || '').toLowerCase();
+  const mimeCheck = (fileType || '').toLowerCase();
+  if (extCheck === '.tif' || extCheck === '.tiff' || mimeCheck === 'image/tiff' || mimeCheck === 'image/tif') {
+    return res.status(400).json({
+      error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
+    });
+  }
+
   const { getPresignedR2UploadUrl, isR2Configured } = require('../../utils/r2Storage');
   if (!isR2Configured()) {
     return res.status(503).json({ error: 'Direct Cloudflare R2 storage is not configured on server' });
@@ -240,6 +258,15 @@ router.post('/multipart/initiate', async (req, res) => {
   const { fileName, fileType, folder = 'designs' } = req.body || {};
   if (!fileName) {
     return res.status(400).json({ error: 'fileName is required' });
+  }
+
+  // Reject TIFF
+  const extCheck = path.extname(fileName || '').toLowerCase();
+  const mimeCheck = (fileType || '').toLowerCase();
+  if (extCheck === '.tif' || extCheck === '.tiff' || mimeCheck === 'image/tiff' || mimeCheck === 'image/tif') {
+    return res.status(400).json({
+      error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
+    });
   }
 
   const { initiateMultipartR2Upload, isR2Configured } = require('../../utils/r2Storage');
