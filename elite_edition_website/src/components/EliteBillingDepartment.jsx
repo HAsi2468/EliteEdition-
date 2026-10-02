@@ -363,9 +363,29 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     date: new Date().toISOString().split('T')[0],
     vendorName: '',
     items: [createEmptyPurchaseItem()],
+    gstRate: 0,
+    gstType: 'CGST_SGST',
+    gstAmount: '0.00',
     totalAmount: '',
     notes: ''
   });
+
+  const handleGstRateChange = (newRate) => {
+    setPurchaseForm(prev => {
+      const items = prev.items || [];
+      const subtotal = items.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
+      const rateNum = Math.max(0, parseFloat(newRate) || 0);
+      const gstAmt = (subtotal * rateNum) / 100;
+      const total = subtotal + gstAmt;
+
+      return {
+        ...prev,
+        gstRate: newRate,
+        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
+        totalAmount: total > 0 ? total.toFixed(2) : ''
+      };
+    });
+  };
 
   const handleAddPurchaseItem = () => {
     setPurchaseForm(prev => ({
@@ -379,11 +399,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       const items = prev.items || [];
       if (items.length <= 1) return prev;
       const newItems = items.filter((_, idx) => idx !== index);
-      const sum = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      const subtotal = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      const rateNum = Math.max(0, parseFloat(prev.gstRate) || 0);
+      const gstAmt = (subtotal * rateNum) / 100;
+      const total = subtotal + gstAmt;
       return {
         ...prev,
         items: newItems,
-        totalAmount: sum > 0 ? sum.toFixed(2) : ''
+        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
+        totalAmount: total > 0 ? total.toFixed(2) : ''
       };
     });
   };
@@ -403,38 +427,50 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         }
         return updated;
       });
-      const sum = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      const subtotal = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      const rateNum = Math.max(0, parseFloat(prev.gstRate) || 0);
+      const gstAmt = (subtotal * rateNum) / 100;
+      const total = subtotal + gstAmt;
+
       return {
         ...prev,
         items: newItems,
-        totalAmount: sum > 0 ? sum.toFixed(2) : prev.totalAmount
+        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
+        totalAmount: total > 0 ? total.toFixed(2) : prev.totalAmount
       };
     });
   };
 
   const handleEditPurchase = (p) => {
     setEditingPurchaseId(p.id);
+    const pGstRate = p.gstRate != null ? p.gstRate : 0;
+    const pItems = Array.isArray(p.items) && p.items.length > 0
+      ? p.items.map(it => ({
+          id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          itemName: it.itemName || '',
+          quantity: it.quantity || '',
+          unit: it.unit || 'Mtr',
+          rate: it.rate || '',
+          amount: it.amount || (it.quantity && it.rate ? (it.quantity * it.rate).toFixed(2) : '')
+        }))
+      : [{
+          id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          itemName: p.itemName || '',
+          quantity: p.quantity || '',
+          unit: p.unit || 'Mtr',
+          rate: p.rate !== '-' ? p.rate : '',
+          amount: p.totalAmount || ''
+        }];
+
     setPurchaseForm({
       purchaseNo: p.purchaseNo || '',
       date: p.date || new Date().toISOString().split('T')[0],
       vendorName: p.vendorName || '',
-      items: Array.isArray(p.items) && p.items.length > 0
-        ? p.items.map(it => ({
-            id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-            itemName: it.itemName || '',
-            quantity: it.quantity || '',
-            unit: it.unit || 'Mtr',
-            rate: it.rate || '',
-            amount: it.amount || (it.quantity && it.rate ? (it.quantity * it.rate).toFixed(2) : '')
-          }))
-        : [{
-            id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-            itemName: p.itemName || '',
-            quantity: p.quantity || '',
-            unit: p.unit || 'Mtr',
-            rate: p.rate !== '-' ? p.rate : '',
-            amount: p.totalAmount || ''
-          }],
+      items: pItems,
+      gstRate: pGstRate,
+      gstType: p.gstType || 'CGST_SGST',
+      taxableAmount: p.taxableAmount || '',
+      gstAmount: p.gstAmount || '0.00',
       totalAmount: p.totalAmount || '',
       notes: p.notes || ''
     });
@@ -460,14 +496,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       return;
     }
 
-    const calculatedTotal = validItems.reduce((acc, item) => {
+    const calculatedSubtotal = validItems.reduce((acc, item) => {
       const q = parseFloat(item.quantity) || 0;
       const r = parseFloat(item.rate) || 0;
       const amt = parseFloat(item.amount) || (q * r);
       return acc + amt;
     }, 0);
 
-    const finalTotal = parseFloat(purchaseForm.totalAmount) || calculatedTotal;
+    const rateNum = Math.max(0, parseFloat(purchaseForm.gstRate) || 0);
+    const calculatedGstAmt = (calculatedSubtotal * rateNum) / 100;
+    const finalTotal = parseFloat(purchaseForm.totalAmount) || (calculatedSubtotal + calculatedGstAmt);
 
     const newPur = {
       id: editingPurchaseId || `pur_${Date.now()}`,
@@ -490,6 +528,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       quantity: validItems.reduce((acc, i) => acc + (parseFloat(i.quantity) || 0), 0),
       unit: validItems[0]?.unit || 'Mtr',
       rate: validItems.length === 1 ? (parseFloat(validItems[0].rate) || 0) : (validItems.every(i => parseFloat(i.rate) === parseFloat(validItems[0].rate)) ? parseFloat(validItems[0].rate) : '-'),
+      subtotalAmount: calculatedSubtotal,
+      taxableAmount: calculatedSubtotal,
+      gstRate: rateNum,
+      gstType: purchaseForm.gstType || 'CGST_SGST',
+      gstAmount: parseFloat(purchaseForm.gstAmount) || calculatedGstAmt,
       totalAmount: finalTotal,
       notes: purchaseForm.notes || ''
     };
@@ -507,6 +550,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       date: new Date().toISOString().split('T')[0],
       vendorName: '',
       items: [createEmptyPurchaseItem()],
+      gstRate: 0,
+      gstType: 'CGST_SGST',
+      gstAmount: '0.00',
       totalAmount: '',
       notes: ''
     });
@@ -3802,6 +3848,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   date: new Date().toISOString().split('T')[0],
                   vendorName: '',
                   items: [createEmptyPurchaseItem()],
+                  gstRate: 0,
+                  gstType: 'CGST_SGST',
+                  gstAmount: '0.00',
                   totalAmount: '',
                   notes: ''
                 });
@@ -3896,7 +3945,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                           return p.rate && p.rate !== '-' ? `₹${p.rate}` : '-';
                         })()}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>₹{Number(p.totalAmount).toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>
+                        <div>₹{Number(p.totalAmount).toLocaleString('en-IN')}</div>
+                        {p.gstRate > 0 && (
+                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4f46e5', marginTop: 2 }}>
+                            ({p.gstRate}% GST)
+                          </div>
+                        )}
+                      </td>
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'top' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
                           <button
@@ -4088,8 +4144,148 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </div>
               </div>
 
+              {/* ── GST RATE SELECTION & BILL SUMMARY ── */}
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                    🏷️ GST Percentage Selection *
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Tax Type:</label>
+                    <select
+                      value={purchaseForm.gstType}
+                      onChange={e => setPurchaseForm(prev => ({ ...prev, gstType: e.target.value }))}
+                      style={{ padding: '3px 8px', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', color: '#1e293b' }}
+                    >
+                      <option value="CGST_SGST">CGST + SGST (Intra-State)</option>
+                      <option value="IGST">IGST (Inter-State)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Quick Selection Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.45rem' }}>
+                  {[
+                    { rate: 0, label: '0%', desc: 'None / Exempt' },
+                    { rate: 5, label: '5%', desc: 'Fabric / Yarn' },
+                    { rate: 12, label: '12%', desc: 'Paper / Bags' },
+                    { rate: 18, label: '18%', desc: 'Ink / Spares' },
+                    { rate: 28, label: '28%', desc: 'Machinery' },
+                    { rate: 'custom', label: 'Custom', desc: 'Other %' }
+                  ].map((g) => {
+                    const isCustom = g.rate === 'custom';
+                    const isSelected = isCustom
+                      ? ![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate))
+                      : Number(purchaseForm.gstRate) === g.rate;
+
+                    return (
+                      <button
+                        key={g.label}
+                        type="button"
+                        onClick={() => {
+                          if (isCustom) {
+                            const currentVal = ![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate)) ? purchaseForm.gstRate : '';
+                            handleGstRateChange(currentVal || '');
+                          } else {
+                            handleGstRateChange(g.rate);
+                          }
+                        }}
+                        style={{
+                          padding: '0.5rem 0.25rem', borderRadius: '7px', textAlign: 'center', cursor: 'pointer',
+                          border: isSelected ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                          background: isSelected ? 'rgba(79, 70, 229, 0.12)' : '#ffffff',
+                          color: isSelected ? '#4f46e5' : '#475569',
+                          boxShadow: isSelected ? '0 0 8px rgba(79, 70, 229, 0.2)' : 'none',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.88rem', fontWeight: 900 }}>{g.label}</span>
+                        <span style={{ fontSize: '0.62rem', opacity: 0.8, whiteSpace: 'nowrap' }}>{g.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* If custom is selected, show custom rate input */}
+                {![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate)) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5' }}>Enter Custom GST %:</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="100"
+                      placeholder="e.g. 7.5"
+                      value={purchaseForm.gstRate}
+                      onChange={e => handleGstRateChange(e.target.value)}
+                      style={{ width: '90px', padding: '0.3rem 0.5rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: '4px', border: '1px solid #4f46e5' }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>%</span>
+                  </div>
+                )}
+
+                {/* Calculated Breakdown Line */}
+                {(() => {
+                  const validItems = purchaseForm.items || [];
+                  const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
+                  const gstPct = parseFloat(purchaseForm.gstRate) || 0;
+                  const gstAmt = (subtotal * gstPct) / 100;
+                  const isInterstate = purchaseForm.gstType === 'IGST';
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>Subtotal (Taxable):</span>
+                        <strong style={{ fontSize: '0.9rem', color: '#1e293b' }}>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
+                          GST ({gstPct}%){gstPct > 0 && !isInterstate ? ' [CGST+SGST]' : gstPct > 0 ? ' [IGST]' : ''}:
+                        </span>
+                        <strong style={{ fontSize: '0.9rem', color: gstAmt > 0 ? '#4f46e5' : '#64748b' }}>
+                          + ₹{gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                        {gstPct > 0 && !isInterstate && (
+                          <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 1 }}>
+                            (CGST: ₹{(gstAmt / 2).toFixed(2)} | SGST: ₹{(gstAmt / 2).toFixed(2)})
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ color: '#0284c7', fontSize: '0.7rem', fontWeight: 800, display: 'block' }}>Calculated Total:</span>
+                        <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7' }}>
+                          ₹{(subtotal + gstAmt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: 4 }}>Total Bill Amount (₹) *</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', margin: 0 }}>
+                    Total Bill Amount (₹) *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const validItems = purchaseForm.items || [];
+                      const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
+                      const rateNum = Math.max(0, parseFloat(purchaseForm.gstRate) || 0);
+                      const total = subtotal + (subtotal * rateNum) / 100;
+                      setPurchaseForm(prev => ({
+                        ...prev,
+                        totalAmount: total > 0 ? total.toFixed(2) : ''
+                      }));
+                    }}
+                    style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', border: '1px solid #93c5fd', background: '#eff6ff', color: '#0284c7', cursor: 'pointer' }}
+                    title="Recalculate exact total from Items & GST"
+                  >
+                    Sync with Calculated Total
+                  </button>
+                </div>
                 <input
                   type="number"
                   required
@@ -4192,9 +4388,27 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0f9ff', border: '1.5px solid #93c5fd', padding: '0.85rem 1.1rem', borderRadius: '10px' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0369a1' }}>Total Bill Amount</span>
-                <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN')}</span>
+              <div style={{ background: '#f8fafc', border: '1.5px solid #93c5fd', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#64748b' }}>Subtotal (Taxable Value):</span>
+                  <strong style={{ color: '#1e293b' }}>
+                    ₹{Number(viewPurchaseModal.subtotalAmount || (viewPurchaseModal.totalAmount - (viewPurchaseModal.gstAmount || 0)) || viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#64748b' }}>
+                    GST ({viewPurchaseModal.gstRate || 0}%) {viewPurchaseModal.gstType === 'IGST' ? '[IGST]' : '[CGST + SGST]'}:
+                  </span>
+                  <strong style={{ color: (viewPurchaseModal.gstAmount > 0 || viewPurchaseModal.gstRate > 0) ? '#4f46e5' : '#64748b' }}>
+                    + ₹{Number(viewPurchaseModal.gstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1.5px solid #cbd5e1', paddingTop: '0.6rem', marginTop: '0.2rem' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1' }}>Total Bill Amount:</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
               </div>
 
               {viewPurchaseModal.notes && (
