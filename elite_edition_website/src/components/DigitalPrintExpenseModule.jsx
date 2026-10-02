@@ -480,6 +480,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       ? expenseFilters.type.join(', ')
       : 'All Ledger (IN & OUT)';
 
+    const categoryLabel = (expenseFilters.category && expenseFilters.category.length > 0)
+      ? expenseFilters.category.join(', ')
+      : 'All Categories';
+
+    const paymentModeLabel = (expenseFilters.paymentMode && expenseFilters.paymentMode.length > 0)
+      ? expenseFilters.paymentMode.join(', ')
+      : 'All Modes';
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -524,7 +532,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
           <div class="meta-info">
             <div><strong>Date Range:</strong> ${activeRange.labelText}</div>
             <div><strong>Ledger Filter:</strong> ${typeLabel}</div>
-            <div><strong>Category:</strong> ${categoryFilter}</div>
+            <div><strong>Category:</strong> ${categoryLabel}</div>
+            <div><strong>Payment Mode:</strong> ${paymentModeLabel}</div>
             ${search ? `<div><strong>Search Filter:</strong> "${search}"</div>` : ''}
             <div><strong>Generated On:</strong> ${new Date().toLocaleString('en-IN')}</div>
           </div>
