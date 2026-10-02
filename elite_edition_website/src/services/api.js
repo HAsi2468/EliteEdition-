@@ -960,6 +960,10 @@ export const api = {
     return response.json();
   },
 
+  async uploadDesignerImage(file, folder = 'sample_reference') {
+    return this.uploadImage(file, folder);
+  },
+
   async uploadComplaintAttachment(file, department = 'Digital_Print') {
     const cleanDept = String(department || 'General')
       .trim()
