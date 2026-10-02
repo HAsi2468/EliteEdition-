@@ -16,7 +16,7 @@ import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
 import DesignerScreen from './DesignerScreen';
-import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
+import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates, ACCEPTED_IMAGE_FORMATS, isTiffFile } from '../utils/imageUrlHelper';
 import DesignImage from './DesignImage';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 
@@ -459,6 +459,11 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
 
   const processAndUploadFile = async (file) => {
     if (!file) return;
+    if (isTiffFile(file)) {
+      alert('TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     try {
       // 1. Convert file to compressed Base64 immediately so preview loads 100% instantly
       const base64 = await compressAndConvertToBase64(file);
@@ -547,7 +552,7 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*"
+            accept={ACCEPTED_IMAGE_FORMATS}
             style={{ display: 'none' }}
           />
           {directUrl ? (

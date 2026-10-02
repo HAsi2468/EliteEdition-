@@ -48,7 +48,7 @@ import { triggerPushNotification } from './NotificationToast';
 import { triggerEliteConfirm } from './EliteModalDialog';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignImage from './DesignImage';
-import { getDisplayImageUrl, isTiffFile } from '../utils/imageUrlHelper';
+import { getDisplayImageUrl, isTiffFile, ACCEPTED_IMAGE_FORMATS, validateImageFile } from '../utils/imageUrlHelper';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 
 // ─── Status Definitions ────────────────────────────────────────────────────────
@@ -1034,6 +1034,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   const processSampleFile = async (file) => {
     if (!file) return;
+    if (isTiffFile(file)) {
+      alert('TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.');
+      return;
+    }
     setUploadingSampleImage(true);
     try {
       const options = {
@@ -1139,7 +1143,13 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   // Handle multi-file selection
   const handleFileChange = (e) => {
-    const files = Array.from(e.target.files || []);
+    const rawFiles = Array.from(e.target.files || []);
+    if (!rawFiles.length) return;
+    const files = rawFiles.filter(f => !isTiffFile(f));
+    const skipped = rawFiles.length - files.length;
+    if (skipped > 0) {
+      alert(`TIFF files (.tif/.tiff) are not allowed. ${skipped} file(s) skipped. Please upload JPG, PNG, WEBP, or standard image formats.`);
+    }
     if (!files.length) return;
 
     setSelectedFiles((prev) => [...prev, ...files]);
@@ -1212,7 +1222,13 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   // Upload multiple images directly from table row
   const handleTableMultipleImageUpload = async (task, fileList) => {
     if (!fileList || fileList.length === 0) return;
-    const files = Array.from(fileList);
+    const allFiles = Array.from(fileList);
+    const files = allFiles.filter(f => !isTiffFile(f));
+    const tiffCount = allFiles.length - files.length;
+    if (tiffCount > 0) {
+      alert(`TIFF files (.tif/.tiff) are not allowed. ${tiffCount} file(s) skipped. Please upload JPG, PNG, WEBP, or standard image formats.`);
+    }
+    if (files.length === 0) return;
     setUploadingRowId(task._id);
     setUploadRowProgress(10);
 
@@ -1298,6 +1314,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         for (const item of imgsToProcess) {
           const file = item?.file || (item instanceof File ? item : null);
           if (file) {
+            if (isTiffFile(file)) {
+              alert('TIFF files (.tif/.tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.');
+              continue;
+            }
             let fileToUpload = file;
             if (file.type && file.type.startsWith('image/')) {
               try {
@@ -1311,9 +1331,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               uploadedUrls.push(res.url);
             }
           } else if (typeof item === 'string' && item.startsWith('http')) {
-            uploadedUrls.push(item);
+            if (!isTiffFile(item)) uploadedUrls.push(item);
           } else if (item?.previewUrl && typeof item.previewUrl === 'string' && item.previewUrl.startsWith('http')) {
-            uploadedUrls.push(item.previewUrl);
+            if (!isTiffFile(item.previewUrl)) uploadedUrls.push(item.previewUrl);
           }
         }
       }
@@ -1427,9 +1447,14 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   // Add files to multi-upload modal queue with local previews
   const addMultiUploadFiles = (incomingFiles) => {
-    const valid = Array.from(incomingFiles || []).filter(
-      (f) => f && f.type && f.type.startsWith('image/')
+    const rawFiles = Array.from(incomingFiles || []);
+    const valid = rawFiles.filter(
+      (f) => f && f.type && f.type.startsWith('image/') && !isTiffFile(f)
     );
+    const skippedTiff = rawFiles.filter(f => isTiffFile(f)).length;
+    if (skippedTiff > 0) {
+      alert(`TIFF files (.tif/.tiff) are not allowed. ${skippedTiff} file(s) skipped. Please upload JPG, PNG, WEBP, or standard image formats.`);
+    }
     if (!valid.length) return;
 
     setMultiUploadFiles((prev) => [...prev, ...valid]);
@@ -2944,15 +2969,22 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                 <input
                                   type="file"
                                   multiple
-                                  accept="image/*"
+                                  accept={ACCEPTED_IMAGE_FORMATS}
                                   style={{ display: 'none' }}
                                   onChange={(e) => {
                                     if (e.target.files && e.target.files.length > 0) {
-                                      const newFiles = Array.from(e.target.files).map((f) => ({
-                                        file: f,
-                                        previewUrl: URL.createObjectURL(f),
-                                      }));
-                                      setCommentDraftImages((prev) => [...prev, ...newFiles]);
+                                      const rawFiles = Array.from(e.target.files);
+                                      const validFiles = rawFiles.filter(f => !isTiffFile(f));
+                                      if (rawFiles.length > validFiles.length) {
+                                        alert('TIFF files (.tif/.tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.');
+                                      }
+                                      if (validFiles.length > 0) {
+                                        const newFiles = validFiles.map((f) => ({
+                                          file: f,
+                                          previewUrl: URL.createObjectURL(f),
+                                        }));
+                                        setCommentDraftImages((prev) => [...prev, ...newFiles]);
+                                      }
                                     }
                                   }}
                                 />
@@ -3088,7 +3120,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                     <input
                                       type="file"
                                       multiple
-                                      accept="image/*"
+                                      accept={ACCEPTED_IMAGE_FORMATS}
                                       disabled={uploadingRowId === task._id}
                                       style={{ display: 'none' }}
                                       onChange={(e) => {
@@ -3580,7 +3612,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     id="r2-multi-file-input"
                     type="file"
                     multiple
-                    accept="image/*"
+                    accept={ACCEPTED_IMAGE_FORMATS}
                     onChange={handleFileChange}
                     style={{ display: 'none' }}
                   />
@@ -3896,7 +3928,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   id="modal-multi-image-file-input"
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept={ACCEPTED_IMAGE_FORMATS}
                   onChange={(e) => {
                     addMultiUploadFiles(e.target.files);
                     e.target.value = '';
@@ -4624,15 +4656,22 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   <input
                     type="file"
                     multiple
-                    accept="image/*"
+                    accept={ACCEPTED_IMAGE_FORMATS}
                     style={{ display: 'none' }}
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
-                        const newFiles = Array.from(e.target.files).map((f) => ({
-                          file: f,
-                          previewUrl: URL.createObjectURL(f),
-                        }));
-                        setModalCommentImages((prev) => [...prev, ...newFiles]);
+                        const rawFiles = Array.from(e.target.files);
+                        const validFiles = rawFiles.filter(f => !isTiffFile(f));
+                        if (rawFiles.length > validFiles.length) {
+                          alert('TIFF files (.tif/.tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.');
+                        }
+                        if (validFiles.length > 0) {
+                          const newFiles = validFiles.map((f) => ({
+                            file: f,
+                            previewUrl: URL.createObjectURL(f),
+                          }));
+                          setModalCommentImages((prev) => [...prev, ...newFiles]);
+                        }
                       }
                     }}
                   />
@@ -5177,7 +5216,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     <input
                       id="task-sample-file-input"
                       type="file"
-                      accept="image/*"
+                      accept={ACCEPTED_IMAGE_FORMATS}
                       style={{ display: 'none' }}
                       onChange={handleSampleImageUpload}
                     />

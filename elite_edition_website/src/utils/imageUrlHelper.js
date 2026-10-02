@@ -40,9 +40,27 @@ export function extractCleanFilename(raw) {
   return str.trim();
 }
 
-export function isTiffFile(url) {
-  if (!url || typeof url !== 'string') return false;
-  return /\.tiff?($|\?)/i.test(url.trim());
+export const ACCEPTED_IMAGE_FORMATS = 'image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/avif,image/bmp,.jpg,.jpeg,.png,.webp,.gif,.svg,.avif,.bmp';
+
+export function isTiffFile(fileOrUrl) {
+  if (!fileOrUrl) return false;
+  if (typeof fileOrUrl === 'string') {
+    return /\.tiff?($|\?)/i.test(fileOrUrl.trim());
+  }
+  const name = fileOrUrl.name || '';
+  const type = (fileOrUrl.type || '').toLowerCase();
+  return /\.tiff?$/i.test(name) || type === 'image/tiff' || type === 'image/tif';
+}
+
+export function validateImageFile(file) {
+  if (!file) return { valid: false, error: 'No file provided' };
+  if (isTiffFile(file)) {
+    return {
+      valid: false,
+      error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or other image formats.'
+    };
+  }
+  return { valid: true };
 }
 
 export function getDisplayImageUrl(url) {

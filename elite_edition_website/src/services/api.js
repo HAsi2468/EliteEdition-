@@ -938,6 +938,14 @@ export const api = {
 
   // ─── Design Catalogue & Cloudflare R2 Uploads ──────────────────────────────────────
   async uploadImage(file, folder = 'designs') {
+    if (file) {
+      const name = file.name || '';
+      const type = (file.type || '').toLowerCase();
+      if (/\.tiff?$/i.test(name) || type === 'image/tiff' || type === 'image/tif') {
+        throw new Error('TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.');
+      }
+    }
+
     const formData = new FormData();
     formData.append('image', file);
     if (folder) formData.append('folder', folder);
