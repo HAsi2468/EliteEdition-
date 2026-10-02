@@ -941,23 +941,11 @@ export const api = {
     const formData = new FormData();
     formData.append('image', file);
     if (folder) formData.append('folder', folder);
-    
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
 
-    const response = await fetch(`${getBaseUrl()}/upload`, {
+    return request('/upload', {
       method: 'POST',
-      headers,
       body: formData
     });
-    
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || `HTTP error! status: ${response.status}`);
-    }
-    return response.json();
   },
 
   async uploadDesignerImage(file, folder = 'sample_reference') {
@@ -984,15 +972,10 @@ export const api = {
     formData.append('file', file);
     formData.append('folder', folder);
 
-    const response = await fetch(`${getBaseUrl()}/workspace/upload`, {
+    return request('/workspace/upload', {
       method: 'POST',
       body: formData
     });
-
-    if (!response.ok) {
-      throw new Error(`Chat upload error! status: ${response.status}`);
-    }
-    return response.json();
   },
 
 
