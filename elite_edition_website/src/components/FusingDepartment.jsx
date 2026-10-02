@@ -64,6 +64,64 @@ export const getCardPrintedMeters = (card) => {
   return match ? match[0] : '';
 };
 
+/**
+ * Textile Quarter Meter Helpers:
+ * Accepts strictly .00, .25, .50, .75 decimal values.
+ */
+export const isValidMeterQuarter = (val) => {
+  if (val === '' || val === undefined || val === null) return true;
+  const num = parseFloat(val);
+  if (isNaN(num) || num < 0) return false;
+  const remainder = Math.round((num % 1) * 100);
+  return remainder === 0 || remainder === 25 || remainder === 50 || remainder === 75;
+};
+
+export const sanitizeQuarterInput = (rawVal) => {
+  if (rawVal === '' || rawVal === undefined || rawVal === null) return '';
+  const str = String(rawVal).trim();
+  if (str === '') return '';
+  // Allow typing integers or typing a trailing dot (e.g. "10", "10.")
+  if (/^\d+\.?$/.test(str)) return str;
+
+  const parts = str.split('.');
+  if (parts.length > 2) return parts[0] + '.' + parts[1];
+
+  const intPart = parts[0] || '0';
+  const dec = parts[1];
+
+  // While typing 1st decimal digit
+  if (dec.length === 1) {
+    if (['0', '2', '5', '7'].includes(dec)) return `${intPart}.${dec}`;
+    const d = parseInt(dec, 10);
+    if (d <= 1) return `${intPart}.00`;
+    if (d <= 3) return `${intPart}.25`;
+    if (d <= 6) return `${intPart}.50`;
+    return `${intPart}.75`;
+  }
+
+  // When 2 or more decimal digits are typed
+  if (dec.length >= 2) {
+    const two = dec.slice(0, 2);
+    if (['00', '25', '50', '75'].includes(two)) return `${intPart}.${two}`;
+    const n = parseInt(two, 10);
+    if (n < 13) return `${intPart}.00`;
+    if (n < 38) return `${intPart}.25`;
+    if (n < 63) return `${intPart}.50`;
+    if (n < 88) return `${intPart}.75`;
+    return `${parseInt(intPart, 10) + 1}.00`;
+  }
+
+  return str;
+};
+
+export const finalizeQuarterBlur = (val) => {
+  if (val === '' || val === undefined || val === null) return '';
+  const num = parseFloat(val);
+  if (isNaN(num) || num < 0) return '0';
+  const snapped = Math.round(num * 4) / 4;
+  return Number.isInteger(snapped) ? String(snapped) : snapped.toFixed(2);
+};
+
 const DEFAULT_FUSING_MACHINES = [
   'Fusing Machine 1 (Rotary)',
   'Fusing Machine 2 (High Speed)',
@@ -256,28 +314,39 @@ export default function FusingDepartment() {
     const fus = parseFloat(topForm.fusingFaultMtr) || 0;
     const prt = parseFloat(topForm.printFaultMtr) || 0;
     const gen = parseFloat(topForm.genuineFaultMtr) || 0;
-    return (fab + fus + prt + gen).toFixed(1);
+    const sum = fab + fus + prt + gen;
+    return Number.isInteger(sum) ? String(sum) : sum.toFixed(2);
   }, [topForm.fabricFaultMtr, topForm.fusingFaultMtr, topForm.printFaultMtr, topForm.genuineFaultMtr]);
 
   // Handler for individual fault type changes (Fabric, Fusing, Print, Genuine)
   const handleFaultChange = (field, val) => {
+    const sanitized = sanitizeQuarterInput(val);
     setTopForm(prev => {
-      const updated = { ...prev, [field]: val };
-      const fab = parseFloat(field === 'fabricFaultMtr' ? val : updated.fabricFaultMtr) || 0;
-      const fus = parseFloat(field === 'fusingFaultMtr' ? val : updated.fusingFaultMtr) || 0;
-      const prt = parseFloat(field === 'printFaultMtr' ? val : updated.printFaultMtr) || 0;
-      const gen = parseFloat(field === 'genuineFaultMtr' ? val : updated.genuineFaultMtr) || 0;
+      const updated = { ...prev, [field]: sanitized };
+      const fab = parseFloat(field === 'fabricFaultMtr' ? sanitized : updated.fabricFaultMtr) || 0;
+      const fus = parseFloat(field === 'fusingFaultMtr' ? sanitized : updated.fusingFaultMtr) || 0;
+      const prt = parseFloat(field === 'printFaultMtr' ? sanitized : updated.printFaultMtr) || 0;
+      const gen = parseFloat(field === 'genuineFaultMtr' ? sanitized : updated.genuineFaultMtr) || 0;
       const totalW = fab + fus + prt + gen;
       const pMtr = parseFloat(prev.printedMtr) || 0;
       const autoFresh = pMtr > 0 ? Math.max(0, pMtr - totalW) : (parseFloat(prev.freshMtr) || 0);
 
+      const totalWStr = Number.isInteger(totalW) ? String(totalW) : totalW.toFixed(2);
+      const autoFreshStr = Number.isInteger(autoFresh) ? String(autoFresh) : autoFresh.toFixed(2);
+      const fusingMtrStr = Number.isInteger(autoFresh + totalW) ? String(autoFresh + totalW) : (autoFresh + totalW).toFixed(2);
+
       return {
         ...updated,
-        fabricWastageMtr: String(totalW),
-        freshMtr: pMtr > 0 ? String(autoFresh) : prev.freshMtr,
-        fusingMtr: String(autoFresh + totalW)
+        fabricWastageMtr: totalWStr,
+        freshMtr: pMtr > 0 ? autoFreshStr : prev.freshMtr,
+        fusingMtr: fusingMtrStr
       };
     });
+  };
+
+  const handleFaultBlur = (field, val) => {
+    const finalized = finalizeQuarterBlur(val);
+    handleFaultChange(field, finalized);
   };
 
   const handleResetWastage = () => {
@@ -297,19 +366,26 @@ export default function FusingDepartment() {
   };
 
   const handleFreshMtrChange = (val) => {
+    const sanitized = sanitizeQuarterInput(val);
     setTopForm(prev => {
-      const fMtr = parseFloat(val) || 0;
+      const fMtr = parseFloat(sanitized) || 0;
       const fab = parseFloat(prev.fabricFaultMtr) || 0;
       const fus = parseFloat(prev.fusingFaultMtr) || 0;
       const prt = parseFloat(prev.printFaultMtr) || 0;
       const gen = parseFloat(prev.genuineFaultMtr) || 0;
       const totalW = fab + fus + prt + gen;
+      const fusingMtrStr = Number.isInteger(fMtr + totalW) ? String(fMtr + totalW) : (fMtr + totalW).toFixed(2);
       return {
         ...prev,
-        freshMtr: val,
-        fusingMtr: String(fMtr + totalW)
+        freshMtr: sanitized,
+        fusingMtr: fusingMtrStr
       };
     });
+  };
+
+  const handleFreshMtrBlur = (val) => {
+    const finalized = finalizeQuarterBlur(val);
+    handleFreshMtrChange(finalized);
   };
 
   // Dynamic Report Modal Table State (Panna, Roll Qty, Weight KG)
@@ -705,6 +781,26 @@ export default function FusingDepartment() {
       return;
     }
 
+    // Strict quarter decimal validation (.00, .25, .50, .75)
+    const quarterChecks = [
+      { label: 'Fresh Fused (MTR)', val: topForm.freshMtr },
+      { label: '1. Fabric Fault (Mtr)', val: topForm.fabricFaultMtr },
+      { label: '2. Fusing Fault (Mtr)', val: topForm.fusingFaultMtr },
+      { label: '3. Print Fault (Mtr)', val: topForm.printFaultMtr },
+      { label: '4. Genuine / Joint (Mtr)', val: topForm.genuineFaultMtr }
+    ];
+
+    for (const item of quarterChecks) {
+      if (item.val && !isValidMeterQuarter(item.val)) {
+        triggerEliteAlert(
+          'Invalid Decimal Value',
+          `${item.label} only accepts quarter decimal values: .00, .25, .50, or .75 (e.g. 10.00, 10.25, 10.50, 10.75). Please adjust the value.`,
+          'warning'
+        );
+        return;
+      }
+    }
+
     const printedVal = parseFloat(topForm.printedMtr) || 0;
     const fabW = parseFloat(topForm.fabricFaultMtr) || 0;
     const fusW = parseFloat(topForm.fusingFaultMtr) || 0;
@@ -934,6 +1030,26 @@ export default function FusingDepartment() {
     if (!form.jobCardId) {
       triggerEliteAlert('Please select a valid Job Card.');
       return;
+    }
+
+    // Strict quarter decimal validation (.00, .25, .50, .75)
+    const quarterChecks = [
+      { label: 'Fresh Output (MTR)', val: form.freshMtr },
+      { label: '1. Fabric Fault (Mtr)', val: form.fabricFaultMtr },
+      { label: '2. Fusing Fault (Mtr)', val: form.fusingFaultMtr },
+      { label: '3. Print Fault (Mtr)', val: form.printFaultMtr },
+      { label: '4. Genuine / Joint (Mtr)', val: form.genuineFaultMtr }
+    ];
+
+    for (const item of quarterChecks) {
+      if (item.val && !isValidMeterQuarter(item.val)) {
+        triggerEliteAlert(
+          'Invalid Decimal Value',
+          `${item.label} only accepts quarter decimal values: .00, .25, .50, or .75 (e.g. 10.00, 10.25, 10.50, 10.75). Please adjust the value.`,
+          'warning'
+        );
+        return;
+      }
     }
 
     const freshMtrVal = parseFloat(form.freshMtr) || 0;
@@ -1848,11 +1964,12 @@ export default function FusingDepartment() {
                   <input
                     type="number"
                     min="0"
-                    step="0.1"
+                    step="0.25"
                     required
                     placeholder="Fresh mtr..."
                     value={topForm.freshMtr}
                     onChange={e => handleFreshMtrChange(e.target.value)}
+                    onBlur={e => handleFreshMtrBlur(e.target.value)}
                     className="fusing-field-input"
                     style={{
                       border: '2px solid #4ade80',
@@ -1862,6 +1979,9 @@ export default function FusingDepartment() {
                       fontSize: '0.95rem'
                     }}
                   />
+                  <div style={{ fontSize: '0.64rem', color: '#16a34a', marginTop: '3px', fontWeight: 700 }}>
+                    Accepted decimals: .00, .25, .50, .75 only
+                  </div>
                 </div>
               </div>
 
@@ -1934,8 +2054,8 @@ export default function FusingDepartment() {
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c53030' }}>
                         🧵 1. Fabric Fault
                       </span>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        {['0', '1', '2', '5'].map(val => (
+                      <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                        {['0', '0.25', '0.5', '0.75', '1', '2', '5'].map(val => (
                           <button
                             key={val}
                             type="button"
@@ -1944,14 +2064,14 @@ export default function FusingDepartment() {
                               background: String(topForm.fabricFaultMtr) === val ? '#fed7d7' : '#ffffff',
                               border: `1px solid ${String(topForm.fabricFaultMtr) === val ? '#e53e3e' : '#feb2b2'}`,
                               borderRadius: '3px',
-                              padding: '0 4px',
+                              padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
                               color: '#9b2c2c',
                               cursor: 'pointer'
                             }}
                           >
-                            {val}m
+                            {val === '0.25' ? '.25' : val === '0.5' ? '.50' : val === '0.75' ? '.75' : (val === '0' ? '0m' : `${val}m`)}
                           </button>
                         ))}
                       </div>
@@ -1962,10 +2082,11 @@ export default function FusingDepartment() {
                     <input
                       type="number"
                       min="0"
-                      step="0.1"
-                      placeholder="0.0"
+                      step="0.25"
+                      placeholder="0.00"
                       value={topForm.fabricFaultMtr}
                       onChange={e => handleFaultChange('fabricFaultMtr', e.target.value)}
+                      onBlur={e => handleFaultBlur('fabricFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
                         height: '38px',
@@ -1979,6 +2100,9 @@ export default function FusingDepartment() {
                         boxSizing: 'border-box'
                       }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#c53030', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
 
                   {/* 2. Fusing Fault (Mtr) */}
@@ -1987,8 +2111,8 @@ export default function FusingDepartment() {
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#c05621' }}>
                         🔥 2. Fusing Fault
                       </span>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        {['0', '1', '2', '5'].map(val => (
+                      <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                        {['0', '0.25', '0.5', '0.75', '1', '2', '5'].map(val => (
                           <button
                             key={val}
                             type="button"
@@ -1997,14 +2121,14 @@ export default function FusingDepartment() {
                               background: String(topForm.fusingFaultMtr) === val ? '#feebc8' : '#ffffff',
                               border: `1px solid ${String(topForm.fusingFaultMtr) === val ? '#dd6b20' : '#fbd38d'}`,
                               borderRadius: '3px',
-                              padding: '0 4px',
+                              padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
                               color: '#9c4221',
                               cursor: 'pointer'
                             }}
                           >
-                            {val}m
+                            {val === '0.25' ? '.25' : val === '0.5' ? '.50' : val === '0.75' ? '.75' : (val === '0' ? '0m' : `${val}m`)}
                           </button>
                         ))}
                       </div>
@@ -2015,10 +2139,11 @@ export default function FusingDepartment() {
                     <input
                       type="number"
                       min="0"
-                      step="0.1"
-                      placeholder="0.0"
+                      step="0.25"
+                      placeholder="0.00"
                       value={topForm.fusingFaultMtr}
                       onChange={e => handleFaultChange('fusingFaultMtr', e.target.value)}
+                      onBlur={e => handleFaultBlur('fusingFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
                         height: '38px',
@@ -2032,6 +2157,9 @@ export default function FusingDepartment() {
                         boxSizing: 'border-box'
                       }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#c05621', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
 
                   {/* 3. Print Fault (Mtr) */}
@@ -2040,8 +2168,8 @@ export default function FusingDepartment() {
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2b6cb0' }}>
                         🖨️ 3. Print Fault
                       </span>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        {['0', '1', '2', '5'].map(val => (
+                      <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                        {['0', '0.25', '0.5', '0.75', '1', '2', '5'].map(val => (
                           <button
                             key={val}
                             type="button"
@@ -2050,14 +2178,14 @@ export default function FusingDepartment() {
                               background: String(topForm.printFaultMtr) === val ? '#bee3f8' : '#ffffff',
                               border: `1px solid ${String(topForm.printFaultMtr) === val ? '#3182ce' : '#90cdf4'}`,
                               borderRadius: '3px',
-                              padding: '0 4px',
+                              padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
                               color: '#2a4365',
                               cursor: 'pointer'
                             }}
                           >
-                            {val}m
+                            {val === '0.25' ? '.25' : val === '0.5' ? '.50' : val === '0.75' ? '.75' : (val === '0' ? '0m' : `${val}m`)}
                           </button>
                         ))}
                       </div>
@@ -2068,10 +2196,11 @@ export default function FusingDepartment() {
                     <input
                       type="number"
                       min="0"
-                      step="0.1"
-                      placeholder="0.0"
+                      step="0.25"
+                      placeholder="0.00"
                       value={topForm.printFaultMtr}
                       onChange={e => handleFaultChange('printFaultMtr', e.target.value)}
+                      onBlur={e => handleFaultBlur('printFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
                         height: '38px',
@@ -2085,6 +2214,9 @@ export default function FusingDepartment() {
                         boxSizing: 'border-box'
                       }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#2b6cb0', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
 
                   {/* 4. Genuine Fault / Joint (Mtr) */}
@@ -2093,8 +2225,8 @@ export default function FusingDepartment() {
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#6b46c1' }}>
                         ✂️ 4. Genuine / Joint
                       </span>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        {['0', '1', '2', '5'].map(val => (
+                      <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                        {['0', '0.25', '0.5', '0.75', '1', '2', '5'].map(val => (
                           <button
                             key={val}
                             type="button"
@@ -2103,14 +2235,14 @@ export default function FusingDepartment() {
                               background: String(topForm.genuineFaultMtr) === val ? '#e9d8fd' : '#ffffff',
                               border: `1px solid ${String(topForm.genuineFaultMtr) === val ? '#805ad5' : '#d6bcfa'}`,
                               borderRadius: '3px',
-                              padding: '0 4px',
+                              padding: '0 3px',
                               fontSize: '0.62rem',
                               fontWeight: 800,
                               color: '#44337a',
                               cursor: 'pointer'
                             }}
                           >
-                            {val}m
+                            {val === '0.25' ? '.25' : val === '0.5' ? '.50' : val === '0.75' ? '.75' : (val === '0' ? '0m' : `${val}m`)}
                           </button>
                         ))}
                       </div>
@@ -2121,10 +2253,11 @@ export default function FusingDepartment() {
                     <input
                       type="number"
                       min="0"
-                      step="0.1"
-                      placeholder="0.0"
+                      step="0.25"
+                      placeholder="0.00"
                       value={topForm.genuineFaultMtr}
                       onChange={e => handleFaultChange('genuineFaultMtr', e.target.value)}
+                      onBlur={e => handleFaultBlur('genuineFaultMtr', e.target.value)}
                       style={{
                         width: '100%',
                         height: '38px',
@@ -2138,6 +2271,9 @@ export default function FusingDepartment() {
                         boxSizing: 'border-box'
                       }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#6b46c1', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
                 </div>
 
@@ -3306,11 +3442,12 @@ export default function FusingDepartment() {
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.25"
                     min="0"
                     required
                     value={form.freshMtr}
-                    onChange={e => setForm(f => ({ ...f, freshMtr: e.target.value }))}
+                    onChange={e => setForm(f => ({ ...f, freshMtr: sanitizeQuarterInput(e.target.value) }))}
+                    onBlur={e => setForm(f => ({ ...f, freshMtr: finalizeQuarterBlur(e.target.value) }))}
                     placeholder="e.g. 138.00"
                     style={{
                       width: '100%', padding: '0.55rem', borderRadius: '8px',
@@ -3318,6 +3455,9 @@ export default function FusingDepartment() {
                       background: '#ecfdf5', color: '#047857'
                     }}
                   />
+                  <div style={{ fontSize: '0.64rem', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
+                    Accepted decimals: .00, .25, .50, .75 only
+                  </div>
                 </div>
 
                 {/* 2. Total Fabric Used (Fresh MTR + Total Wastage) */}
@@ -3349,38 +3489,54 @@ export default function FusingDepartment() {
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>1. Fabric Fault (Mtr)</label>
                     <input
-                      type="number" step="0.01" min="0"
+                      type="number" step="0.25" min="0"
                       value={form.fabricFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, fabricFaultMtr: e.target.value }))}
+                      onChange={e => setForm(f => ({ ...f, fabricFaultMtr: sanitizeQuarterInput(e.target.value) }))}
+                      onBlur={e => setForm(f => ({ ...f, fabricFaultMtr: finalizeQuarterBlur(e.target.value) }))}
                       style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>2. Fusing Fault (Mtr)</label>
                     <input
-                      type="number" step="0.01" min="0"
+                      type="number" step="0.25" min="0"
                       value={form.fusingFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, fusingFaultMtr: e.target.value }))}
+                      onChange={e => setForm(f => ({ ...f, fusingFaultMtr: sanitizeQuarterInput(e.target.value) }))}
+                      onBlur={e => setForm(f => ({ ...f, fusingFaultMtr: finalizeQuarterBlur(e.target.value) }))}
                       style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>3. Print Fault (Mtr)</label>
                     <input
-                      type="number" step="0.01" min="0"
+                      type="number" step="0.25" min="0"
                       value={form.printFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, printFaultMtr: e.target.value }))}
+                      onChange={e => setForm(f => ({ ...f, printFaultMtr: sanitizeQuarterInput(e.target.value) }))}
+                      onBlur={e => setForm(f => ({ ...f, printFaultMtr: finalizeQuarterBlur(e.target.value) }))}
                       style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>4. Genuine Fault (Mtr)</label>
                     <input
-                      type="number" step="0.01" min="0"
+                      type="number" step="0.25" min="0"
                       value={form.genuineFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, genuineFaultMtr: e.target.value }))}
+                      onChange={e => setForm(f => ({ ...f, genuineFaultMtr: sanitizeQuarterInput(e.target.value) }))}
+                      onBlur={e => setForm(f => ({ ...f, genuineFaultMtr: finalizeQuarterBlur(e.target.value) }))}
                       style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
                     />
+                    <div style={{ fontSize: '0.62rem', color: '#9f1239', marginTop: '2px', fontWeight: 600 }}>
+                      Decimals: .00, .25, .50, .75
+                    </div>
                   </div>
                 </div>
               </div>
