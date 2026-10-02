@@ -436,28 +436,6 @@ export default function SignedDocumentPreviewModal({
           </div>
         </div>
 
-        {/* Verification Helper Banner */}
-        <div
-          style={{
-            padding: '0.45rem 1.5rem',
-            background: '#f0f9ff',
-            borderBottom: '1px solid #e0f2fe',
-            fontSize: '0.76rem',
-            color: '#0369a1',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '0.5rem'
-          }}
-        >
-          <div>
-            🔍 Verifying Document: <strong style={{ color: '#0c4a6e' }}>{docNumber}</strong> {partyName ? `(${partyName})` : ''} — <em>Check header at the top of the bill below to verify number and stamps.</em>
-          </div>
-          <div style={{ color: '#0284c7' }}>
-            💡 Tip: <strong>Fit Page</strong> shows whole bill | <strong>Fit Width</strong> lets you read text from top to bottom
-          </div>
-        </div>
 
         {/* Image Display Area - High Contrast, Full Page top to bottom & left to right */}
         <div
