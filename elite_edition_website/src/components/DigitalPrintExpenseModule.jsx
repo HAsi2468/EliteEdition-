@@ -4,7 +4,7 @@ import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
   CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2,
   User, FileText, ArrowRight, Calendar, Wallet, TrendingUp, TrendingDown, DollarSign, CreditCard,
-  Users, Building2, CheckSquare, Square
+  Users, Building2, CheckSquare, Square, ShoppingBag
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -261,6 +261,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [loadingPartiesData, setLoadingPartiesData] = useState(false);
   const [showAllPartyInvoices, setShowAllPartyInvoices] = useState(false);
   const [partySearchTerm, setPartySearchTerm] = useState('');
+  const [allPurchases, setAllPurchases] = useState([]);
+  const [selectedPurchasesMap, setSelectedPurchasesMap] = useState({});
+  const [showAllVendorPurchases, setShowAllVendorPurchases] = useState(false);
 
   const [formVal, setFormVal] = useState({
     companyEntity,
@@ -351,18 +354,90 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       });
       setPartiesList(sortedParties);
 
-      // Build vendor list
+      // Load purchases from localStorage
+      const loadedPurchases = [];
+      const seenPurchaseIds = new Set();
+      try {
+        const pKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('elite_purchases_')) pKeys.push(k);
+        }
+        if (pKeys.length === 0) {
+          pKeys.push(`elite_purchases_${companyEntity || 'edp'}`);
+        }
+        pKeys.forEach(k => {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const arr = JSON.parse(raw);
+              if (Array.isArray(arr)) {
+                arr.forEach(p => {
+                  const id = p.id || p.purchaseNo || `${p.vendorName}_${p.date}_${p.totalAmount}`;
+                  if (!seenPurchaseIds.has(id)) {
+                    seenPurchaseIds.add(id);
+                    loadedPurchases.push({ ...p, id, _storageKey: k });
+                  }
+                });
+              }
+            }
+          } catch (e) {}
+        });
+      } catch (err) {
+        console.warn('Failed reading purchases from storage', err);
+      }
+      setAllPurchases(loadedPurchases);
+
+      // Build vendor list with purchase aggregates
       const vendorMap = new Map();
       [...vendors, ...fabricVendors].forEach(v => {
         const vName = (v.name || v.vendorName || '').trim();
         if (vName && !vendorMap.has(vName.toLowerCase())) {
           vendorMap.set(vName.toLowerCase(), {
             name: vName,
-            category: v.category || v.fabricType || 'Vendor / Supplier'
+            category: v.category || v.fabricType || 'Vendor / Supplier',
+            pendingCount: 0,
+            pendingAmount: 0,
+            totalPurchaseCount: 0,
+            totalPurchaseAmount: 0
           });
         }
       });
-      setVendorsList(Array.from(vendorMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+
+      // Integrate purchases with vendors
+      loadedPurchases.forEach(p => {
+        const vName = (p.vendorName || '').trim();
+        if (vName) {
+          const key = vName.toLowerCase();
+          if (!vendorMap.has(key)) {
+            vendorMap.set(key, {
+              name: vName,
+              category: 'Material / Fabric Supplier',
+              pendingCount: 0,
+              pendingAmount: 0,
+              totalPurchaseCount: 0,
+              totalPurchaseAmount: 0
+            });
+          }
+          const vEntry = vendorMap.get(key);
+          const totalAmt = Number(p.totalAmount) || 0;
+          const paidAmt = Number(p.paidAmount) || 0;
+          const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
+          vEntry.totalPurchaseCount = (vEntry.totalPurchaseCount || 0) + 1;
+          vEntry.totalPurchaseAmount = (vEntry.totalPurchaseAmount || 0) + totalAmt;
+
+          if (p.paymentStatus !== 'PAID' && due > 0) {
+            vEntry.pendingCount = (vEntry.pendingCount || 0) + 1;
+            vEntry.pendingAmount = (vEntry.pendingAmount || 0) + due;
+          }
+        }
+      });
+
+      const sortedVendors = Array.from(vendorMap.values()).sort((a, b) => {
+        if (b.pendingCount !== a.pendingCount) return b.pendingCount - a.pendingCount;
+        return a.name.localeCompare(b.name);
+      });
+      setVendorsList(sortedVendors);
     } catch (err) {
       console.warn('Error loading parties and vendors:', err);
     } finally {
@@ -496,14 +571,140 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     syncFormWithSelectedInvoices({}, selectedParty);
   };
 
+  const currentVendorPurchases = React.useMemo(() => {
+    if (!selectedVendor) return [];
+    const vendorNameLower = selectedVendor.trim().toLowerCase();
+    const purs = (allPurchases || []).filter(p => {
+      const vName = (p.vendorName || '').trim().toLowerCase();
+      return vName === vendorNameLower;
+    });
+
+    if (showAllVendorPurchases) return purs;
+
+    return purs.filter(p => {
+      const purKey = p.id || p.purchaseNo;
+      const isSelected = !!selectedPurchasesMap[purKey]?.selected;
+      const totalAmt = Number(p.totalAmount) || 0;
+      const paidAmt = Number(p.paidAmount) || 0;
+      const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
+      return isSelected || (p.paymentStatus !== 'PAID' && (due > 0 || totalAmt > 0));
+    });
+  }, [allPurchases, selectedVendor, showAllVendorPurchases, selectedPurchasesMap]);
+
+  const syncFormWithSelectedPurchases = (map, vendorName) => {
+    const selectedEntries = Object.values(map).filter(e => e && e.selected && Number(e.payingAmount) > 0);
+    const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.payingAmount) || 0), 0);
+    const billNos = selectedEntries.map(e => e.purchase?.purchaseNo).filter(Boolean);
+
+    const billNoStr = billNos.join(', ');
+    const titleStr = vendorName 
+      ? `Vendor Payment - ${vendorName}${billNos.length ? ` (${billNoStr})` : ''}`
+      : `Vendor Payment${billNos.length ? ` (${billNoStr})` : ''}`;
+
+    setFormVal(prev => ({
+      ...prev,
+      type: 'OUT', // Strictly Cash OUT for Vendor Purchase Payment
+      category: outCategories.find(c => c.toLowerCase().includes('ink') || c.toLowerCase().includes('maintenance') || c.toLowerCase().includes('paper') || c.toLowerCase().includes('expense')) || outCategories[0] || 'Ink & Consumables',
+      paidToOrReceivedFrom: vendorName || prev.paidToOrReceivedFrom,
+      amount: totalAmount > 0 ? totalAmount.toFixed(2) : prev.amount,
+      billNo: billNoStr,
+      title: titleStr
+    }));
+  };
+
   const handleVendorChange = (vendorName) => {
     setSelectedVendor(vendorName);
+    setSelectedPurchasesMap({});
+    if (!vendorName) {
+      setFormVal(prev => ({
+        ...prev,
+        paidToOrReceivedFrom: '',
+        title: 'Vendor Payment',
+        amount: '',
+        billNo: ''
+      }));
+      return;
+    }
+
     setFormVal(prev => ({
       ...prev,
       type: 'OUT', // Stored as Cash OUT
+      category: outCategories.find(c => c.toLowerCase().includes('ink') || c.toLowerCase().includes('maintenance') || c.toLowerCase().includes('paper') || c.toLowerCase().includes('expense')) || outCategories[0] || 'Ink & Consumables',
       paidToOrReceivedFrom: vendorName,
-      title: vendorName ? `Vendor Payment - ${vendorName}` : 'Vendor Payment'
+      title: `Vendor Payment - ${vendorName}`,
+      amount: '',
+      billNo: ''
     }));
+  };
+
+  const handleTogglePurchase = (pur) => {
+    const purKey = pur.id || pur.purchaseNo;
+    const isCurrentlySelected = !!selectedPurchasesMap[purKey]?.selected;
+    const newSelected = !isCurrentlySelected;
+    const totalAmt = Number(pur.totalAmount) || 0;
+    const paidAmt = Number(pur.paidAmount) || 0;
+    const due = pur.balanceDue != null ? Number(pur.balanceDue) : Math.max(0, totalAmt - paidAmt);
+
+    const updatedMap = {
+      ...selectedPurchasesMap,
+      [purKey]: {
+        selected: newSelected,
+        payingAmount: newSelected ? (due > 0 ? due : totalAmt) : 0,
+        purchase: pur
+      }
+    };
+    if (!newSelected) {
+      delete updatedMap[purKey];
+    }
+    setSelectedPurchasesMap(updatedMap);
+    syncFormWithSelectedPurchases(updatedMap, selectedVendor);
+  };
+
+  const handlePurchasePayingAmountChange = (pur, val) => {
+    const purKey = pur.id || pur.purchaseNo;
+    const numVal = Math.max(0, parseFloat(val) || 0);
+    const updatedMap = {
+      ...selectedPurchasesMap,
+      [purKey]: {
+        selected: true,
+        payingAmount: numVal,
+        purchase: pur
+      }
+    };
+    setSelectedPurchasesMap(updatedMap);
+    syncFormWithSelectedPurchases(updatedMap, selectedVendor);
+  };
+
+  const handleSelectAllPendingPurchases = () => {
+    if (!selectedVendor) return;
+    const vendorNameLower = selectedVendor.trim().toLowerCase();
+    const pendingPurs = (allPurchases || []).filter(p => {
+      const vName = (p.vendorName || '').trim().toLowerCase();
+      const totalAmt = Number(p.totalAmount) || 0;
+      const paidAmt = Number(p.paidAmount) || 0;
+      const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
+      return vName === vendorNameLower && p.paymentStatus !== 'PAID' && (due > 0 || totalAmt > 0);
+    });
+
+    const newMap = {};
+    pendingPurs.forEach(p => {
+      const totalAmt = Number(p.totalAmount) || 0;
+      const paidAmt = Number(p.paidAmount) || 0;
+      const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
+      const purKey = p.id || p.purchaseNo;
+      newMap[purKey] = {
+        selected: true,
+        payingAmount: due > 0 ? due : totalAmt,
+        purchase: p
+      };
+    });
+    setSelectedPurchasesMap(newMap);
+    syncFormWithSelectedPurchases(newMap, selectedVendor);
+  };
+
+  const handleDeselectAllPurchases = () => {
+    setSelectedPurchasesMap({});
+    syncFormWithSelectedPurchases({}, selectedVendor);
   };
 
   const handleModeSelect = (mode) => {
@@ -580,6 +781,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     setSelectedInvoicesMap({});
     setShowAllPartyInvoices(false);
     setPartySearchTerm('');
+    setSelectedPurchasesMap({});
+    setShowAllVendorPurchases(false);
 
     const initialMode = defaultMode || (defaultType === 'IN' ? 'IN' : 'OUT');
     setTransactionMode(initialMode);
@@ -630,6 +833,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     setSelectedParty(item.paidToOrReceivedFrom || '');
     setSelectedVendor(item.paidToOrReceivedFrom || '');
     setSelectedInvoicesMap({});
+    setSelectedPurchasesMap({});
+    setShowAllVendorPurchases(false);
     loadPartiesAndVendors();
 
     const defaultCat = item.type === 'IN' 
@@ -746,6 +951,68 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
           triggerEliteAlert(`✨ Transaction saved as Cash IN and payment applied to ${updatedCount} invoice(s)!`);
         } else if (!editingItem) {
           triggerEliteAlert('✨ Transaction logged as Cash IN successfully!');
+        }
+      } else if (transactionMode === 'VENDOR') {
+        const selectedEntries = Object.values(selectedPurchasesMap).filter(
+          e => e && e.selected && Number(e.payingAmount) > 0
+        );
+        if (selectedEntries.length > 0) {
+          try {
+            const pKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith('elite_purchases_')) pKeys.push(k);
+            }
+            if (pKeys.length === 0) {
+              pKeys.push(`elite_purchases_${companyEntity || 'edp'}`);
+            }
+
+            let updatedCount = 0;
+            pKeys.forEach(k => {
+              try {
+                const raw = localStorage.getItem(k);
+                if (raw) {
+                  let arr = JSON.parse(raw);
+                  if (Array.isArray(arr)) {
+                    let changed = false;
+                    arr = arr.map(p => {
+                      const purKey = p.id || p.purchaseNo;
+                      const entry = selectedPurchasesMap[purKey];
+                      if (entry && entry.selected && Number(entry.payingAmount) > 0) {
+                        const paying = Number(entry.payingAmount);
+                        const prevPaid = Number(p.paidAmount) || 0;
+                        const total = Number(p.totalAmount) || 0;
+                        const newPaid = prevPaid + paying;
+                        const newDue = Math.max(0, total - newPaid);
+                        changed = true;
+                        updatedCount++;
+                        return {
+                          ...p,
+                          paidAmount: Number(newPaid.toFixed(2)),
+                          balanceDue: Number(newDue.toFixed(2)),
+                          paymentStatus: newDue <= 0 ? 'PAID' : (newPaid > 0 ? 'PARTIAL' : 'UNPAID'),
+                          lastPaymentDate: formVal.date,
+                          lastPaymentVoucher: formVal.voucherNo
+                        };
+                      }
+                      return p;
+                    });
+                    if (changed) {
+                      localStorage.setItem(k, JSON.stringify(arr));
+                    }
+                  }
+                }
+              } catch (e) {}
+            });
+
+            window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: 'billing' }));
+            triggerGlobalDataRefresh('billing');
+            triggerEliteAlert(`✨ Transaction saved as Cash OUT and payment applied to ${selectedEntries.length} purchase bill(s)!`);
+          } catch (pErr) {
+            console.error('Failed to update purchase records:', pErr);
+          }
+        } else if (!editingItem) {
+          triggerEliteAlert('✨ Transaction logged as Cash OUT successfully!');
         }
       } else if (!editingItem) {
         triggerEliteAlert('✨ Transaction logged successfully!');
@@ -1499,24 +1766,168 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </div>
               )}
 
-              {/* VENDOR MODE: VENDOR SELECTOR */}
+              {/* VENDOR MODE: VENDOR SELECTOR & PURCHASE BILL PAYMENT PICKER */}
               {transactionMode === 'VENDOR' && (
-                <div style={{ background: 'rgba(217, 119, 6, 0.05)', border: '1px solid rgba(217, 119, 6, 0.25)', borderRadius: '10px', padding: '0.85rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem' }}>
-                    <Building2 size={16} /> Select Vendor (Supplier / Service) *
-                  </label>
-                  <select
-                    value={selectedVendor}
-                    onChange={e => handleVendorChange(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 700 }}
-                  >
-                    <option value="">-- Choose Vendor / Supplier --</option>
-                    {vendorsList.map((v, idx) => (
-                      <option key={idx} value={v.name}>
-                        {v.name} ({v.category})
-                      </option>
-                    ))}
-                  </select>
+                <div style={{ background: 'rgba(217, 119, 6, 0.05)', border: '1px solid rgba(217, 119, 6, 0.25)', borderRadius: '10px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                      <Building2 size={16} /> Select Vendor (Supplier / Inward) *
+                    </label>
+                    {loadingPartiesData && (
+                      <span style={{ fontSize: '0.7rem', color: '#fbbf24' }}>Loading vendors & purchases...</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <select
+                      value={selectedVendor}
+                      onChange={e => handleVendorChange(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 700 }}
+                    >
+                      <option value="">-- Choose Vendor / Supplier --</option>
+                      {vendorsList.map((v, idx) => (
+                        <option key={idx} value={v.name}>
+                          {v.name} {v.pendingCount > 0 ? `(${v.pendingCount} unpaid bills • Due: ₹${v.pendingAmount.toLocaleString('en-IN')})` : (v.totalPurchaseCount > 0 ? `(${v.totalPurchaseCount} bills)` : `(${v.category})`)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Vendor Purchases List */}
+                  {selectedVendor && (
+                    <div style={{ borderTop: '1px solid rgba(217, 119, 6, 0.2)', paddingTop: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          Select Purchase Bills for Payment ({currentVendorPurchases.length} found):
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={handleSelectAllPendingPurchases}
+                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.4)', background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24', cursor: 'pointer' }}
+                          >
+                            Select All Unpaid
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeselectAllPurchases}
+                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', cursor: 'pointer' }}
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowAllVendorPurchases(prev => !prev)}
+                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', background: showAllVendorPurchases ? 'rgba(217, 119, 6, 0.2)' : 'rgba(255,255,255,0.05)', color: showAllVendorPurchases ? '#fbbf24' : 'var(--text-muted)', cursor: 'pointer' }}
+                          >
+                            {showAllVendorPurchases ? 'Showing All' : 'Show All'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {currentVendorPurchases.length === 0 ? (
+                        <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                          No unpaid purchase bills found for {selectedVendor}. (You can still record a manual payment/advance or click &quot;Show All&quot; to view paid bills)
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                          {currentVendorPurchases.map((pur) => {
+                            const purKey = pur.id || pur.purchaseNo;
+                            const isSelected = !!selectedPurchasesMap[purKey]?.selected;
+                            const totalAmt = Number(pur.totalAmount) || 0;
+                            const paidAmt = Number(pur.paidAmount) || 0;
+                            const due = pur.balanceDue != null ? Number(pur.balanceDue) : Math.max(0, totalAmt - paidAmt);
+                            const isPaid = pur.paymentStatus === 'PAID' || due <= 0;
+                            const payingAmt = selectedPurchasesMap[purKey]?.payingAmount ?? (isSelected ? (due > 0 ? due : totalAmt) : '');
+
+                            // Item summary text
+                            const itemsSummary = Array.isArray(pur.items) && pur.items.length > 0
+                              ? pur.items.map(it => `${it.itemName || 'Item'} (${it.quantity || 0} ${it.unit || 'Mtr'})`).join(', ')
+                              : (pur.itemName || 'Material Inward');
+
+                            return (
+                              <div
+                                key={purKey}
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                  padding: '0.5rem 0.7rem', borderRadius: '7px',
+                                  background: isSelected ? 'rgba(217, 119, 6, 0.12)' : 'rgba(255,255,255,0.025)',
+                                  border: isSelected ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--border-light)',
+                                  gap: '0.5rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: '1 1 auto', minWidth: 0 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => handleTogglePurchase(pur)}
+                                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#d97706' }}
+                                  />
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                                        {pur.purchaseNo}
+                                      </span>
+                                      <span style={{
+                                        fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: '8px',
+                                        background: isPaid ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                                        color: isPaid ? '#34d399' : '#f87171'
+                                      }}>
+                                        {pur.paymentStatus || (isPaid ? 'PAID' : 'UNPAID')}
+                                      </span>
+                                      {pur.gstRate > 0 && (
+                                        <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
+                                          {pur.gstRate}% GST
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>
+                                      {itemsSummary}
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>
+                                      {pur.date ? new Date(pur.date).toLocaleDateString('en-IN') : ''} • Bill Total: ₹{totalAmt.toLocaleString('en-IN')} • Due: <strong style={{ color: due > 0 ? '#f87171' : '#34d399' }}>₹{due.toLocaleString('en-IN')}</strong>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ width: '110px', flexShrink: 0 }}>
+                                  <label style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>
+                                    Paying (₹)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    disabled={!isSelected}
+                                    value={payingAmt}
+                                    onChange={e => handlePurchasePayingAmountChange(pur, e.target.value)}
+                                    placeholder="0.00"
+                                    style={{
+                                      width: '100%', padding: '0.3rem 0.45rem', fontSize: '0.8rem', fontWeight: 800,
+                                      color: isSelected ? '#fbbf24' : 'var(--text-muted)',
+                                      border: isSelected ? '1px solid #fbbf24' : '1px solid var(--border-light)',
+                                      background: isSelected ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.03)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Selected Purchases Summary */}
+                      {Object.values(selectedPurchasesMap).filter(e => e?.selected).length > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.65rem', padding: '0.45rem 0.75rem', background: 'rgba(217, 119, 6, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#fbbf24' }}>
+                            ✓ {Object.values(selectedPurchasesMap).filter(e => e?.selected).length} Purchase Bill(s) Selected
+                          </span>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fbbf24' }}>
+                            Total: ₹{Number(formVal.amount || 0).toLocaleString('en-IN')} (Stored as Cash OUT)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1667,7 +2078,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     color: '#fff', cursor: saving || uploading ? 'not-allowed' : 'pointer', opacity: saving || uploading ? 0.6 : 1
                   }}
                 >
-                  {saving ? 'Saving...' : editingItem ? 'Update Entry' : transactionMode === 'PARTY' ? 'Receive Payment & Save Cash IN' : formVal.type === 'IN' ? 'Save Cash IN' : 'Save Transaction'}
+                  {saving ? 'Saving...' : editingItem ? 'Update Entry' : transactionMode === 'PARTY' ? 'Receive Payment & Save Cash IN' : transactionMode === 'VENDOR' ? 'Pay Vendor & Save Cash OUT' : formVal.type === 'IN' ? 'Save Cash IN' : 'Save Transaction'}
                 </button>
               </div>
             </form>

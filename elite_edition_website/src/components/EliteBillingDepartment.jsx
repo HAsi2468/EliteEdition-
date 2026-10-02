@@ -483,6 +483,21 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     } catch (e) {}
   }, [purchases, companyEntity]);
 
+  useEffect(() => {
+    const handleRefresh = (e) => {
+      if (!e || !e.detail || e.detail === 'billing' || e.detail?.source === 'billing') {
+        try {
+          const saved = localStorage.getItem(`elite_purchases_${companyEntity || 'edp'}`);
+          if (saved) {
+            setPurchases(JSON.parse(saved));
+          }
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('elite-data-refresh', handleRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleRefresh);
+  }, [companyEntity]);
+
   const handleCreatePurchase = (e) => {
     e.preventDefault();
     if (!purchaseForm.vendorName) {
@@ -3952,6 +3967,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                             ({p.gstRate}% GST)
                           </div>
                         )}
+                        {p.paymentStatus === 'PAID' && (
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: 'rgba(16,185,129,0.15)', color: '#16a34a', display: 'inline-block', marginTop: 3 }}>
+                            PAID
+                          </div>
+                        )}
+                        {p.paymentStatus === 'PARTIAL' && (
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: 'rgba(234,179,8,0.15)', color: '#ca8a04', display: 'inline-block', marginTop: 3 }}>
+                            PARTIAL (Due: ₹{Number(p.balanceDue || 0).toLocaleString('en-IN')})
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'top' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
@@ -4410,6 +4435,25 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
+
+              {viewPurchaseModal.paymentStatus && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)', padding: '0.75rem 1rem', borderRadius: '8px', border: `1px solid ${viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}` }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: viewPurchaseModal.paymentStatus === 'PAID' ? '#16a34a' : '#d97706' }}>
+                      Payment Status: {viewPurchaseModal.paymentStatus}
+                    </span>
+                    {viewPurchaseModal.lastPaymentDate && (
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>Last Payment: {viewPurchaseModal.lastPaymentDate} {viewPurchaseModal.lastPaymentVoucher ? `(${viewPurchaseModal.lastPaymentVoucher})` : ''}</div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Paid: ₹{Number(viewPurchaseModal.paidAmount || 0).toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: (viewPurchaseModal.balanceDue > 0) ? '#ef4444' : '#16a34a', marginTop: 2 }}>
+                      Due: ₹{Number(viewPurchaseModal.balanceDue != null ? viewPurchaseModal.balanceDue : (viewPurchaseModal.paymentStatus === 'PAID' ? 0 : viewPurchaseModal.totalAmount)).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {viewPurchaseModal.notes && (
                 <div>
