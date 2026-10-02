@@ -1537,7 +1537,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
 
       {/* ── MAIN CONTENT AREA ── */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
@@ -1546,9 +1546,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         ) : activeView === 'kanban' ? (
           
           /* ════ VIEW 1: KANBAN BOARD ════ */
-          <div className="task-kanban-board">
+          <div className="task-kanban-board" style={{ flex: 1, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Mobile Column Bar Switcher */}
-            <div className="task-mobile-col-bar">
+            <div className="task-mobile-col-bar" style={{ flexShrink: 0 }}>
               <button
                 type="button"
                 className={`task-mobile-col-pill ${mobileKanbanCol === 'all' ? 'active' : ''}`}
@@ -1582,8 +1582,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 display: 'grid',
                 gridTemplateColumns: mobileKanbanCol !== 'all' ? '1fr' : 'repeat(5, minmax(260px, 1fr))',
                 gap: '0.75rem',
+                flex: 1,
+                minHeight: 0,
                 height: '100%',
                 overflowX: 'auto',
+                overflowY: 'hidden',
                 paddingBottom: '0.5rem'
               }}
             >
@@ -1600,19 +1603,23 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                       borderRadius: '12px',
                       display: 'flex',
                       flexDirection: 'column',
+                      height: '100%',
+                      minHeight: 0,
                       maxHeight: '100%',
                       overflow: 'hidden'
                     }}
                   >
                     {/* Column Header */}
                     <div
+                      className="task-kanban-col-header"
                       style={{
                         padding: '0.65rem 0.85rem',
                         borderBottom: '1px solid var(--border-light)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        background: col.bg
+                        background: col.bg,
+                        flexShrink: 0
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1627,7 +1634,20 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     </div>
 
                     {/* Task Cards Container */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div
+                      className="task-kanban-cards-stream"
+                      style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
+                        padding: '0.5rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        WebkitOverflowScrolling: 'touch'
+                      }}
+                    >
                       {colTasks.length === 0 ? (
                         <div style={{ padding: '2rem 0.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                           No tasks in {col.label}

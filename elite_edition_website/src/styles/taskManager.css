@@ -336,15 +336,24 @@
 .task-kanban-board {
   flex: 1 1 0% !important;
   min-height: 0 !important;
+  height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
   position: relative !important;
 }
 
+.kanban-grid-responsive {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow-y: hidden !important;
+}
+
 .task-kanban-columns-track {
   flex: 1 1 0% !important;
   min-height: 0 !important;
+  height: 100% !important;
   display: grid !important;
   grid-template-columns: repeat(5, minmax(260px, 1fr)) !important;
   gap: 10px !important;
@@ -372,6 +381,7 @@
   flex-direction: column !important;
   height: 100% !important;
   min-height: 0 !important;
+  max-height: 100% !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
@@ -415,16 +425,27 @@
   display: flex !important;
   flex-direction: column !important;
   gap: 8px !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 transparent !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 .task-kanban-cards-stream::-webkit-scrollbar {
-  width: 4px !important;
+  width: 6px !important;
   height: 0px !important;
+}
+
+.task-kanban-cards-stream::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
 .task-kanban-cards-stream::-webkit-scrollbar-thumb {
   background: #cbd5e1 !important;
   border-radius: 4px !important;
+}
+
+.task-kanban-cards-stream::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
 }
 
 /* Task Card */
@@ -574,6 +595,8 @@
 /* ─── LIST VIEW STYLES ─── */
 .task-list-table-container {
   height: 100% !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
   border-radius: 12px !important;
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;

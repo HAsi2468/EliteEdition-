@@ -3178,7 +3178,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     >
       {/* ── MAIN CONTENT VIEW (IF TASK MODE: FULL TASK PANEL | IF CHAT MODE: PHOENIX CHAT LAYOUT) ── */}
       {mainTab === 'task' ? (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 1rem', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-light)', flexShrink: 0 }}>
             <button
               type="button"
@@ -3192,7 +3192,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Task Management Board</h3>
             <div />
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
             <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
           </div>
         </div>
@@ -3440,7 +3440,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         <div className={`phoenix-chat-main ${(isMobileScreen && !activeGroup) ? 'is-mobile-hidden is-hidden' : ''}`} style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
           
           {rosterTab === 'tasks' ? (
-            <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+              <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+            </div>
           ) : activeGroup ? (
             <>
               {/* Group / Direct Top Header */}
