@@ -36,10 +36,82 @@ const diskStorage = multer.diskStorage({
   }
 });
 
+const axios = require('axios');
+const sharp = require('sharp');
+
 // Dynamic multer middleware depending on R2 availability
 const upload = multer({
   storage: isR2Configured() ? memoryStorage : diskStorage,
   limits: { fileSize: 100 * 1024 * 1024 } // 100MB max per image/file
+});
+
+/**
+ * GET /v1/upload/preview
+ * Converts TIFF (.tif/.tiff) or large images into web-compatible JPEG on the fly using Sharp.
+ * Allows browsers (Chrome/Firefox/Safari) to display TIFF artwork thumbnails and lightbox previews.
+ */
+router.get('/preview', async (req, res) => {
+  try {
+    const rawUrl = req.query.url;
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      return res.status(400).send('Missing url parameter');
+    }
+
+    const targetUrl = rawUrl.trim();
+    let imageBuffer = null;
+
+    // 1. If local file path
+    if (targetUrl.startsWith('/uploads/') || targetUrl.startsWith('uploads/')) {
+      const cleanPath = targetUrl.replace(/^\/?uploads\//, '');
+      const localPath = path.join(uploadDir, cleanPath);
+      if (fs.existsSync(localPath)) {
+        imageBuffer = fs.readFileSync(localPath);
+      }
+    }
+
+    // 2. If remote URL (e.g. Cloudflare R2 CDN or external)
+    if (!imageBuffer) {
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        // Assume R2 key if just a filename or relative path
+        const { getR2PublicUrl } = require('../../utils/r2Storage');
+        const remoteUrl = `${getR2PublicUrl()}/${targetUrl.replace(/^\/+/, '')}`;
+        const resp = await axios.get(remoteUrl, {
+          responseType: 'arraybuffer',
+          timeout: 15000,
+          maxContentLength: 100 * 1024 * 1024,
+        });
+        imageBuffer = Buffer.from(resp.data);
+      } else {
+        const resp = await axios.get(targetUrl, {
+          responseType: 'arraybuffer',
+          timeout: 15000,
+          maxContentLength: 100 * 1024 * 1024,
+        });
+        imageBuffer = Buffer.from(resp.data);
+      }
+    }
+
+    if (!imageBuffer) {
+      return res.status(404).send('Image could not be retrieved');
+    }
+
+    let pipeline = sharp(imageBuffer).rotate();
+
+    // Optional width resize for thumbnails
+    const width = parseInt(req.query.w, 10);
+    if (width && width > 0 && width <= 3000) {
+      pipeline = pipeline.resize({ width, withoutEnlargement: true });
+    }
+
+    const jpegBuffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=2592000');
+    return res.send(jpegBuffer);
+  } catch (err) {
+    console.error('[Upload Preview] Conversion failed:', err.message);
+    return res.status(500).send('Failed to generate image preview: ' + err.message);
+  }
 });
 
 router.post('/', upload.single('image'), async (req, res) => {
@@ -74,6 +146,24 @@ router.post('/', upload.single('image'), async (req, res) => {
         folder: folder
       });
 
+      // If TIFF file, generate and upload high-quality JPEG web preview companion
+      let previewUrl = null;
+      const isTiff = ext.toLowerCase() === '.tif' || ext.toLowerCase() === '.tiff' || (req.file.mimetype && req.file.mimetype.includes('tiff'));
+      if (isTiff) {
+        try {
+          const previewBuffer = await sharp(req.file.buffer).rotate().jpeg({ quality: 85 }).toBuffer();
+          const previewFilename = `${rawBase || 'file'}-${uniqueSuffix}-preview.jpg`;
+          previewUrl = await uploadToR2({
+            buffer: previewBuffer,
+            fileName: previewFilename,
+            mimeType: 'image/jpeg',
+            folder: folder
+          });
+        } catch (previewErr) {
+          console.warn('[R2 Upload] Failed to generate TIFF companion preview:', previewErr.message);
+        }
+      }
+
       // If designName is provided and folder is designs, also upload named version e.g. "ED-709.jpg"
       if (designName && folder === 'designs') {
         await uploadToR2({
@@ -84,7 +174,7 @@ router.post('/', upload.single('image'), async (req, res) => {
         }).catch(err => console.warn('[R2] Failed to save designName copy:', err.message));
       }
 
-      return res.json({ url: r2Url, filename, folder });
+      return res.json({ url: r2Url, previewUrl, filename, folder });
     } catch (err) {
       console.error('[Cloudflare R2] Upload error:', err);
       return res.status(500).json({ error: 'Failed to upload file to Cloudflare R2: ' + err.message });
