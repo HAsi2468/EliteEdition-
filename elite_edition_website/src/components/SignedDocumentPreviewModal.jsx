@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   X,
   CheckCircle,
@@ -14,7 +14,9 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCw,
-  Maximize2
+  Maximize2,
+  FileText,
+  RotateCcw
 } from 'lucide-react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
@@ -31,8 +33,10 @@ export default function SignedDocumentPreviewModal({
   const [processing, setProcessing] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [viewMode, setViewMode] = useState('fit'); // 'fit' = whole page on 1 screen | 'width' = full width reading from top | 'custom'
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = fit page
   const [rotation, setRotation] = useState(0); // 0, 90, 180, 270
+  const scrollContainerRef = useRef(null);
 
   if (!isOpen || !documentData) return null;
 
@@ -240,8 +244,13 @@ export default function SignedDocumentPreviewModal({
                   type="button"
                   onClick={() => {
                     setActiveImageIdx(idx);
+                    setViewMode('fit');
                     setZoomLevel(1);
                     setRotation(0);
+                    if (scrollContainerRef.current) {
+                      scrollContainerRef.current.scrollTop = 0;
+                      scrollContainerRef.current.scrollLeft = 0;
+                    }
                   }}
                   style={{
                     padding: '5px 12px',
@@ -265,11 +274,71 @@ export default function SignedDocumentPreviewModal({
             )}
           </div>
 
-          {/* Interactive Inspection Toolbar: Zoom & Rotate */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {/* Interactive Inspection Toolbar: Fit Mode, Zoom & Rotate */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => setZoomLevel(z => Math.max(z - 0.25, 0.75))}
+              onClick={() => {
+                setViewMode('fit');
+                setZoomLevel(1);
+                setRotation(0);
+                if (scrollContainerRef.current) {
+                  scrollContainerRef.current.scrollTop = 0;
+                  scrollContainerRef.current.scrollLeft = 0;
+                }
+              }}
+              title="Fit entire page from top to bottom (See bill number & signature on 1 screen)"
+              style={{
+                background: viewMode === 'fit' && zoomLevel === 1 && rotation === 0 ? '#eff6ff' : '#ffffff',
+                border: viewMode === 'fit' && zoomLevel === 1 && rotation === 0 ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                color: viewMode === 'fit' && zoomLevel === 1 && rotation === 0 ? '#1d4ed8' : '#334155',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Maximize2 size={13} /> Fit Page
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('width');
+                setZoomLevel(1);
+                if (scrollContainerRef.current) {
+                  scrollContainerRef.current.scrollTop = 0;
+                  scrollContainerRef.current.scrollLeft = 0;
+                }
+              }}
+              title="Expand width to read bill details & numbers easily from top to bottom"
+              style={{
+                background: viewMode === 'width' && zoomLevel === 1 ? '#eff6ff' : '#ffffff',
+                border: viewMode === 'width' && zoomLevel === 1 ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                color: viewMode === 'width' && zoomLevel === 1 ? '#1d4ed8' : '#334155',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <FileText size={13} /> Fit Width (Read Top-to-Bottom)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setZoomLevel(z => Math.max(0.5, Number((z - 0.25).toFixed(2))));
+                if (viewMode === 'fit') setViewMode('custom');
+              }}
               title="Zoom out"
               style={{
                 background: '#ffffff',
@@ -287,33 +356,16 @@ export default function SignedDocumentPreviewModal({
               <ZoomOut size={13} />
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setZoomLevel(1);
-                setRotation(0);
-              }}
-              title="Fit entire page from top to bottom"
-              style={{
-                background: zoomLevel === 1 && rotation === 0 ? '#eff6ff' : '#ffffff',
-                border: zoomLevel === 1 && rotation === 0 ? '1px solid #93c5fd' : '1px solid #cbd5e1',
-                color: zoomLevel === 1 && rotation === 0 ? '#1d4ed8' : '#334155',
-                borderRadius: '6px',
-                padding: '4px 10px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              <Maximize2 size={13} /> Fit Page ({Math.round(zoomLevel * 100)}%)
-            </button>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', minWidth: '38px', textAlign: 'center' }}>
+              {Math.round(zoomLevel * 100)}%
+            </span>
 
             <button
               type="button"
-              onClick={() => setZoomLevel(z => Math.min(z + 0.25, 3))}
+              onClick={() => {
+                setZoomLevel(z => Math.min(3, Number((z + 0.25).toFixed(2))));
+                if (viewMode === 'fit') setViewMode('custom');
+              }}
               title="Zoom in"
               style={{
                 background: '#ffffff',
@@ -336,8 +388,9 @@ export default function SignedDocumentPreviewModal({
               onClick={() => setRotation(r => (r + 90) % 360)}
               title="Rotate 90 degrees clockwise"
               style={{
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
+                background: rotation > 0 ? '#eff6ff' : '#ffffff',
+                border: rotation > 0 ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                color: rotation > 0 ? '#1d4ed8' : '#334155',
                 borderRadius: '6px',
                 padding: '4px 10px',
                 fontSize: '0.75rem',
@@ -350,42 +403,114 @@ export default function SignedDocumentPreviewModal({
             >
               <RotateCw size={13} /> Rotate {rotation ? `(${rotation}°)` : ''}
             </button>
+
+            {(zoomLevel !== 1 || rotation !== 0 || viewMode !== 'fit') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('fit');
+                  setZoomLevel(1);
+                  setRotation(0);
+                  if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTop = 0;
+                    scrollContainerRef.current.scrollLeft = 0;
+                  }
+                }}
+                title="Reset view to default fit"
+                style={{
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '4px 8px',
+                  fontSize: '0.75rem',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+              >
+                <RotateCcw size={12} /> Reset
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Verification Helper Banner */}
+        <div
+          style={{
+            padding: '0.45rem 1.5rem',
+            background: '#f0f9ff',
+            borderBottom: '1px solid #e0f2fe',
+            fontSize: '0.76rem',
+            color: '#0369a1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem'
+          }}
+        >
+          <div>
+            🔍 Verifying Document: <strong style={{ color: '#0c4a6e' }}>{docNumber}</strong> {partyName ? `(${partyName})` : ''} — <em>Check header at the top of the bill below to verify number and stamps.</em>
+          </div>
+          <div style={{ color: '#0284c7' }}>
+            💡 Tip: <strong>Fit Page</strong> shows whole bill | <strong>Fit Width</strong> lets you read text from top to bottom
           </div>
         </div>
 
         {/* Image Display Area - High Contrast, Full Page top to bottom & left to right */}
         <div
+          ref={scrollContainerRef}
           style={{
             flex: 1,
+            height: '66vh',
             minHeight: '460px',
             maxHeight: '68vh',
             overflow: 'auto',
             background: '#090d16',
             display: 'flex',
-            alignItems: 'center',
             justifyContent: 'center',
+            alignItems: (viewMode === 'fit' && zoomLevel === 1) ? 'center' : 'flex-start',
             padding: '1.25rem',
             position: 'relative'
           }}
         >
           {images[activeImageIdx] ? (
-            <img
-              src={images[activeImageIdx]}
-              alt={`Signed Copy ${activeImageIdx + 1}`}
+            <div
               style={{
-                maxWidth: zoomLevel === 1 ? '100%' : 'none',
-                maxHeight: zoomLevel === 1 ? '100%' : 'none',
-                width: zoomLevel > 1 ? `${zoomLevel * 100}%` : 'auto',
-                height: zoomLevel === 1 ? 'auto' : undefined,
-                objectFit: 'contain',
-                borderRadius: '6px',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-                background: '#ffffff',
-                transform: `rotate(${rotation}deg)`,
-                transformOrigin: 'center center',
-                transition: 'transform 0.2s ease, width 0.15s ease'
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                width: viewMode === 'width' && zoomLevel === 1 ? '100%' : 'auto',
+                maxWidth: viewMode === 'width' && zoomLevel === 1 ? '900px' : 'none',
+                transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                transformOrigin: 'top center',
+                transition: 'transform 0.2s ease'
               }}
-            />
+            >
+              <img
+                src={images[activeImageIdx]}
+                alt={`Signed Copy ${activeImageIdx + 1}`}
+                style={{
+                  maxHeight: (viewMode === 'fit' && zoomLevel === 1) ? 'calc(66vh - 2.5rem)' : 'none',
+                  maxWidth: (viewMode === 'fit' && zoomLevel === 1) ? '100%' : 'none',
+                  width:
+                    viewMode === 'fit' && zoomLevel === 1
+                      ? 'auto'
+                      : viewMode === 'width' && zoomLevel === 1
+                      ? '100%'
+                      : `${Math.round(zoomLevel * 100)}%`,
+                  height: 'auto',
+                  objectFit: 'contain',
+                  borderRadius: '6px',
+                  boxShadow: '0 10px 35px rgba(0,0,0,0.7)',
+                  background: '#ffffff',
+                  display: 'block'
+                }}
+              />
+            </div>
           ) : (
             <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
               No image available
