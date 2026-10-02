@@ -1899,6 +1899,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       const challanList = Array.isArray(chInput) ? chInput : [chInput];
       if (challanList.length === 0) return;
 
+      // STRICT GUARD: Cannot bill already billed challans
+      const alreadyBilled = challanList.filter(c => c && (c.status === 'INVOICED' || c.billingStatus === 'INVOICED' || c.isBilled || Boolean(c.invoiceNo)));
+      if (alreadyBilled.length > 0) {
+        const details = alreadyBilled.map(c => `Challan #${c.challanNo}${c.invoiceNo ? ` (Invoice #${c.invoiceNo})` : ''}`).join(', ');
+        triggerEliteAlert('Already Invoiced', `Cannot generate bill: The following challan(s) are already billed:\n${details}\n\nA delivery challan cannot be billed a 2nd time.`, 'error');
+        return;
+      }
+
       // MAX 10 CHALLANS LIMIT
       if (challanList.length > 10) {
         triggerEliteAlert('Too Many Challans', 'Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.', 'error');
@@ -4982,7 +4990,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         <SignedDocumentUploadModal
           isOpen={!!signedUploadTarget}
           onClose={() => setSignedUploadTarget(null)}
-          docType="invoice"
+          docType={signedUploadTarget.docType || "invoice"}
           docId={signedUploadTarget.id}
           docNumber={signedUploadTarget.docNumber}
           partyName={signedUploadTarget.partyName}
@@ -4998,6 +5006,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           documentData={signedPreviewTarget}
           isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
           onStatusUpdated={() => { loadData(); fetchDigitalChallans(); }}
+          onReupload={(docData) => {
+            setSignedPreviewTarget(null);
+            setSignedUploadTarget({
+              id: docData._id,
+              docType: docData.docType || 'invoice',
+              docNumber: docData.docNumber,
+              partyName: docData.partyName,
+              existingSignedCopy: docData.signedCopy
+            });
+          }}
         />
       )}
 

@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import { triggerPushNotification } from './NotificationToast';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
+import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import {
   FileCheck,
   CheckCircle,
@@ -14,7 +15,8 @@ import {
   Eye,
   Filter,
   Image as ImageIcon,
-  AlertCircle
+  AlertCircle,
+  UploadCloud
 } from 'lucide-react';
 
 export default function AdminSignedDocumentsApproval() {
@@ -27,6 +29,7 @@ export default function AdminSignedDocumentsApproval() {
   const [search, setSearch] = useState('');
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [uploadTargetDoc, setUploadTargetDoc] = useState(null);
   const [rejectPromptDoc, setRejectPromptDoc] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [processingId, setProcessingId] = useState(null);
@@ -598,19 +601,23 @@ export default function AdminSignedDocumentsApproval() {
                   </span>
                 </div>
 
-                {/* Thumbnails (1 or 2 images) */}
+                {/* Thumbnails (1 or 2 images) - Complete top to bottom, left to right page visibility */}
                 <div
                   style={{
                     display: 'flex',
                     gap: '0.5rem',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    padding: '6px',
+                    background: '#0f172a',
+                    border: '1px solid #334155',
+                    padding: '8px',
                     borderRadius: '10px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    minHeight: '220px',
+                    height: '240px',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
                   onClick={() => openPreview(doc)}
-                  title="Click to zoom & inspect full resolution"
+                  title="Click to zoom & inspect full resolution (top to bottom)"
                 >
                   {images.length > 0 ? (
                     images.map((imgUrl, idx) => (
@@ -618,37 +625,49 @@ export default function AdminSignedDocumentsApproval() {
                         key={idx}
                         style={{
                           flex: 1,
-                          height: '95px',
+                          height: '100%',
                           borderRadius: '6px',
                           overflow: 'hidden',
                           position: 'relative',
-                          border: '1px solid #cbd5e1'
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: '#020617'
                         }}
                       >
                         <img
                           src={imgUrl}
                           alt={`Signed copy ${idx + 1}`}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            width: 'auto',
+                            height: 'auto',
+                            objectFit: 'contain',
+                            borderRadius: '4px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                          }}
                         />
                         <span
                           style={{
                             position: 'absolute',
-                            bottom: '3px',
-                            right: '3px',
-                            background: 'rgba(15, 23, 42, 0.8)',
+                            bottom: '5px',
+                            right: '5px',
+                            background: 'rgba(15, 23, 42, 0.85)',
                             color: '#fff',
-                            fontSize: '0.62rem',
-                            padding: '1px 5px',
+                            fontSize: '0.65rem',
+                            padding: '2px 7px',
                             borderRadius: '4px',
-                            fontWeight: 700
+                            fontWeight: 700,
+                            border: '1px solid rgba(255,255,255,0.2)'
                           }}
                         >
-                          Page {idx + 1}
+                          Page {idx + 1} • Full Page
                         </span>
                       </div>
                     ))
                   ) : (
-                    <div style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.78rem' }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.78rem' }}>
                       No image
                     </div>
                   )}
@@ -711,51 +730,100 @@ export default function AdminSignedDocumentsApproval() {
                     <Eye size={13} /> Inspect
                   </button>
 
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button
-                      type="button"
-                      disabled={processingId === doc._id}
-                      onClick={() => {
-                        setRejectPromptDoc(doc);
-                        setRejectionReason('');
-                      }}
-                      style={{
-                        background: '#fef2f2',
-                        border: '1px solid #fca5a5',
-                        color: '#dc2626',
-                        padding: '0.45rem 0.75rem',
-                        borderRadius: '6px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}
-                    >
-                      <XCircle size={13} /> Reject
-                    </button>
-                    <button
-                      type="button"
-                      disabled={processingId === doc._id}
-                      onClick={() => handleApprove(doc)}
-                      style={{
-                        background: 'linear-gradient(135deg, #10b981, #059669)',
-                        border: 'none',
-                        color: '#fff',
-                        padding: '0.45rem 0.9rem',
-                        borderRadius: '6px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
-                      }}
-                    >
-                      <CheckCircle size={13} /> Approve
-                    </button>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    {isRejected ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setUploadTargetDoc(doc)}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #3b82f6',
+                            color: '#1d4ed8',
+                            padding: '0.45rem 0.85rem',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            boxShadow: '0 1px 3px rgba(37, 99, 235, 0.15)'
+                          }}
+                          title="Re-upload replacement signed document copy"
+                        >
+                          <UploadCloud size={13} /> Re-upload
+                        </button>
+                        <button
+                          type="button"
+                          disabled={processingId === doc._id}
+                          onClick={() => handleApprove(doc)}
+                          style={{
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            border: 'none',
+                            color: '#fff',
+                            padding: '0.45rem 0.9rem',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: processingId === doc._id ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                          }}
+                        >
+                          <CheckCircle size={13} /> Approve
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={processingId === doc._id}
+                          onClick={() => {
+                            setRejectPromptDoc(doc);
+                            setRejectionReason('');
+                          }}
+                          style={{
+                            background: '#fef2f2',
+                            border: '1px solid #fca5a5',
+                            color: '#dc2626',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: processingId === doc._id ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                        >
+                          <XCircle size={13} /> Reject
+                        </button>
+                        <button
+                          type="button"
+                          disabled={processingId === doc._id}
+                          onClick={() => handleApprove(doc)}
+                          style={{
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            border: 'none',
+                            color: '#fff',
+                            padding: '0.45rem 0.9rem',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: processingId === doc._id ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                          }}
+                        >
+                          <CheckCircle size={13} /> Approve
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -955,6 +1023,27 @@ export default function AdminSignedDocumentsApproval() {
           documentData={selectedDoc}
           isAdmin={true}
           onStatusUpdated={() => fetchDocuments()}
+          onReupload={(docData) => {
+            setPreviewModalOpen(false);
+            setUploadTargetDoc(docData);
+          }}
+        />
+      )}
+
+      {/* Upload / Re-upload Modal */}
+      {uploadTargetDoc && (
+        <SignedDocumentUploadModal
+          isOpen={!!uploadTargetDoc}
+          onClose={() => setUploadTargetDoc(null)}
+          docType={uploadTargetDoc.docType}
+          docId={uploadTargetDoc._id}
+          docNumber={uploadTargetDoc.docNumber}
+          partyName={uploadTargetDoc.partyName}
+          existingSignedCopy={uploadTargetDoc.signedCopy}
+          onSuccess={() => {
+            setUploadTargetDoc(null);
+            fetchDocuments();
+          }}
         />
       )}
     </div>

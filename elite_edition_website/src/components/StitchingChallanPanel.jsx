@@ -556,14 +556,25 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                           >
                             <FileText size={13} /> PDF
                           </button>
-                          <button
-                            onClick={() => onNavigateToBilling && onNavigateToBilling(c)}
-                            className="btn-secondary"
-                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', borderColor: 'rgba(124,58,237,0.4)' }}
-                            title="Generate Bill"
-                          >
-                            <Receipt size={13} /> Bill
-                          </button>
+                          {(c.status !== 'INVOICED' && !c.isBilled && !c.invoiceNo) ? (
+                            <button
+                              onClick={() => onNavigateToBilling && onNavigateToBilling(c)}
+                              className="btn-secondary"
+                              style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', borderColor: 'rgba(124,58,237,0.4)' }}
+                              title="Generate Bill"
+                            >
+                              <Receipt size={13} /> Bill
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => alert(`Stitching Challan #${c.challanNo} is already billed in Invoice #${c.invoiceNo || 'N/A'}. A challan cannot be billed a 2nd time.`)}
+                              className="btn-secondary"
+                              style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderColor: '#10b981' }}
+                              title={`Already Billed in Invoice #${c.invoiceNo || ''}`}
+                            >
+                              <CheckCircle size={13} /> Billed
+                            </button>
+                          )}
                           <button
                             onClick={() => openEdit(c)}
                             className="btn-secondary"

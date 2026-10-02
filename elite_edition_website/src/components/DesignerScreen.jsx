@@ -316,18 +316,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     (effectiveUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com'
   );
   const isUserAdmin = isAdmin || isMasterAdmin;
-  const userAssignedName = (currentUser?.designerName || currentUser?.name || '').trim();
+  const userAssignedName = (currentUser?.designerName || currentUser?.name || currentUser?.username || '').trim();
   const userPerms = currentUser?.permissions || [];
-  const hasFullCatalogAccess = isUserAdmin ||
-    userPerms.includes('jobcards_sample') ||
-    userPerms.includes('designer_screen') ||
-    userPerms.includes('designer_module') ||
-    userPerms.includes('jobcards_catalogue') ||
-    userPerms.includes('jobcards') ||
-    Boolean(currentUser?.canCreateDesigns) ||
-    Boolean(currentUser?.canInputNewDesign);
-
-  const isUserRestricted = !hasFullCatalogAccess && !embedded;
+  // Restrict designer view so each logged-in designer only sees designs assigned to them
+  const canViewAll = Boolean(currentUser?.canViewAllDesigns || currentUser?.isSuperUser);
+  const isUserRestricted = !isUserAdmin && !canViewAll;
   const isDesignerRestricted = isUserRestricted;
   const canInputNewDesign = isUserAdmin ||
     embedded ||
@@ -623,7 +616,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   // Resolve effective designer identifier from currentUser profile & registered designers
   const effectiveDesignerTokens = useMemo(() => {
     const dName = (currentUser?.designerName || '').trim();
-    const uName = (currentUser?.name || '').trim();
+    const uName = (currentUser?.name || currentUser?.username || '').trim();
     const tokens = new Set();
     if (dName) tokens.add(dName.toLowerCase());
     if (uName) {
@@ -631,6 +624,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       uName.split(/[\s._-]+/).forEach(p => {
         if (p.length >= 2) tokens.add(p.toLowerCase());
       });
+    }
+    if (currentUser?.username && currentUser?.username !== uName) {
+      tokens.add(currentUser.username.toLowerCase().trim());
     }
 
     // Also check if any registered designer in settings matches any of user's tokens
@@ -642,7 +638,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     });
 
     return Array.from(tokens);
-  }, [currentUser?.designerName, currentUser?.name, printConfig.designers]);
+  }, [currentUser?.designerName, currentUser?.name, currentUser?.username, printConfig.designers]);
 
   const primaryDesignerIdentifier = useMemo(() => {
     if (currentUser?.designerName) return currentUser.designerName;
@@ -751,8 +747,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
           const str = String(val).toLowerCase().trim();
           return effectiveDesignerTokens.some(tok => str === tok || str.includes(tok) || tok.includes(str));
         };
+        const isCreator = checkMatch(t.createdByName) || checkMatch(t.createdBy);
         return checkMatch(t.designerName) || (Array.isArray(t.designers) && t.designers.some(checkMatch)) ||
-               checkMatch(t.colourMatching) || (Array.isArray(t.colourMatches) && t.colourMatches.some(checkMatch));
+               checkMatch(t.colourMatching) || (Array.isArray(t.colourMatches) && t.colourMatches.some(checkMatch)) ||
+               isCreator;
       });
     }
 
@@ -793,9 +791,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
         const isDesigner = checkMatch(t.designerName) || (Array.isArray(t.designers) && t.designers.some(checkMatch));
         const isColourMatcher = checkMatch(t.colourMatching) || (Array.isArray(t.colourMatches) && t.colourMatches.some(checkMatch));
+        const isCreator = checkMatch(t.createdByName) || checkMatch(t.createdBy);
 
-        // Design is ONLY visible if user is named in Designer OR Colour Matching
-        return isDesigner || isColourMatcher;
+        // Design is ONLY visible if user is named in Designer OR Colour Matching OR is Creator
+        return isDesigner || isColourMatcher || isCreator;
       });
     }
 
@@ -2283,8 +2282,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-              gap: '1.25rem',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))',
+              gap: '1rem',
             }}
           >
             {[1, 2, 3].map((idx) => (
@@ -2433,62 +2432,112 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         </div>
                       </td>
 
-                      {/* Sample Ref (Enlarged to 68px) */}
+                      {/* Sample Ref (Enlarged to 68px with Link Display) */}
                       <td style={{ padding: '0.85rem 0.75rem', verticalAlign: 'middle' }}>
                         {task.sampleImage ? (
-                          <div
-                            onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
-                            style={{
-                              width: '68px',
-                              height: '68px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              border: '1.5px solid #cbd5e1',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                              cursor: 'pointer',
-                              position: 'relative',
-                              background: '#f8fafc',
-                              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'scale(1.05)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
-                            }}
-                            title="Click to zoom sample image"
-                          >
-                            <img
-                              src={task.sampleImage}
-                              alt="Sample"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              loading="lazy"
-                            />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                            <div
+                              onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
+                              style={{
+                                width: '68px',
+                                height: '68px',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                border: '1.5px solid #cbd5e1',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                background: '#f8fafc',
+                                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'scale(1)';
+                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
+                              }}
+                              title="Click to zoom sample image"
+                            >
+                              <img
+                                src={task.sampleImage}
+                                alt="Sample"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                loading="lazy"
+                              />
+                            </div>
+                            {task.sampleLink && (
+                              <a
+                                href={task.sampleLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  color: '#2563eb',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  background: '#eff6ff',
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid #bfdbfe',
+                                  textDecoration: 'none',
+                                }}
+                                title={task.sampleLink}
+                              >
+                                <ExternalLink size={11} /> Link
+                              </a>
+                            )}
                           </div>
                         ) : task.sampleLink ? (
-                          <a
-                            href={task.sampleLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              color: '#2563eb',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.3rem',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              background: '#eff6ff',
-                              padding: '0.35rem 0.6rem',
-                              borderRadius: '6px',
-                              border: '1px solid #bfdbfe',
-                              textDecoration: 'none',
-                            }}
-                            title="Open reference link"
-                          >
-                            <ExternalLink size={13} /> Link
-                          </a>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                            <div
+                              onClick={() => handleOpenLightbox([task.sampleLink], 0, `Sample: ${task.designName}`)}
+                              style={{
+                                width: '68px',
+                                height: '68px',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                border: '1.5px solid #cbd5e1',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                background: '#f8fafc',
+                              }}
+                              title="Click to zoom sample preview"
+                            >
+                              <DesignImage
+                                rawUrl={task.sampleLink}
+                                designName={task.designName}
+                                thumbnail={true}
+                                width={120}
+                                style={{ width: '100%', height: '100%' }}
+                              />
+                            </div>
+                            <a
+                              href={task.sampleLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                color: '#2563eb',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                background: '#eff6ff',
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '5px',
+                                border: '1px solid #bfdbfe',
+                                textDecoration: 'none',
+                              }}
+                              title="Open reference link"
+                            >
+                              <ExternalLink size={12} /> Link
+                            </a>
+                          </div>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>--</span>
                         )}
@@ -3116,7 +3165,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               </div>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
           {filteredTasks.map((task) => {
             const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
             const progress = getTaskStageProgress(task);
@@ -3139,7 +3188,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             const finalImgs = task.finalDesignImages || [];
 
             if (embedded) {
-              const heroImg = task.sampleImage || finalImgs[0] || stage3Imgs[0] || cmImgs[0] || drowImgs[0] || task.outputImage || (task.sampleLink && /\.(jpg|jpeg|png|webp|gif)/i.test(task.sampleLink) ? task.sampleLink : '');
+              const heroImg = task.sampleImage || finalImgs[0] || stage3Imgs[0] || cmImgs[0] || drowImgs[0] || task.outputImage || task.sampleLink || '';
               const isApproved = task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE' || task.status === 'Approved';
               const isRevision = String(task.finalDesignStatus || '').toLowerCase().startsWith('reject');
 
@@ -3285,10 +3334,35 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
                   {/* Design Info */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {task.designName}
                       </span>
+                      {task.sampleLink && (
+                        <a
+                          href={task.sampleLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: '#2563eb',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            textDecoration: 'none',
+                            flexShrink: 0
+                          }}
+                          title={`Open link: ${task.sampleLink}`}
+                        >
+                          <ExternalLink size={11} /> Link
+                        </a>
+                      )}
                     </div>
 
                     {/* Parameters grid: Exactly 3 rows as requested */}
@@ -3871,66 +3945,114 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   {/* Left: Sample Reference */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
                     {task.sampleImage ? (
-                      <div
-                        onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
-                        style={{
-                          width: '56px',
-                          height: '56px',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          border: '1.5px solid #cbd5e1',
-                          cursor: 'pointer',
-                          position: 'relative',
-                          background: '#ffffff',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
-                          transition: 'transform 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                        title="Click to zoom sample image"
-                      >
-                        <img src={task.sampleImage} alt="Sample" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                         <div
+                          onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
                           style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'rgba(0,0,0,0.25)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            opacity: 0,
-                            transition: 'opacity 0.15s',
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            border: '1.5px solid #cbd5e1',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            background: '#ffffff',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
+                            transition: 'transform 0.15s ease',
                           }}
-                          className="hover:opacity-100"
+                          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                          title="Click to zoom sample image"
                         >
-                          <Eye size={14} />
+                          <img src={task.sampleImage} alt="Sample" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background: 'rgba(0,0,0,0.25)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ffffff',
+                              opacity: 0,
+                              transition: 'opacity 0.15s',
+                            }}
+                            className="hover:opacity-100"
+                          >
+                            <Eye size={14} />
+                          </div>
                         </div>
+                        {task.sampleLink && (
+                          <a
+                            href={task.sampleLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '2px',
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              color: '#2563eb',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              textDecoration: 'none'
+                            }}
+                            title={task.sampleLink}
+                          >
+                            <ExternalLink size={10} /> Link
+                          </a>
+                        )}
                       </div>
                     ) : task.sampleLink ? (
-                      <a
-                        href={task.sampleLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          width: '56px',
-                          height: '56px',
-                          borderRadius: '8px',
-                          border: '1px dashed #93c5fd',
-                          background: '#eff6ff',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#2563eb',
-                          textDecoration: 'none',
-                          gap: '2px',
-                        }}
-                        title="Open reference link"
-                      >
-                        <ExternalLink size={14} />
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800 }}>Link</span>
-                      </a>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <div
+                          onClick={() => handleOpenLightbox([task.sampleLink], 0, `Sample: ${task.designName}`)}
+                          style={{
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            border: '1.5px solid #cbd5e1',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            background: '#ffffff',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
+                          }}
+                          title="Click to zoom sample preview"
+                        >
+                          <DesignImage
+                            rawUrl={task.sampleLink}
+                            designName={task.designName}
+                            thumbnail={true}
+                            width={100}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        </div>
+                        <a
+                          href={task.sampleLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                            color: '#2563eb',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            textDecoration: 'none'
+                          }}
+                          title="Open reference link"
+                        >
+                          <ExternalLink size={10} /> Link
+                        </a>
+                      </div>
                     ) : (
                       <div
                         style={{

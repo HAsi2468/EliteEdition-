@@ -1,5 +1,21 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, XCircle, Clock, ExternalLink, Download, User, Calendar, ShieldCheck, AlertCircle } from 'lucide-react';
+import {
+  X,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ExternalLink,
+  Download,
+  User,
+  Calendar,
+  ShieldCheck,
+  AlertCircle,
+  UploadCloud,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Maximize2
+} from 'lucide-react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 
@@ -8,12 +24,15 @@ export default function SignedDocumentPreviewModal({
   onClose,
   documentData, // { _id, docType, docNumber, partyName, date, signedCopy }
   isAdmin = false,
-  onStatusUpdated
+  onStatusUpdated,
+  onReupload
 }) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = fit page
+  const [rotation, setRotation] = useState(0); // 0, 90, 180, 270
 
   if (!isOpen || !documentData) return null;
 
@@ -82,8 +101,8 @@ export default function SignedDocumentPreviewModal({
           border: '1px solid #e2e8f0',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: '850px',
-          maxHeight: '92vh',
+          maxWidth: '1050px',
+          maxHeight: '95vh',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -199,52 +218,153 @@ export default function SignedDocumentPreviewModal({
           </div>
         </div>
 
-        {/* Multi-Image Switcher if 2 images uploaded */}
-        {images.length > 1 && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.5rem',
-              padding: '0.6rem 1.5rem',
-              background: '#f8fafc',
-              borderBottom: '1px solid #e2e8f0'
-            }}
-          >
-            {images.map((imgUrl, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setActiveImageIdx(idx)}
-                style={{
-                  padding: '5px 14px',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  border: activeImageIdx === idx ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                  background: activeImageIdx === idx ? '#eff6ff' : '#ffffff',
-                  color: activeImageIdx === idx ? '#1d4ed8' : '#64748b',
-                  transition: 'all 0.15s'
-                }}
-              >
-                📄 Image {idx + 1} {idx === 0 ? '(Page 1 / Front)' : '(Page 2 / Back)'}
-              </button>
-            ))}
+        {/* Inspection Tools & Multi-Image Switcher */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            padding: '0.6rem 1.5rem',
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0'
+          }}
+        >
+          {/* Multi-Image Switcher if 2 images uploaded */}
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            {images.length > 1 ? (
+              images.map((imgUrl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setActiveImageIdx(idx);
+                    setZoomLevel(1);
+                    setRotation(0);
+                  }}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: activeImageIdx === idx ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                    background: activeImageIdx === idx ? '#eff6ff' : '#ffffff',
+                    color: activeImageIdx === idx ? '#1d4ed8' : '#64748b',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  📄 Page {idx + 1} {idx === 0 ? '(Front)' : '(Back)'}
+                </button>
+              ))
+            ) : (
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+                📄 Single Page Document
+              </span>
+            )}
           </div>
-        )}
 
-        {/* Image Display Area */}
+          {/* Interactive Inspection Toolbar: Zoom & Rotate */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button
+              type="button"
+              onClick={() => setZoomLevel(z => Math.max(z - 0.25, 0.75))}
+              title="Zoom out"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                fontSize: '0.75rem',
+                color: '#334155',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+            >
+              <ZoomOut size={13} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setZoomLevel(1);
+                setRotation(0);
+              }}
+              title="Fit entire page from top to bottom"
+              style={{
+                background: zoomLevel === 1 && rotation === 0 ? '#eff6ff' : '#ffffff',
+                border: zoomLevel === 1 && rotation === 0 ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                color: zoomLevel === 1 && rotation === 0 ? '#1d4ed8' : '#334155',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Maximize2 size={13} /> Fit Page ({Math.round(zoomLevel * 100)}%)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setZoomLevel(z => Math.min(z + 0.25, 3))}
+              title="Zoom in"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                fontSize: '0.75rem',
+                color: '#334155',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+            >
+              <ZoomIn size={13} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRotation(r => (r + 90) % 360)}
+              title="Rotate 90 degrees clockwise"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                color: '#334155',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <RotateCw size={13} /> Rotate {rotation ? `(${rotation}°)` : ''}
+            </button>
+          </div>
+        </div>
+
+        {/* Image Display Area - High Contrast, Full Page top to bottom & left to right */}
         <div
           style={{
             flex: 1,
-            minHeight: '340px',
-            maxHeight: '52vh',
+            minHeight: '460px',
+            maxHeight: '68vh',
             overflow: 'auto',
-            background: '#f1f5f9',
+            background: '#090d16',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '1rem',
+            padding: '1.25rem',
             position: 'relative'
           }}
         >
@@ -253,16 +373,21 @@ export default function SignedDocumentPreviewModal({
               src={images[activeImageIdx]}
               alt={`Signed Copy ${activeImageIdx + 1}`}
               style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
+                maxWidth: zoomLevel === 1 ? '100%' : 'none',
+                maxHeight: zoomLevel === 1 ? '100%' : 'none',
+                width: zoomLevel > 1 ? `${zoomLevel * 100}%` : 'auto',
+                height: zoomLevel === 1 ? 'auto' : undefined,
                 objectFit: 'contain',
-                borderRadius: '8px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                background: '#ffffff'
+                borderRadius: '6px',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+                background: '#ffffff',
+                transform: `rotate(${rotation}deg)`,
+                transformOrigin: 'center center',
+                transition: 'transform 0.2s ease, width 0.15s ease'
               }}
             />
           ) : (
-            <div style={{ color: '#64748b', fontSize: '0.85rem' }}>
+            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
               No image available
             </div>
           )}
@@ -301,26 +426,64 @@ export default function SignedDocumentPreviewModal({
         </div>
 
         {/* Rejection Note Display if rejected */}
-        {status === 'REJECTED' && signedCopy?.rejectionReason && (
+        {status === 'REJECTED' && (
           <div
             style={{
-              padding: '0.75rem 1.5rem',
+              padding: '0.85rem 1.5rem',
               background: '#fef2f2',
               borderTop: '1px solid #fca5a5',
               color: '#991b1b',
               fontSize: '0.82rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              flexWrap: 'wrap'
             }}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0, color: '#dc2626' }} />
-            <span><strong>Rejection Reason:</strong> {signedCopy.rejectionReason}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <AlertCircle size={20} style={{ flexShrink: 0, color: '#dc2626' }} />
+              <div>
+                <div style={{ fontWeight: 800, color: '#991b1b' }}>
+                  Document Rejected: <span style={{ fontWeight: 600 }}>{signedCopy?.rejectionReason || 'Rejected by Admin'}</span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: '2px' }}>
+                  The previous signed copy was rejected. You can re-upload a clear replacement copy now.
+                </div>
+              </div>
+            </div>
+
+            {onReupload && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onReupload(documentData);
+                }}
+                style={{
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.5rem 1.1rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <UploadCloud size={14} /> Re-upload Signed Copy
+              </button>
+            )}
           </div>
         )}
 
         {/* Admin Action Bar */}
-        {isAdmin && (
+        {isAdmin ? (
           <div
             style={{
               padding: '1rem 1.5rem',
@@ -385,11 +548,35 @@ export default function SignedDocumentPreviewModal({
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
                   👑 <strong>Admin Controls:</strong> Verify signatures, dates, and stamps.
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  {status === 'REJECTED' && onReupload && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onReupload(documentData);
+                      }}
+                      style={{
+                        background: '#eff6ff',
+                        border: '1px solid #93c5fd',
+                        color: '#1d4ed8',
+                        padding: '0.55rem 1rem',
+                        borderRadius: '8px',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <UploadCloud size={14} /> Re-upload Copy
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowRejectInput(true)}
@@ -436,6 +623,60 @@ export default function SignedDocumentPreviewModal({
                 </div>
               </div>
             )}
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: '0.85rem 1.5rem',
+              borderTop: '1px solid #e2e8f0',
+              background: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}
+          >
+            {status === 'REJECTED' && onReupload && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onReupload(documentData);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.55rem 1.25rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
+                }}
+              >
+                <UploadCloud size={15} /> Re-upload Signed Copy
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                color: '#475569',
+                padding: '0.55rem 1rem',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              Close
+            </button>
           </div>
         )}
       </div>

@@ -112,7 +112,9 @@ const buildAssignedUserOrConditions = (rawUserStr) => {
       { designers: tok },
       { colourMatching: { $regex: reg } },
       { colourMatches: { $regex: reg } },
-      { colourMatches: tok }
+      { colourMatches: tok },
+      { createdBy: { $regex: reg } },
+      { createdByName: { $regex: reg } }
     );
   });
   return orArr;

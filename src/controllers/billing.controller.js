@@ -222,12 +222,142 @@ const getNextInvoiceNo = async (req, res) => {
   }
 };
 
+/**
+ * Strict Guard: Verify delivery challans are not already billed in an active invoice.
+ * A delivery challan cannot be billed a 2nd time.
+ */
+const assertChallansNotAlreadyBilled = async (invoiceData, currentInvoiceId = null) => {
+  const challanIdsToCheck = new Set();
+  const challanNosToCheck = new Set();
+
+  if (Array.isArray(invoiceData.linkedChallanIds)) {
+    invoiceData.linkedChallanIds.forEach(id => id && challanIdsToCheck.add(String(id)));
+  }
+  if (Array.isArray(invoiceData.linkedChallanNos)) {
+    invoiceData.linkedChallanNos.forEach(no => {
+      const num = parseInt(String(no).replace(/[^0-9]/g, ''), 10);
+      if (num) challanNosToCheck.add(num);
+    });
+  }
+  if (invoiceData.ourChallanNo) {
+    String(invoiceData.ourChallanNo).split(/[,;\s]+/).forEach(p => {
+      const num = parseInt(p.replace(/[^0-9]/g, ''), 10);
+      if (num) challanNosToCheck.add(num);
+    });
+  }
+  if (Array.isArray(invoiceData.items)) {
+    invoiceData.items.forEach(it => {
+      if (it.challanId) challanIdsToCheck.add(String(it.challanId));
+      if (it.ourChallanNo) {
+        const num = parseInt(String(it.ourChallanNo).replace(/[^0-9]/g, ''), 10);
+        if (num) challanNosToCheck.add(num);
+      }
+    });
+  }
+
+  const activeChallanIdList = Array.from(challanIdsToCheck).filter(id => mongoose.Types.ObjectId.isValid(id));
+  const activeChallanNoList = Array.from(challanNosToCheck);
+
+  if (activeChallanIdList.length === 0 && activeChallanNoList.length === 0) {
+    return; // No challans to check
+  }
+
+  const excludeCurrentInv = currentInvoiceId ? { _id: { $ne: currentInvoiceId } } : {};
+
+  // 1. Direct active BillingInvoice check
+  for (const num of activeChallanNoList) {
+    const numStr = String(num);
+    const existingInv = await BillingInvoice.findOne({
+      ...excludeCurrentInv,
+      invoiceStatus: { $ne: 'CANCELLED' },
+      $or: [
+        { linkedChallanNos: numStr },
+        { linkedChallanNos: `EDP-${numStr}` },
+        { ourChallanNo: new RegExp(`(^|[^0-9])${numStr}([^0-9]|$)`) },
+        { 'items.ourChallanNo': new RegExp(`(^|[^0-9])${numStr}([^0-9]|$)`) }
+      ]
+    }).lean();
+
+    if (existingInv) {
+      throw new Error(`Delivery Challan EDP-${numStr} is already billed in Invoice #${existingInv.invoiceNo}. A delivery challan cannot be billed a 2nd time.`);
+    }
+  }
+
+  if (activeChallanIdList.length > 0) {
+    const existingInvById = await BillingInvoice.findOne({
+      ...excludeCurrentInv,
+      invoiceStatus: { $ne: 'CANCELLED' },
+      $or: [
+        { linkedChallanIds: { $in: activeChallanIdList } },
+        { 'items.challanId': { $in: activeChallanIdList } }
+      ]
+    }).lean();
+
+    if (existingInvById) {
+      throw new Error(`One or more selected Challans are already billed in Invoice #${existingInvById.invoiceNo}. A delivery challan cannot be billed a 2nd time.`);
+    }
+  }
+
+  // 2. Check FabricChallan database state
+  const billedFabricChallans = await FabricChallan.find({
+    $or: [
+      ...(activeChallanIdList.length > 0 ? [{ _id: { $in: activeChallanIdList } }] : []),
+      ...(activeChallanNoList.length > 0 ? [{ challanNo: { $in: activeChallanNoList } }] : [])
+    ],
+    status: 'INVOICED',
+    invoiceNo: { $exists: true, $ne: '' }
+  }).lean();
+
+  for (const fc of billedFabricChallans) {
+    if (fc.invoiceNo) {
+      const activeInv = await BillingInvoice.findOne({
+        ...excludeCurrentInv,
+        invoiceNo: fc.invoiceNo,
+        invoiceStatus: { $ne: 'CANCELLED' }
+      }).lean();
+      if (activeInv) {
+        throw new Error(`Delivery Challan EDP-${fc.challanNo} is already billed in Invoice #${fc.invoiceNo}. A delivery challan cannot be billed a 2nd time.`);
+      }
+    }
+  }
+
+  // 3. Check StitchingChallan database state
+  const billedStitchingChallans = await StitchingChallan.find({
+    $or: [
+      ...(activeChallanIdList.length > 0 ? [{ _id: { $in: activeChallanIdList } }] : []),
+      ...(activeChallanNoList.length > 0 ? [{ challanNo: { $in: activeChallanNoList } }] : [])
+    ],
+    status: 'INVOICED',
+    invoiceNo: { $exists: true, $ne: '' }
+  }).lean();
+
+  for (const sc of billedStitchingChallans) {
+    if (sc.invoiceNo) {
+      const activeInv = await BillingInvoice.findOne({
+        ...excludeCurrentInv,
+        invoiceNo: sc.invoiceNo,
+        invoiceStatus: { $ne: 'CANCELLED' }
+      }).lean();
+      if (activeInv) {
+        throw new Error(`Stitching Challan #${sc.challanNo} is already billed in Invoice #${sc.invoiceNo}. A delivery challan cannot be billed a 2nd time.`);
+      }
+    }
+  }
+};
+
 // ── 5. CREATE INVOICE ────────────────────────────────────────────────────────
 const createInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
     const entity = invoiceData.companyEntity || 'Elite Digital Print';
     const filter = buildCompanyFilter(entity);
+
+    // Strict Guard: Prevent duplicate billing of delivery challans
+    try {
+      await assertChallansNotAlreadyBilled(invoiceData);
+    } catch (guardErr) {
+      return res.status(409).json({ success: false, error: guardErr.message });
+    }
 
     if (!invoiceData.invoiceSeq || !invoiceData.invoiceNo) {
       const PrintConfig = require('../db/models/printConfig.model');
@@ -592,6 +722,13 @@ const updateInvoice = async (req, res) => {
       invoiceData.paymentStatus = 'UNPAID';
     }
 
+    // Strict Guard: Prevent duplicate billing of delivery challans in another invoice
+    try {
+      await assertChallansNotAlreadyBilled(invoiceData, req.params.id);
+    } catch (guardErr) {
+      return res.status(409).json({ success: false, error: guardErr.message });
+    }
+
     const invoice = await BillingInvoice.findByIdAndUpdate(req.params.id, invoiceData, { new: true });
     if (!invoice) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
@@ -622,6 +759,16 @@ const mergeChallans = async (req, res) => {
     const allChallans = [...fabricChallans, ...stitchingChallans];
     if (allChallans.length === 0) {
       return res.status(404).json({ success: false, error: 'No matching Challans found.' });
+    }
+
+    // Strict Guard: Reject if any selected challan is already invoiced
+    for (const ch of allChallans) {
+      if (ch.status === 'INVOICED' || ch.billingStatus === 'INVOICED' || ch.isBilled || Boolean(ch.invoiceNo)) {
+        return res.status(409).json({
+          success: false,
+          error: `Cannot generate bill: Challan #${ch.challanNo} has already been billed in Invoice #${ch.invoiceNo || 'N/A'}. A delivery challan cannot be billed a 2nd time.`
+        });
+      }
     }
 
     // 2. FLEXIBLE SAME-CUSTOMER VALIDATION CHECK

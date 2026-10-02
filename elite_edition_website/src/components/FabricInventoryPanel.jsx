@@ -1899,6 +1899,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // Create Bill / Tax Invoice directly from a Delivery Challan
   const handleCreateBillFromChallan = async (ch) => {
+    if (!ch) return;
+    const challanList = Array.isArray(ch) ? ch : [ch];
+    const alreadyBilled = challanList.filter(c => c && (c.status === 'INVOICED' || c.billingStatus === 'INVOICED' || c.isBilled || Boolean(c.invoiceNo)));
+    if (alreadyBilled.length > 0) {
+      const details = alreadyBilled.map(c => `EDP-${c.challanNo}${c.invoiceNo ? ` (Invoice #${c.invoiceNo})` : ''}`).join(', ');
+      alert(`⚠️ Cannot generate bill: The following challan(s) are already billed:\n${details}\n\nA delivery challan cannot be billed a 2nd time.`);
+      return;
+    }
     if (onNavigateToBilling) {
       onNavigateToBilling(ch);
       return;
@@ -4556,6 +4564,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       return;
                     }
                     const selected = Object.values(selectedChallanMap);
+                    const alreadyBilled = selected.filter(c => c && (c.status === 'INVOICED' || c.billingStatus === 'INVOICED' || c.isBilled || Boolean(c.invoiceNo)));
+                    if (alreadyBilled.length > 0) {
+                      const details = alreadyBilled.map(c => `EDP-${c.challanNo}${c.invoiceNo ? ` (Invoice #${c.invoiceNo})` : ''}`).join(', ');
+                      alert(`⚠️ Cannot merge or create bill: The following selected challan(s) are already billed:\n${details}\n\nA delivery challan cannot be billed a 2nd time.`);
+                      return;
+                    }
                     const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const customerKeys = new Set(selected.map(c => normalizeKey(c.billTo || c.partyName)).filter(Boolean));
                     const partyNameKeys = new Set(selected.map(c => normalizeKey(c.partyName || c.billTo)).filter(Boolean));
@@ -4815,16 +4829,31 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   onClick: () => setViewChallanModal(ch),
                                   isPrimary: true
                                 },
-                                {
-                                  id: 'bill',
-                                  icon: Receipt,
-                                  label: 'Create Bill',
-                                  tooltip: 'Create Tax Invoice / Bill',
-                                  variant: 'purple',
-                                  color: '#a78bfa',
-                                  onClick: () => handleCreateBillFromChallan(ch),
-                                  isPrimary: true
-                                },
+                                ...((ch.status !== 'INVOICED' && !ch.isBilled && !ch.invoiceNo) ? [
+                                  {
+                                    id: 'bill',
+                                    icon: Receipt,
+                                    label: 'Create Bill',
+                                    tooltip: 'Create Tax Invoice / Bill',
+                                    variant: 'purple',
+                                    color: '#a78bfa',
+                                    onClick: () => handleCreateBillFromChallan(ch),
+                                    isPrimary: true
+                                  }
+                                ] : [
+                                  {
+                                    id: 'bill',
+                                    icon: CheckCircle,
+                                    label: ch.invoiceNo ? `Billed #${ch.invoiceNo}` : 'Billed',
+                                    tooltip: `Already Billed in Invoice #${ch.invoiceNo || ''}`,
+                                    variant: 'success',
+                                    color: '#10b981',
+                                    onClick: () => {
+                                      alert(`Challan EDP-${ch.challanNo} is already billed in Invoice #${ch.invoiceNo || 'N/A'}. A delivery challan cannot be billed a 2nd time.`);
+                                    },
+                                    isPrimary: false
+                                  }
+                                ]),
                                 {
                                   id: 'download',
                                   icon: FileDown,
@@ -5087,13 +5116,19 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             })()}
 
             {/* Action Buttons - White & Blue Theme */}
-            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
               <button onClick={() => setViewChallanModal(null)} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#475569', fontWeight: '600', cursor: 'pointer' }}>
                 Close
               </button>
-              <button onClick={() => { setViewChallanModal(null); handleCreateBillFromChallan(viewChallanModal); }} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' }}>
-                <Receipt size={15} /> Create Bill
-              </button>
+              {(viewChallanModal && (viewChallanModal.status === 'INVOICED' || viewChallanModal.billingStatus === 'INVOICED' || viewChallanModal.isBilled || Boolean(viewChallanModal.invoiceNo))) ? (
+                <div style={{ padding: '0.55rem 1rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid #10b981', color: '#059669', fontWeight: '700', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <CheckCircle size={15} /> Billed: {viewChallanModal.invoiceNo ? `Invoice #${viewChallanModal.invoiceNo}` : 'Invoiced'}
+                </div>
+              ) : (
+                <button onClick={() => { setViewChallanModal(null); handleCreateBillFromChallan(viewChallanModal); }} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' }}>
+                  <Receipt size={15} /> Create Bill
+                </button>
+              )}
               <button onClick={() => handleDownloadChallanPdf(viewChallanModal._id, viewChallanModal.challanNo)} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none', backgroundColor: '#0284c7', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)' }}>
                 <FileDown size={15} /> Download PDF
               </button>

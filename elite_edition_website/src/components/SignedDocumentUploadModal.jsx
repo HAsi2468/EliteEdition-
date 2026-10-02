@@ -350,7 +350,7 @@ export default function SignedDocumentUploadModal({
                   {docType === 'challan' ? 'Challan' : 'Tax Invoice'}
                 </span>
                 <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800 }}>
-                  Upload Signed Copy
+                  {existingSignedCopy?.status === 'REJECTED' ? 'Re-upload Signed Copy' : 'Upload Signed Copy'}
                 </h3>
               </div>
               <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.92)' }}>
@@ -417,7 +417,7 @@ export default function SignedDocumentUploadModal({
 
         <div style={{ padding: '1.35rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Previous Rejection Alert if any */}
-          {existingSignedCopy?.status === 'REJECTED' && existingSignedCopy?.rejectionReason && (
+          {existingSignedCopy?.status === 'REJECTED' && (
             <div
               style={{
                 display: 'flex',
@@ -434,7 +434,7 @@ export default function SignedDocumentUploadModal({
               <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px', color: '#dc2626' }} />
               <div>
                 <strong>Previous upload was rejected:</strong>
-                <div style={{ marginTop: '2px' }}>{existingSignedCopy.rejectionReason}</div>
+                <div style={{ marginTop: '2px' }}>{existingSignedCopy.rejectionReason || 'Document was rejected by admin'}</div>
                 <div style={{ marginTop: '4px', fontSize: '0.74rem', color: '#b91c1c' }}>
                   Please upload a clear, fully signed copy with legible stamp/signature.
                 </div>
@@ -450,10 +450,10 @@ export default function SignedDocumentUploadModal({
                 <div
                   key={index}
                   style={{
-                    height: '175px',
+                    height: '240px',
                     borderRadius: '12px',
                     border: img ? '2px solid #2563eb' : '2px dashed #93c5fd',
-                    background: img ? '#f8fafc' : '#f0f7ff',
+                    background: img ? '#0f172a' : '#f0f7ff',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -469,7 +469,14 @@ export default function SignedDocumentUploadModal({
                       <img
                         src={img.previewUrl}
                         alt={`Signed Copy ${index + 1}`}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          width: 'auto',
+                          height: 'auto',
+                          objectFit: 'contain',
+                          borderRadius: '4px'
+                        }}
                       />
                       <div
                         style={{
@@ -677,7 +684,9 @@ export default function SignedDocumentUploadModal({
               ) : (
                 <>
                   <UploadCloud size={16} />
-                  Submit for Admin Approval ({images.length}/2)
+                  {existingSignedCopy?.status === 'REJECTED'
+                    ? `Re-submit for Admin Approval (${images.length}/2)`
+                    : `Submit for Admin Approval (${images.length}/2)`}
                 </>
               )}
             </button>
