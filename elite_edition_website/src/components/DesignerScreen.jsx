@@ -2052,6 +2052,34 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             showChips={true}
           />
 
+          {/* Quick Stage / Status Dropdown */}
+          <div style={{ minWidth: '150px' }}>
+            <select
+              value={stageTab}
+              onChange={(e) => setStageTab(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.75rem',
+                fontSize: '0.82rem',
+                borderRadius: '8px',
+                border: stageTab !== 'ALL' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                background: stageTab !== 'ALL' ? '#eff6ff' : '#ffffff',
+                color: stageTab !== 'ALL' ? '#1d4ed8' : '#0f172a',
+                fontWeight: stageTab !== 'ALL' ? 800 : 600,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+              title="Filter by Stage / Status"
+            >
+              <option value="ALL">📋 Status: All Stages ({stageCounts.all})</option>
+              <option value="DROW">🎨 1. Drawing ({stageCounts.drow})</option>
+              <option value="CM">🌈 2. Colour Match ({stageCounts.cm})</option>
+              <option value="STAGE_3">⏸️ 3. Hold / Continue ({stageCounts.stage3})</option>
+              <option value="APPROVED">✅ 4. Approved ({stageCounts.approved})</option>
+              <option value="REVISION">❌ 5. Reject / Revisions ({stageCounts.revision})</option>
+            </select>
+          </div>
+
           {/* Sorting */}
           <div style={{ minWidth: '130px' }}>
             <select
@@ -2564,37 +2592,44 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         </div>
                       </td>
 
-                      {/* Stage / Status & Time Taken (No status update dropdown, shows time duration) */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                      {/* Stage / Status Dropdown Menu (Direct Update) */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', position: 'relative' }}>
                         {(() => {
                           const currentBadge = getTaskCurrentStatusBadge(task);
+                          const statusOpts = getStatusDropdownOptions(task);
+                          const isOpen = openStatusDropdownId === task._id;
                           const CurrentIcon = currentBadge.icon;
                           const timeInfo = getTaskStatusTimeInfo(task);
 
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.32rem', alignItems: 'flex-start' }}>
-                              {/* Status Badge + Proof Counters */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                <span
-                                  style={{
-                                    padding: '0.32rem 0.62rem',
-                                    borderRadius: '7px',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 800,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.35rem',
-                                    border: `1.5px solid ${currentBadge.border}`,
-                                    background: currentBadge.bg,
-                                    color: currentBadge.color,
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                  title={`Current Status: ${currentBadge.label}`}
-                                >
-                                  {CurrentIcon && <CurrentIcon size={12} />}
-                                  <span>{currentBadge.label}</span>
-                                </span>
+                              {/* Status Dropdown Trigger + Proof Counters */}
+                              <div className="status-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenStatusDropdownId(isOpen ? null : task._id)}
+                                    style={{
+                                      padding: '0.35rem 0.65rem',
+                                      borderRadius: '7px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.35rem',
+                                      border: `1.5px solid ${currentBadge.border}`,
+                                      background: currentBadge.bg,
+                                      color: currentBadge.color,
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                    title="Click to select status action"
+                                  >
+                                    {CurrentIcon && <CurrentIcon size={12} />}
+                                    <span>{currentBadge.label}</span>
+                                    <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                                  </button>
 
                                 {/* Proof thumbnails / count if available */}
                                 {drowImgs.length > 0 && (
@@ -2638,6 +2673,61 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                   </button>
                                 )}
                               </div>
+
+                              {/* Floating Dropdown Menu with 5 options */}
+                              {isOpen && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 9999,
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                                    minWidth: '220px',
+                                    padding: '0.35rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.2rem',
+                                  }}
+                                >
+                                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
+                                    Select Stage Status
+                                  </div>
+                                  {statusOpts.map((opt) => {
+                                    const OptIcon = opt.icon;
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => handleDirectStatusChange(task, opt)}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.45rem',
+                                          width: '100%',
+                                          padding: '0.42rem 0.55rem',
+                                          borderRadius: '6px',
+                                          border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
+                                          background: opt.isActive ? opt.bg : 'transparent',
+                                          color: opt.color,
+                                          fontSize: '0.74rem',
+                                          fontWeight: opt.isActive ? 800 : 600,
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                        }}
+                                      >
+                                        {OptIcon && <OptIcon size={12} />}
+                                        <span style={{ flex: 1 }}>{opt.label}</span>
+                                        {opt.isActive && <span>✓</span>}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
 
                               {/* Time Taken in Current Status & Total */}
                               <div
@@ -3548,6 +3638,93 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     <span>Drop images here to upload to {task.designName}!</span>
                   </div>
                 )}
+
+                {/* ── Direct Status Dropdown Menu ── */}
+                <div className="status-dropdown-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: isStatusDropdownOpen ? 30 : 1 }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenStatusDropdownId(isStatusDropdownOpen ? null : task._id)}
+                    style={{
+                      padding: '0.32rem 0.65rem',
+                      borderRadius: '7px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      border: `1.5px solid ${currentBadge.border}`,
+                      background: currentBadge.bg,
+                      color: currentBadge.color,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      transition: 'all 0.15s ease',
+                      width: '100%',
+                      justifyContent: 'space-between'
+                    }}
+                    title="Click to select / change status directly"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      {CurrentIcon && <CurrentIcon size={12} />}
+                      <span>{currentBadge.label}</span>
+                    </div>
+                    <ChevronDown size={12} style={{ transform: isStatusDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                  </button>
+
+                  {/* Floating Dropdown Menu with 5 options */}
+                  {isStatusDropdownOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        left: 0,
+                        right: 0,
+                        zIndex: 9999,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                        minWidth: '220px',
+                        padding: '0.35rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.2rem',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
+                        Select Stage Status
+                      </div>
+                      {statusOpts.map((opt) => {
+                        const OptIcon = opt.icon;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => handleDirectStatusChange(task, opt)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              width: '100%',
+                              padding: '0.42rem 0.55rem',
+                              borderRadius: '6px',
+                              border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
+                              background: opt.isActive ? opt.bg : 'transparent',
+                              color: opt.color,
+                              fontSize: '0.74rem',
+                              fontWeight: opt.isActive ? 800 : 600,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            {OptIcon && <OptIcon size={12} />}
+                            <span style={{ flex: 1 }}>{opt.label}</span>
+                            {opt.isActive && <span>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 {/* ── Workflow Progress Pipeline Stepper ── */}
                 <div
