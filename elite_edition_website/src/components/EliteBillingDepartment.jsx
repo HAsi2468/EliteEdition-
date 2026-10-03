@@ -1,0 +1,5619 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { api } from '../services/api';
+import { triggerPushNotification } from './NotificationToast';
+import { formatDateDDMMYYYY, formatForInputDate } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
+import StitchingChallanPanel from './StitchingChallanPanel';
+import FabricInventoryPanel from './FabricInventoryPanel';
+import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
+
+import ScreenGroupRoster from './ScreenGroupRoster';
+import { dispatchScreenGroupEvent } from '../services/screenGroupService';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import { openPrintOptionsDialog } from '../utils/printService';
+import DateRangePicker from './DateRangePicker';
+import SignedDocumentUploadModal from './SignedDocumentUploadModal';
+import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
+import QuickActionMenu from './common/QuickActionMenu';
+import { SmartActionGroup } from './common/SmartActionGroup';
+import * as XLSX from 'xlsx';
+
+const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+
+function convertDriveUrl(link) {
+  if (!link || typeof link !== 'string' || !link.trim()) return '';
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
+    let fid = '';
+    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (fileMatch) fid = fileMatch[1];
+    if (!fid) {
+      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (openMatch) fid = openMatch[1];
+    }
+    if (!fid) {
+      const idMatch = trimmed.match(/([-\w]{25,})/);
+      if (idMatch) fid = idMatch[1];
+    }
+    if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
+  }
+
+  if (trimmed.includes('/designs/')) {
+    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/designs/${filename}`;
+  }
+  if (trimmed.includes('/uploads/')) {
+    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
+  }
+
+  if (trimmed.startsWith('https://')) return encodeURI(trimmed);
+
+  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
+    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
+    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
+      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
+      return `${R2_PUBLIC_BASE}/${sub}`;
+    }
+    return encodeURI(trimmed.replace('http://', 'https://'));
+  }
+
+  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpeg`;
+    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
+  }
+
+  return encodeURI(trimmed);
+}
+
+import {
+  FileText,
+  Plus,
+  Trash2,
+  Download,
+  Printer,
+  DollarSign,
+  Users,
+  Search,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  CreditCard,
+  Building,
+  RefreshCw,
+  PlusCircle,
+  Eye,
+  Edit2,
+  ChevronRight,
+  Package,
+  Calendar,
+  X,
+  Truck,
+  Receipt,
+  Lock,
+  BookOpen,
+  FileSpreadsheet,
+  ShoppingBag,
+  FileCode,
+  Filter,
+  RotateCcw,
+  Percent
+} from 'lucide-react';
+
+// Helper for Indian Currency formatting
+const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Number to Words Converter in Indian format
+function numToWords(amount) {
+  const words = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+  ];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convert(n) {
+    if (n < 20) return words[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + words[n % 10] : '');
+    if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convert(n % 100) : '');
+    if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + convert(n % 1000) : '');
+    if (n < 10000000) return convert(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + convert(n % 100000) : '');
+    return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convert(n % 10000000) : '');
+  }
+
+  const num = Math.floor(amount || 0);
+  if (num === 0) return 'Rupees Zero Only';
+  return 'Rupees ' + convert(num) + ' Only';
+}
+
+// Helper to format job card display string cleanly
+function formatJobDisplay(jobStr) {
+  if (!jobStr) return '';
+  const str = String(jobStr);
+  const matches = str.match(/\d+/g);
+  if (matches && matches.length > 0) {
+    const unique = [...new Set(matches)];
+    if (unique.length === 1) return `Job Card: ${unique[0]}`;
+    return `Job Cards: ${unique.join(', ')}`;
+  }
+  return str.replace(/JOB NO\.-?\s*/gi, '').replace(/Job\s*#?\s*/gi, '').trim();
+}
+
+const PRESET_OPTIONS = [
+  { id: 'today', name: 'Today' },
+  { id: 'yesterday', name: 'Yesterday' },
+  { id: 'this_week', name: 'This Week' },
+  { id: 'last_week', name: 'Last Week' },
+  { id: 'last_7_days', name: 'Last 7 Days' },
+  { id: 'this_month', name: 'This Month' },
+  { id: 'previous_month', name: 'Previous Month' },
+  { id: 'last_30_days', name: 'Last 30 Days' },
+  { id: 'this_quarter', name: 'This Quarter' },
+  { id: 'previous_quarter', name: 'Previous Quarter' },
+  { id: 'current_fiscal_year', name: 'Current Fiscal Year' },
+  { id: 'previous_fiscal_year', name: 'Previous Fiscal Year' },
+  { id: 'last_365_days', name: 'Last 365 Days' },
+  { id: 'all', name: 'All Time' },
+  { id: 'custom', name: 'Custom' }
+];
+
+function getDatePresetRange(preset, customStart = '', customEnd = '') {
+  const now = new Date();
+  let start = null;
+  let end = null;
+  let labelText = '';
+
+  const formatDate = (d) => {
+    if (!d) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  switch (preset) {
+    case 'today': {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'yesterday': {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      start = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0);
+      end = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_week': {
+      const dayOfWeek = now.getDay();
+      const distToMonday = (dayOfWeek + 6) % 7;
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0);
+      const sun = new Date(start);
+      sun.setDate(start.getDate() + 6);
+      end = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_week': {
+      const dayOfWeek = now.getDay();
+      const distToMonday = (dayOfWeek + 6) % 7;
+      const prevMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday - 7, 0, 0, 0);
+      start = prevMon;
+      const prevSun = new Date(prevMon);
+      prevSun.setDate(prevMon.getDate() + 6);
+      end = new Date(prevSun.getFullYear(), prevSun.getMonth(), prevSun.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_7_days': {
+      const d7 = new Date(now);
+      d7.setDate(now.getDate() - 6);
+      start = new Date(d7.getFullYear(), d7.getMonth(), d7.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_month': {
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_month': {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_30_days': {
+      const d30 = new Date(now);
+      d30.setDate(now.getDate() - 29);
+      start = new Date(d30.getFullYear(), d30.getMonth(), d30.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_quarter': {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3;
+      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_quarter': {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3 - 3;
+      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'current_fiscal_year': {
+      const yr = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      start = new Date(yr, 3, 1, 0, 0, 0);
+      end = new Date(yr + 1, 2, 31, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_fiscal_year': {
+      const yr = (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) - 1;
+      start = new Date(yr, 3, 1, 0, 0, 0);
+      end = new Date(yr + 1, 2, 31, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_365_days': {
+      const d365 = new Date(now);
+      d365.setDate(now.getDate() - 364);
+      start = new Date(d365.getFullYear(), d365.getMonth(), d365.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'custom': {
+      if (customStart) start = new Date(`${customStart}T00:00:00`);
+      if (customEnd) end = new Date(`${customEnd}T23:59:59`);
+      labelText = start && end ? `${formatDate(start)} - ${formatDate(end)}` : 'Custom Range';
+      break;
+    }
+    case 'all':
+    default: {
+      start = null;
+      end = null;
+      labelText = 'All Time Records';
+      break;
+    }
+  }
+
+  return { start, end, labelText };
+}
+
+export default function EliteBillingDepartment({ initialChallanData = null, department = 'digital_print', companyEntity = 'Elite Edition', initialTab = null }) {
+  const [activeTab, setActiveTab] = useState(() => (initialTab && initialTab !== 'costing') || (companyEntity === 'Elite Edition' || companyEntity === 'Elite Fabtex' ? 'invoices' : 'challans')); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
+  const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
+  const [stats, setStats] = useState({
+    totalInvoices: 0,
+    totalInvoiced: 0,
+    totalPaid: 0,
+    totalBalanceDue: 0,
+    paidCount: 0,
+    unpaidCount: 0,
+    overdueCount: 0
+  });
+
+  const [invoices, setInvoices] = useState([]);
+  const [selectedInvoiceHistory, setSelectedInvoiceHistory] = useState(null);
+  const [customers, setCustomers] = useState([]);
+  const [itemsList, setItemsList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [datePreset, setDatePreset] = useState('this_month');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const currentUser = api.getCurrentUser();
+  const [signedUploadTarget, setSignedUploadTarget] = useState(null);
+  const [signedPreviewTarget, setSignedPreviewTarget] = useState(null);
+
+  // Multi-select for bulk Invoice PDF download
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  // Auto open Expense create modal
+  const [autoOpenExpenseModal, setAutoOpenExpenseModal] = useState(false);
+
+  // ── Ledger System States ──────────────────────────────────────────────────
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [ledgerMode, setLedgerMode] = useState('party'); // 'party' or 'master'
+  const [selectedPartyId, setSelectedPartyId] = useState('ALL');
+  const [ledgerPreset, setLedgerPreset] = useState('this_month');
+  const [ledgerDateStart, setLedgerDateStart] = useState('');
+  const [ledgerDateEnd, setLedgerDateEnd] = useState('');
+  const [ledgerFormat, setLedgerFormat] = useState('pdf'); // 'excel', 'pdf', 'csv', 'print'
+  // ── Purchase Module States ─────────────────────────────────────────────
+  const [purchases, setPurchases] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`elite_purchases_${companyEntity || 'edp'}`);
+      if (saved) return JSON.parse(saved);
+      for (const k of ['elite_purchases_edp', 'elite_purchases_Elite Digital Prints', 'elite_purchases_Elite Edition', 'elite_purchases_Elite Fabtex']) {
+        const anySaved = localStorage.getItem(k);
+        if (anySaved) {
+          const parsed = JSON.parse(anySaved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [purchaseSearch, setPurchaseSearch] = useState('');
+  const [purchaseDatePreset, setPurchaseDatePreset] = useState('all');
+  const [purchaseDateStart, setPurchaseDateStart] = useState('');
+  const [purchaseDateEnd, setPurchaseDateEnd] = useState('');
+  const [purchaseVendorFilter, setPurchaseVendorFilter] = useState('ALL');
+  const [purchaseGstFilter, setPurchaseGstFilter] = useState('ALL');
+  const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
+  const [editingPurchaseId, setEditingPurchaseId] = useState(null);
+
+  const createEmptyPurchaseItem = () => ({
+    id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    itemName: '',
+    quantity: '',
+    unit: 'Mtr',
+    rate: '',
+    amount: ''
+  });
+
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [purchaseForm, setPurchaseForm] = useState({
+    purchaseNo: 'PUR-2026-001',
+    date: new Date().toISOString().split('T')[0],
+    vendorName: '',
+    items: [createEmptyPurchaseItem()],
+    gstRate: 0,
+    gstType: 'CGST_SGST',
+    gstAmount: '0.00',
+    totalAmount: '',
+    notes: ''
+  });
+
+  const handleGstRateChange = (newRate) => {
+    setPurchaseForm(prev => {
+      const items = prev.items || [];
+      const subtotal = items.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
+      const rateNum = Math.max(0, parseFloat(newRate) || 0);
+      const gstAmt = (subtotal * rateNum) / 100;
+      const total = subtotal + gstAmt;
+
+      return {
+        ...prev,
+        gstRate: newRate,
+        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
+        totalAmount: total > 0 ? total.toFixed(2) : ''
+      };
+    });
+  };
+
+  const handleAddPurchaseItem = () => {
+    setPurchaseForm(prev => ({
+      ...prev,
+      items: [...(prev.items || []), createEmptyPurchaseItem()]
+    }));
+  };
+
+  const handleRemovePurchaseItem = (index) => {
+    setPurchaseForm(prev => {
+      const items = prev.items || [];
+      if (items.length <= 1) return prev;
+      const newItems = items.filter((_, idx) => idx !== index);
+      const subtotal = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      const rateNum = Math.max(0, parseFloat(prev.gstRate) || 0);
+      const gstAmt = (subtotal * rateNum) / 100;
+      const total = subtotal + gstAmt;
+      return {
+        ...prev,
+        items: newItems,
+        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
+        totalAmount: total > 0 ? total.toFixed(2) : ''
+      };
+    });
+  };
+
+  const handleUpdatePurchaseItem = (index, field, value) => {
+    setPurchaseForm(prev => {
+      const items = prev.items || [];
+      const newItems = items.map((item, idx) => {
+        if (idx !== index) return item;
+        const updated = { ...item, [field]: value };
+        if (field === 'quantity' || field === 'rate') {
+          const q = parseFloat(field === 'quantity' ? value : updated.quantity);
+          const r = parseFloat(field === 'rate' ? value : updated.rate);
+          if (!isNaN(q) && !isNaN(r)) {
+            updated.amount = (q * r).toFixed(2);
+          }
+        }
+        return updated;
+      });
+      const subtotal = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      const rateNum = Math.max(0, parseFloat(prev.gstRate) || 0);
+      const gstAmt = (subtotal * rateNum) / 100;
+      const total = subtotal + gstAmt;
+
+      return {
+        ...prev,
+        items: newItems,
+        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
+        totalAmount: total > 0 ? total.toFixed(2) : prev.totalAmount
+      };
+    });
+  };
+
+  const handleEditPurchase = (p) => {
+    setEditingPurchaseId(p._id || p.id);
+    const pGstRate = p.gstRate != null ? p.gstRate : 0;
+    const pItems = Array.isArray(p.items) && p.items.length > 0
+      ? p.items.map(it => ({
+          id: it.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          itemName: it.itemName || '',
+          quantity: it.quantity || '',
+          unit: it.unit || 'Mtr',
+          rate: it.rate || '',
+          amount: it.amount || (it.quantity && it.rate ? (it.quantity * it.rate).toFixed(2) : '')
+        }))
+      : [{
+          id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          itemName: p.itemName || '',
+          quantity: p.quantity || '',
+          unit: p.unit || 'Mtr',
+          rate: p.rate !== '-' ? p.rate : '',
+          amount: p.totalAmount || ''
+        }];
+
+    setPurchaseForm({
+      purchaseNo: p.purchaseNo || '',
+      date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : p.date) : new Date().toISOString().split('T')[0],
+      vendorName: p.vendorName || '',
+      items: pItems,
+      gstRate: pGstRate,
+      gstType: p.gstType || 'CGST_SGST',
+      taxableAmount: p.taxableAmount || '',
+      gstAmount: p.gstAmount || '0.00',
+      totalAmount: p.totalAmount || '',
+      notes: p.notes || ''
+    });
+    setShowPurchaseModal(true);
+  };
+
+  const fetchPurchases = async () => {
+    try {
+      const res = await api.getBillingPurchases(companyEntity);
+      let dbPurchases = (res && res.data) ? res.data : [];
+
+      // Collect all local storage purchases to ensure no previous entry is lost
+      const allLocalPurchases = [];
+      const keysToCheck = [
+        `elite_purchases_${companyEntity || 'edp'}`,
+        'elite_purchases_edp',
+        'elite_purchases_Elite Digital Prints',
+        'elite_purchases_Elite Edition',
+        'elite_purchases_Elite Fabtex'
+      ];
+      keysToCheck.forEach(k => {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) {
+              arr.forEach(item => {
+                if (item && (item.purchaseNo || item.vendorName)) {
+                  allLocalPurchases.push({ ...item, companyEntity: item.companyEntity || companyEntity || 'Elite Digital Prints' });
+                }
+              });
+            }
+          }
+        } catch (err) {}
+      });
+
+      // Filter unsynced items
+      const unsynced = allLocalPurchases.filter(localP => {
+        const localNo = String(localP.purchaseNo || '').trim().toLowerCase();
+        const localVendor = String(localP.vendorName || '').trim().toLowerCase();
+        return !dbPurchases.some(dbP => 
+          String(dbP.purchaseNo || '').trim().toLowerCase() === localNo &&
+          String(dbP.vendorName || '').trim().toLowerCase() === localVendor
+        );
+      });
+
+      if (unsynced.length > 0) {
+        try {
+          await api.bulkSyncBillingPurchases(unsynced);
+          const freshRes = await api.getBillingPurchases(companyEntity);
+          if (freshRes && freshRes.data) {
+            dbPurchases = freshRes.data;
+          }
+        } catch (syncErr) {
+          console.warn('Failed bulkSyncBillingPurchases:', syncErr);
+        }
+      }
+
+      setPurchases(dbPurchases);
+      try {
+        localStorage.setItem(`elite_purchases_${companyEntity || 'edp'}`, JSON.stringify(dbPurchases));
+      } catch (e) {}
+    } catch (err) {
+      console.warn('Failed to load purchases from API:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPurchases();
+  }, [companyEntity]);
+
+  useEffect(() => {
+    const handleRefresh = (e) => {
+      if (!e || !e.detail || e.detail === 'billing' || e.detail?.source === 'billing') {
+        fetchPurchases();
+      }
+    };
+    window.addEventListener('elite-data-refresh', handleRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleRefresh);
+  }, [companyEntity]);
+
+  const handleCreatePurchase = async (e) => {
+    e.preventDefault();
+    if (!purchaseForm.vendorName) {
+      alert('Please select Vendor Name.');
+      return;
+    }
+
+    const validItems = (purchaseForm.items || []).filter(i => i.itemName && i.itemName.trim() !== '');
+    if (validItems.length === 0) {
+      alert('Please add at least one item description.');
+      return;
+    }
+
+    const calculatedSubtotal = validItems.reduce((acc, item) => {
+      const q = parseFloat(item.quantity) || 0;
+      const r = parseFloat(item.rate) || 0;
+      const amt = parseFloat(item.amount) || (q * r);
+      return acc + amt;
+    }, 0);
+
+    const rateNum = Math.max(0, parseFloat(purchaseForm.gstRate) || 0);
+    const calculatedGstAmt = (calculatedSubtotal * rateNum) / 100;
+    const finalTotal = parseFloat(purchaseForm.totalAmount) || (calculatedSubtotal + calculatedGstAmt);
+
+    const payload = {
+      purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
+      date: purchaseForm.date || new Date().toISOString().split('T')[0],
+      vendorName: purchaseForm.vendorName,
+      companyEntity: companyEntity || 'Elite Digital Prints',
+      items: validItems.map(item => {
+        const q = parseFloat(item.quantity) || 0;
+        const r = parseFloat(item.rate) || 0;
+        const amt = parseFloat(item.amount) || (q * r);
+        return {
+          itemName: item.itemName.trim(),
+          quantity: q,
+          unit: item.unit || 'Mtr',
+          rate: r,
+          amount: amt
+        };
+      }),
+      itemName: validItems.map(i => i.itemName.trim()).join(', '),
+      quantity: validItems.reduce((acc, i) => acc + (parseFloat(i.quantity) || 0), 0),
+      unit: validItems[0]?.unit || 'Mtr',
+      rate: validItems.length === 1 ? (parseFloat(validItems[0].rate) || 0) : (validItems.every(i => parseFloat(i.rate) === parseFloat(validItems[0].rate)) ? parseFloat(validItems[0].rate) : '-'),
+      subtotalAmount: calculatedSubtotal,
+      taxableAmount: calculatedSubtotal,
+      gstRate: rateNum,
+      gstType: purchaseForm.gstType || 'CGST_SGST',
+      gstAmount: parseFloat(purchaseForm.gstAmount) || calculatedGstAmt,
+      totalAmount: finalTotal,
+      notes: purchaseForm.notes || ''
+    };
+
+    try {
+      if (editingPurchaseId) {
+        const isMongoId = /^[0-9a-fA-F]{24}$/.test(editingPurchaseId);
+        if (isMongoId) {
+          const res = await api.updateBillingPurchase(editingPurchaseId, payload);
+          if (res && res.data) {
+            setPurchases(prev => prev.map(p => ((p._id === editingPurchaseId || p.id === editingPurchaseId) ? res.data : p)));
+          } else {
+            setPurchases(prev => prev.map(p => ((p._id === editingPurchaseId || p.id === editingPurchaseId) ? { ...payload, _id: editingPurchaseId, id: editingPurchaseId } : p)));
+          }
+        } else {
+          const res = await api.createBillingPurchase(payload);
+          const saved = (res && res.data) ? res.data : { ...payload, id: editingPurchaseId };
+          setPurchases(prev => prev.map(p => (p.id === editingPurchaseId ? saved : p)));
+        }
+        setEditingPurchaseId(null);
+      } else {
+        const res = await api.createBillingPurchase(payload);
+        const saved = (res && res.data) ? res.data : { ...payload, id: `pur_${Date.now()}` };
+        setPurchases(prev => [saved, ...prev]);
+      }
+    } catch (err) {
+      console.error('Error saving purchase to DB:', err);
+      const fallbackPur = {
+        ...payload,
+        id: editingPurchaseId || `pur_${Date.now()}`
+      };
+      if (editingPurchaseId) {
+        setPurchases(prev => prev.map(p => (p.id === editingPurchaseId || p._id === editingPurchaseId ? fallbackPur : p)));
+        setEditingPurchaseId(null);
+      } else {
+        setPurchases(prev => [fallbackPur, ...prev]);
+      }
+    }
+
+    setShowPurchaseModal(false);
+    setPurchaseForm({
+      purchaseNo: `PUR-2026-00${purchases.length + 2}`,
+      date: new Date().toISOString().split('T')[0],
+      vendorName: '',
+      items: [createEmptyPurchaseItem()],
+      gstRate: 0,
+      gstType: 'CGST_SGST',
+      gstAmount: '0.00',
+      totalAmount: '',
+      notes: ''
+    });
+  };
+
+  const handleDeletePurchase = async (id) => {
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Purchase Record',
+      message: 'Are you sure you want to delete this purchase record? This action cannot be undone.',
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      const isMongoId = /^[0-9a-fA-F]{24}$/.test(id);
+      if (isMongoId) {
+        await api.deleteBillingPurchase(id);
+      }
+      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
+      triggerPushNotification('🗑️ Purchase Deleted', 'Purchase record deleted successfully.', 'success');
+    } catch (err) {
+      console.error('Error deleting purchase:', err);
+      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
+    }
+  };
+
+  const [fabricVendors, setFabricVendors] = useState([]);
+
+  useEffect(() => {
+    api.getFabricVendors()
+      .then(res => {
+        if (Array.isArray(res)) setFabricVendors(res);
+      })
+      .catch(err => console.warn('Could not load fabric vendors:', err));
+  }, []);
+
+  // Vendor options populated ONLY from Elite Digital Prints Vendor Master (Fabric Vendors)
+  const vendorOptions = useMemo(() => {
+    const list = new Set();
+
+    (fabricVendors || []).forEach(v => {
+      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
+      if (vName) list.add(String(vName).trim());
+    });
+
+    return Array.from(list).filter(Boolean);
+  }, [fabricVendors]);
+
+  // Dynamic list of unique vendors for purchases filter
+  const purchaseVendorsList = useMemo(() => {
+    const list = new Set();
+    (purchases || []).forEach(p => {
+      if (p.vendorName && p.vendorName.trim()) list.add(p.vendorName.trim());
+    });
+    (fabricVendors || []).forEach(v => {
+      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
+      if (vName && String(vName).trim()) list.add(String(vName).trim());
+    });
+    return Array.from(list).sort();
+  }, [purchases, fabricVendors]);
+
+  // Date range object based on preset or custom range
+  const purchaseDateRange = useMemo(() => {
+    return getDatePresetRange(purchaseDatePreset, purchaseDateStart, purchaseDateEnd);
+  }, [purchaseDatePreset, purchaseDateStart, purchaseDateEnd]);
+
+  const hasActivePurchaseFilters = Boolean(
+    (purchaseSearch && purchaseSearch.trim()) ||
+    purchaseDatePreset !== 'all' ||
+    purchaseVendorFilter !== 'ALL' ||
+    purchaseGstFilter !== 'ALL'
+  );
+
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter(p => {
+      // 1. Text Search
+      if (purchaseSearch && purchaseSearch.trim()) {
+        const q = purchaseSearch.toLowerCase().trim();
+        const matchNo = p.purchaseNo && p.purchaseNo.toLowerCase().includes(q);
+        const matchVendor = p.vendorName && p.vendorName.toLowerCase().includes(q);
+        const matchItem = p.itemName && p.itemName.toLowerCase().includes(q);
+        const matchChildItems = Array.isArray(p.items) && p.items.some(it => it.itemName && it.itemName.toLowerCase().includes(q));
+        if (!matchNo && !matchVendor && !matchItem && !matchChildItems) return false;
+      }
+
+      // 2. Vendor Filter
+      if (purchaseVendorFilter && purchaseVendorFilter !== 'ALL') {
+        if ((p.vendorName || '').trim().toLowerCase() !== purchaseVendorFilter.trim().toLowerCase()) return false;
+      }
+
+      // 3. GST Rate Filter
+      if (purchaseGstFilter && purchaseGstFilter !== 'ALL') {
+        if (Number(p.gstRate || 0) !== Number(purchaseGstFilter)) return false;
+      }
+
+      // 4. Date Range Filter
+      if (purchaseDateRange.start || purchaseDateRange.end) {
+        if (!p.date) return false;
+        const pDate = new Date(p.date);
+        if (!isNaN(pDate.getTime())) {
+          if (purchaseDateRange.start && pDate < purchaseDateRange.start) return false;
+          if (purchaseDateRange.end && pDate > purchaseDateRange.end) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseDateRange]);
+
+  const totalPurchaseValue = filteredPurchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
+  const totalInwardQty = filteredPurchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
+  const uniqueVendorsCount = new Set(filteredPurchases.map(p => p.vendorName).filter(Boolean)).size;
+
+  // Helper for Ledger dates
+  const getLedgerDateRange = () => {
+    const now = new Date();
+    let startD = null;
+    let endD = null;
+
+    if (ledgerPreset === 'this_month') {
+      startD = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      endD = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    } else if (ledgerPreset === 'last_quarter') {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3 - 3;
+      startD = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      endD = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+    } else if (ledgerPreset === 'fy_ytd') {
+      const yr = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      startD = new Date(yr, 3, 1, 0, 0, 0);
+      endD = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    } else if (ledgerPreset === 'custom') {
+      if (ledgerDateStart) startD = new Date(`${ledgerDateStart}T00:00:00`);
+      if (ledgerDateEnd) endD = new Date(`${ledgerDateEnd}T23:59:59`);
+    }
+    return { startD, endD };
+  };
+
+  // Helper to extract taxable amount and GST tax breakup for Tally accuracy
+  const extractInvoiceTaxDetails = (inv) => {
+    if (!inv) return { taxable: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0, isIgst: false };
+    
+    let taxable = 0;
+    if (inv.taxableAmount !== undefined && inv.taxableAmount !== null && Number(inv.taxableAmount) > 0) {
+      taxable = Number(inv.taxableAmount);
+    } else if (inv.subtotal !== undefined && inv.subtotal !== null && Number(inv.subtotal) > 0) {
+      taxable = Number(inv.subtotal);
+    } else if (inv.netSubtotal !== undefined && inv.netSubtotal !== null && Number(inv.netSubtotal) > 0) {
+      taxable = Number(inv.netSubtotal);
+    }
+
+    const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+    let totalTax = Number(inv.totalTax || inv.gstAmount || 0);
+    let cgst = Number(inv.cgstAmount || 0);
+    let sgst = Number(inv.sgstAmount || 0);
+    let igst = Number(inv.igstAmount || 0);
+
+    const isIgst = inv.taxType === 'IGST' || (inv.stateCode && inv.stateCode !== '24') || (inv.customer?.stateCode && inv.customer?.stateCode !== '24');
+
+    if (cgst > 0 || sgst > 0 || igst > 0) {
+      totalTax = cgst + sgst + igst;
+    }
+
+    if (taxable === 0) {
+      if (grandTotal > 0 && totalTax > 0) {
+        taxable = Math.max(0, grandTotal - totalTax);
+      } else if (grandTotal > 0) {
+        taxable = parseFloat((grandTotal / 1.05).toFixed(2));
+        totalTax = parseFloat((grandTotal - taxable).toFixed(2));
+        if (isIgst) {
+          igst = totalTax;
+        } else {
+          cgst = parseFloat((totalTax / 2).toFixed(2));
+          sgst = parseFloat((totalTax / 2).toFixed(2));
+        }
+      }
+    } else if (totalTax === 0 && grandTotal > taxable) {
+      totalTax = parseFloat((grandTotal - taxable).toFixed(2));
+      if (isIgst) {
+        igst = totalTax;
+      } else {
+        cgst = parseFloat((totalTax / 2).toFixed(2));
+        sgst = parseFloat((totalTax / 2).toFixed(2));
+      }
+    } else if (totalTax > 0 && cgst === 0 && sgst === 0 && igst === 0) {
+      if (isIgst) {
+        igst = totalTax;
+      } else {
+        cgst = parseFloat((totalTax / 2).toFixed(2));
+        sgst = parseFloat((totalTax / 2).toFixed(2));
+      }
+    }
+
+    return {
+      taxable: parseFloat(taxable.toFixed(2)),
+      cgst: parseFloat(cgst.toFixed(2)),
+      sgst: parseFloat(sgst.toFixed(2)),
+      igst: parseFloat(igst.toFixed(2)),
+      totalTax: parseFloat(totalTax.toFixed(2)),
+      isIgst
+    };
+  };
+
+  // Helper to comprehensively resolve customer / party name and GSTIN across invoices and master database
+  const resolvePartyInfo = (inv, fallbackParty = null) => {
+    let matchedCust = null;
+    const invCustId = inv?.customer?.customerId || inv?.customerId || inv?.customer?._id || inv?.customer?.id;
+    if (invCustId) {
+      matchedCust = customers.find(c => String(c._id) === String(invCustId) || String(c.id) === String(invCustId));
+    }
+
+    const rawGst = (
+      inv?.customer?.gstin ||
+      inv?.customer?.partyGstin ||
+      inv?.customerGst ||
+      inv?.customerGstin ||
+      inv?.partyGstin ||
+      inv?.gstin ||
+      ''
+    ).trim().toUpperCase();
+
+    if (!matchedCust && rawGst && rawGst !== 'N/A' && rawGst !== 'UNDEFINED' && rawGst !== 'NULL') {
+      matchedCust = customers.find(c => (c.gstin || '').trim().toUpperCase() === rawGst);
+    }
+
+    const rawName = (
+      inv?.customer?.businessName ||
+      inv?.customer?.name ||
+      inv?.customerName ||
+      inv?.partyName ||
+      inv?.billTo ||
+      (typeof inv?.customer === 'string' ? inv?.customer : '') ||
+      ''
+    ).trim().toLowerCase();
+
+    if (!matchedCust && rawName) {
+      matchedCust = customers.find(c => {
+        const cBiz = (c.businessName || '').trim().toLowerCase();
+        const cName = (c.name || '').trim().toLowerCase();
+        return (cBiz && (cBiz === rawName || rawName.includes(cBiz) || cBiz.includes(rawName))) ||
+               (cName && (cName === rawName || rawName.includes(cName) || cName.includes(rawName)));
+      });
+    }
+
+    const rawPhone = (inv?.customer?.phone || inv?.customerPhone || '').trim();
+    if (!matchedCust && rawPhone && rawPhone !== 'N/A') {
+      matchedCust = customers.find(c => (c.phone || '').trim() === rawPhone);
+    }
+
+    const finalCust = matchedCust || (fallbackParty && fallbackParty._id ? fallbackParty : null);
+
+    // Business name is standard for Tally party ledgers, fallback to name or rawName
+    const resolvedName = (
+      finalCust?.businessName ||
+      inv?.customer?.businessName ||
+      finalCust?.name ||
+      inv?.customer?.name ||
+      inv?.customerName ||
+      inv?.partyName ||
+      inv?.billTo ||
+      (typeof inv?.customer === 'string' ? inv?.customer : '') ||
+      (fallbackParty?.businessName && fallbackParty.businessName !== 'Global Account Ledger' ? fallbackParty.businessName : '') ||
+      (fallbackParty?.name && fallbackParty.name !== 'All Customers' ? fallbackParty.name : '') ||
+      'Sundry Debtors'
+    ).trim();
+
+    // Clean GSTIN resolution
+    const candidateGst = (
+      rawGst ||
+      finalCust?.gstin ||
+      fallbackParty?.gstin ||
+      ''
+    ).trim().toUpperCase();
+    const cleanGst = (candidateGst === 'N/A' || candidateGst === 'UNDEFINED' || candidateGst === 'NULL' || candidateGst === 'NONE') ? '' : candidateGst;
+
+    const resolvedState = (
+      finalCust?.state ||
+      inv?.customer?.state ||
+      inv?.state ||
+      fallbackParty?.state ||
+      (cleanGst.startsWith('24') ? 'Gujarat (24)' : (cleanGst ? 'Inter-State' : 'Gujarat (24)'))
+    );
+
+    const resolvedStateCode = (
+      finalCust?.stateCode ||
+      inv?.customer?.stateCode ||
+      fallbackParty?.stateCode ||
+      (cleanGst.length >= 2 && !isNaN(cleanGst.slice(0, 2)) ? cleanGst.slice(0, 2) : '24')
+    );
+
+    return {
+      partyName: resolvedName,
+      partyGstin: cleanGst,
+      state: resolvedState,
+      stateCode: resolvedStateCode,
+      matchedCust: finalCust
+    };
+  };
+
+  // Compute Party Ledger Data with robust matching & date parsing
+  const computePartyLedger = (partyId, startD, endD) => {
+    const parseInvDate = (dateVal) => {
+      if (!dateVal) return new Date();
+      if (dateVal instanceof Date) return dateVal;
+      const str = String(dateVal);
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+          return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        }
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    const targetParty = customers.find(c => String(c._id) === String(partyId) || String(c.id) === String(partyId));
+
+    const isMatch = (inv) => {
+      if (!partyId || partyId === 'ALL') return true;
+      if (inv.customerId && String(inv.customerId) === String(partyId)) return true;
+      if (inv.customer?._id && String(inv.customer._id) === String(partyId)) return true;
+      if (inv.customer?.id && String(inv.customer.id) === String(partyId)) return true;
+      if (inv.customer?.customerId && String(inv.customer.customerId) === String(partyId)) return true;
+
+      if (targetParty) {
+        const pName = (targetParty.businessName || targetParty.name || '').toLowerCase().trim();
+        const pGst = (targetParty.gstin || '').toLowerCase().trim();
+        const pPhone = (targetParty.phone || '').toLowerCase().trim();
+
+        const invCustName = (inv.customer?.businessName || inv.customer?.name || inv.customerName || inv.partyName || inv.billTo || (typeof inv.customer === 'string' ? inv.customer : '')).toLowerCase().trim();
+        const invGst = (inv.customer?.gstin || inv.customer?.partyGstin || inv.customerGst || inv.customerGstin || inv.partyGstin || inv.gstin || '').toLowerCase().trim();
+        const invPhone = (inv.customer?.phone || inv.customerPhone || '').toLowerCase().trim();
+
+        if (pName && invCustName && (invCustName === pName || invCustName.includes(pName) || pName.includes(invCustName))) return true;
+        if (pGst && invGst && invGst === pGst) return true;
+        if (pPhone && invPhone && invPhone === pPhone) return true;
+      }
+      return false;
+    };
+
+    const sortedInvoices = [...invoices]
+      .filter(isMatch)
+      .sort((a, b) => parseInvDate(a.invoiceDate || a.createdAt) - parseInvDate(b.invoiceDate || b.createdAt));
+    
+    let openingBalance = 0;
+    const periodTx = [];
+
+    sortedInvoices.forEach(inv => {
+      const invDate = parseInvDate(inv.invoiceDate || inv.createdAt);
+      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+      const paidAmount = Number(inv.paidAmount || 0);
+
+      if (startD && invDate < startD) {
+        openingBalance += (grandTotal - paidAmount);
+        return;
+      }
+
+      if (endD && invDate > endD) return;
+
+      const taxDetails = extractInvoiceTaxDetails(inv);
+      const partyInfo = resolvePartyInfo(inv, targetParty);
+      const pName = partyInfo.partyName;
+      const pGstin = partyInfo.partyGstin;
+      const pState = partyInfo.state;
+      const pStateCode = partyInfo.stateCode;
+
+      if (grandTotal > 0) {
+        periodTx.push({
+          date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
+          rawDate: invDate,
+          voucherType: 'Sales',
+          voucherNo: inv.invoiceNo || 'INV',
+          particulars: `Sales Invoice #${inv.invoiceNo || ''}`,
+          department: inv.department || 'Elite Digital Prints',
+          partyName: pName,
+          partyGstin: pGstin,
+          gstin: pGstin,
+          state: pState,
+          stateCode: pStateCode,
+          opposingLedger: 'Sales - Digital Print',
+          taxableAmount: taxDetails.taxable,
+          cgstAmount: taxDetails.cgst,
+          sgstAmount: taxDetails.sgst,
+          igstAmount: taxDetails.igst,
+          totalTax: taxDetails.totalTax,
+          debit: grandTotal,
+          credit: 0,
+          narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo || ''}`
+        });
+      }
+
+      if (paidAmount > 0) {
+        const payMode = inv.paymentMode || inv.paymentMethod || 'Bank';
+        const isCash = payMode.toLowerCase().includes('cash');
+        const pDate = inv.paymentDate ? parseInvDate(inv.paymentDate) : invDate;
+        periodTx.push({
+          date: formatDateDDMMYYYY(inv.paymentDate || inv.invoiceDate || inv.createdAt),
+          rawDate: pDate,
+          voucherType: 'Receipt',
+          voucherNo: `REC-${inv.invoiceNo || ''}`,
+          particulars: `Payment Received (${payMode}) — Invoice #${inv.invoiceNo || ''}`,
+          department: inv.department || 'Elite Digital Prints',
+          partyName: pName,
+          partyGstin: pGstin,
+          gstin: pGstin,
+          state: pState,
+          stateCode: pStateCode,
+          opposingLedger: isCash ? 'Cash Account' : 'Bank Account',
+          taxableAmount: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          totalTax: 0,
+          debit: 0,
+          credit: paidAmount,
+          narration: `Payment received against Invoice #${inv.invoiceNo || ''} via ${payMode}`
+        });
+      }
+    });
+
+    let runningBal = openingBalance;
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    const rows = periodTx.map(tx => {
+      runningBal += (tx.debit - tx.credit);
+      totalDebit += tx.debit;
+      totalCredit += tx.credit;
+      return { ...tx, runningBalance: runningBal, balType: runningBal >= 0 ? 'Dr' : 'Cr' };
+    });
+
+    return {
+      openingBalance,
+      totalDebit,
+      totalCredit,
+      closingBalance: runningBal,
+      transactions: rows
+    };
+  };
+
+  // ── Helper to Generate Standard Tally XML (Tally.ERP 9 / TallyPrime) ───────
+  const generateTallyXML = ({ mode, partyName, partyGstin, partyPhone, ledger, customers, startD, endD }) => {
+    const toTallyDate = (dateStr) => {
+      if (!dateStr) return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+          return `${year}${month}${day}`;
+        }
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}${m}${day}`;
+    };
+
+    const escapeXml = (str) => {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    };
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<ENVELOPE>\n';
+    xml += '  <HEADER>\n';
+    xml += '    <TALLYREQUEST>Import Data</TALLYREQUEST>\n';
+    xml += '  </HEADER>\n';
+    xml += '  <BODY>\n';
+    xml += '    <IMPORTDATA>\n';
+    xml += '      <REQUESTDESC>\n';
+    xml += `        <REPORTNAME>${mode === 'party' ? 'All Masters &amp; Vouchers' : 'All Masters'}</REPORTNAME>\n`;
+    xml += '        <STATICVARIABLES>\n';
+    xml += '          <SVCURRENTCOMPANY>ELITE DIGITAL PRINTS</SVCURRENTCOMPANY>\n';
+    xml += '        </STATICVARIABLES>\n';
+    xml += '      </REQUESTDESC>\n';
+    xml += '      <REQUESTDATA>\n';
+
+    if (mode === 'party') {
+      // 1. Ledger Master
+      xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
+      xml += `          <LEDGER NAME="${escapeXml(partyName)}" ACTION="Create">\n`;
+      xml += `            <NAME>${escapeXml(partyName)}</NAME>\n`;
+      xml += '            <PARENT>Sundry Debtors</PARENT>\n';
+      xml += `            <OPENINGBALANCE>${(ledger.openingBalance || 0) > 0 ? (ledger.openingBalance * -1).toFixed(2) : Math.abs(ledger.openingBalance || 0).toFixed(2)}</OPENINGBALANCE>\n`;
+      xml += '            <ISBILLWISEON>Yes</ISBILLWISEON>\n';
+      if (partyGstin) xml += `            <PARTYGSTIN>${escapeXml(partyGstin)}</PARTYGSTIN>\n`;
+      if (partyPhone) xml += `            <LEDGERPHONE>${escapeXml(partyPhone)}</LEDGERPHONE>\n`;
+      xml += `            <MAILINGNAME>${escapeXml(partyName)}</MAILINGNAME>\n`;
+      xml += '          </LEDGER>\n';
+      xml += '        </TALLYMESSAGE>\n';
+
+      // 2. Transactions as Tally Vouchers
+      (ledger.transactions || []).forEach(t => {
+        const isSales = (t.debit || 0) > 0;
+        const vchType = isSales ? 'Sales' : 'Receipt';
+        const tallyDate = toTallyDate(t.date);
+        const amt = Math.abs(isSales ? t.debit : t.credit);
+        const rowPartyName = t.partyName || (partyName !== 'All Customers (Combined)' && partyName !== 'Global Account Ledger' ? partyName : '') || 'Sundry Debtors';
+        const rowGstin = (t.partyGstin || t.gstin || partyGstin || '').trim().toUpperCase();
+        const cleanGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+
+        xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
+        xml += `          <VOUCHER VCHTYPE="${vchType}" ACTION="Create" OBJVIEW="Accounting Voucher View">\n`;
+        xml += `            <DATE>${tallyDate}</DATE>\n`;
+        xml += `            <EFFECTIVEDATE>${tallyDate}</EFFECTIVEDATE>\n`;
+        xml += `            <VOUCHERTYPENAME>${vchType}</VOUCHERTYPENAME>\n`;
+        xml += `            <VOUCHERNUMBER>${escapeXml(t.voucherNo || 'GEN')}</VOUCHERNUMBER>\n`;
+        xml += `            <PARTYLEDGERNAME>${escapeXml(rowPartyName)}</PARTYLEDGERNAME>\n`;
+        xml += `            <PARTYNAME>${escapeXml(rowPartyName)}</PARTYNAME>\n`;
+        xml += `            <BASICBUYERNAME>${escapeXml(rowPartyName)}</BASICBUYERNAME>\n`;
+        if (cleanGst) xml += `            <PARTYGSTIN>${escapeXml(cleanGst)}</PARTYGSTIN>\n`;
+        xml += `            <NARRATION>${escapeXml(t.particulars || '')} - ${escapeXml(t.department || 'Digital Print')}</NARRATION>\n`;
+        xml += '            <PERSISTEDVIEW>Accounting Voucher View</PERSISTEDVIEW>\n';
+
+        if (isSales) {
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += `              <LEDGERNAME>${escapeXml(rowPartyName)}</LEDGERNAME>\n`;
+          xml += '              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>-${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              <BILLALLOCATIONS.LIST>\n';
+          xml += `                <NAME>${escapeXml(t.voucherNo || 'INV')}</NAME>\n`;
+          xml += '                <BILLTYPE>New Ref</BILLTYPE>\n';
+          xml += `                <AMOUNT>-${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              </BILLALLOCATIONS.LIST>\n';
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+
+          const taxableVal = t.taxableAmount > 0 ? t.taxableAmount : (amt - (t.totalTax || 0));
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += '              <LEDGERNAME>Sales - Digital Print</LEDGERNAME>\n';
+          xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>${taxableVal.toFixed(2)}</AMOUNT>\n`;
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+
+          if (t.cgstAmount > 0) {
+            xml += '            <ALLLEDGERENTRIES.LIST>\n';
+            xml += '              <LEDGERNAME>CGST Output Tax</LEDGERNAME>\n';
+            xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+            xml += `              <AMOUNT>${t.cgstAmount.toFixed(2)}</AMOUNT>\n`;
+            xml += '            </ALLLEDGERENTRIES.LIST>\n';
+          }
+          if (t.sgstAmount > 0) {
+            xml += '            <ALLLEDGERENTRIES.LIST>\n';
+            xml += '              <LEDGERNAME>SGST Output Tax</LEDGERNAME>\n';
+            xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+            xml += `              <AMOUNT>${t.sgstAmount.toFixed(2)}</AMOUNT>\n`;
+            xml += '            </ALLLEDGERENTRIES.LIST>\n';
+          }
+          if (t.igstAmount > 0) {
+            xml += '            <ALLLEDGERENTRIES.LIST>\n';
+            xml += '              <LEDGERNAME>IGST Output Tax</LEDGERNAME>\n';
+            xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+            xml += `              <AMOUNT>${t.igstAmount.toFixed(2)}</AMOUNT>\n`;
+            xml += '            </ALLLEDGERENTRIES.LIST>\n';
+          }
+        } else {
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += '              <LEDGERNAME>Bank / Cash Account</LEDGERNAME>\n';
+          xml += '              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>-${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += `              <LEDGERNAME>${escapeXml(rowPartyName)}</LEDGERNAME>\n`;
+          xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              <BILLALLOCATIONS.LIST>\n';
+          xml += `                <NAME>${escapeXml(t.voucherNo || 'Advance')}</NAME>\n`;
+          xml += '                <BILLTYPE>Agst Ref</BILLTYPE>\n';
+          xml += `                <AMOUNT>${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              </BILLALLOCATIONS.LIST>\n';
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+        }
+
+        xml += '          </VOUCHER>\n';
+        xml += '        </TALLYMESSAGE>\n';
+      });
+    } else {
+      // Mode B: All-Parties Master Ledger
+      customers.forEach(cust => {
+        const custName = cust.businessName || cust.name || 'Unknown';
+        const partyLedger = computePartyLedger(cust._id, startD, endD);
+        const opBal = partyLedger.openingBalance || 0;
+        const foundGst = (partyLedger.transactions || []).find(x => x.partyGstin || x.gstin);
+        const cleanGstin = (cust.gstin || foundGst?.partyGstin || foundGst?.gstin || '').trim().toUpperCase();
+
+        xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
+        xml += `          <LEDGER NAME="${escapeXml(custName)}" ACTION="Create">\n`;
+        xml += `            <NAME>${escapeXml(custName)}</NAME>\n`;
+        xml += '            <PARENT>Sundry Debtors</PARENT>\n';
+        xml += `            <OPENINGBALANCE>${opBal > 0 ? (opBal * -1).toFixed(2) : Math.abs(opBal).toFixed(2)}</OPENINGBALANCE>\n`;
+        xml += '            <ISBILLWISEON>Yes</ISBILLWISEON>\n';
+        if (cleanGstin && cleanGstin !== 'N/A' && cleanGstin !== 'UNDEFINED' && cleanGstin !== 'NULL') xml += `            <PARTYGSTIN>${escapeXml(cleanGstin)}</PARTYGSTIN>\n`;
+        if (cust.phone) xml += `            <LEDGERPHONE>${escapeXml(cust.phone)}</LEDGERPHONE>\n`;
+        xml += `            <MAILINGNAME>${escapeXml(custName)}</MAILINGNAME>\n`;
+        xml += '          </LEDGER>\n';
+        xml += '        </TALLYMESSAGE>\n';
+      });
+    }
+
+    xml += '      </REQUESTDATA>\n';
+    xml += '    </IMPORTDATA>\n';
+    xml += '  </BODY>\n';
+    xml += '</ENVELOPE>\n';
+
+    return xml;
+  };
+
+  const handleGenerateLedgerExport = async () => {
+    const { startD, endD } = getLedgerDateRange();
+
+    if (ledgerMode === 'party') {
+      const selectedParty = customers.find(c => String(c._id) === String(selectedPartyId) || String(c.id) === String(selectedPartyId)) || { name: 'All Customers', businessName: 'Global Account Ledger' };
+      const partyName = selectedPartyId === 'ALL' ? 'All Customers (Combined)' : (selectedParty.businessName || selectedParty.name);
+      const ledger = computePartyLedger(selectedPartyId, startD, endD);
+
+      if (ledgerFormat === 'tally' || ledgerFormat === 'xml') {
+        const xmlContent = generateTallyXML({
+          mode: 'party',
+          partyName,
+          partyGstin: selectedParty.gstin,
+          partyPhone: selectedParty.phone,
+          ledger,
+          customers,
+          startD,
+          endD
+        });
+        const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Tally_Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xml`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        triggerPushNotification('🏛️ Tally XML Ready', `Tally XML ledger statement for ${partyName} exported successfully.`, 'success');
+        return;
+      }
+
+      if (ledgerFormat === 'excel') {
+        const wb = XLSX.utils.book_new();
+
+        // ── SHEET 1: PARTY LEDGER STATEMENT (Comprehensive with Tax & Voucher Type) ──
+        const pGst = (selectedParty?.gstin || '').trim().toUpperCase();
+        const cleanPGst = (pGst === 'N/A' || pGst === 'UNDEFINED' || pGst === 'NULL') ? '' : pGst;
+        const pPhone = selectedParty?.phone || 'N/A';
+        const pState = selectedParty?.state || (cleanPGst.startsWith('24') ? 'Gujarat (24)' : (cleanPGst ? 'Inter-State' : 'Gujarat (24)'));
+
+        const rows = [
+          ['ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT'],
+          ['Party Name:', partyName],
+          ['GSTIN:', selectedPartyId === 'ALL' ? 'Various / Multi-Party' : (cleanPGst || 'Unregistered'), 'State / POS:', pState, 'Phone:', pPhone],
+          ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
+          ['Opening Balance (₹):', Number(ledger.openingBalance) || 0],
+          [],
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Party GSTIN', 'Particulars', 'Taxable (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
+        ];
+
+        let sumTaxable = 0;
+        let sumCgst = 0;
+        let sumSgst = 0;
+        let sumIgst = 0;
+
+        ledger.transactions.forEach(t => {
+          sumTaxable += (t.taxableAmount || 0);
+          sumCgst += (t.cgstAmount || 0);
+          sumSgst += (t.sgstAmount || 0);
+          sumIgst += (t.igstAmount || 0);
+
+          const rowParty = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? cleanPGst : '') || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+
+          rows.push([
+            t.date,
+            t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt'),
+            t.voucherNo,
+            rowParty,
+            cleanRowGst,
+            t.particulars,
+            Number(t.taxableAmount) || 0,
+            Number(t.cgstAmount) || 0,
+            Number(t.sgstAmount) || 0,
+            Number(t.igstAmount) || 0,
+            Number(t.debit) || 0,
+            Number(t.credit) || 0,
+            Number(Math.abs(t.runningBalance)) || 0,
+            t.balType
+          ]);
+        });
+
+        rows.push([]);
+        rows.push([
+          'TOTALS',
+          '',
+          '',
+          '',
+          '',
+          '',
+          parseFloat(sumTaxable.toFixed(2)),
+          parseFloat(sumCgst.toFixed(2)),
+          parseFloat(sumSgst.toFixed(2)),
+          parseFloat(sumIgst.toFixed(2)),
+          Number(ledger.totalDebit) || 0,
+          Number(ledger.totalCredit) || 0,
+          Number(Math.abs(ledger.closingBalance)) || 0,
+          ledger.closingBalance >= 0 ? 'Dr' : 'Cr'
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [
+          { wch: 13 }, // Date
+          { wch: 14 }, // Voucher Type
+          { wch: 20 }, // Voucher No
+          { wch: 32 }, // Party Ledger Name
+          { wch: 18 }, // Party GSTIN
+          { wch: 42 }, // Particulars
+          { wch: 15 }, // Taxable
+          { wch: 12 }, // CGST
+          { wch: 12 }, // SGST
+          { wch: 12 }, // IGST
+          { wch: 15 }, // Debit
+          { wch: 15 }, // Credit
+          { wch: 18 }, // Running Bal
+          { wch: 8 },  // Dr/Cr
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Party Statement');
+
+        // ── SHEET 2: TALLY PRIME / ACCOUNTING IMPORT FORMAT ──
+        const tallyRows = [
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Sales / Bank Ledger', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN', 'Narration']
+        ];
+
+        ledger.transactions.forEach(t => {
+          const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
+          const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
+          const totAmt = t.debit > 0 ? t.debit : t.credit;
+
+          const rowPartyName = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? cleanPGst : '') || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+          const rowState = t.state || pState || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+
+          tallyRows.push([
+            t.date,
+            vType,
+            t.voucherNo,
+            rowPartyName,
+            oppLedger,
+            Number(t.taxableAmount) || 0,
+            Number(t.cgstAmount) || 0,
+            Number(t.sgstAmount) || 0,
+            Number(t.igstAmount) || 0,
+            Number(totAmt) || 0,
+            Number(t.debit) || 0,
+            Number(t.credit) || 0,
+            rowState,
+            cleanRowGst,
+            t.narration || t.particulars || ''
+          ]);
+        });
+
+        const wsTally = XLSX.utils.aoa_to_sheet(tallyRows);
+        wsTally['!cols'] = [
+          { wch: 13 }, // Date
+          { wch: 14 }, // Voucher Type
+          { wch: 20 }, // Voucher No
+          { wch: 32 }, // Party Ledger Name
+          { wch: 26 }, // Sales/Bank Ledger
+          { wch: 16 }, // Taxable Amount
+          { wch: 12 }, // CGST
+          { wch: 12 }, // SGST
+          { wch: 12 }, // IGST
+          { wch: 16 }, // Total Amount
+          { wch: 14 }, // Debit
+          { wch: 14 }, // Credit
+          { wch: 18 }, // POS
+          { wch: 18 }, // GSTIN
+          { wch: 45 }, // Narration
+        ];
+        XLSX.utils.book_append_sheet(wb, wsTally, 'Tally Import Format');
+
+        const fileName = `Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        triggerPushNotification('📊 Excel Export Ready', `Party statement & Tally format for ${partyName} exported as XLSX.`, 'success');
+        return;
+      }
+
+      if (ledgerFormat === 'csv') {
+        let csvContent = `ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT\n`;
+        csvContent += `Party Name: "${partyName}"\n`;
+        csvContent += `Period: ${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}\n`;
+        csvContent += `Opening Balance: ₹ ${ledger.openingBalance.toFixed(2)}\n\n`;
+        csvContent += `Date,Voucher No,Party Ledger Name,Party GSTIN,Particulars,Department,Debit (₹),Credit (₹),Running Balance (₹),Dr/Cr\n`;
+
+        ledger.transactions.forEach(t => {
+          const rowParty = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? selectedParty.gstin : '') || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+          csvContent += `"${t.date}","${t.voucherNo}","${rowParty}","${cleanRowGst}","${t.particulars}","${t.department}",${t.debit.toFixed(2)},${t.credit.toFixed(2)},${Math.abs(t.runningBalance).toFixed(2)},"${t.balType}"\n`;
+        });
+
+        csvContent += `\nTOTALS,,,,,"",${ledger.totalDebit.toFixed(2)},${ledger.totalCredit.toFixed(2)},${Math.abs(ledger.closingBalance).toFixed(2)},"${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'}"\n`;
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        triggerPushNotification('📒 Ledger Exported', `Party statement for ${partyName} exported successfully.`, 'success');
+      } else {
+        const htmlContent = `
+          <div style="font-family: 'Segoe UI', Arial, Helvetica, sans-serif; padding: 15px; color: #0f172a; font-size: 11px; line-height: 1.4;">
+            <style>
+              .header { border-bottom: 2.5px solid #7c3aed; padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-start; }
+              .title { font-size: 22px; font-weight: 800; color: #4c1d95; letter-spacing: -0.5px; }
+              .subtitle { font-size: 11px; color: #64748b; margin-top: 3px; font-weight: 600; }
+              .meta-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 11px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+              th { background: #1e1b4b; color: #ffffff; text-align: left; padding: 8px 10px; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+              td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+              tr:nth-child(even) { background: #f8fafc; }
+              .num { text-align: right; }
+              .totals-row { font-weight: 800; background: #f1f5f9; border-top: 2px solid #1e1b4b; border-bottom: 2px solid #1e1b4b; font-size: 11px; }
+              .footer { margin-top: 35px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+            </style>
+
+            <div class="header">
+              <div>
+                <div class="title">ELITE DIGITAL PRINTS</div>
+                <div class="subtitle">Cloud Accounting & GST Invoicing — Official Party Account Ledger Statement</div>
+              </div>
+              <div style="text-align: right; font-size: 11px; color: #475569;">
+                <div style="background: #7c3aed; color: #fff; padding: 3px 8px; border-radius: 4px; font-weight: 800; display: inline-block; margin-bottom: 4px;">LEDGER STATEMENT</div>
+                <div><strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
+              </div>
+            </div>
+
+            <div class="meta-box">
+              <div>
+                <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700;">Account / Customer Details</div>
+                <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 2px;">${partyName}</div>
+                <div style="color: #475569; margin-top: 3px;">
+                  ${selectedParty.gstin ? `GSTIN: <b>${selectedParty.gstin}</b> | ` : ''}
+                  ${selectedParty.phone ? `Phone: <b>${selectedParty.phone}</b>` : ''}
+                </div>
+              </div>
+              <div style="text-align: right; border-left: 1px solid #e2e8f0; padding-left: 15px;">
+                <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700;">Statement Summary</div>
+                <div style="margin-top: 4px;">Opening Balance: <b>${fmtINR(ledger.openingBalance)}</b></div>
+                <div>Total Billed: <b>${fmtINR(ledger.totalDebit)}</b> | Total Paid: <b>${fmtINR(ledger.totalCredit)}</b></div>
+                <div style="margin-top: 3px;">Closing Balance: <span style="color: ${ledger.closingBalance > 0 ? '#dc2626' : '#16a34a'}; font-weight: 800; font-size: 13px;">${fmtINR(Math.abs(ledger.closingBalance))} (${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</span></div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 12%;">Date</th>
+                  <th style="width: 16%;">Voucher No</th>
+                  <th>Particulars / Description</th>
+                  <th style="width: 16%;">Department</th>
+                  <th class="num" style="width: 14%;">Debit (₹)</th>
+                  <th class="num" style="width: 14%;">Credit (₹)</th>
+                  <th class="num" style="width: 16%;">Running Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background: #f1f5f9; font-weight: 700;">
+                  <td colspan="4"><i>Opening Balance B/F</i></td>
+                  <td class="num">—</td>
+                  <td class="num">—</td>
+                  <td class="num"><b>${fmtINR(Math.abs(ledger.openingBalance))} ${ledger.openingBalance >= 0 ? 'Dr' : 'Cr'}</b></td>
+                </tr>
+                ${ledger.transactions.length === 0 ? '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #64748b;">No transactions recorded for selected period.</td></tr>' : ledger.transactions.map(t => `
+                  <tr>
+                    <td>${t.date}</td>
+                    <td><strong>${t.voucherNo}</strong></td>
+                    <td>${t.particulars}</td>
+                    <td>${t.department}</td>
+                    <td class="num">${t.debit > 0 ? fmtINR(t.debit) : '—'}</td>
+                    <td class="num">${t.credit > 0 ? fmtINR(t.credit) : '—'}</td>
+                    <td class="num"><strong>${fmtINR(Math.abs(t.runningBalance))} ${t.balType}</strong></td>
+                  </tr>
+                `).join('')}
+                <tr class="totals-row">
+                  <td colspan="4">TOTAL PERIOD TRANSACTIONS</td>
+                  <td class="num">${fmtINR(ledger.totalDebit)}</td>
+                  <td class="num">${fmtINR(ledger.totalCredit)}</td>
+                  <td class="num">${fmtINR(Math.abs(ledger.closingBalance))} ${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="footer">
+              <div>Prepared By: Accounts & Billing Department — Elite Digital Prints</div>
+              <div>Authorized Signatory: _______________________</div>
+            </div>
+          </div>
+        `;
+
+        await openPrintOptionsDialog({
+          title: `Party Ledger — ${partyName}`,
+          content: htmlContent,
+          defaultSettings: {
+            paperSize: 'A4',
+            orientation: 'portrait',
+            margin: 'default'
+          }
+        });
+        triggerPushNotification('📄 Ledger Ready', `Party statement print ready for ${partyName}.`, 'success');
+      }
+    } else {
+      // Mode B: Master Ledger Export
+      if (ledgerFormat === 'tally' || ledgerFormat === 'xml') {
+        const xmlContent = generateTallyXML({
+          mode: 'master',
+          customers,
+          startD,
+          endD
+        });
+        const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Tally_Master_Ledgers_${new Date().toISOString().split('T')[0]}.xml`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        triggerPushNotification('🏛️ Tally XML Ready', `All-Parties Tally XML Master Ledgers exported successfully.`, 'success');
+        return;
+      }
+
+      if (ledgerFormat === 'excel') {
+        const wb = XLSX.utils.book_new();
+
+        // ── SHEET 1: ALL-PARTIES MASTER SUMMARY ──
+        const rows = [
+          ['ELITE DIGITAL PRINTS — ALL-PARTIES MASTER LEDGER SUMMARY'],
+          ['Report Date:', new Date().toLocaleDateString('en-IN')],
+          ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
+          [],
+          ['Party Code', 'Party Name', 'GSTIN', 'State / POS', 'Phone', 'Opening Balance (₹)', 'Total Billed (₹)', 'Total Paid (₹)', 'Closing Balance (₹)', 'Status']
+        ];
+
+        let grandBilled = 0;
+        let grandPaid = 0;
+        let grandBal = 0;
+        const allTransactions = [];
+
+        customers.forEach(cust => {
+          const partyLedger = computePartyLedger(cust._id, startD, endD);
+          grandBilled += partyLedger.totalDebit;
+          grandPaid += partyLedger.totalCredit;
+          grandBal += partyLedger.closingBalance;
+
+          const pName = cust.businessName || cust.name || 'Party';
+          const foundGst = (partyLedger.transactions || []).find(x => x.partyGstin || x.gstin);
+          const rawCustGst = (cust.gstin || foundGst?.partyGstin || foundGst?.gstin || '').trim().toUpperCase();
+          const cleanCustGst = (rawCustGst === 'N/A' || rawCustGst === 'UNDEFINED' || rawCustGst === 'NULL') ? '' : rawCustGst;
+          const pState = cust.state || (cleanCustGst.startsWith('24') ? 'Gujarat (24)' : (cleanCustGst ? 'Inter-State' : 'Gujarat (24)'));
+
+          (partyLedger.transactions || []).forEach(tx => {
+            const txGst = (tx.partyGstin || tx.gstin || cleanCustGst || '').trim().toUpperCase();
+            const cleanTxGst = (txGst === 'N/A' || txGst === 'UNDEFINED' || txGst === 'NULL') ? '' : txGst;
+            allTransactions.push({
+              ...tx,
+              partyCode: `CUST-${cust._id.slice(-4).toUpperCase()}`,
+              partyName: tx.partyName || pName,
+              partyGstin: cleanTxGst,
+              partyState: tx.state || pState
+            });
+          });
+
+          rows.push([
+            `CUST-${cust._id.slice(-4).toUpperCase()}`,
+            pName,
+            cleanCustGst || 'Unregistered',
+            pState,
+            cust.phone || 'N/A',
+            Number(partyLedger.openingBalance) || 0,
+            Number(partyLedger.totalDebit) || 0,
+            Number(partyLedger.totalCredit) || 0,
+            Number(partyLedger.closingBalance) || 0,
+            partyLedger.closingBalance > 0 ? 'Overdue' : 'Active'
+          ]);
+        });
+
+        // Include any standalone invoices not linked to customers list
+        const processedInvNos = new Set(allTransactions.map(t => t.voucherNo));
+        invoices.forEach(inv => {
+          if (!inv.invoiceNo || processedInvNos.has(inv.invoiceNo)) return;
+          const invDate = new Date(inv.invoiceDate || inv.createdAt);
+          if (startD && invDate < startD) return;
+          if (endD && invDate > endD) return;
+
+          const pInfo = resolvePartyInfo(inv, null);
+          const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+          const taxD = extractInvoiceTaxDetails(inv);
+          if (grandTotal > 0) {
+            allTransactions.push({
+              date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
+              rawDate: invDate,
+              voucherType: 'Sales',
+              voucherNo: inv.invoiceNo,
+              particulars: `Sales Invoice #${inv.invoiceNo}`,
+              department: inv.department || 'Elite Digital Prints',
+              partyCode: 'CUST-WALK',
+              partyName: pInfo.partyName,
+              partyGstin: pInfo.partyGstin,
+              partyState: pInfo.state,
+              opposingLedger: 'Sales - Digital Print',
+              taxableAmount: taxD.taxable,
+              cgstAmount: taxD.cgst,
+              sgstAmount: taxD.sgst,
+              igstAmount: taxD.igst,
+              totalTax: taxD.totalTax,
+              debit: grandTotal,
+              credit: 0,
+              narration: `Job Work Digital Printing / Invoice #${inv.invoiceNo}`
+            });
+          }
+        });
+
+        rows.push([]);
+        rows.push([
+          'GRAND TOTALS',
+          '',
+          '',
+          '',
+          '',
+          '',
+          Number(grandBilled) || 0,
+          Number(grandPaid) || 0,
+          Number(grandBal) || 0,
+          ''
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [
+          { wch: 14 },
+          { wch: 35 },
+          { wch: 20 },
+          { wch: 18 },
+          { wch: 16 },
+          { wch: 20 },
+          { wch: 20 },
+          { wch: 20 },
+          { wch: 22 },
+          { wch: 12 },
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Master Summary');
+
+        // ── SHEET 2: ALL VOUCHERS FOR TALLY IMPORT ──
+        allTransactions.sort((a, b) => (a.rawDate || 0) - (b.rawDate || 0));
+
+        const tallyRows = [
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Sales / Bank Ledger', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN', 'Narration']
+        ];
+
+        allTransactions.forEach(t => {
+          const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
+          const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
+          const totAmt = t.debit > 0 ? t.debit : t.credit;
+
+          const rowPartyName = t.partyName || 'Sundry Debtors';
+          const rowGstin = (t.partyGstin || t.gstin || '').trim().toUpperCase();
+          const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
+          const rowState = t.partyState || t.state || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+
+          tallyRows.push([
+            t.date,
+            vType,
+            t.voucherNo,
+            rowPartyName,
+            oppLedger,
+            Number(t.taxableAmount) || 0,
+            Number(t.cgstAmount) || 0,
+            Number(t.sgstAmount) || 0,
+            Number(t.igstAmount) || 0,
+            Number(totAmt) || 0,
+            Number(t.debit) || 0,
+            Number(t.credit) || 0,
+            rowState,
+            cleanRowGst,
+            t.narration || t.particulars || ''
+          ]);
+        });
+
+        const wsTally = XLSX.utils.aoa_to_sheet(tallyRows);
+        wsTally['!cols'] = [
+          { wch: 13 },
+          { wch: 14 },
+          { wch: 20 },
+          { wch: 32 },
+          { wch: 26 },
+          { wch: 16 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 16 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 18 },
+          { wch: 18 },
+          { wch: 45 },
+        ];
+        XLSX.utils.book_append_sheet(wb, wsTally, 'Tally All Vouchers');
+
+        const fileName = `Master_Ledger_Summary_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        triggerPushNotification('📊 Excel Export Ready', `All-Parties Master Ledger & Tally format exported as XLSX.`, 'success');
+        return;
+      }
+
+      let csvContent = `ELITE DIGITAL PRINTS — ALL-PARTIES MASTER LEDGER SUMMARY\n`;
+      csvContent += `Report Date: ${new Date().toLocaleDateString('en-IN')}\n\n`;
+      csvContent += `Party Code,Party Name,GSTIN,Phone,Opening Balance (₹),Total Billed (₹),Total Paid (₹),Closing Balance (₹),Status\n`;
+
+      let grandBilled = 0;
+      let grandPaid = 0;
+      let grandBal = 0;
+
+      customers.forEach(cust => {
+        const partyLedger = computePartyLedger(cust._id, startD, endD);
+        grandBilled += partyLedger.totalDebit;
+        grandPaid += partyLedger.totalCredit;
+        grandBal += partyLedger.closingBalance;
+
+        csvContent += `"CUST-${cust._id.slice(-4).toUpperCase()}","${cust.businessName || cust.name}","${cust.gstin || 'N/A'}","${cust.phone || 'N/A'}",${partyLedger.openingBalance.toFixed(2)},${partyLedger.totalDebit.toFixed(2)},${partyLedger.totalCredit.toFixed(2)},${partyLedger.closingBalance.toFixed(2)},"${partyLedger.closingBalance > 0 ? 'Overdue' : 'Active'}"\n`;
+      });
+
+      csvContent += `\nGRAND TOTALS,,,,,${grandBilled.toFixed(2)},${grandPaid.toFixed(2)},${grandBal.toFixed(2)},\n`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Master_Ledger_Summary_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      triggerPushNotification('🌐 Master Ledger Exported', `All-Parties Master Ledger exported successfully.`, 'success');
+    }
+  };
+
+  const handleToggleSelectAllInvoices = (visibleInvoices) => {
+    const visibleIds = visibleInvoices.map(i => i._id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedInvoiceIds.includes(id));
+    if (allSelected) {
+      setSelectedInvoiceIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedInvoiceIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleToggleSelectInvoice = (id) => {
+    setSelectedInvoiceIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDownloadInvoices = async () => {
+    if (selectedInvoiceIds.length === 0) return;
+    setBulkDownloading(true);
+    try {
+      await api.downloadBulkInvoicesPdf(
+        selectedInvoiceIds,
+        `Combined_Tax_Invoices_${selectedInvoiceIds.length}_Invoices.pdf`
+      );
+      triggerPushNotification(
+        '📥 Combined Invoices PDF Downloaded',
+        `${selectedInvoiceIds.length} Invoices merged into 1 single multi-page PDF document successfully.`,
+        'success'
+      );
+    } catch (e) {
+      alert('Error during bulk invoice download: ' + e.message);
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
+  const activeRange = useMemo(() => {
+    return getDatePresetRange(datePreset, customDateStart, customDateEnd);
+  }, [datePreset, customDateStart, customDateEnd]);
+
+  const periodInvoices = useMemo(() => {
+    if (!activeRange.start && !activeRange.end) return invoices;
+    return invoices.filter(inv => {
+      const dateVal = inv.invoiceDate || inv.date || inv.createdAt;
+      if (!dateVal) return true;
+      const d = new Date(dateVal);
+      if (activeRange.start && d < activeRange.start) return false;
+      if (activeRange.end && d > activeRange.end) return false;
+      return true;
+    });
+  }, [invoices, activeRange]);
+
+  const getAmountWithoutGst = useCallback((inv) => {
+    if (!inv) return 0;
+    if (inv.subtotal !== undefined && inv.subtotal !== null && Number(inv.subtotal) > 0) {
+      return Number(inv.subtotal);
+    }
+    if (inv.netSubtotal !== undefined && inv.netSubtotal !== null && Number(inv.netSubtotal) > 0) {
+      return Number(inv.netSubtotal);
+    }
+    if (inv.taxableAmount !== undefined && inv.taxableAmount !== null && Number(inv.taxableAmount) > 0) {
+      return Number(inv.taxableAmount);
+    }
+    const gTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+    const tax = Number(inv.totalTax || inv.gstAmount || (Number(inv.cgstAmount || 0) + Number(inv.sgstAmount || 0) + Number(inv.igstAmount || 0)) || 0);
+    if (gTotal > 0 && tax > 0) {
+      return Math.max(0, gTotal - tax);
+    }
+    if (gTotal > 0) {
+      return gTotal / 1.05;
+    }
+    return 0;
+  }, []);
+
+  const periodStats = useMemo(() => {
+    const totalInvoices = periodInvoices.length;
+    let totalInvoiced = 0;
+    let totalPaid = 0;
+    let totalBalanceDue = 0;
+    let paidCount = 0;
+    let unpaidCount = 0;
+    let overdueCount = 0;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    periodInvoices.forEach(inv => {
+      const amountExclGst = getAmountWithoutGst(inv);
+      const paid = Number(inv.paidAmount || 0);
+      const balance = Math.max(0, amountExclGst - paid);
+
+      totalInvoiced += amountExclGst;
+      totalPaid += paid;
+      totalBalanceDue += balance;
+
+      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+      if (inv.paymentStatus === 'PAID' || (grandTotal - paid) <= 0) {
+        paidCount++;
+      } else {
+        unpaidCount++;
+        if (inv.dueDate && inv.dueDate < todayStr) {
+          overdueCount++;
+        }
+      }
+    });
+
+    return {
+      totalInvoices,
+      totalInvoiced,
+      totalPaid,
+      totalBalanceDue,
+      paidCount,
+      unpaidCount,
+      overdueCount
+    };
+  }, [periodInvoices, getAmountWithoutGst]);
+
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [signedCopyFilter, setSignedCopyFilter] = useState('All');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
+  const [digitalChallans, setDigitalChallans] = useState([]);
+  const [loadingChallans, setLoadingChallans] = useState(false);
+  const [challanSearch, setChallanSearch] = useState('');
+
+  const fetchDigitalChallans = async () => {
+    setLoadingChallans(true);
+    try {
+      const res = await api.getFabricChallans();
+      if (res && res.success && Array.isArray(res.data)) {
+        setDigitalChallans(res.data);
+      } else if (Array.isArray(res)) {
+        setDigitalChallans(res);
+      }
+    } catch (e) {
+      console.warn('Failed to load Digital Print Challans:', e);
+    } finally {
+      setLoadingChallans(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'challans' && department !== 'stitching') {
+      fetchDigitalChallans();
+    }
+  }, [activeTab, department]);
+
+  const [viewInvoiceModal, setViewInvoiceModal] = useState(null);
+  const [pdfDuplicateModal, setPdfDuplicateModal] = useState(null); // { inv } when open
+  const [pdfDuplicateChecked, setPdfDuplicateChecked] = useState(false);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+
+  const openPdfDialog = (inv) => {
+    setPdfDuplicateChecked(false);
+    setPdfDuplicateModal(inv);
+  };
+
+  const handleConfirmDownloadPdf = async () => {
+    if (!pdfDuplicateModal) return;
+    setPdfDownloading(true);
+    try {
+      await api.downloadInvoicePdf(pdfDuplicateModal._id, pdfDuplicateModal.invoiceNo, pdfDuplicateChecked);
+    } catch (e) {
+      alert('Failed to download PDF: ' + e.message);
+    } finally {
+      setPdfDownloading(false);
+      setPdfDuplicateModal(null);
+    }
+  };
+
+  // Filtered Customers & Items
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return customers;
+    const q = customerSearch.toLowerCase();
+    return customers.filter(c =>
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.businessName || '').toLowerCase().includes(q) ||
+      (c.phone || '').toLowerCase().includes(q) ||
+      (c.gstin || '').toLowerCase().includes(q)
+    );
+  }, [customers, customerSearch]);
+
+  const filteredItems = useMemo(() => {
+    if (!itemSearch) return itemsList;
+    const q = itemSearch.toLowerCase();
+    return itemsList.filter(i =>
+      (i.itemName || '').toLowerCase().includes(q) ||
+      (i.hsnCode || '').toLowerCase().includes(q) ||
+      (i.category || '').toLowerCase().includes(q)
+    );
+  }, [itemsList, itemSearch]);
+
+  // Delete Customer
+  const handleDeleteCustomer = async (id, name) => {
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Customer',
+      message: `Are you sure you want to delete customer "${name}"?`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.deleteBillingCustomer(id);
+      setCustomers(prev => prev.filter(c => c._id !== id));
+      triggerPushNotification('🗑️ Customer Deleted', `Customer "${name}" deleted.`, 'info');
+    } catch (err) {
+      alert(err.message || 'Failed to delete customer');
+    }
+  };
+
+  // Delete Item
+  const handleDeleteItem = async (id, name) => {
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Product',
+      message: `Are you sure you want to delete product "${name}"?`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.deleteBillingItem(id);
+      setItemsList(prev => prev.filter(i => i._id !== id));
+      triggerPushNotification('🗑️ Product Deleted', `Product "${name}" deleted.`, 'info');
+    } catch (err) {
+      alert(err.message || 'Failed to delete product');
+    }
+  };
+
+  // Modal State for Payments
+  const [paymentModalInvoice, setPaymentModalInvoice] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('Bank Transfer');
+  const [payRef, setPayRef] = useState('');
+  const [payNotes, setPayNotes] = useState('');
+  const [submittingPay, setSubmittingPay] = useState(false);
+
+  // New Customer Modal State
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
+  const [custForm, setCustForm] = useState({
+    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
+  });
+
+  // New Item Modal State
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [itemForm, setItemForm] = useState({
+    itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 5, category: 'Printing Services'
+  });
+
+  // ── INVOICE EDITOR STATE (myBillBook style) ──────────────────────────────
+  const [editingInvoiceId, setEditingInvoiceId] = useState(null);
+  const [invoiceForm, setInvoiceForm] = useState({
+    invoiceNo: '',
+    invoiceSeq: 1001,
+    ourChallanNo: '',
+    invoiceDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    customer: {
+      customerId: '',
+      name: '',
+      businessName: '',
+      phone: '',
+      email: '',
+      gstin: '',
+      billingAddress: '',
+      shippingAddress: '',
+      state: 'Gujarat',
+      stateCode: '24'
+    },
+    items: [
+      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', ourChallanNo: '', imageUrl: '', totalAmount: 4500 }
+    ],
+    isButterPaperUsed: false,
+    enableRoundOff: true,
+    discountType: 'flat',
+    discountValue: 0,
+    taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
+    paidAmount: 0,
+    notes: 'Thank you for doing business with Elite Digital Prints!',
+    terms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.'
+  });
+
+  // ── Fetch Initial Data ─────────────────────────────────────────────────────
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [sRes, iRes, cRes, itemRes] = await Promise.all([
+        api.getBillingDashboardStats(companyEntity),
+        api.getBillingInvoices({ companyEntity, search, paymentStatus: statusFilter }),
+        api.getBillingCustomers(companyEntity),
+        api.getBillingItems(companyEntity)
+      ]);
+
+      if (sRes.data) setStats(sRes.data);
+      if (iRes.data) setInvoices(iRes.data);
+      if (cRes.data) setCustomers(cRes.data);
+      if (itemRes.data) setItemsList(itemRes.data);
+    } catch (err) {
+      setError(err.message || 'Failed to load billing data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchInvoices = loadData;
+
+  useEffect(() => {
+    loadData();
+  }, [search, statusFilter, companyEntity]);
+
+  // Auto-populate Invoice from Challan with Saved Customer Auto-Selection & Multi-Challan Merging
+  const loadInvoiceFromChallan = async (chInput) => {
+    if (!chInput) return;
+    try {
+      const challanList = Array.isArray(chInput) ? chInput : [chInput];
+      if (challanList.length === 0) return;
+
+      // STRICT GUARD: Cannot bill already billed challans
+      const alreadyBilled = challanList.filter(c => c && (c.status === 'INVOICED' || c.billingStatus === 'INVOICED' || c.isBilled || Boolean(c.invoiceNo)));
+      if (alreadyBilled.length > 0) {
+        const details = alreadyBilled.map(c => `Challan #${c.challanNo}${c.invoiceNo ? ` (Invoice #${c.invoiceNo})` : ''}`).join(', ');
+        triggerEliteAlert('Already Invoiced', `Cannot generate bill: The following challan(s) are already billed:\n${details}\n\nA delivery challan cannot be billed a 2nd time.`, 'error');
+        return;
+      }
+
+      // MAX 10 CHALLANS LIMIT
+      if (challanList.length > 10) {
+        triggerEliteAlert('Too Many Challans', 'Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.', 'error');
+        return;
+      }
+
+      // 1. FLEXIBLE SAME-CUSTOMER VALIDATION CHECK
+      const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const customerKeys = new Set(challanList.map(c => typeof c === 'string' ? '' : normalizeKey(c.billTo || c.partyName)).filter(Boolean));
+      const partyNameKeys = new Set(challanList.map(c => typeof c === 'string' ? '' : normalizeKey(c.partyName || c.billTo)).filter(Boolean));
+
+      if (customerKeys.size > 1 && partyNameKeys.size > 1) {
+        const partyList = [...new Set(challanList.map(c => typeof c === 'string' ? c : (c.billTo || c.partyName)).filter(Boolean))].join(', ');
+        triggerEliteAlert('Customer Mismatch', `Cannot merge Challans from different customers. Selected Challans belong to multiple customers: ${partyList}`, 'error');
+        return;
+      }
+
+      // 2. Call backend merge endpoint for complete aggregation & customer resolution
+      const challanIds = challanList.map(c => (typeof c === 'string' ? c : (c._id || c.id))).filter(Boolean);
+      const mergeRes = await api.mergeChallansToInvoice(challanIds);
+
+      if (!mergeRes || !mergeRes.success || !mergeRes.data) {
+        throw new Error(mergeRes?.error || 'Failed to merge selected Challans.');
+      }
+
+      const { customer: custData, items: mergedItems, linkedChallanIds, linkedChallanNos, deliveryBy: mergeDeliveryBy } = mergeRes.data;
+
+      // Add isLocked flag to ensure MTR fields are read-only
+      const lockedItems = (mergedItems || []).map(it => ({
+        ...it,
+        isLocked: true
+      }));
+
+      const nextRes = await api.getNextInvoiceNo();
+      const cfg = await api.getPrintConfig().catch(() => ({}));
+      const dueDays = cfg?.paymentDueDays || 30;
+      const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
+      const challanTagStr = (linkedChallanNos || []).join(', ');
+
+      setInvoiceForm({
+        invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
+        invoiceSeq: nextRes.nextSeq || 1001,
+        ourChallanNo: challanTagStr,
+        deliveryBy: mergeDeliveryBy || '',
+        linkedChallanIds: linkedChallanIds || [],
+        linkedChallanNos: linkedChallanNos || [],
+        invoiceDate: new Date().toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
+        customer: custData,
+        items: lockedItems,
+        isButterPaperUsed: false,
+        enableRoundOff: true,
+        discountType: 'flat',
+        discountValue: 0,
+        taxType: custData.stateCode && custData.stateCode !== '24' ? 'IGST' : 'CGST_SGST',
+        paidAmount: 0,
+        notes: `Auto-generated from Delivery Challan(s): #${challanTagStr}`,
+        terms: termsStr
+      });
+
+      setEditingInvoiceId(null);
+      setActiveTab('create');
+      triggerPushNotification('Challans Merged 🚚', `${challanList.length} Delivery Challan(s) successfully imported into Invoice Generator.`, 'success');
+    } catch (e) {
+      console.error('Error loading invoice from challan:', e);
+      triggerEliteAlert('Import Error', e.message || 'Failed to import Challan(s)', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (initialChallanData) {
+      if (initialChallanData.isJobCardChallan) {
+        setActiveTab('challans');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('open-new-challan', { detail: initialChallanData }));
+        }, 100);
+      } else {
+        loadInvoiceFromChallan(initialChallanData);
+      }
+    }
+  }, [initialChallanData]);
+
+  // Load next invoice number when opening create tab
+  const handleOpenCreateTab = async (invoiceToEdit = null) => {
+    if (invoiceToEdit) {
+      setEditingInvoiceId(invoiceToEdit._id);
+      const cleanedItems = (invoiceToEdit.items || []).map(it => {
+        let hsn = it.hsnCode;
+        if (!hsn || hsn === '5407') {
+          const matched = itemsList.find(cat => cat.itemName.trim().toLowerCase() === (it.itemName || '').trim().toLowerCase());
+          hsn = matched?.hsnCode || '998821';
+        }
+        return { ...it, hsnCode: hsn };
+      });
+      setInvoiceForm({
+        ...invoiceToEdit,
+        items: cleanedItems,
+        invoiceDate: invoiceToEdit.invoiceDate ? invoiceToEdit.invoiceDate.split('T')[0] : '',
+        dueDate: invoiceToEdit.dueDate ? invoiceToEdit.dueDate.split('T')[0] : ''
+      });
+      setActiveTab('create');
+    } else {
+      setEditingInvoiceId(null);
+      try {
+        const nextRes = await api.getNextInvoiceNo(companyEntity);
+        const cfg = await api.getPrintConfig().catch(() => ({}));
+        const dueDays = cfg?.paymentDueDays || 30;
+        const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
+
+        setInvoiceForm({
+          invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
+          invoiceSeq: nextRes.nextSeq || 1001,
+          invoiceDate: new Date().toISOString().split('T')[0],
+          dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
+          customer: customers[0] ? { ...customers[0] } : {
+            customerId: '', name: 'Walk-in Client', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
+          },
+          items: [
+            { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, totalAmount: 4500 }
+          ],
+          discountType: 'flat',
+          discountValue: 0,
+          taxType: 'CGST_SGST',
+          paidAmount: 0,
+          notes: 'Thank you for doing business with Elite Digital Prints!',
+          terms: termsStr
+        });
+        setActiveTab('create');
+      } catch (err) {
+        console.error('Failed to get next invoice number:', err);
+      }
+    }
+  };
+
+  // ── REAL-TIME INVOICE CALCULATIONS ──────────────────────────────────────
+  const calculatedInvoice = useMemo(() => {
+    let subtotal = 0;
+    const updatedItems = invoiceForm.items.map(it => {
+      const qty = parseFloat(it.qty) || 0;
+      const basePrice = parseFloat(it.unitPrice) || 0;
+      const effectivePrice = basePrice + (it.butterPaper ? 3 : 0);
+      const discPct = parseFloat(it.discountPct) || 0;
+      const baseTotal = qty * effectivePrice;
+      const discAmt = (baseTotal * discPct) / 100;
+      const itemTotal = baseTotal - discAmt;
+      subtotal += itemTotal;
+      return {
+        ...it,
+        effectivePrice,
+        discountAmt: discAmt,
+        totalAmount: itemTotal
+      };
+    });
+
+    const discVal = parseFloat(invoiceForm.discountValue) || 0;
+    let discountTotal = 0;
+    if (invoiceForm.discountType === 'percentage') {
+      discountTotal = (subtotal * discVal) / 100;
+    } else {
+      discountTotal = discVal;
+    }
+
+    const netSubtotal = Math.max(0, subtotal - discountTotal);
+
+    // Calculate Tax based on items individual tax rates or 5% default
+    const totalTax = updatedItems.reduce((sum, i) => {
+      const taxable = i.totalAmount || 0;
+      const rate = parseFloat(i.taxRate !== undefined && i.taxRate !== null ? i.taxRate : 5);
+      return sum + (taxable * rate / 100);
+    }, 0);
+
+    let cgstAmount = 0;
+    let sgstAmount = 0;
+    let igstAmount = 0;
+
+    if (invoiceForm.taxType === 'IGST') {
+      igstAmount = totalTax;
+    } else {
+      cgstAmount = totalTax / 2;
+      sgstAmount = totalTax / 2;
+    }
+
+    const rawGrandTotal = netSubtotal + totalTax;
+    let grandTotal = rawGrandTotal;
+    let roundOff = 0;
+
+    if (invoiceForm.enableRoundOff !== false) {
+      if (invoiceForm.manualRoundOff !== undefined && invoiceForm.manualRoundOff !== '') {
+        // Manual override: use user-specified round off value
+        roundOff = parseFloat(invoiceForm.manualRoundOff);
+        grandTotal = parseFloat((rawGrandTotal + roundOff).toFixed(2));
+      } else {
+        // Auto round off
+        grandTotal = Math.round(rawGrandTotal);
+        roundOff = parseFloat((grandTotal - rawGrandTotal).toFixed(2));
+      }
+    } else {
+      grandTotal = parseFloat(rawGrandTotal.toFixed(2));
+      roundOff = 0;
+    }
+
+    const paid = parseFloat(invoiceForm.paidAmount) || 0;
+    const balanceDue = Math.max(0, grandTotal - paid);
+
+    return {
+      items: updatedItems,
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      discountTotal: parseFloat(discountTotal.toFixed(2)),
+      netSubtotal: parseFloat(netSubtotal.toFixed(2)),
+      cgstAmount: parseFloat(cgstAmount.toFixed(2)),
+      sgstAmount: parseFloat(sgstAmount.toFixed(2)),
+      igstAmount: parseFloat(igstAmount.toFixed(2)),
+      totalTax: parseFloat(totalTax.toFixed(2)),
+      roundOff,
+      rawGrandTotal: parseFloat(rawGrandTotal.toFixed(2)),
+      grandTotal,
+      balanceDue: parseFloat(balanceDue.toFixed(2))
+    };
+  }, [invoiceForm.items, invoiceForm.isButterPaperUsed, invoiceForm.enableRoundOff, invoiceForm.discountType, invoiceForm.discountValue, invoiceForm.taxType, invoiceForm.paidAmount]);
+
+  // Handle Dynamic Line Item Change with HSN Auto-Sync
+  const handleItemChange = async (index, field, value) => {
+    const newItems = [...invoiceForm.items];
+    newItems[index][field] = value;
+
+    // If item selected from dropdown or typed, fill default metadata
+    if (field === 'itemName') {
+      const matched = itemsList.find(i => i.itemName.trim().toLowerCase() === value.trim().toLowerCase());
+      if (matched) {
+        newItems[index].hsnCode = matched.hsnCode || '998821';
+        newItems[index].unitPrice = matched.unitPrice != null ? matched.unitPrice : newItems[index].unitPrice;
+        newItems[index].unit = matched.unit || 'Meters';
+        newItems[index].taxRate = matched.taxRate != null ? matched.taxRate : 5;
+      }
+    }
+
+    // Failsafe: if HSN is 5407 or empty, correct to product catalog HSN or 998821
+    if (newItems[index].hsnCode === '5407' || !newItems[index].hsnCode) {
+      const matched = itemsList.find(i => i.itemName.trim().toLowerCase() === (newItems[index].itemName || '').trim().toLowerCase());
+      newItems[index].hsnCode = matched?.hsnCode || '998821';
+    }
+
+    // HSN Code Change Auto-Sync to Saved Product
+    if (field === 'hsnCode' && newItems[index].itemName) {
+      const matched = itemsList.find(i => i.itemName.trim().toLowerCase() === newItems[index].itemName.trim().toLowerCase());
+      if (matched && matched._id) {
+        try {
+          await api.updateBillingItem(matched._id, { ...matched, hsnCode: value });
+          setItemsList(prev => prev.map(i => i._id === matched._id ? { ...i, hsnCode: value } : i));
+        } catch (e) {
+          console.warn('HSN sync error:', e);
+        }
+      }
+    }
+
+    setInvoiceForm(prev => ({ ...prev, items: newItems }));
+  };
+
+  const handleAddItemRow = () => {
+    setInvoiceForm(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { itemName: '', hsnCode: '998821', qty: 1, unit: 'Meters', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
+      ]
+    }));
+  };
+
+  const handleRemoveItemRow = (index) => {
+    if (invoiceForm.items.length === 1) return;
+    setInvoiceForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const handleResyncMetersFromChallans = async () => {
+    try {
+      const [resChallans, resJobs] = await Promise.all([
+        api.getFabricChallans(),
+        api.getJobCards().catch(() => ({ data: [] }))
+      ]);
+      const allChallans = Array.isArray(resChallans) ? resChallans : (resChallans?.data || []);
+      const allJobs = Array.isArray(resJobs) ? resJobs : (resJobs?.data || []);
+
+      let updatedCount = 0;
+      setInvoiceForm(f => {
+        const updatedItems = f.items.map(it => {
+          const itemChallanNoStr = String(it.ourChallanNo || it.description || f.ourChallanNo || '').toUpperCase();
+          const matchChallan = allChallans.find(c => {
+            if (it.challanId && String(c._id) === String(it.challanId)) return true;
+            const cNo = `EDP-${c.challanNo}`.toUpperCase();
+            const rawNo = String(c.challanNo);
+            return itemChallanNoStr.includes(cNo) || itemChallanNoStr.includes(rawNo);
+          });
+
+          if (!matchChallan) return it;
+
+          let itemChanged = false;
+          const updatedItem = { ...it };
+
+          // 1. Re-sync Metres / Qty
+          if (matchChallan.totalMtr !== undefined && matchChallan.totalMtr !== null) {
+            const newMtr = Number(matchChallan.totalMtr) || 0;
+            if (newMtr > 0 && newMtr !== Number(it.qty)) {
+              updatedItem.qty = newMtr;
+              itemChanged = true;
+            }
+          }
+
+          // 2. Re-sync Fabric Name & Description from Challan / Job Card
+          const chJobNo = String(matchChallan.jobNo || it.jobNo || '').trim();
+          const matchedJob = chJobNo ? allJobs.find(j => {
+            const jNum = String(j.jobNo || '').replace(/\D/g, '');
+            const targetNum = chJobNo.replace(/\D/g, '');
+            return (targetNum && jNum === targetNum) || String(j.jobNo).toUpperCase() === chJobNo.toUpperCase();
+          }) : null;
+
+          const latestFabric = (matchChallan.fabricName || matchChallan.fabric || matchedJob?.fabric || '').trim();
+          const chNoStr = matchChallan.challanNo
+            ? (String(matchChallan.challanNo).startsWith('PCH') || String(matchChallan.challanNo).startsWith('EDP')
+                ? String(matchChallan.challanNo)
+                : `EDP-${matchChallan.challanNo}`)
+            : (it.ourChallanNo || '');
+
+          if (latestFabric) {
+            if (updatedItem.fabric !== latestFabric || updatedItem.fabricName !== latestFabric) {
+              updatedItem.fabric = latestFabric;
+              updatedItem.fabricName = latestFabric;
+              itemChanged = true;
+            }
+
+            const expectedDesc = chNoStr ? `Challan ${chNoStr} | Fabric: ${latestFabric}` : `Fabric: ${latestFabric}`;
+            if (updatedItem.description !== expectedDesc) {
+              updatedItem.description = expectedDesc;
+              itemChanged = true;
+            }
+          }
+
+          // 3. Re-sync Item Name if panna changed
+          const pannaStr = String(matchChallan.panna || matchedJob?.panna || '').trim();
+          if (pannaStr && updatedItem.itemName && updatedItem.itemName.startsWith('DIGITAL PRINT JOB WORK')) {
+            let newItemName = 'DIGITAL PRINT JOB WORK 58"';
+            if (pannaStr.includes('36')) newItemName = 'DIGITAL PRINT JOB WORK 36"';
+            else if (pannaStr.includes('44')) newItemName = 'DIGITAL PRINT JOB WORK 44"';
+            else if (pannaStr.includes('58')) newItemName = 'DIGITAL PRINT JOB WORK 58"';
+            else if (pannaStr) newItemName = `DIGITAL PRINT JOB WORK ${pannaStr.replace(/['"]/g, '')}"`;
+
+            if (updatedItem.itemName !== newItemName) {
+              updatedItem.itemName = newItemName;
+              itemChanged = true;
+            }
+          }
+
+          // 4. Re-sync Job No, Lot No, Vendor Challan, Design Image
+          if (matchChallan.jobNo && matchChallan.jobNo !== updatedItem.jobNo) {
+            updatedItem.jobNo = matchChallan.jobNo;
+            itemChanged = true;
+          }
+          if (matchChallan.lotNo && matchChallan.lotNo !== updatedItem.lotNo) {
+            updatedItem.lotNo = matchChallan.lotNo;
+            itemChanged = true;
+          }
+          const vChallan = matchChallan.vendorChallanNo || matchChallan.partyChallan || '';
+          if (vChallan && vChallan !== updatedItem.partyChallan) {
+            updatedItem.partyChallan = vChallan;
+            itemChanged = true;
+          }
+          const dImg = matchChallan.designImage || matchChallan.imageUrl || matchedJob?.imageUrl1 || matchedJob?.imageUrl2 || '';
+          if (dImg && !updatedItem.imageUrl) {
+            updatedItem.imageUrl = dImg;
+            itemChanged = true;
+          }
+
+          if (itemChanged) {
+            updatedCount++;
+            return updatedItem;
+          }
+          return it;
+        });
+
+        return { ...f, items: updatedItems };
+      });
+
+      if (updatedCount > 0) {
+        triggerPushNotification('🔄 Challan Details Re-synced!', `Updated ${updatedCount} line item(s) with latest Fabric Name, Metres & details from Delivery Challan(s).`, 'success');
+      } else {
+        triggerPushNotification('ℹ️ Details Up-to-Date', 'Line item Fabric Name and Metres are already up-to-date with Delivery Challans.', 'info');
+      }
+    } catch (e) {
+      console.error('Error re-syncing details from challans:', e);
+      triggerEliteAlert('Sync Error', 'Failed to fetch latest Delivery Challans to re-sync details.', 'error');
+    }
+  };
+
+  const handleCustomerSelect = (custName) => {
+    const matched = customers.find(c => c.name === custName || c.businessName === custName);
+    if (matched) {
+      setInvoiceForm(prev => ({
+        ...prev,
+        customer: {
+          customerId: matched._id,
+          name: matched.name,
+          businessName: matched.businessName || '',
+          phone: matched.phone || '',
+          email: matched.email || '',
+          gstin: matched.gstin || '',
+          billingAddress: matched.billingAddress || '',
+          shippingAddress: matched.shippingAddress || matched.billingAddress || '',
+          state: matched.state || 'Gujarat',
+          stateCode: matched.stateCode || '24'
+        },
+        taxType: matched.stateCode && matched.stateCode !== '24' ? 'IGST' : 'CGST_SGST'
+      }));
+    }
+  };
+
+  // Submit Invoice Handler
+  const handleSaveInvoice = async () => {
+    setLoading(true);
+    try {
+      // Strip UI-only fields and build clean payload
+      const { manualRoundOff, ...formRest } = invoiceForm;
+      const payload = {
+        ...formRest,
+        companyEntity: companyEntity || 'Elite Online',
+        items: calculatedInvoice.items,
+        subtotal: calculatedInvoice.subtotal,
+        discountTotal: calculatedInvoice.discountTotal,
+        cgstAmount: calculatedInvoice.cgstAmount,
+        sgstAmount: calculatedInvoice.sgstAmount,
+        igstAmount: calculatedInvoice.igstAmount,
+        totalTax: calculatedInvoice.totalTax,
+        roundOff: calculatedInvoice.roundOff,
+        grandTotal: calculatedInvoice.grandTotal,
+        balanceDue: calculatedInvoice.balanceDue
+      };
+
+      // Guard against NaN values that would fail DB save
+      if (!payload.grandTotal || isNaN(payload.grandTotal)) {
+        alert('Grand Total is invalid. Please check item prices and quantities.');
+        setLoading(false);
+        return;
+      }
+
+      if (editingInvoiceId) {
+        await api.updateBillingInvoice(editingInvoiceId, payload);
+      } else {
+        const createRes = await api.createBillingInvoice(payload);
+        const invNoStr = createRes?.data?.invoiceNo || payload.invoiceNo || 'INV';
+        dispatchScreenGroupEvent('jobcards_billing', 'New Tax Invoice Generated 🧾', `Invoice #${invNoStr} for ${payload.customerName || 'Customer'} (₹${Number(payload.grandTotal || 0).toLocaleString('en-IN')}) generated & dispatched to Billing Group.`, 'invoices');
+      }
+
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'billing', timestamp: Date.now() } }));
+      alert(`Invoice ${editingInvoiceId ? 'updated' : 'created'} successfully!`);
+      await loadData();
+      setActiveTab('invoices');
+    } catch (err) {
+      alert(err.message || 'Failed to save invoice');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete Invoice
+  const handleDeleteInvoice = async (id, invNo) => {
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Tax Invoice',
+      message: `Are you sure you want to delete Invoice "${invNo}"? This action cannot be undone.`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.deleteBillingInvoice(id);
+      await loadData();
+      triggerPushNotification('🗑️ Invoice Deleted', `Invoice "${invNo}" deleted successfully.`, 'info');
+    } catch (err) {
+      alert(err.message || 'Failed to delete invoice');
+    }
+  };
+
+  // Record Payment
+  const handleSavePayment = async () => {
+    if (!payAmount || parseFloat(payAmount) <= 0) {
+      alert('Please enter a valid payment amount');
+      return;
+    }
+    setSubmittingPay(true);
+    try {
+      await api.recordInvoicePayment(paymentModalInvoice._id, {
+        amount: parseFloat(payAmount),
+        method: payMethod,
+        referenceNo: payRef,
+        notes: payNotes
+      });
+      alert('Payment recorded successfully!');
+      setPaymentModalInvoice(null);
+      setPayAmount('');
+      setPayRef('');
+      setPayNotes('');
+      await loadData();
+    } catch (err) {
+      alert(err.message || 'Failed to record payment');
+    } finally {
+      setSubmittingPay(false);
+    }
+  };
+
+  // Create / Update Customer Handler
+  const handleSaveCustomer = async () => {
+    if (!custForm.name) {
+      alert('Customer Name is required');
+      return;
+    }
+    try {
+      if (editingCustomerId) {
+        const res = await api.updateBillingCustomer(editingCustomerId, custForm);
+        setCustomers(prev => prev.map(c => c._id === editingCustomerId ? res.data : c));
+        triggerPushNotification('✏️ Customer Updated', `Customer "${custForm.name}" updated.`, 'success');
+      } else {
+        const res = await api.createBillingCustomer({ ...custForm, companyEntity });
+        setCustomers(prev => [...prev, res.data]);
+        triggerPushNotification('👥 Customer Created', `Customer "${custForm.name}" registered.`, 'success');
+      }
+      setShowCustomerModal(false);
+      setEditingCustomerId(null);
+      setCustForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24' });
+    } catch (err) {
+      alert(err.message || 'Failed to save customer');
+    }
+  };
+
+  const handleEditCustomer = (c) => {
+    setEditingCustomerId(c._id);
+    setCustForm({
+      name: c.name || '',
+      businessName: c.businessName || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      gstin: c.gstin || '',
+      billingAddress: c.billingAddress || '',
+      state: c.state || 'Gujarat',
+      stateCode: c.stateCode || '24'
+    });
+    setShowCustomerModal(true);
+  };
+
+  // Create / Update Item Handler
+  const handleSaveItem = async () => {
+    if (!itemForm.itemName || !itemForm.unitPrice) {
+      alert('Item Name and Price are required');
+      return;
+    }
+    try {
+      if (editingItemId) {
+        const res = await api.updateBillingItem(editingItemId, itemForm);
+        setItemsList(prev => prev.map(i => i._id === editingItemId ? res.data : i));
+        triggerPushNotification('✏️ Product Updated', `Product "${itemForm.itemName}" updated.`, 'success');
+      } else {
+        const res = await api.createBillingItem({ ...itemForm, companyEntity });
+        setItemsList(prev => [...prev, res.data]);
+        triggerPushNotification('📦 Product Created', `Product "${itemForm.itemName}" cataloged.`, 'success');
+      }
+      setShowItemModal(false);
+      setEditingItemId(null);
+      setItemForm({ itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 5, category: 'Printing Services' });
+    } catch (err) {
+      alert(err.message || 'Failed to save product');
+    }
+  };
+  const handleEditItem = (item) => {
+    setEditingItemId(item._id);
+    setItemForm({
+      itemName: item.itemName || '',
+      hsnCode: item.hsnCode || '998821',
+      unitPrice: item.unitPrice != null ? item.unitPrice : '',
+      unit: item.unit || 'Meters',
+      taxRate: item.taxRate != null ? item.taxRate : 5,
+      category: item.category || 'Printing Services'
+    });
+    setShowItemModal(true);
+  };
+
+  const handleOpenCreateChallan = () => {
+    setActiveTab('challans');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-new-challan'));
+    }, 50);
+  };
+
+  return (
+    <div className="ent-screen-container">
+
+      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
+      <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
+          <div className="ent-header-title-wrap">
+            <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#7c3aed,#3b82f6)' }}>
+              <FileText size={18} color="#fff" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <h2 className="ent-header-title">Billing & Invoicing</h2>
+              <ScreenGroupRoster screenId="jobcards_billing" />
+            </div>
+          </div>
+
+          {/* Quick Action Menu */}
+          <div className="ent-header-actions">
+            <QuickActionMenu
+              onNewInvoice={() => handleOpenCreateTab()}
+              onNewChallan={handleOpenCreateChallan}
+              onExpenseEntry={() => {
+                setActiveTab('expense');
+                setAutoOpenExpenseModal(true);
+              }}
+              onLedgerReports={() => setShowLedgerModal(true)}
+            />
+          </div>
+        </div>
+
+        {/* Sub-Tabs Bar */}
+        <div
+          className="ent-tab-bar"
+          style={{
+            display: 'flex',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-x pan-y',
+            width: '100%',
+            maxWidth: '100%',
+            gap: '0.5rem',
+            padding: '4px 2px 6px 2px',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {[
+            { id: 'challans', label: 'Challan' },
+            { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
+            { id: 'purchase', label: 'Purchases' },
+            ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
+            { id: 'expense', label: 'Expenses & Ledger' },
+            { id: 'customers', label: `Customers (${customers.length})` },
+            { id: 'items', label: `Items (${itemsList.length})` }
+          ].map(t => {
+            const isActive = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`ent-tab-btn ${isActive ? 'active' : ''}`}
+                style={{ flexShrink: 0, flex: '0 0 auto', whiteSpace: 'nowrap', minWidth: 'max-content' }}
+              >
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── DATE FILTER & KPI CARDS BAR (Displayed on Invoices Directory) ──────── */}
+      {activeTab === 'invoices' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+              <Calendar size={15} color="#4f46e5" />
+              <span>Reporting Period:</span>
+              <span style={{ fontSize: '0.78rem', color: '#4f46e5', fontWeight: 700 }}>({activeRange.labelText})</span>
+            </div>
+
+            <DateRangePicker
+              preset={datePreset}
+              onChange={({ preset: p }) => setDatePreset(p)}
+              customStart={customDateStart}
+              customEnd={customDateEnd}
+              onCustomChange={(s, e) => {
+                setCustomDateStart(s);
+                setCustomDateEnd(e);
+              }}
+            />
+          </div>
+
+          {/* KPI CARDS GRID */}
+          <div className="ent-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{fmtINR(periodStats.totalInvoiced)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#3b82f6', marginTop: 2 }}>{periodStats.totalInvoices} Invoices</div>
+            </div>
+
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#34d399', marginTop: 2 }}>{fmtINR(periodStats.totalPaid)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#10b981', marginTop: 2 }}>{periodStats.paidCount} Paid Invoices</div>
+            </div>
+
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Balance</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24', marginTop: 2 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#f59e0b', marginTop: 2 }}>{periodStats.unpaidCount} Pending / Partial</div>
+            </div>
+
+            <div className="ent-stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f87171', marginTop: 2 }}>{periodStats.overdueCount}</div>
+              <div style={{ fontSize: '0.68rem', color: '#ef4444', marginTop: 2 }}>Payment Passed</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB 1: INVOICES DIRECTORY ───────────────────────────────────────── */}
+      {activeTab === 'invoices' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+          {/* Search & Status Filters */}
+          <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', display: 'flex', gap: '0.8rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search Invoice No, Customer Name, Phone..."
+                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              {['ALL', 'UNPAID', 'PARTIALLY_PAID', 'PAID'].map(st => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    border: '1px solid',
+                    borderColor: statusFilter === st ? '#7c3aed' : 'var(--border-light)',
+                    background: statusFilter === st ? 'rgba(124,58,237,0.15)' : 'transparent',
+                    color: statusFilter === st ? '#a78bfa' : 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+
+            {/* Signed Copy Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginLeft: 'auto' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Signed:</span>
+              <select
+                value={signedCopyFilter}
+                onChange={e => setSignedCopyFilter(e.target.value)}
+                style={{
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  border: '1px solid var(--border-light)',
+                  background: 'var(--bg-input, rgba(15, 23, 42, 0.6))',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="All">All Signed Status</option>
+                <option value="NOT_UPLOADED">⚪ Not Uploaded (Gray)</option>
+                <option value="PENDING">🟡 In Process (Yellow)</option>
+                <option value="APPROVED">🟢 Approved (Green)</option>
+                <option value="REJECTED">🔴 Rejected (Red)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Bulk Invoices Selection Action Bar */}
+          {selectedInvoiceIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 1.1rem', background: 'rgba(124, 58, 237, 0.18)', border: '1px solid #7c3aed', borderRadius: '10px', boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#c084fc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle size={16} color="#a78bfa" />
+                <span>{selectedInvoiceIds.length} Invoice{selectedInvoiceIds.length > 1 ? 's' : ''} Selected for Bulk PDF Download</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={handleBulkDownloadInvoices}
+                  disabled={bulkDownloading}
+                  className="btn-primary"
+                  style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #7c3aed, #6366f1)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Download size={15} className={bulkDownloading ? 'spin-loader' : ''} />
+                  {bulkDownloading ? 'Downloading Invoices...' : `Download ${selectedInvoiceIds.length} PDF${selectedInvoiceIds.length > 1 ? 's' : ''}`}
+                </button>
+                <button
+                  onClick={() => setSelectedInvoiceIds([])}
+                  className="btn-secondary"
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Invoices Table */}
+          <div className="table-responsive-wrapper" style={{ margin: '0 0 1rem 0' }}>
+            <div className="table-responsive" style={{ padding: 0 }}>
+            {(() => {
+              const displayedInvoices = periodInvoices
+                .filter(inv => matchSearchQuery(inv, search, [
+                  'invoiceNo', 'ourChallanNo', 'challanNo', 'orderNo', 'dispatchDocNo',
+                  'customer.name', 'customer.businessName', 'customer.phone', 'customer.gstin',
+                  'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
+                ]))
+                .filter(inv => {
+                  if (!signedCopyFilter || signedCopyFilter === 'All') return true;
+                  const sc = inv.signedCopy;
+                  const st = sc?.status;
+                  if (signedCopyFilter === 'NOT_UPLOADED') {
+                    return !sc || !st || st === 'NONE' || (!sc.images?.length && !sc.pdfUrl && !sc.fileUrl && st !== 'APPROVED' && st !== 'PENDING' && st !== 'REJECTED');
+                  }
+                  if (signedCopyFilter === 'PENDING') {
+                    return st === 'PENDING' || st === 'IN_PROCESS' || st === 'UPLOADED';
+                  }
+                  if (signedCopyFilter === 'APPROVED') {
+                    return st === 'APPROVED';
+                  }
+                  if (signedCopyFilter === 'REJECTED') {
+                    return st === 'REJECTED';
+                  }
+                  return true;
+                });
+              return (
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
+                      <th style={{ padding: '0.75rem 0.5rem', width: '42px', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={displayedInvoices.length > 0 && displayedInvoices.every(i => selectedInvoiceIds.includes(i._id))}
+                          onChange={() => handleToggleSelectAllInvoices(displayedInvoices)}
+                          style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
+                          title="Select All Invoices"
+                        />
+                      </th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Grand Total</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Paid Amount</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Balance Due</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Created By</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No invoices found for the selected date range ({activeRange.labelText}).
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedInvoices.map(inv => {
+                        const rawChallanStr = inv.ourChallanNo || (Array.isArray(inv.linkedChallanNos) && inv.linkedChallanNos.length > 0 ? inv.linkedChallanNos.join(', ') : '') || (inv.items && inv.items.map(i => i.ourChallanNo || i.partyChallan).filter(Boolean).join(', ')) || '';
+                        const challanList = rawChallanStr ? rawChallanStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+                        return (
+                          <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: selectedInvoiceIds.includes(inv._id) ? 'rgba(124, 58, 237, 0.08)' : 'transparent' }}>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedInvoiceIds.includes(inv._id)}
+                                onChange={() => handleToggleSelectInvoice(inv._id)}
+                                style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa', verticalAlign: 'middle' }}>
+                              <button
+                                onClick={() => setViewInvoiceModal(inv)}
+                                style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none', whiteSpace: 'nowrap' }}
+                              >
+                                {inv.invoiceNo}
+                              </button>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle', maxWidth: '220px' }}>
+                              {challanList.length === 0 ? (
+                                <span style={{ color: 'var(--text-muted)' }}>—</span>
+                              ) : challanList.length <= 2 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {challanList.map((ch, idx) => (
+                                    <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                      {ch}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                                  {challanList.slice(0, 2).map((ch, idx) => (
+                                    <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                      {ch}
+                                    </span>
+                                  ))}
+                                  <span
+                                    title={challanList.join(', ')}
+                                    style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(124, 58, 237, 0.15)', color: '#c084fc', border: '1px solid rgba(124, 58, 237, 0.35)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                  >
+                                    +{challanList.length - 2} more
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
+                              {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {formatDateDDMMYYYY(inv.invoiceDate)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(getAmountWithoutGst(inv))}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(inv.paidAmount)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)))}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
+                              <span style={{
+                                padding: '0.25rem 0.6rem',
+                                borderRadius: 6,
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.15)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: inv.paymentStatus === 'PAID' ? '#34d399' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
+                                border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.3)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                whiteSpace: 'nowrap',
+                                display: 'inline-block'
+                              }}>
+                                {inv.paymentStatus}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle' }}>
+                              <span style={{ padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                                {inv.createdByName || inv.createdBy || 'HASI'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              {(() => {
+                                const sc = inv.signedCopy;
+                                const status = sc?.status;
+                                const isApproved = status === 'APPROVED';
+                                const isPending = status === 'PENDING' || status === 'IN_PROCESS' || status === 'UPLOADED';
+                                const isRejected = status === 'REJECTED';
+
+                                let signedIconColor = '#94a3b8';
+                                let signedBgColor = 'rgba(148, 163, 184, 0.12)';
+                                let signedBorderColor = 'rgba(148, 163, 184, 0.3)';
+                                let signedTitle = 'Signed Copy: Not Uploaded (Click to upload)';
+                                let SignedIcon = FileText;
+
+                                if (isApproved) {
+                                  signedIconColor = '#10b981';
+                                  signedBgColor = 'rgba(16, 185, 129, 0.14)';
+                                  signedBorderColor = 'rgba(16, 185, 129, 0.35)';
+                                  signedTitle = `Signed Copy: Approved by Admin (${sc?.images?.length || 1} pages). Click to view.`;
+                                  SignedIcon = CheckCircle;
+                                } else if (isRejected) {
+                                  signedIconColor = '#ef4444';
+                                  signedBgColor = 'rgba(239, 68, 68, 0.14)';
+                                  signedBorderColor = 'rgba(239, 68, 68, 0.35)';
+                                  signedTitle = `Signed Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
+                                  SignedIcon = AlertCircle;
+                                } else if (isPending) {
+                                  signedIconColor = '#f59e0b';
+                                  signedBgColor = 'rgba(245, 158, 11, 0.14)';
+                                  signedBorderColor = 'rgba(245, 158, 11, 0.35)';
+                                  signedTitle = `Signed Copy: In Process / Pending Admin Review (${sc?.images?.length || 1} pages). Click to view.`;
+                                  SignedIcon = Clock;
+                                }
+
+                                const invoiceActions = [
+                                  {
+                                    id: 'signed_copy',
+                                    icon: SignedIcon,
+                                    label: 'Signed Copy',
+                                    tooltip: signedTitle,
+                                    color: signedIconColor,
+                                    bgColor: signedBgColor,
+                                    borderColor: signedBorderColor,
+                                    onClick: () => {
+                                      if (isApproved || isPending) {
+                                        setSignedPreviewTarget({
+                                          _id: inv._id,
+                                          docType: 'invoice',
+                                          docNumber: inv.invoiceNo,
+                                          partyName: inv.customer?.businessName || inv.customer?.name,
+                                          signedCopy: inv.signedCopy
+                                        });
+                                      } else {
+                                        setSignedUploadTarget({
+                                          id: inv._id,
+                                          docType: 'invoice',
+                                          docNumber: inv.invoiceNo,
+                                          partyName: inv.customer?.businessName || inv.customer?.name,
+                                          existingSignedCopy: isRejected ? inv.signedCopy : null
+                                        });
+                                      }
+                                    },
+                                    isPrimary: true
+                                  },
+                                  {
+                                    id: 'pdf',
+                                    icon: Download,
+                                    label: 'Download PDF',
+                                    tooltip: 'Download Tax Invoice PDF',
+                                    variant: 'purple',
+                                    color: '#a78bfa',
+                                    onClick: () => openPdfDialog(inv),
+                                    isPrimary: true
+                                  },
+                                  {
+                                    id: 'view',
+                                    icon: Eye,
+                                    label: 'View Details',
+                                    tooltip: 'View Invoice Details',
+                                    variant: 'default',
+                                    color: '#38bdf8',
+                                    onClick: () => setViewInvoiceModal(inv),
+                                    isPrimary: false
+                                  },
+                                  ...(inv.balanceDue > 0 ? [
+                                    {
+                                      id: 'payment',
+                                      icon: CreditCard,
+                                      label: 'Record Payment',
+                                      tooltip: `Record Payment (Due: ₹${inv.balanceDue})`,
+                                      variant: 'success',
+                                      color: '#34d399',
+                                      onClick: () => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); },
+                                      isPrimary: false
+                                    }
+                                  ] : []),
+                                  {
+                                    id: 'history',
+                                    icon: Clock,
+                                    label: 'Audit History',
+                                    tooltip: 'View Audit History & Staff Log',
+                                    variant: 'warning',
+                                    color: '#fbbf24',
+                                    onClick: () => setSelectedInvoiceHistory(inv),
+                                    isPrimary: false
+                                  },
+                                  {
+                                    id: 'edit',
+                                    icon: Edit2,
+                                    label: 'Edit',
+                                    tooltip: 'Edit Invoice',
+                                    variant: 'primary',
+                                    onClick: () => handleOpenCreateTab(inv),
+                                    isPrimary: false
+                                  },
+                                  {
+                                    id: 'delete',
+                                    icon: Trash2,
+                                    label: 'Delete',
+                                    tooltip: 'Delete Invoice',
+                                    variant: 'danger',
+                                    color: '#f87171',
+                                    onClick: () => handleDeleteInvoice(inv._id, inv.invoiceNo),
+                                    isPrimary: false
+                                  }
+                                ];
+
+                                return <SmartActionGroup actions={invoiceActions} maxInlineMobile={2} align="center" />;
+                              })()}
+                            </td>
+                          </tr>
+                        );
+                      })
+                )}
+              </tbody>
+            </table>
+          );
+        })()}
+      </div>
+    </div>
+        </div>
+      )}
+
+      {/* ── TAB: DELIVERY CHALLANS HUB ─────────────────────────────────────── */}
+      {activeTab === 'challans' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {department === 'stitching' ? (
+            <StitchingChallanPanel
+              onNavigateToBilling={(ch) => {
+                loadInvoiceFromChallan(ch);
+                setActiveTab('create');
+              }}
+            />
+          ) : (
+            <FabricInventoryPanel
+              department="digital_print"
+              onlyChallan={true}
+              onNavigateToBilling={(ch) => {
+                loadInvoiceFromChallan(ch);
+                setActiveTab('create');
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 2: INVOICE GENERATOR / EDITOR (myBillBook style) ────────────── */}
+      {activeTab === 'create' && (
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.8rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              {editingInvoiceId ? `Edit Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
+            </h3>
+            <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <button className="btn-secondary" onClick={() => setActiveTab('invoices')}>Cancel</button>
+              <button className="btn-primary" onClick={handleSaveInvoice} disabled={loading} style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)' }}>
+                {loading ? 'Saving...' : editingInvoiceId ? 'Update Invoice' : 'Save & Issue Invoice'}
+              </button>
+            </div>
+          </div>
+
+          {/* Core Metadata */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+            <div>
+              <label style={{ ...labelStyle, color: '#60a5fa', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
+              <select
+                value="Elite Digital Print"
+                disabled
+                style={{
+                  ...inputStyle,
+                  fontWeight: '800',
+                  color: '#60a5fa',
+                  background: 'rgba(96, 165, 250, 0.12)',
+                  border: '1px solid rgba(96, 165, 250, 0.4)',
+                  cursor: 'not-allowed'
+                }}
+              >
+                <option value="Elite Digital Print">🏢 Elite Digital Print</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Invoice No. *</label>
+              <input
+                type="text"
+                value={invoiceForm.invoiceNo}
+                onChange={e => setInvoiceForm(f => ({ ...f, invoiceNo: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Challan No.</label>
+              <input
+                type="text"
+                value={invoiceForm.ourChallanNo || ''}
+                onChange={e => setInvoiceForm(f => ({ ...f, ourChallanNo: e.target.value }))}
+                placeholder="e.g. EDP-101"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Invoice Date *</label>
+              <input
+                type="date"
+                value={formatForInputDate(invoiceForm.invoiceDate)}
+                onChange={e => setInvoiceForm(f => ({ ...f, invoiceDate: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Due Date</label>
+              <input
+                type="date"
+                value={formatForInputDate(invoiceForm.dueDate)}
+                onChange={e => setInvoiceForm(f => ({ ...f, dueDate: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ ...labelStyle, color: '#a78bfa', fontWeight: 800 }}>⚡ GST Tax Type (Dynamic)</label>
+              <select
+                value={invoiceForm.taxType}
+                onChange={e => setInvoiceForm(f => ({ ...f, taxType: e.target.value }))}
+                style={{
+                  ...inputStyle,
+                  fontWeight: '700',
+                  color: '#a78bfa',
+                  background: 'rgba(124, 58, 237, 0.15)',
+                  border: '1px solid rgba(167, 139, 250, 0.5)'
+                }}
+              >
+                <option value="CGST_SGST">Intra-State (CGST + SGST)</option>
+                <option value="IGST">Inter-State (IGST)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Customer Selection */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>🏢 Billed To (Customer Details)</div>
+              <button type="button" onClick={() => setShowCustomerModal(true)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}>
+                + Add New Customer
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem' }}>
+              <div>
+                <label style={labelStyle}>Select Saved Customer</label>
+                <select
+                  onChange={e => handleCustomerSelect(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">-- Choose Customer --</option>
+                  {customers.map(c => (
+                    <option key={c._id} value={c.name}>{c.businessName ? `${c.businessName} (${c.name})` : c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Customer / Party Name *</label>
+                <input
+                  type="text"
+                  value={invoiceForm.customer.name}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, name: e.target.value } }))}
+                  style={inputStyle}
+                  placeholder="e.g. Acme Prints Ltd."
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>GSTIN Number</label>
+                <input
+                  type="text"
+                  value={invoiceForm.customer.gstin}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, gstin: e.target.value } }))}
+                  style={inputStyle}
+                  placeholder="e.g. 24AAAFE1234F1Z5"
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Billing Address</label>
+                <input
+                  type="text"
+                  value={invoiceForm.customer.billingAddress}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, billingAddress: e.target.value } }))}
+                  style={inputStyle}
+                  placeholder="Street / Area / City"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic Products / Line Items Table */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>📦 Invoice Line Items</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', cursor: 'pointer', background: 'rgba(251,191,36,0.12)', padding: '0.3rem 0.65rem', borderRadius: '5px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                  <input
+                    type="checkbox"
+                    checked={invoiceForm.items.length > 0 && invoiceForm.items.every(it => it.butterPaper)}
+                    ref={el => { if (el) el.indeterminate = invoiceForm.items.some(it => it.butterPaper) && !invoiceForm.items.every(it => it.butterPaper); }}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setInvoiceForm(f => ({
+                        ...f,
+                        isButterPaperUsed: checked,
+                        items: f.items.map(item => ({ ...item, butterPaper: checked }))
+                      }));
+                    }}
+                  />
+                  🧈 Butter Paper Used (+ ₹3/m Rate)
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleResyncMetersFromChallans}
+                    className="btn-secondary"
+                    style={{
+                      padding: '0.35rem 0.8rem',
+                      fontSize: '0.75rem',
+                      color: '#38bdf8',
+                      borderColor: 'rgba(56, 189, 248, 0.4)',
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                    title="Fetch latest metres, fabric name & job details from linked Delivery Challan(s)"
+                  >
+                    <RefreshCw size={13} /> 🔄 Re-sync Fabric & Meters
+                  </button>
+                  <button type="button" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
+                    <Plus size={13} /> Add Item Row
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '920px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '0.5rem' }}>Item Description & Details</th>
+                  <th style={{ padding: '0.5rem', width: '90px' }}>HSN</th>
+                  <th style={{ padding: '0.5rem', width: '80px' }}>Qty</th>
+                  <th style={{ padding: '0.5rem', width: '90px' }}>Unit</th>
+                  <th style={{ padding: '0.5rem', width: '100px' }}>Price (₹)</th>
+                  <th style={{ padding: '0.5rem', width: '65px', textAlign: 'center' }}>🧈 Butter</th>
+                  <th style={{ padding: '0.5rem', width: '75px' }}>Disc %</th>
+                  <th style={{ padding: '0.5rem', width: '75px' }}>GST %</th>
+                  <th style={{ padding: '0.5rem', width: '105px', textAlign: 'right' }}>Total (₹)</th>
+                  <th style={{ padding: '0.5rem', width: '40px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {calculatedInvoice.items.map((it, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)', verticalAlign: 'top' }}>
+                    <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        {it.imageUrl && (
+                          <img src={convertDriveUrl(it.imageUrl, it.itemName)} alt="Design" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} onError={e => { e.target.style.display = 'none'; }} />
+                        )}
+                        <input
+                          type="text"
+                          list={`items-list-${idx}`}
+                          value={it.itemName}
+                          onChange={e => handleItemChange(idx, 'itemName', e.target.value)}
+                          placeholder="Type item or select..."
+                          style={inputStyle}
+                        />
+                        <datalist id={`items-list-${idx}`}>
+                          {itemsList.map(item => <option key={item._id} value={item.itemName} />)}
+                        </datalist>
+                      </div>
+
+                      {/* Visible Fabric & Description badge so the user sees the fabric name! */}
+                      {(it.fabric || it.fabricName || it.description) && (
+                        <div style={{ fontSize: '0.72rem', color: '#4f46e5', background: '#eef2ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #c7d2fe', display: 'flex', alignItems: 'center', gap: 5, width: 'fit-content' }}>
+                          <span>🧵</span>
+                          <span style={{ fontWeight: 700 }}>
+                            {it.fabric || it.fabricName ? `Fabric: ${it.fabric || it.fabricName}` : it.description}
+                          </span>
+                          {it.description && !it.description.includes(it.fabric || it.fabricName || '') && (
+                            <span style={{ color: '#64748b', fontWeight: 500 }}>({it.description})</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Sub-inputs: Job No, Lot No, Party Challan, Our Challan, Image URL */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1.5fr', gap: '0.3rem' }}>
+                        <input
+                          type="text"
+                          value={it.jobNo || ''}
+                          onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
+                          placeholder="Job Card"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.lotNo || ''}
+                          onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
+                          placeholder="Lot No"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.partyChallan || ''}
+                          onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
+                          placeholder="Vendor Challan"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.ourChallanNo || ''}
+                          onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
+                          placeholder="Challan"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.imageUrl || ''}
+                          onChange={e => handleItemChange(idx, 'imageUrl', e.target.value)}
+                          placeholder="Design Image Link..."
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                      </div>
+                    </td>
+                    <td style={{ padding: '0.4rem' }}>
+                      <input
+                        type="text"
+                        value={it.hsnCode}
+                        onChange={e => handleItemChange(idx, 'hsnCode', e.target.value)}
+                        style={inputStyle}
+                      />
+                    </td>
+                    <td style={{ padding: '0.4rem' }}>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={it.qty}
+                          onChange={e => handleItemChange(idx, 'qty', e.target.value)}
+                          style={{
+                            ...inputStyle,
+                            backgroundColor: it.isLocked ? 'rgba(251, 191, 36, 0.08)' : undefined,
+                            borderColor: it.isLocked ? 'rgba(251, 191, 36, 0.5)' : undefined
+                          }}
+                        />
+                        {it.isLocked && (
+                          <Lock size={12} style={{ position: 'absolute', right: 6, color: '#fbbf24', pointerEvents: 'none' }} title="Imported from Delivery Challan (editable anytime)" />
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '0.4rem' }}>
+                      <select
+                        value={it.unit}
+                        onChange={e => handleItemChange(idx, 'unit', e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="Meters">Meters</option>
+                        <option value="Pcs">Pcs</option>
+                        <option value="Rolls">Rolls</option>
+                        <option value="Hours">Hours</option>
+                      </select>
+                    </td>
+                    <td style={{ padding: '0.4rem' }}>
+                      <input
+                        type="number"
+                        value={it.unitPrice}
+                        onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
+                        style={inputStyle}
+                      />
+                      {it.butterPaper && (
+                        <span style={{ fontSize: '0.62rem', color: '#fbbf24', fontWeight: 700, display: 'block', textAlign: 'center', marginTop: '2px' }}>
+                          Eff: ₹{(parseFloat(it.unitPrice || 0) + 3).toFixed(2)}
+                        </span>
+                      )}
+                    </td>
+                    {/* Per-item Butter Paper Toggle */}
+                    <td style={{ padding: '0.4rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' }} title="Toggle Butter Paper (+₹3/m)">
+                        <input
+                          type="checkbox"
+                          checked={!!it.butterPaper}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setInvoiceForm(f => ({
+                              ...f,
+                              items: f.items.map((item, i) => i === idx ? { ...item, butterPaper: checked } : item)
+                            }));
+                          }}
+                          style={{ cursor: 'pointer', width: 14, height: 14 }}
+                        />
+                        <span style={{ fontSize: '0.6rem', color: it.butterPaper ? '#fbbf24' : 'var(--text-muted)', fontWeight: 700 }}>
+                          {it.butterPaper ? '+₹3' : 'None'}
+                        </span>
+                      </label>
+                    </td>
+                    <td style={{ padding: '0.4rem' }}>
+                      <input
+                        type="number"
+                        value={it.discountPct}
+                        onChange={e => handleItemChange(idx, 'discountPct', e.target.value)}
+                        style={inputStyle}
+                      />
+                    </td>
+                    <td style={{ padding: '0.4rem' }}>
+                      <select
+                        value={it.taxRate}
+                        onChange={e => handleItemChange(idx, 'taxRate', e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value={0}>0%</option>
+                        <option value={5}>5%</option>
+                        <option value={12}>12%</option>
+                        <option value={18}>18%</option>
+                        <option value={28}>28%</option>
+                      </select>
+                    </td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      ₹ {(it.totalAmount || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '0.4rem', textAlign: 'center' }}>
+                      <button type="button" onClick={() => handleRemoveItemRow(idx)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}>
+                        <X size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Financial Summary & Tax Breakdown Box */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <div>
+                <label style={labelStyle}>Notes for Customer</label>
+                <textarea
+                  rows={2}
+                  value={invoiceForm.notes}
+                  onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Terms & Conditions</label>
+                <textarea
+                  rows={2}
+                  value={invoiceForm.terms}
+                  onChange={e => setInvoiceForm(f => ({ ...f, terms: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1.1rem', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Subtotal:</span>
+                <span style={{ fontWeight: 700 }}>₹ {calculatedInvoice.subtotal.toFixed(2)}</span>
+              </div>
+
+              {calculatedInvoice.discountTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#34d399' }}>
+                  <span>Discount:</span>
+                  <span>- ₹ {calculatedInvoice.discountTotal.toFixed(2)}</span>
+                </div>
+              )}
+
+              {invoiceForm.taxType === 'IGST' ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    IGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal) * 100).toFixed(1) : 5}%):
+                  </span>
+                  <span>₹ {calculatedInvoice.igstAmount.toFixed(2)}</span>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      CGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                    </span>
+                    <span>₹ {calculatedInvoice.cgstAmount.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      SGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                    </span>
+                    <span>₹ {calculatedInvoice.sgstAmount.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+
+              {/* Round Off Checkbox & Editable Value */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#a78bfa', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dashed var(--border-light)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={invoiceForm.enableRoundOff !== false}
+                    onChange={e => setInvoiceForm(f => ({ ...f, enableRoundOff: e.target.checked, manualRoundOff: undefined }))}
+                  />
+                  Round Off Total
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  disabled={invoiceForm.enableRoundOff === false}
+                  value={invoiceForm.manualRoundOff !== undefined ? invoiceForm.manualRoundOff : calculatedInvoice.roundOff}
+                  onChange={e => setInvoiceForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
+                  onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualRoundOff: undefined })); }}
+                  style={{ width: '90px', padding: '0.25rem 0.5rem', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '5px', color: '#a78bfa', textAlign: 'right' }}
+                  title="Auto-calculated. Edit to set manually."
+                />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#a78bfa' }}>
+                <span>Grand Total:</span>
+                <span>₹ {calculatedInvoice.grandTotal.toFixed(2)}</span>
+              </div>
+
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                Amount in Words: {numToWords(calculatedInvoice.grandTotal)}
+              </div>
+
+              <div style={{ marginTop: '0.8rem', paddingTop: '0.6rem', borderTop: '1px dashed var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Advance / Paid (₹)</label>
+                  <input
+                    type="number"
+                    value={invoiceForm.paidAmount}
+                    onChange={e => setInvoiceForm(f => ({ ...f, paidAmount: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ flex: 1, textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>BALANCE DUE</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: calculatedInvoice.balanceDue > 0 ? '#f87171' : '#34d399' }}>
+                    ₹ {calculatedInvoice.balanceDue.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ── TAB 3: FINANCIAL SUMMARY / DASHBOARD ────────────────────────────── */}
+      {activeTab === 'dashboard' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="glass-panel" style={{ padding: '1.25rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>
+              📊 Payment Collection & Revenue Progress
+            </h3>
+
+            {/* Collection Progress Bar */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: 8, padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Payment Collection Rate:</span>
+                <span style={{ color: '#34d399' }}>
+                  {stats.totalInvoiced > 0 ? ((stats.totalPaid / stats.totalInvoiced) * 100).toFixed(1) : 0}% Collected
+                </span>
+              </div>
+
+              <div style={{ height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 5, overflow: 'hidden', display: 'flex' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${stats.totalInvoiced > 0 ? (stats.totalPaid / stats.totalInvoiced) * 100 : 0}%`,
+                  background: 'linear-gradient(90deg, #10b981, #34d399)',
+                  transition: 'width 0.5s ease'
+                }} />
+                <div style={{
+                  height: '100%',
+                  width: `${stats.totalInvoiced > 0 ? (stats.totalBalanceDue / stats.totalInvoiced) * 100 : 0}%`,
+                  background: 'rgba(245,158,11,0.5)'
+                }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
+                <div><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#34d399', marginRight: 5 }}></span> Collected: <strong>{fmtINR(stats.totalPaid)}</strong></div>
+                <div><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', marginRight: 5 }}></span> Outstanding: <strong>{fmtINR(stats.totalBalanceDue)}</strong></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Metrics Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            <div className="glass-panel" style={{ padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                👥 Top Billed Customers
+              </h4>
+              {customers.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No customers found.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {customers.slice(0, 5).map((c, idx) => (
+                    <div key={c._id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.82rem' }}>
+                      <span style={{ fontWeight: 700 }}>{c.businessName || c.name}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{c.phone || c.gstin || 'Active Client'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                📦 Top Billing Products & Services
+              </h4>
+              {itemsList.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No products cataloged.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {itemsList.slice(0, 5).map((item, idx) => (
+                    <div key={item._id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.82rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{item.itemName}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>HSN: {item.hsnCode || '998821'}</div>
+                      </div>
+                      <div style={{ fontWeight: 800, color: '#a78bfa' }}>₹ {item.unitPrice}/{item.unit}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB 4: CUSTOMERS DIRECTORY ───────────────────────────────────────── */}
+      {activeTab === 'customers' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={customerSearch}
+                onChange={e => setCustomerSearch(e.target.value)}
+                placeholder="Search Customer Name, Phone, GSTIN..."
+                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
+              />
+            </div>
+            <button className="btn-primary" onClick={() => setShowCustomerModal(true)}>
+              <PlusCircle size={15} /> Add New Customer
+            </button>
+          </div>
+
+          <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Customer / Contact</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Business Name</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Phone & Email</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>GSTIN</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Address & State</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No customers found. Click "Add New Customer" to register your client!
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCustomers.map(c => (
+                    <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{c.businessName || '—'}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
+                        <div>{c.phone || '—'}</div>
+                        {c.email && <div style={{ fontSize: '0.7rem' }}>{c.email}</div>}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#a78bfa' }}>{c.gstin || 'Unregistered'}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {c.billingAddress || '—'} ({c.state || 'Gujarat'})
+                      </td>
+                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button onClick={() => handleEditCustomer(c)} className="btn-icon" title="Edit Customer">
+                            <Edit2 size={14} color="var(--primary)" />
+                          </button>
+                          <button onClick={() => handleDeleteCustomer(c._id, c.name)} className="btn-icon" title="Delete Customer">
+                            <Trash2 size={14} color="#f87171" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB 5: BILLING PRODUCTS CATALOG ──────────────────────────────────── */}
+      {activeTab === 'items' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={itemSearch}
+                onChange={e => setItemSearch(e.target.value)}
+                placeholder="Search Product Name, HSN Code, Category..."
+                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
+              />
+            </div>
+            <button className="btn-primary" onClick={() => setShowItemModal(true)}>
+              <PlusCircle size={15} /> Add Billing Product
+            </button>
+          </div>
+
+          <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Product / Service</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Category</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>HSN Code</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Unit Price</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Default GST %</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No billing products found. Click "Add Billing Product" to add your service items!
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map(item => (
+                    <tr key={item._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate != null ? item.taxRate : 5}%</td>
+                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button onClick={() => handleEditItem(item)} className="btn-icon" title="Edit Product">
+                            <Edit2 size={14} color="var(--primary)" />
+                          </button>
+                          <button onClick={() => handleDeleteItem(item._id, item.itemName)} className="btn-icon" title="Delete Product">
+                            <Trash2 size={14} color="#f87171" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+
+      {/* ── TAB 6: EXPENSE & LEDGER MODULE ───────────────────────────────────── */}
+      {activeTab === 'expense' && (
+        <DigitalPrintExpenseModule
+          companyEntity={companyEntity}
+          autoOpenCreate={autoOpenExpenseModal}
+          onModalOpened={() => setAutoOpenExpenseModal(false)}
+        />
+      )}
+      {activeTab === 'purchase' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1rem' }}>
+          {/* Top Metrics Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #4f46e5', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Purchase Orders</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4f46e5', marginTop: 4 }}>{purchases.length}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Logged Inward Bills</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Purchase Amount</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0284c7', marginTop: 4 }}>₹{totalPurchaseValue.toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Gross Material Cost</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Inward Volume</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#16a34a', marginTop: 4 }}>{totalInwardQty.toLocaleString('en-IN')} Units</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Accumulated Material</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Vendors</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#8b5cf6', marginTop: 4 }}>{uniqueVendorsCount}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Registered Suppliers</div>
+            </div>
+          </div>
+
+          {/* Filter Bar & Action Header */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '0.9rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+              {/* Search Bar */}
+              <div style={{ position: 'relative', minWidth: 220, flex: '1 1 220px', maxWidth: 300 }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Search Bill No, Vendor, Item..."
+                  value={purchaseSearch}
+                  onChange={e => setPurchaseSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: 32, paddingRight: 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                />
+              </div>
+
+              {/* Date Filter Dropdown */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <Calendar size={13} style={{ color: '#4f46e5' }} />
+                <select
+                  value={purchaseDatePreset}
+                  onChange={e => setPurchaseDatePreset(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="all">📅 All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="this_week">This Week</option>
+                  <option value="last_7_days">Last 7 Days</option>
+                  <option value="this_month">This Month</option>
+                  <option value="previous_month">Previous Month</option>
+                  <option value="last_30_days">Last 30 Days</option>
+                  <option value="current_fiscal_year">Current FY</option>
+                  <option value="custom">Custom Range...</option>
+                </select>
+              </div>
+
+              {/* Custom Date Pickers */}
+              {purchaseDatePreset === 'custom' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '4px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  <input
+                    type="date"
+                    value={purchaseDateStart}
+                    onChange={e => setPurchaseDateStart(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', color: '#1e293b', outline: 'none' }}
+                    title="From Date"
+                  />
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>to</span>
+                  <input
+                    type="date"
+                    value={purchaseDateEnd}
+                    onChange={e => setPurchaseDateEnd(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', color: '#1e293b', outline: 'none' }}
+                    title="To Date"
+                  />
+                </div>
+              )}
+
+              {/* Vendor Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <Building size={13} style={{ color: '#0284c7' }} />
+                <select
+                  value={purchaseVendorFilter}
+                  onChange={e => setPurchaseVendorFilter(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none', maxWidth: 160 }}
+                >
+                  <option value="ALL">🏢 All Vendors</option>
+                  {purchaseVendorsList.map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* GST Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <Percent size={12} style={{ color: '#8b5cf6' }} />
+                <select
+                  value={purchaseGstFilter}
+                  onChange={e => setPurchaseGstFilter(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="ALL">All GST Rates</option>
+                  <option value="0">0% GST</option>
+                  <option value="5">5% GST</option>
+                  <option value="12">12% GST</option>
+                  <option value="18">18% GST</option>
+                  <option value="28">28% GST</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button & Badge */}
+              {hasActivePurchaseFilters && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPurchaseSearch('');
+                      setPurchaseDatePreset('all');
+                      setPurchaseDateStart('');
+                      setPurchaseDateEnd('');
+                      setPurchaseVendorFilter('ALL');
+                      setPurchaseGstFilter('ALL');
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 9px',
+                      fontSize: '0.76rem', fontWeight: 700, color: '#ef4444', background: '#fef2f2',
+                      border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer'
+                    }}
+                    title="Reset all filters"
+                  >
+                    <RotateCcw size={12} /> Clear
+                  </button>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                    ({filteredPurchases.length} of {purchases.length})
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setEditingPurchaseId(null);
+                setPurchaseForm({
+                  purchaseNo: `PUR-2026-00${purchases.length + 1}`,
+                  date: new Date().toISOString().split('T')[0],
+                  vendorName: '',
+                  items: [createEmptyPurchaseItem()],
+                  gstRate: 0,
+                  gstType: 'CGST_SGST',
+                  gstAmount: '0.00',
+                  totalAmount: '',
+                  notes: ''
+                });
+                setShowPurchaseModal(true);
+              }}
+              style={{
+                padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                border: 'none', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Plus size={16} /> + New Purchase Inward Entry
+            </button>
+          </div>
+
+          {/* Purchase History Table */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                  <th style={{ padding: '0.85rem 1rem' }}>Bill / Invoice No</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Date</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Vendor / Supplier</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Item Description</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Qty / Mtr</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Rate (₹)</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Total Amount (₹)</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPurchases.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                      {hasActivePurchaseFilters ? (
+                        <div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#64748b' }}>
+                            🔍 No matching purchase bills found for the applied filters.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPurchaseSearch('');
+                              setPurchaseDatePreset('all');
+                              setPurchaseDateStart('');
+                              setPurchaseDateEnd('');
+                              setPurchaseVendorFilter('ALL');
+                              setPurchaseGstFilter('ALL');
+                            }}
+                            style={{ padding: '5px 12px', fontSize: '0.78rem', fontWeight: 700, color: '#4f46e5', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer', marginTop: '0.6rem' }}
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
+                      ) : (
+                        '🛒 No purchase invoices found. Click "+ New Purchase Inward Entry" to log vendor bills.'
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPurchases.map((p) => (
+                    <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: '#4f46e5', verticalAlign: 'top' }}>{p.purchaseNo}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: '#64748b', verticalAlign: 'top' }}>
+                        {p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : ''}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 700, verticalAlign: 'top' }}>{p.vendorName}</td>
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'top' }}>
+                        {Array.isArray(p.items) && p.items.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {p.items.map((it, idx) => (
+                              <div key={idx} style={{ fontSize: '0.85rem' }}>
+                                <span style={{ fontWeight: 700 }}>• {it.itemName}</span>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '6px' }}>
+                                  ({it.quantity} {it.unit} @ ₹{it.rate} = ₹{Number(it.amount || (it.quantity * it.rate)).toLocaleString('en-IN')})
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontWeight: 700 }}>{p.itemName}</span>
+                        )}
+                        {p.notes && <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>{p.notes}</div>}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
+                        {(() => {
+                          if (Array.isArray(p.items) && p.items.length > 0) {
+                            const totalQty = p.items.reduce((acc, it) => acc + (parseFloat(it.quantity) || 0), 0);
+                            const units = [...new Set(p.items.map(it => it.unit).filter(Boolean))];
+                            const unitStr = units.length === 1 ? units[0] : 'Units';
+                            if (p.items.length > 1) {
+                              return (
+                                <div>
+                                  <span style={{ fontWeight: 800, color: '#1e293b' }}>{totalQty > 0 ? `${totalQty} ${unitStr}` : `${p.items.length} Items`}</span>
+                                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>({p.items.length} Items)</div>
+                                </div>
+                              );
+                            }
+                            return `${p.items[0].quantity || p.quantity || 0} ${p.items[0].unit || p.unit || 'Mtr'}`;
+                          }
+                          return `${p.quantity || 0} ${p.unit || 'Mtr'}`;
+                        })()}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
+                        {(() => {
+                          if (Array.isArray(p.items) && p.items.length > 0) {
+                            const rates = p.items.map(it => parseFloat(it.rate) || 0).filter(r => r > 0);
+                            const uniqueRates = [...new Set(rates)];
+                            if (uniqueRates.length === 0) return '-';
+                            if (uniqueRates.length === 1) return `₹${uniqueRates[0]}`;
+                            if (uniqueRates.length === 2) return `₹${uniqueRates[0]}, ₹${uniqueRates[1]}`;
+                            const minR = Math.min(...uniqueRates);
+                            const maxR = Math.max(...uniqueRates);
+                            return `₹${minR} - ₹${maxR}`;
+                          }
+                          return p.rate && p.rate !== '-' ? `₹${p.rate}` : '-';
+                        })()}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>
+                        <div>₹{Number(p.totalAmount).toLocaleString('en-IN')}</div>
+                        {p.gstRate > 0 && (
+                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4f46e5', marginTop: 2 }}>
+                            ({p.gstRate}% GST)
+                          </div>
+                        )}
+                        {p.paymentStatus === 'PAID' && (
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: 'rgba(16,185,129,0.15)', color: '#16a34a', display: 'inline-block', marginTop: 3 }}>
+                            PAID
+                          </div>
+                        )}
+                        {p.paymentStatus === 'PARTIAL' && (
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: 'rgba(234,179,8,0.15)', color: '#ca8a04', display: 'inline-block', marginTop: 3 }}>
+                            PARTIAL (Due: ₹{Number(p.balanceDue || 0).toLocaleString('en-IN')})
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                          <button
+                            onClick={() => setViewPurchaseModal(p)}
+                            style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#2563eb', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
+                            title="View Purchase Details"
+                          >
+                            <Eye size={13} /> View
+                          </button>
+                          <button
+                            onClick={() => handleEditPurchase(p)}
+                            style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#d97706', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
+                            title="Edit Purchase Entry"
+                          >
+                            <Edit2 size={13} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeletePurchase(p._id || p.id)}
+                            style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
+                            title="Delete Purchase Entry"
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEW PURCHASE ENTRY MODAL ────────────────────────────────────────── */}
+      {showPurchaseModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShoppingBag size={20} /> {editingPurchaseId ? 'Edit Vendor Purchase Entry' : 'New Vendor Purchase Entry'}
+              </h3>
+              <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Bill / Invoice No *</label>
+                  <input
+                    type="text"
+                    required
+                    value={purchaseForm.purchaseNo}
+                    onChange={e => setPurchaseForm({ ...purchaseForm, purchaseNo: e.target.value })}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Inward Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={purchaseForm.date}
+                    onChange={e => setPurchaseForm({ ...purchaseForm, date: e.target.value })}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Vendor / Supplier Name *</label>
+                <select
+                  required
+                  value={purchaseForm.vendorName}
+                  onChange={e => setPurchaseForm({ ...purchaseForm, vendorName: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', fontWeight: 700 }}
+                >
+                  <option value="">-- Select Vendor --</option>
+                  {vendorOptions.map((v, idx) => (
+                    <option key={idx} value={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ── MULTIPLE ITEMS SECTION ── */}
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: 0 }}>
+                    📦 Item / Fabric List ({(purchaseForm.items || []).length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddPurchaseItem}
+                    style={{ background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', border: '1px solid rgba(79, 70, 229, 0.3)', padding: '0.35rem 0.75rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={14} /> Add Another Item
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {(purchaseForm.items || []).map((item, idx) => (
+                    <div key={item.id || idx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.85rem', position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5' }}>Item #{idx + 1}</span>
+                        {(purchaseForm.items || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePurchaseItem(idx)}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
+                            title="Remove this item"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Item / Fabric Description *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Cotton 60x60 / Cyan Sublimation Ink / Butter Paper"
+                            value={item.itemName}
+                            onChange={e => handleUpdatePurchaseItem(idx, 'itemName', e.target.value)}
+                            style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.9fr 1fr 1fr', gap: '0.6rem' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Quantity</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="0"
+                              value={item.quantity}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'quantity', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Unit</label>
+                            <select
+                              value={item.unit}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'unit', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            >
+                              <option value="Mtr">Mtr</option>
+                              <option value="Pcs">Pcs</option>
+                              <option value="Kg">Kg</option>
+                              <option value="Ltr">Ltr</option>
+                              <option value="Rolls">Rolls</option>
+                              <option value="Boxes">Boxes</option>
+                              <option value="Bags">Bags</option>
+                              <option value="Set">Set</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Rate (₹)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="0"
+                              value={item.rate}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'rate', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#0284c7', marginBottom: 2 }}>Amount (₹)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="0"
+                              value={item.amount}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'amount', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 700, color: '#0284c7', borderRadius: '6px', border: '1px solid #93c5fd' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── GST RATE SELECTION & BILL SUMMARY ── */}
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                    🏷️ GST Percentage Selection *
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Tax Type:</label>
+                    <select
+                      value={purchaseForm.gstType}
+                      onChange={e => setPurchaseForm(prev => ({ ...prev, gstType: e.target.value }))}
+                      style={{ padding: '3px 8px', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', color: '#1e293b' }}
+                    >
+                      <option value="CGST_SGST">CGST + SGST (Intra-State)</option>
+                      <option value="IGST">IGST (Inter-State)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Quick Selection Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.45rem' }}>
+                  {[
+                    { rate: 0, label: '0%', desc: 'None / Exempt' },
+                    { rate: 5, label: '5%', desc: 'Fabric / Yarn' },
+                    { rate: 12, label: '12%', desc: 'Paper / Bags' },
+                    { rate: 18, label: '18%', desc: 'Ink / Spares' },
+                    { rate: 28, label: '28%', desc: 'Machinery' },
+                    { rate: 'custom', label: 'Custom', desc: 'Other %' }
+                  ].map((g) => {
+                    const isCustom = g.rate === 'custom';
+                    const isSelected = isCustom
+                      ? ![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate))
+                      : Number(purchaseForm.gstRate) === g.rate;
+
+                    return (
+                      <button
+                        key={g.label}
+                        type="button"
+                        onClick={() => {
+                          if (isCustom) {
+                            const currentVal = ![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate)) ? purchaseForm.gstRate : '';
+                            handleGstRateChange(currentVal || '');
+                          } else {
+                            handleGstRateChange(g.rate);
+                          }
+                        }}
+                        style={{
+                          padding: '0.5rem 0.25rem', borderRadius: '7px', textAlign: 'center', cursor: 'pointer',
+                          border: isSelected ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                          background: isSelected ? 'rgba(79, 70, 229, 0.12)' : '#ffffff',
+                          color: isSelected ? '#4f46e5' : '#475569',
+                          boxShadow: isSelected ? '0 0 8px rgba(79, 70, 229, 0.2)' : 'none',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.88rem', fontWeight: 900 }}>{g.label}</span>
+                        <span style={{ fontSize: '0.62rem', opacity: 0.8, whiteSpace: 'nowrap' }}>{g.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* If custom is selected, show custom rate input */}
+                {![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate)) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5' }}>Enter Custom GST %:</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="100"
+                      placeholder="e.g. 7.5"
+                      value={purchaseForm.gstRate}
+                      onChange={e => handleGstRateChange(e.target.value)}
+                      style={{ width: '90px', padding: '0.3rem 0.5rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: '4px', border: '1px solid #4f46e5' }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>%</span>
+                  </div>
+                )}
+
+                {/* Calculated Breakdown Line */}
+                {(() => {
+                  const validItems = purchaseForm.items || [];
+                  const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
+                  const gstPct = parseFloat(purchaseForm.gstRate) || 0;
+                  const gstAmt = (subtotal * gstPct) / 100;
+                  const isInterstate = purchaseForm.gstType === 'IGST';
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>Subtotal (Taxable):</span>
+                        <strong style={{ fontSize: '0.9rem', color: '#1e293b' }}>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
+                          GST ({gstPct}%){gstPct > 0 && !isInterstate ? ' [CGST+SGST]' : gstPct > 0 ? ' [IGST]' : ''}:
+                        </span>
+                        <strong style={{ fontSize: '0.9rem', color: gstAmt > 0 ? '#4f46e5' : '#64748b' }}>
+                          + ₹{gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                        {gstPct > 0 && !isInterstate && (
+                          <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 1 }}>
+                            (CGST: ₹{(gstAmt / 2).toFixed(2)} | SGST: ₹{(gstAmt / 2).toFixed(2)})
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ color: '#0284c7', fontSize: '0.7rem', fontWeight: 800, display: 'block' }}>Calculated Total:</span>
+                        <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7' }}>
+                          ₹{(subtotal + gstAmt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', margin: 0 }}>
+                    Total Bill Amount (₹) *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const validItems = purchaseForm.items || [];
+                      const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
+                      const rateNum = Math.max(0, parseFloat(purchaseForm.gstRate) || 0);
+                      const total = subtotal + (subtotal * rateNum) / 100;
+                      setPurchaseForm(prev => ({
+                        ...prev,
+                        totalAmount: total > 0 ? total.toFixed(2) : ''
+                      }));
+                    }}
+                    style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', border: '1px solid #93c5fd', background: '#eff6ff', color: '#0284c7', cursor: 'pointer' }}
+                    title="Recalculate exact total from Items & GST"
+                  >
+                    Sync with Calculated Total
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  required
+                  step="any"
+                  value={purchaseForm.totalAmount}
+                  onChange={e => setPurchaseForm({ ...purchaseForm, totalAmount: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem', fontSize: '0.95rem', fontWeight: 900, borderRadius: '6px', border: '1.5px solid #0284c7', color: '#0284c7', background: '#f0f9ff' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Notes / Remarks</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Batch no, Delivery Challan reference, Transport details"
+                  value={purchaseForm.notes}
+                  onChange={e => setPurchaseForm({ ...purchaseForm, notes: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.5rem 1.1rem', background: 'none', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ padding: '0.55rem 1.4rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}>
+                  Save Purchase Inward Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW PURCHASE ENTRY DETAILS MODAL ────────────────────────── */}
+      {viewPurchaseModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShoppingBag size={20} /> Purchase Inward Details — {viewPurchaseModal.purchaseNo}
+              </h3>
+              <button onClick={() => setViewPurchaseModal(null)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bill / Invoice No</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#4f46e5', marginTop: 2 }}>{viewPurchaseModal.purchaseNo}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Inward Date</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155', marginTop: 2 }}>
+                    {viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vendor / Supplier</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{viewPurchaseModal.vendorName}</div>
+                </div>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '0.88rem', fontWeight: 800, color: '#334155' }}>
+                  📦 Purchased Items Breakdown
+                </h4>
+                <div style={{ borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '0.6rem 0.8rem', width: '30px' }}>#</th>
+                        <th style={{ padding: '0.6rem 0.8rem' }}>Item Description</th>
+                        <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Qty</th>
+                        <th style={{ padding: '0.6rem 0.8rem' }}>Unit</th>
+                        <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Rate (₹)</th>
+                        <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.isArray(viewPurchaseModal.items) && viewPurchaseModal.items.length > 0 ? (
+                        viewPurchaseModal.items.map((it, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>{it.itemName}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{it.quantity}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{it.unit}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>₹{it.rate}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(it.amount || (it.quantity * it.rate)).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>1</td>
+                          <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>{viewPurchaseModal.itemName}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{viewPurchaseModal.quantity}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{viewPurchaseModal.unit}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{viewPurchaseModal.rate !== '-' ? `₹${viewPurchaseModal.rate}` : '-'}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN')}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', border: '1.5px solid #93c5fd', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#64748b' }}>Subtotal (Taxable Value):</span>
+                  <strong style={{ color: '#1e293b' }}>
+                    ₹{Number(viewPurchaseModal.subtotalAmount || (viewPurchaseModal.totalAmount - (viewPurchaseModal.gstAmount || 0)) || viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#64748b' }}>
+                    GST ({viewPurchaseModal.gstRate || 0}%) {viewPurchaseModal.gstType === 'IGST' ? '[IGST]' : '[CGST + SGST]'}:
+                  </span>
+                  <strong style={{ color: (viewPurchaseModal.gstAmount > 0 || viewPurchaseModal.gstRate > 0) ? '#4f46e5' : '#64748b' }}>
+                    + ₹{Number(viewPurchaseModal.gstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1.5px solid #cbd5e1', paddingTop: '0.6rem', marginTop: '0.2rem' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1' }}>Total Bill Amount:</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+
+              {viewPurchaseModal.paymentStatus && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)', padding: '0.75rem 1rem', borderRadius: '8px', border: `1px solid ${viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}` }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: viewPurchaseModal.paymentStatus === 'PAID' ? '#16a34a' : '#d97706' }}>
+                      Payment Status: {viewPurchaseModal.paymentStatus}
+                    </span>
+                    {viewPurchaseModal.lastPaymentDate && (
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>Last Payment: {viewPurchaseModal.lastPaymentDate} {viewPurchaseModal.lastPaymentVoucher ? `(${viewPurchaseModal.lastPaymentVoucher})` : ''}</div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Paid: ₹{Number(viewPurchaseModal.paidAmount || 0).toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: (viewPurchaseModal.balanceDue > 0) ? '#ef4444' : '#16a34a', marginTop: 2 }}>
+                      Due: ₹{Number(viewPurchaseModal.balanceDue != null ? viewPurchaseModal.balanceDue : (viewPurchaseModal.paymentStatus === 'PAID' ? 0 : viewPurchaseModal.totalAmount)).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {viewPurchaseModal.notes && (
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', marginBottom: 2 }}>Notes / Remarks</div>
+                  <div style={{ fontSize: '0.85rem', color: '#334155', background: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>{viewPurchaseModal.notes}</div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = viewPurchaseModal;
+                    setViewPurchaseModal(null);
+                    handleEditPurchase(p);
+                  }}
+                  style={{ padding: '0.5rem 1.1rem', background: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Edit2 size={15} /> Edit Purchase Entry
+                </button>
+                <button type="button" onClick={() => setViewPurchaseModal(null)} style={{ padding: '0.5rem 1.2rem', background: '#475569', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAX INVOICE PREVIEW / VIEW MODAL ────────────────────────────────── */}
+      {viewInvoiceModal && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '780px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
+
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.9rem', marginBottom: '1.1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#6d28d9', fontWeight: 900, fontSize: '1.25rem' }}>
+                  🧾 Tax Invoice — {viewInvoiceModal.invoiceNo}
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginTop: 2, display: 'block' }}>
+                  Invoice Date: <strong>{formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)}</strong> {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
+                  {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) ? ` | Challan No: ${viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}` : ''}
+                </span>
+              </div>
+              <button onClick={() => setViewInvoiceModal(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: 8, padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Billed To & Status Box */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem', background: '#f8fafc', padding: '1.1rem', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>BILLED TO CUSTOMER</div>
+                <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#0f172a' }}>{viewInvoiceModal.customer?.businessName || viewInvoiceModal.customer?.name || 'Walk-in Client'}</div>
+                {viewInvoiceModal.customer?.gstin && <div style={{ color: '#6d28d9', fontWeight: 700, marginTop: 3 }}>GSTIN: {viewInvoiceModal.customer.gstin}</div>}
+                {viewInvoiceModal.customer?.billingAddress && <div style={{ color: '#475569', marginTop: 3, lineHeight: '1.35' }}>{viewInvoiceModal.customer.billingAddress}</div>}
+                {viewInvoiceModal.customer?.phone && <div style={{ color: '#475569', marginTop: 3 }}>Phone: {viewInvoiceModal.customer.phone}</div>}
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>INVOICE DETAILS & STATUS</div>
+                <span style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  display: 'inline-block',
+                  background: viewInvoiceModal.paymentStatus === 'PAID' ? '#ecfdf5' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fffbeb' : '#fef2f2',
+                  color: viewInvoiceModal.paymentStatus === 'PAID' ? '#059669' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#d97706' : '#dc2626',
+                  border: `1px solid ${viewInvoiceModal.paymentStatus === 'PAID' ? '#6ee7b7' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fcd34d' : '#fca5a5'}`
+                }}>
+                  {viewInvoiceModal.paymentStatus || 'UNPAID'}
+                </span>
+                {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) && (
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#2563eb', marginTop: 5 }}>
+                    Challan No: {viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}
+                  </div>
+                )}
+                <div style={{ marginTop: '0.5rem', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                  Total: {fmtINR(viewInvoiceModal.grandTotal)}
+                </div>
+                {viewInvoiceModal.balanceDue > 0 && (
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#dc2626', marginTop: 2 }}>
+                    Balance Due: {fmtINR(viewInvoiceModal.balanceDue)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Line Items Table */}
+            <div style={{ marginBottom: '1.25rem', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <table style={{ width: '100%', fontSize: '0.83rem', borderCollapse: 'collapse', textAlign: 'left', background: '#ffffff' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Sr.</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', width: '50px' }}>Image</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Item Description & Details</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>HSN</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Qty</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Rate</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(viewInvoiceModal.items || []).map((it, idx) => {
+                    const jobDisplay = formatJobDisplay(it.jobNo);
+                    const secondaryBadges = [];
+                    if (it.lotNo) secondaryBadges.push(`Lot: ${it.lotNo}`);
+                    if (it.partyChallan) secondaryBadges.push(`Vendor Challan: ${it.partyChallan}`);
+                    if (it.ourChallanNo) secondaryBadges.push(`Challan: ${it.ourChallanNo}`);
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'top', background: idx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                        <td style={{ padding: '0.7rem 0.6rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
+                        <td style={{ padding: '0.7rem 0.6rem' }}>
+                          {it.imageUrl ? (
+                            <img src={convertDriveUrl(it.imageUrl, it.itemName)} alt="Item" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid #cbd5e1' }} onError={e => { e.target.style.display = 'none'; }} />
+                          ) : (
+                            <div style={{ width: 38, height: 38, borderRadius: 6, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>No Img</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.7rem 0.6rem' }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{it.itemName}</div>
+                          {jobDisplay && (
+                            <div style={{ fontSize: '0.76rem', color: '#7c3aed', fontWeight: 700, marginTop: 3, display: 'inline-block', background: '#f3e8ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #d8b4fe' }}>
+                              📋 {jobDisplay}
+                            </div>
+                          )}
+                          {secondaryBadges.length > 0 && (
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: 5 }}>
+                              {secondaryBadges.map((b, bIdx) => (
+                                <span key={bIdx} style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 4, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontWeight: 600 }}>
+                                  {b}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {it.description && <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>{it.description}</div>}
+                        </td>
+                        <td style={{ padding: '0.7rem 0.6rem', fontWeight: 800, color: '#7c3aed' }}>{it.hsnCode || '998821'}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{it.qty} {it.unit || 'Meters'}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', color: '#475569', fontWeight: 600 }}>₹ {it.unitPrice}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 900, color: '#2563eb' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 800 }}>
+                    <td colSpan={4} style={{ padding: '0.65rem', textAlign: 'right', color: '#475569', fontSize: '0.8rem' }}>Total Qty:</td>
+                    <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#6d28d9', fontSize: '0.9rem', fontWeight: 900 }}>
+                      {(viewInvoiceModal.items || []).reduce((sum, item) => sum + (parseFloat(item.qty) || 0), 0).toFixed(2)} {viewInvoiceModal.items?.[0]?.unit || 'MTR'}
+                    </td>
+                    <td colSpan={2} style={{ padding: '0.65rem' }}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Financial Totals Breakdown */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+              <div>
+                {viewInvoiceModal.notes && (
+                  <div style={{ marginBottom: '0.6rem' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>NOTES:</span>
+                    <div style={{ color: '#334155', fontSize: '0.83rem', marginTop: 2, background: '#f8fafc', padding: '0.6rem', borderRadius: 6, border: '1px solid #e2e8f0' }}>{viewInvoiceModal.notes}</div>
+                  </div>
+                )}
+                <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 700, background: '#f5f3ff', padding: '0.65rem 0.85rem', borderRadius: 8, border: '1px solid #ddd6fe' }}>
+                  Amount in Words: <strong>{numToWords(viewInvoiceModal.grandTotal)}</strong>
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b', fontWeight: 600 }}>Subtotal:</span>
+                  <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.subtotal)}</span>
+                </div>
+                {viewInvoiceModal.igstAmount > 0 ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>IGST Tax (18%):</span>
+                    <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.igstAmount)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>CGST Tax (9%):</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.cgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>SGST Tax (9%):</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.sgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* Round Off Details Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#7c3aed', fontWeight: 600 }}>
+                  <span>Round Off:</span>
+                  <span style={{ fontWeight: 700 }}>{viewInvoiceModal.roundOff != null ? (viewInvoiceModal.roundOff > 0 ? '+' : '') + ' ₹ ' + Number(viewInvoiceModal.roundOff).toFixed(2) : '₹ 0.00'}</span>
+                </div>
+
+                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '0.45rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6d28d9', fontWeight: 800, fontSize: '1.05rem' }}>Grand Total:</span>
+                  <span style={{ color: '#059669', fontWeight: 900, fontSize: '1.25rem' }}>{fmtINR(viewInvoiceModal.grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <button style={{ padding: '0.5rem 1.1rem', background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => setViewInvoiceModal(null)}>Close</button>
+              <button style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#ffffff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => openPdfDialog(viewInvoiceModal)}>
+                <Download size={15} /> Download PDF
+              </button>
+              {viewInvoiceModal.balanceDue > 0 && (
+                <button style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', color: '#ffffff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }}>
+                  <CreditCard size={15} /> Record Payment
+                </button>
+              )}
+              <button style={{ padding: '0.5rem 1.1rem', background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleOpenCreateTab(inv); }}>
+                <Edit2 size={15} /> Edit Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── RECORD PAYMENT MODAL ────────────────────────────────────────────── */}
+      {paymentModalInvoice && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Record Payment — {paymentModalInvoice.invoiceNo}</h3>
+              <button onClick={() => setPaymentModalInvoice(null)} className="btn-icon"><X size={16} /></button>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Payment Amount (₹) *</label>
+              <input
+                type="number"
+                value={payAmount}
+                onChange={e => setPayAmount(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Payment Mode</label>
+              <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={inputStyle}>
+                <option value="UPI / GPay / PhonePe">UPI / GPay / PhonePe</option>
+                <option value="Bank Transfer (NEFT/RTGS)">Bank Transfer (NEFT/RTGS)</option>
+                <option value="Cash">Cash</option>
+                <option value="Cheque">Cheque</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Transaction / Reference No</label>
+              <input
+                type="text"
+                value={payRef}
+                onChange={e => setPayRef(e.target.value)}
+                placeholder="e.g. UTR123456789"
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <button className="btn-secondary" onClick={() => setPaymentModalInvoice(null)}>Cancel</button>
+              <button className="btn-primary" onClick={handleSavePayment} disabled={submittingPay} style={{ background: '#10b981' }}>
+                {submittingPay ? 'Recording...' : 'Confirm Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CREATE CUSTOMER MODAL ───────────────────────────────────────────── */}
+      {showCustomerModal && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '450px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Add New Customer / Client</h3>
+              <button onClick={() => setShowCustomerModal(false)} className="btn-icon"><X size={16} /></button>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Contact Person Name *</label>
+              <input type="text" value={custForm.name} onChange={e => setCustForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Business / Company Name</label>
+              <input type="text" value={custForm.businessName} onChange={e => setCustForm(f => ({ ...f, businessName: e.target.value }))} style={inputStyle} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Phone Number</label>
+                <input type="text" value={custForm.phone} onChange={e => setCustForm(f => ({ ...f, phone: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>GSTIN Number</label>
+                <input type="text" value={custForm.gstin} onChange={e => setCustForm(f => ({ ...f, gstin: e.target.value }))} style={inputStyle} />
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Billing Address</label>
+              <textarea rows={2} value={custForm.billingAddress} onChange={e => setCustForm(f => ({ ...f, billingAddress: e.target.value }))} style={inputStyle} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <button className="btn-secondary" onClick={() => setShowCustomerModal(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleSaveCustomer}>Save Customer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CREATE ITEM MODAL ──────────────────────────────────────────────── */}
+      {showItemModal && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Add Billing Product / Service</h3>
+              <button onClick={() => setShowItemModal(false)} className="btn-icon"><X size={16} /></button>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Product / Service Name *</label>
+              <input type="text" value={itemForm.itemName} onChange={e => setItemForm(f => ({ ...f, itemName: e.target.value }))} style={inputStyle} placeholder="e.g. Digital Printing Service" />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>HSN Code</label>
+                <input type="text" value={itemForm.hsnCode} onChange={e => setItemForm(f => ({ ...f, hsnCode: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Unit Price (₹) *</label>
+                <input type="number" value={itemForm.unitPrice} onChange={e => setItemForm(f => ({ ...f, unitPrice: e.target.value }))} style={inputStyle} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Unit</label>
+                <select value={itemForm.unit} onChange={e => setItemForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle}>
+                  <option value="Meters">Meters</option>
+                  <option value="Pcs">Pcs</option>
+                  <option value="Rolls">Rolls</option>
+                  <option value="Hours">Hours</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Default GST %</label>
+                <select value={itemForm.taxRate} onChange={e => setItemForm(f => ({ ...f, taxRate: e.target.value }))} style={inputStyle}>
+                  <option value={5}>5%</option>
+                  <option value={12}>12%</option>
+                  <option value={18}>18%</option>
+                  <option value={28}>28%</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <button className="btn-secondary" onClick={() => setShowItemModal(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleSaveItem}>Save Product</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PDF DUPLICATE COPY DIALOG ─────────────────────────────────── */}
+      {pdfDuplicateModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: 'var(--bg-card, #1a2035)',
+            border: '1px solid rgba(124,58,237,0.35)',
+            borderRadius: '16px',
+            padding: '2rem',
+            width: '380px',
+            boxShadow: '0 20px 60px rgba(76,29,149,0.4)',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.2rem' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7c3aed,#4c1d95)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Download size={18} color="#fff" />
+              </div>
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary, #f7fafc)' }}>Download Invoice PDF</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>
+                  Invoice: {pdfDuplicateModal.invoiceNo}
+                </div>
+              </div>
+            </div>
+
+            {/* Checkbox option */}
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+              background: pdfDuplicateChecked ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1.5px solid ${pdfDuplicateChecked ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: '10px', padding: '0.85rem 1rem',
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}>
+              <input
+                type="checkbox"
+                checked={pdfDuplicateChecked}
+                onChange={e => setPdfDuplicateChecked(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 2, accentColor: '#7c3aed', cursor: 'pointer' }}
+              />
+              <div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary, #f7fafc)', marginBottom: '0.2rem' }}>
+                  Include Duplicate Copy
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', lineHeight: 1.4 }}>
+                  Adds a 2nd page — <b style={{ color: '#a78bfa' }}>black &amp; white</b> duplicate copy of this invoice for your records.
+                </div>
+              </div>
+            </label>
+
+            {/* Info note */}
+            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted, #94a3b8)', margin: '0.8rem 0 1.4rem', paddingLeft: '0.3rem' }}>
+              {pdfDuplicateChecked
+                ? '📄 You will get a 2-page PDF: Page 1 (Original — Colourful) + Page 2 (Duplicate — Black & White)'
+                : '📄 You will get a 1-page PDF: Original colourful copy only'}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '0.7rem', justifyContent: 'flex-end' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setPdfDuplicateModal(null)}
+                disabled={pdfDownloading}
+                style={{ minWidth: 80 }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleConfirmDownloadPdf}
+                disabled={pdfDownloading}
+                style={{ background: 'linear-gradient(135deg,#10b981,#059669)', display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 130 }}
+              >
+                {pdfDownloading ? (
+                  <>⏳ Generating...</>
+                ) : (
+                  <><Download size={15} /> Download PDF</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DOWNLOAD ACCOUNTS & PARTY LEDGER MODAL (WHITE & BLUE THEME) ─────────────── */}
+      {showLedgerModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '16px', width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)', color: '#0f172a', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                  <BookOpen size={22} color="#0284c7" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Ledger Export &amp; Accounts Statement</h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Download Party Account Statements &amp; Global Master Ledgers</span>
+                </div>
+              </div>
+              <button onClick={() => setShowLedgerModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Mode Selector Tabs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.35rem', borderRadius: '10px' }}>
+              <button
+                onClick={() => setLedgerMode('party')}
+                style={{
+                  padding: '0.65rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  background: ledgerMode === 'party' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'transparent',
+                  color: ledgerMode === 'party' ? '#ffffff' : '#64748b',
+                  boxShadow: ledgerMode === 'party' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                👤 Mode A: Party-Wise Detailed Ledger
+              </button>
+              <button
+                onClick={() => setLedgerMode('master')}
+                style={{
+                  padding: '0.65rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  background: ledgerMode === 'master' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'transparent',
+                  color: ledgerMode === 'master' ? '#ffffff' : '#64748b',
+                  boxShadow: ledgerMode === 'master' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🌐 Mode B: All-Parties Master Ledger
+              </button>
+            </div>
+
+            {/* Mode A: Select Party */}
+            {ledgerMode === 'party' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Select Customer / Party Account</label>
+                <select
+                  value={selectedPartyId}
+                  onChange={e => setSelectedPartyId(e.target.value)}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
+                >
+                  <option value="ALL">All Parties (Combined)</option>
+                  {customers.map(c => (
+                    <option key={c._id} value={c._id}>
+                      {c.businessName || c.name} {c.phone ? `(${c.phone})` : ''} {c.gstin ? `— GSTIN: ${c.gstin}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Date Range Presets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Date Range Filter</label>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'this_month', label: 'This Month' },
+                  { id: 'last_quarter', label: 'Last Quarter' },
+                  { id: 'fy_ytd', label: 'Financial Year (YTD)' },
+                  { id: 'all_time', label: 'All Time' },
+                  { id: 'custom', label: 'Custom Date' }
+                ].map(preset => {
+                  const isSel = ledgerPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      onClick={() => setLedgerPreset(preset.id)}
+                      style={{
+                        padding: '0.4rem 0.85rem',
+                        borderRadius: '6px',
+                        border: '1.5px solid',
+                        borderColor: isSel ? '#0284c7' : '#cbd5e1',
+                        background: isSel ? '#eff6ff' : '#ffffff',
+                        color: isSel ? '#0284c7' : '#64748b',
+                        fontSize: '0.78rem',
+                        fontWeight: isSel ? 800 : 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {ledgerPreset === 'custom' && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.85rem',
+                  marginTop: '0.4rem',
+                  padding: '0.85rem 1rem',
+                  background: 'rgba(2, 132, 199, 0.04)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(2, 132, 199, 0.2)'
+                }}>
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#0369a1', fontWeight: 700, marginBottom: '0.3rem' }}>
+                      <Calendar size={13} /> FROM DATE
+                    </label>
+                    <input
+                      type="date"
+                      value={ledgerDateStart}
+                      onChange={e => setLedgerDateStart(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        background: '#ffffff',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#0369a1', fontWeight: 700, marginBottom: '0.3rem' }}>
+                      <Calendar size={13} /> TO DATE
+                    </label>
+                    <input
+                      type="date"
+                      value={ledgerDateEnd}
+                      onChange={e => setLedgerDateEnd(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.65rem',
+                        background: '#ffffff',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '6px',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Export Format Selector — 5 Formats (Excel, PDF, CSV, Tally XML, Quick Print) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Select Export Format</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
+                {[
+                  { id: 'excel', label: '📊 Excel (.xlsx)', icon: FileSpreadsheet },
+                  { id: 'pdf', label: '📄 PDF Document', icon: FileText },
+                  { id: 'csv', label: '📁 CSV File', icon: Download },
+                  { id: 'tally', label: '🏛️ Tally (XML)', icon: FileCode },
+                  { id: 'print', label: '🖨️ Quick Print', icon: Printer }
+                ].map(fmt => {
+                  const Icon = fmt.icon;
+                  const isSel = ledgerFormat === fmt.id;
+                  return (
+                    <button
+                      key={fmt.id}
+                      onClick={() => setLedgerFormat(fmt.id)}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        padding: '0.75rem 0.4rem',
+                        borderRadius: '10px',
+                        border: isSel ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                        background: isSel ? '#eff6ff' : '#ffffff',
+                        color: isSel ? '#0284c7' : '#475569',
+                        fontWeight: isSel ? 800 : 700,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        boxShadow: isSel ? '0 4px 12px rgba(2, 132, 199, 0.15)' : 'none',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <Icon size={20} color={isSel ? '#0284c7' : '#64748b'} />
+                      <span style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{fmt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Live Calculated Summary Box (White & Blue) */}
+            {(() => {
+              const { startD, endD } = getLedgerDateRange();
+              if (ledgerMode === 'party') {
+                const ledger = computePartyLedger(selectedPartyId, startD, endD);
+                return (
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1.5px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Opening Balance</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmtINR(ledger.openingBalance)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Debit (Billed)</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7', marginTop: 2 }}>{fmtINR(ledger.totalDebit)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Credit (Paid)</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#16a34a', marginTop: 2 }}>{fmtINR(ledger.totalCredit)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Closing Balance</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: ledger.closingBalance > 0 ? '#ea580c' : '#16a34a', marginTop: 2 }}>{fmtINR(ledger.closingBalance)} ({ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</div>
+                    </div>
+                  </div>
+                );
+              } else {
+                let grandBilled = 0;
+                let grandPaid = 0;
+                let grandBal = 0;
+                customers.forEach(cust => {
+                  const pL = computePartyLedger(cust._id, startD, endD);
+                  grandBilled += pL.totalDebit;
+                  grandPaid += pL.totalCredit;
+                  grandBal += pL.closingBalance;
+                });
+                return (
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1.5px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Parties Count</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{customers.length} Accounts</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Period Billed</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7', marginTop: 2 }}>{fmtINR(grandBilled)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Period Collected</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#16a34a', marginTop: 2 }}>{fmtINR(grandPaid)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Outstanding</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#ea580c', marginTop: 2 }}>{fmtINR(grandBal)}</div>
+                    </div>
+                  </div>
+                );
+              }
+            })()}
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
+              <button onClick={() => setShowLedgerModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+              <button
+                onClick={handleGenerateLedgerExport}
+                style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', border: 'none', color: '#ffffff', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)' }}
+              >
+                <Download size={16} /> Generate &amp; Download Ledger
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Tax Invoice Staff Audit History Modal */}
+      {selectedInvoiceHistory && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '600px', background: '#ffffff', border: '1px solid #e2e8f0',
+            borderRadius: '14px', padding: '1.25rem', color: '#0f172a', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={18} /> Tax Invoice #{selectedInvoiceHistory.invoiceNo} — Staff Audit Log
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Staff member attribution for invoice generation and billing history.
+                </p>
+              </div>
+              <button className="btn-icon" onClick={() => setSelectedInvoiceHistory(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Generated By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: 800, fontSize: '0.85rem', border: '1px solid #bfdbfe' }}>
+                  {selectedInvoiceHistory.createdByName || selectedInvoiceHistory.createdBy || 'HASI'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Customer: <strong style={{ color: '#0f172a' }}>{selectedInvoiceHistory.customer?.businessName || selectedInvoiceHistory.customer?.name || 'Client'}</strong></div>
+                <div>Grand Total: <strong style={{ color: '#16a34a' }}>{fmtINR(selectedInvoiceHistory.grandTotal)}</strong></div>
+                <div>Invoice Date: <strong style={{ color: '#0f172a' }}>{formatDateDDMMYYYY(selectedInvoiceHistory.invoiceDate)}</strong></div>
+                <div>Payment Status: <strong style={{ color: selectedInvoiceHistory.paymentStatus === 'PAID' ? '#16a34a' : '#ef4444' }}>{selectedInvoiceHistory.paymentStatus}</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {signedUploadTarget && (
+        <SignedDocumentUploadModal
+          isOpen={!!signedUploadTarget}
+          onClose={() => setSignedUploadTarget(null)}
+          docType={signedUploadTarget.docType || "invoice"}
+          docId={signedUploadTarget.id}
+          docNumber={signedUploadTarget.docNumber}
+          partyName={signedUploadTarget.partyName}
+          existingSignedCopy={signedUploadTarget.existingSignedCopy}
+          onSuccess={() => { loadData(); fetchDigitalChallans(); }}
+        />
+      )}
+
+      {signedPreviewTarget && (
+        <SignedDocumentPreviewModal
+          isOpen={!!signedPreviewTarget}
+          onClose={() => setSignedPreviewTarget(null)}
+          documentData={signedPreviewTarget}
+          isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
+          onStatusUpdated={() => { loadData(); fetchDigitalChallans(); }}
+          onReupload={(docData) => {
+            setSignedPreviewTarget(null);
+            setSignedUploadTarget({
+              id: docData._id,
+              docType: docData.docType || 'invoice',
+              docNumber: docData.docNumber,
+              partyName: docData.partyName,
+              existingSignedCopy: docData.signedCopy
+            });
+          }}
+        />
+      )}
+
+    </div>
+  );
+}
+
+const labelStyle = {
+  fontSize: '0.7rem',
+  fontWeight: 700,
+  color: 'var(--text-muted)',
+  textTransform: 'uppercase',
+  marginBottom: '0.3rem',
+  display: 'block'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.5rem 0.7rem',
+  fontSize: '0.85rem',
+  background: 'var(--bg-input, #161b26)',
+  border: '1px solid var(--border-light, #2d3748)',
+  borderRadius: 'var(--radius-sm, 6px)',
+  color: 'var(--text-primary, #f7fafc)',
+  boxSizing: 'border-box'
+};

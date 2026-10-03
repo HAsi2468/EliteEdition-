@@ -1,0 +1,1236 @@
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
+import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode, Plus, Search, AlertTriangle, Warehouse } from 'lucide-react';
+import { api } from '../services/api';
+import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
+
+export default function InventoryForm({ item, isCatalog = true, onSubmit, onClose }) {
+  const scrollPosRef = useRef(0);
+
+  useEffect(() => {
+    scrollPosRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    return () => {
+      const targetY = scrollPosRef.current;
+      if (typeof window !== 'undefined' && targetY > 0) {
+        window.scrollTo({ top: targetY, behavior: 'instant' });
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+      }
+    };
+  }, []);
+
+  const handleModalClose = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    const targetY = scrollPosRef.current || window.scrollY || 0;
+    if (onClose) onClose();
+
+    if (typeof window !== 'undefined' && targetY > 0) {
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+      requestAnimationFrame(() => window.scrollTo({ top: targetY, behavior: 'instant' }));
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+    }
+  };
+
+  const [formData, setFormData] = useState({
+    skuCode: '',
+    itemName: '',
+    party: 'ANOUK',
+    facility: 'Pankhudi',
+    categoryName: 'KURTA SET',
+    size: '',
+    purchasePrice: 0.0,
+    salePrice: 0.0,
+    hsnCode: '',
+    imageUrl: '',
+    currentlyAvailableStock: 0,
+    challanNo: '',
+  });
+
+  const [error, setError] = useState('');
+  const [vendorsList, setVendorsList] = useState([]);
+  const [facilitiesList, setFacilitiesList] = useState([]);
+  const [catalogItems, setCatalogItems] = useState([]);
+  const [imageError, setImageError] = useState(false);
+  const [isFetchingUniware, setIsFetchingUniware] = useState(false);
+  const [uniwareSearchStatus, setUniwareSearchStatus] = useState(null);
+
+  // Dynamic Brand-Wise Barcodes / SKU Codes for multi-brand selling
+  const [brandCodes, setBrandCodes] = useState([]);
+
+  useEffect(() => {
+    const loadFormData = async () => {
+      try {
+        const [vData, cData, fData] = await Promise.all([
+          api.getVendors().catch(() => []),
+          api.getProductsCatalog().catch(() => []),
+          api.getFacilities().catch(() => []),
+        ]);
+        setVendorsList(vData || []);
+        setCatalogItems(cData || []);
+        setFacilitiesList(fData || []);
+        if (fData && fData.length > 0 && !item?.facility) {
+          const def = fData.find(f => f.isDefault) || fData[0];
+          if (def) {
+            setFormData(prev => ({ ...prev, facility: def.name }));
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load form reference data:', err);
+      }
+    };
+    loadFormData();
+  }, []);
+
+  useEffect(() => {
+    if (item) {
+      const formattedSize = Array.isArray(item.size) 
+        ? item.size.join(', ') 
+        : (item.size || '');
+
+      const sku = item.skuCode || item.sku || '';
+      let titleOrName = item.description || item.itemName || item.name || item.title || item.productName || '';
+
+      // If title is missing, search in catalogItems reference data for matching SKU description
+      if (!titleOrName && sku && catalogItems && catalogItems.length > 0) {
+        const catMatch = catalogItems.find(c => matchSkuOrBrandCode(c, sku));
+        if (catMatch) {
+          titleOrName = catMatch.description || catMatch.itemName || catMatch.name || '';
+        }
+      }
+
+      // Final fallback to SKU code so field is never empty when editing
+      if (!titleOrName && sku) {
+        titleOrName = sku;
+      }
+
+      const brandOrParty = item.brand || item.party || 'ANOUK';
+      const category = item.categoryName || item.category || 'KURTA SET';
+      const facilityName = item.facility || item.party || 'Pankhudi';
+
+      setFormData({
+        skuCode: sku,
+        itemName: titleOrName,
+        party: brandOrParty,
+        facility: facilityName,
+        categoryName: category,
+        size: formattedSize,
+        purchasePrice: item.basePrice ?? item.purchasePrice ?? 0.0,
+        salePrice: item.price ?? item.salePrice ?? 0.0,
+        hsnCode: item.hsnCode || '',
+        imageUrl: item.imageUrl || '',
+        currentlyAvailableStock: item.currentlyAvailableStock ?? item.qty ?? 0,
+        challanNo: item.challanNo || '',
+      });
+
+      const rawBrandCodes = Array.isArray(item.brandCodes) ? item.brandCodes : [];
+      const normalizedBrandCodes = rawBrandCodes.map(bc => {
+        if (typeof bc === 'string') {
+          return { brand: brandOrParty, code: bc, size: formattedSize };
+        }
+        if (bc && typeof bc === 'object') {
+          return {
+            brand: bc.brand || brandOrParty,
+            code: bc.code || '',
+            size: bc.size || formattedSize
+          };
+        }
+        return { brand: 'ANOUK', code: '' };
+      }).filter(bc => bc.code || bc.brand);
+
+      setBrandCodes(normalizedBrandCodes);
+    }
+  }, [item, catalogItems]);
+
+  const handleAddBrandCodeRow = () => {
+    setBrandCodes(prev => [...prev, { brand: 'ANOUK', code: '' }]);
+  };
+
+  const handleRemoveBrandCodeRow = (idx) => {
+    setBrandCodes(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateBrandCode = (idx, field, value) => {
+    setBrandCodes(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return updated;
+    });
+  };
+
+  // Fetch / Auto-Fill details from Uniware catalog by SKU code
+  const handleFetchUniwareDetails = async () => {
+    const rawSku = (formData.skuCode || '').trim();
+    if (!rawSku) {
+      setUniwareSearchStatus({
+        type: 'warning',
+        message: '⚠️ Please enter SKU Code or scan barcode first.',
+      });
+      return;
+    }
+
+    setIsFetchingUniware(true);
+    setUniwareSearchStatus(null);
+    setImageError(false);
+
+    try {
+      let currentCatalog = catalogItems;
+      if (!currentCatalog || currentCatalog.length === 0) {
+        currentCatalog = await api.getProductsCatalog().catch(() => []);
+        setCatalogItems(currentCatalog);
+      }
+
+      let matchedCatalog = currentCatalog.find(c => matchSkuOrBrandCode(c, rawSku));
+
+      if (!matchedCatalog) {
+        const freshCatalog = await api.getProductsCatalog().catch(() => []);
+        if (freshCatalog && freshCatalog.length > 0) {
+          setCatalogItems(freshCatalog);
+          matchedCatalog = freshCatalog.find(c => matchSkuOrBrandCode(c, rawSku));
+        }
+      }
+
+      if (!matchedCatalog && currentCatalog) {
+        const queryUpper = rawSku.toUpperCase();
+        matchedCatalog = currentCatalog.find(c => {
+          const sCode = (c.skuCode || c.itemSKUCode || '').toUpperCase();
+          if (sCode === queryUpper || queryUpper.startsWith(sCode) || sCode.startsWith(queryUpper)) return true;
+          if (Array.isArray(c.brandCodes)) {
+            return c.brandCodes.some(bc => (bc.code || '').toUpperCase() === queryUpper);
+          }
+          return false;
+        });
+      }
+
+      if (matchedCatalog) {
+        const baseCatalogSku = (matchedCatalog.skuCode || rawSku).trim();
+        const extractedSize = extractSizeFromSku(rawSku) || (Array.isArray(matchedCatalog.size) ? matchedCatalog.size[0] : matchedCatalog.size) || '';
+
+        let masterSku = baseCatalogSku;
+        const catExtractedSize = extractSizeFromSku(baseCatalogSku);
+        if (!catExtractedSize && extractedSize && !baseCatalogSku.includes(`_${extractedSize}`)) {
+          masterSku = `${baseCatalogSku}_${extractedSize}`;
+        }
+
+        const formattedSize = Array.isArray(matchedCatalog.size)
+          ? matchedCatalog.size.join(', ')
+          : (matchedCatalog.size || extractedSize || '');
+
+        setFormData(prev => ({
+          ...prev,
+          skuCode: masterSku,
+          itemName: matchedCatalog.description || matchedCatalog.itemName || matchedCatalog.name || prev.itemName,
+          party: matchedCatalog.brand || matchedCatalog.party || prev.party,
+          categoryName: matchedCatalog.categoryName || matchedCatalog.category || prev.categoryName,
+          size: formattedSize || prev.size,
+          purchasePrice: matchedCatalog.basePrice ?? matchedCatalog.purchasePrice ?? prev.purchasePrice,
+          salePrice: matchedCatalog.price ?? matchedCatalog.salePrice ?? prev.salePrice,
+          hsnCode: matchedCatalog.hsnCode || prev.hsnCode,
+          imageUrl: matchedCatalog.imageUrl || prev.imageUrl,
+        }));
+
+        if (Array.isArray(matchedCatalog.brandCodes) && matchedCatalog.brandCodes.length > 0) {
+          setBrandCodes(matchedCatalog.brandCodes);
+        }
+
+        const foundBrand = matchedCatalog.brand || matchedCatalog.party || 'Uniware';
+        setUniwareSearchStatus({
+          type: 'success',
+          message: `✅ Found & auto-filled details for "${foundBrand}" SKU: ${masterSku}`,
+        });
+      } else {
+        const extractedSize = extractSizeFromSku(rawSku);
+        if (extractedSize) {
+          setFormData(prev => ({
+            ...prev,
+            size: prev.size || extractedSize,
+          }));
+        }
+        setUniwareSearchStatus({
+          type: 'warning',
+          message: `⚠️ SKU "${rawSku}" not found in Uniware catalog. You can manually enter details.`,
+        });
+      }
+    } catch (err) {
+      console.error('Uniware fetch error:', err);
+      setUniwareSearchStatus({
+        type: 'warning',
+        message: '⚠️ Error fetching Uniware details. Please check network connection.',
+      });
+    } finally {
+      setIsFetchingUniware(false);
+    }
+  };
+
+  // Handle Input Changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'skuCode') {
+      const sku = value;
+      setImageError(false);
+      
+      const matchedCatalog = catalogItems.find(c => matchSkuOrBrandCode(c, sku));
+      const extractedSize = extractSizeFromSku(sku);
+
+      let masterSku = sku;
+      if (matchedCatalog) {
+        const baseCatalogSku = (matchedCatalog.skuCode || '').trim();
+        const catExtractedSize = extractSizeFromSku(baseCatalogSku);
+        if (catExtractedSize) {
+          masterSku = baseCatalogSku;
+        } else if (extractedSize) {
+          masterSku = `${baseCatalogSku}_${extractedSize}`;
+        } else {
+          masterSku = baseCatalogSku;
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          skuCode: masterSku,
+          itemName: matchedCatalog.description || prev.itemName,
+          party: matchedCatalog.brand || prev.party,
+          categoryName: matchedCatalog.categoryName || prev.categoryName,
+          size: Array.isArray(matchedCatalog.size) ? matchedCatalog.size.join(', ') : (matchedCatalog.size || extractedSize || prev.size),
+          purchasePrice: matchedCatalog.basePrice ?? prev.purchasePrice,
+          salePrice: matchedCatalog.price ?? prev.salePrice,
+          hsnCode: matchedCatalog.hsnCode || prev.hsnCode,
+          imageUrl: matchedCatalog.imageUrl || prev.imageUrl,
+        }));
+        if (Array.isArray(matchedCatalog.brandCodes) && matchedCatalog.brandCodes.length > 0) {
+          setBrandCodes(matchedCatalog.brandCodes);
+        }
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          skuCode: sku,
+          size: prev.size || extractedSize || '',
+        }));
+      }
+    } else if (name === 'party') {
+      const selectedVal = value;
+      const matchedVendor = vendorsList.find(v => 
+        (v.name && v.name.trim().toLowerCase() === selectedVal.trim().toLowerCase()) ||
+        (v.businessName && v.businessName.trim().toLowerCase() === selectedVal.trim().toLowerCase())
+      );
+      const finalVendorName = matchedVendor && matchedVendor.businessName ? matchedVendor.businessName : selectedVal;
+      setFormData(prev => ({
+        ...prev,
+        party: finalVendorName,
+      }));
+    } else if (name === 'imageUrl') {
+      setImageError(false);
+      setFormData(prev => ({ ...prev, imageUrl: value }));
+    } else {
+      const numericFields = ['purchasePrice', 'salePrice', 'currentlyAvailableStock'];
+      setFormData(prev => ({
+        ...prev,
+        [name]: numericFields.includes(name) ? (value === '' ? '' : parseFloat(value) || 0) : value,
+      }));
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!formData.skuCode.trim()) {
+      setError('SKU Code is required.');
+      return;
+    }
+    if (!formData.itemName.trim()) {
+      setError('Product Name / Description is required.');
+      return;
+    }
+    if (!formData.size.trim()) {
+      setError('Product Size is required.');
+      return;
+    }
+
+    // Filter valid brand codes
+    const validBrandCodes = brandCodes.filter(bc => bc.code && bc.code.trim());
+
+    let primaryBrand = formData.party ? formData.party.trim() : '';
+    if (!primaryBrand && validBrandCodes.length > 0) {
+      primaryBrand = validBrandCodes[0].brand || 'ELITE EDITION';
+    }
+    if (!primaryBrand) {
+      primaryBrand = 'ELITE EDITION';
+    }
+
+    const payload = {
+      ...formData,
+      party: primaryBrand,
+      brand: primaryBrand,
+      brandCodes: validBrandCodes,
+      description: formData.itemName,
+      basePrice: Number(formData.purchasePrice) || 0.0,
+      price: Number(formData.salePrice) || 0.0,
+      currentlyAvailableStock: Number(formData.currentlyAvailableStock) || 0,
+      qty: Number(formData.currentlyAvailableStock) || 0,
+    };
+
+    // Auto-save product to Catalog database if SKU is not in catalog
+    const cleanSku = formData.skuCode.trim();
+    const existsInCatalog = catalogItems.some(c => 
+      (c.skuCode && c.skuCode.trim().toLowerCase() === cleanSku.toLowerCase()) ||
+      matchSkuOrBrandCode(c, cleanSku)
+    );
+
+    if (!existsInCatalog && cleanSku) {
+      const catPayload = {
+        skuCode: cleanSku,
+        description: formData.itemName || cleanSku,
+        brand: primaryBrand,
+        size: formData.size,
+        basePrice: Number(formData.purchasePrice) || 0.0,
+        price: Number(formData.salePrice) || 0.0,
+        imageUrl: formData.imageUrl || '',
+        categoryName: formData.categoryName || '',
+        hsnCode: formData.hsnCode || '',
+        brandCodes: validBrandCodes,
+      };
+      api.createProductCatalog(catPayload).catch(err => {
+        console.warn('Auto catalog save notice:', err.message);
+      });
+    }
+
+    onSubmit(payload);
+  };
+
+  // Managed brands array for dropdown selection - synchronized with Brand Manager
+  const [managedBrands, setManagedBrands] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_managed_brands');
+      const defaultBrands = ['ANOUK', 'EON', 'ELITE EDITION', 'HERA', 'KALINI', 'MYNTRA', 'SANGRIA'];
+      const savedBrands = saved ? JSON.parse(saved) : defaultBrands;
+      const catBrands = (catalogItems || [])
+        .map(c => (c.brand || c.party || '').trim().toUpperCase())
+        .filter(b => b && b !== 'ALL');
+      const setOfBrands = new Set([...defaultBrands, ...savedBrands, ...catBrands]);
+      return Array.from(setOfBrands).map(b => b.trim().toUpperCase()).filter(Boolean).sort();
+    } catch (e) {
+      return ['ANOUK', 'EON', 'ELITE EDITION', 'HERA', 'KALINI', 'MYNTRA', 'SANGRIA'];
+    }
+  });
+
+  useEffect(() => {
+    const syncBrands = () => {
+      try {
+        const saved = localStorage.getItem('elite_managed_brands');
+        const defaultBrands = ['ANOUK', 'EON', 'ELITE EDITION', 'HERA', 'KALINI', 'MYNTRA', 'SANGRIA'];
+        const savedBrands = saved ? JSON.parse(saved) : defaultBrands;
+        const catBrands = (catalogItems || [])
+          .map(c => (c.brand || c.party || '').trim().toUpperCase())
+          .filter(b => b && b !== 'ALL');
+        const setOfBrands = new Set([...defaultBrands, ...savedBrands, ...catBrands]);
+        setManagedBrands(Array.from(setOfBrands).map(b => b.trim().toUpperCase()).filter(Boolean).sort());
+      } catch (e) {}
+    };
+
+    syncBrands();
+    window.addEventListener('storage', syncBrands);
+    window.addEventListener('elite_brands_updated', syncBrands);
+    return () => {
+      window.removeEventListener('storage', syncBrands);
+      window.removeEventListener('elite_brands_updated', syncBrands);
+    };
+  }, [catalogItems]);
+
+  return (
+    <div style={styles.overlay}>
+      <div className="inventory-modal-container" style={styles.container}>
+        {/* Modal Header */}
+        <div style={styles.header}>
+          <div style={styles.headerTitleGroup}>
+            <div style={styles.badge}>
+              <Sparkles size={14} style={{ marginRight: '6px' }} />
+              {isCatalog ? 'PRODUCT CATALOG MANAGEMENT' : 'STOCK INVENTORY MANAGEMENT'}
+            </div>
+            <h2 style={styles.title}>
+              {item 
+                ? (isCatalog ? 'Edit Product Catalog Details' : 'Edit Stock Item') 
+                : (isCatalog ? 'Add New Product to Catalog' : 'Add Stock Item to Inventory')}
+            </h2>
+            <p style={styles.subtitle}>
+              {isCatalog 
+                ? 'Manage product SKU, brand, category, description, sizes, pricing, and image URL in Product Catalog.' 
+                : 'Record physical stock inward/inventory level in your warehouse Stock Overview.'}
+            </p>
+          </div>
+          <button type="button" onClick={handleModalClose} style={styles.closeBtn} title="Close Form">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <div style={styles.errorBox}>
+            <span>⚠️ {error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={styles.formContent}>
+          <div className="inventory-main-grid" style={styles.mainGrid}>
+            {/* Left Card: Image Preview & Live Product Card */}
+            <div className="inventory-summary-card" style={styles.summaryCard}>
+              <div style={styles.imagePreviewContainer}>
+                {formData.imageUrl && !imageError ? (
+                  <img
+                    src={formData.imageUrl}
+                    alt="Product Preview"
+                    style={styles.previewImg}
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <div style={styles.placeholderImg}>
+                    <ImageIcon size={36} color="#94a3b8" />
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px', fontWeight: '500' }}>
+                      No Image Preview
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div style={styles.summaryDetails}>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>SKU CODE</span>
+                  <span style={styles.summaryValueSKU}>{formData.skuCode || 'NOT SET'}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>BRAND</span>
+                  <span style={styles.summaryValueBrand}>{formData.party || 'ANOUK'}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>CATEGORY</span>
+                  <span style={styles.summaryValueCat}>{formData.categoryName || 'KURTA SET'}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>SIZE(S)</span>
+                  <span style={styles.summaryValueSize}>{formData.size || 'N/A'}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>BASE PRICE</span>
+                  <span style={styles.summaryValueCost}>Rs. {(Number(formData.purchasePrice) || 0).toFixed(2)}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>SALE PRICE</span>
+                  <span style={styles.summaryValueRetail}>Rs. {(Number(formData.salePrice) || 0).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Card: Product Form Fields */}
+            <div style={styles.formFieldsGrid}>
+              {/* Row 1: SKU & Product Name */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Barcode size={14} color="#059669" />
+                    SKU Code *
+                  </label>
+                  <input
+                    type="text"
+                    name="skuCode"
+                    value={formData.skuCode}
+                    onChange={handleChange}
+                    placeholder="e.g., 301_L, 273_2XL"
+                    style={styles.input}
+                    required
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleFetchUniwareDetails}
+                    disabled={isFetchingUniware}
+                    style={styles.uniwareSearchBtn}
+                    title="Search Uniware catalog to auto-fill product details"
+                  >
+                    <Search size={13} className={isFetchingUniware ? 'spin-loader' : ''} />
+                    <span>{isFetchingUniware ? 'Searching Uniware...' : '⚡ Search Uniware & Auto-Fill'}</span>
+                  </button>
+                  {uniwareSearchStatus && (
+                    <div
+                      style={
+                        uniwareSearchStatus.type === 'success'
+                          ? styles.uniwareStatusSuccess
+                          : styles.uniwareStatusWarning
+                      }
+                    >
+                      {uniwareSearchStatus.type === 'success' ? (
+                        <CheckCircle size={13} style={{ flexShrink: 0 }} />
+                      ) : (
+                        <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+                      )}
+                      <span>{uniwareSearchStatus.message}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Tag size={14} color="#059669" />
+                    Product Title / Description *
+                  </label>
+                  <input
+                    type="text"
+                    name="itemName"
+                    value={formData.itemName}
+                    onChange={handleChange}
+                    placeholder="e.g., Women Printed Kurta Set with Dupatta"
+                    style={styles.input}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Brand & Storage Facility */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Building2 size={14} color="#059669" />
+                    Primary Brand / Party *
+                  </label>
+                  <select
+                    name="party"
+                    value={formData.party}
+                    onChange={handleChange}
+                    style={{ ...styles.input, cursor: 'pointer' }}
+                  >
+                    {managedBrands.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Warehouse size={14} color="#059669" />
+                    Storage Facility *
+                  </label>
+                  <select
+                    name="facility"
+                    value={formData.facility || 'Pankhudi'}
+                    onChange={handleChange}
+                    style={{ ...styles.input, cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    {facilitiesList.length === 0 ? (
+                      <option value="Pankhudi">Pankhudi</option>
+                    ) : (
+                      facilitiesList.map(f => (
+                        <option key={f._id || f.id || f.name} value={f.name}>
+                          {f.name} {f.code ? `(${f.code})` : ''}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Category & HSN Code */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Layers size={14} color="#059669" />
+                    Category Name
+                  </label>
+                  <input
+                    type="text"
+                    name="categoryName"
+                    value={formData.categoryName}
+                    onChange={handleChange}
+                    list="form-category-suggestions"
+                    placeholder="e.g., KURTA SET, CO-ORD SET"
+                    style={styles.input}
+                  />
+                  <datalist id="form-category-suggestions">
+                    <option value="KURTA SET" />
+                    <option value="CO-ORD SET" />
+                    <option value="DRESS" />
+                    <option value="SUIT" />
+                    <option value="SAREE" />
+                    <option value="LEHENGA" />
+                    <option value="TOP" />
+                  </datalist>
+                </div>
+
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <FileCode size={14} color="#059669" />
+                    HSN Code
+                  </label>
+                  <input
+                    type="text"
+                    name="hsnCode"
+                    value={formData.hsnCode}
+                    onChange={handleChange}
+                    placeholder="e.g., 6204"
+                    style={styles.input}
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Size & Challan / Ref No */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    Product Size(s) *
+                  </label>
+                  <input
+                    type="text"
+                    name="size"
+                    value={formData.size}
+                    onChange={handleChange}
+                    placeholder="e.g., L or S, M, L, XL, 2XL"
+                    style={styles.input}
+                    required
+                  />
+                </div>
+
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Tag size={14} color="#059669" />
+                    Challan / Ref No.
+                  </label>
+                  <input
+                    type="text"
+                    name="challanNo"
+                    value={formData.challanNo}
+                    onChange={handleChange}
+                    placeholder="e.g., CH-2026-001"
+                    style={styles.input}
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Base Price & Sale Price */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <DollarSign size={14} color="#059669" />
+                    Base Price / Cost (Rs.)
+                  </label>
+                  <input
+                    type="number"
+                    name="purchasePrice"
+                    value={formData.purchasePrice}
+                    onChange={handleChange}
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    style={styles.input}
+                  />
+                </div>
+
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <DollarSign size={14} color="#059669" />
+                    Sale Price / MSRP (Rs.)
+                  </label>
+                  <input
+                    type="number"
+                    name="salePrice"
+                    value={formData.salePrice}
+                    onChange={handleChange}
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    style={styles.input}
+                  />
+                </div>
+              </div>
+
+              {/* Row 5: Image URL */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Product Image URL (Direct Link)
+                </label>
+                <input
+                  type="text"
+                  name="imageUrl"
+                  value={formData.imageUrl}
+                  onChange={handleChange}
+                  placeholder="https://example.com/image.jpg"
+                  style={styles.input}
+                />
+              </div>
+
+              {/* Row 6: Brand-Wise Barcodes / SKU Codes */}
+              <div style={{ marginTop: '0.85rem', background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <label style={{ ...styles.label, margin: 0, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Tag size={14} color="#059669" />
+                    Brand-Wise SKU Codes / Barcodes (Multi-Brand Selling)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddBrandCodeRow}
+                    style={{
+                      background: '#ecfdf5',
+                      color: '#047857',
+                      border: '1px solid #a7f3d0',
+                      padding: '0.35rem 0.65rem',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>+ Add Brand Code</span>
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 0.6rem 0' }}>
+                  Link brand-specific barcodes (e.g. ANOUK: ANK-301-L, MYNTRA: MYN-301-L) to this design. Scanning any linked barcode will manage stock for this master item.
+                </p>
+
+                {brandCodes.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.3rem 0' }}>
+                    No additional brand codes linked yet. Click "+ Add Brand Code" to add multi-brand barcodes.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {brandCodes.map((bc, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <select
+                          value={bc.brand || 'ANOUK'}
+                          onChange={(e) => handleUpdateBrandCode(idx, 'brand', e.target.value)}
+                          style={{
+                            ...styles.input,
+                            flex: 1,
+                            padding: '0.45rem 0.6rem',
+                            fontSize: '0.8rem',
+                            backgroundColor: '#ffffff',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {managedBrands.map(b => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Brand SKU / Barcode (e.g. ANK-301-L)"
+                          value={bc.code || ''}
+                          onChange={(e) => handleUpdateBrandCode(idx, 'code', e.target.value)}
+                          style={{ ...styles.input, flex: 1.5, padding: '0.45rem 0.6rem', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBrandCodeRow(idx)}
+                          style={{
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            borderRadius: '6px',
+                            padding: '0.45rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                          title="Remove Brand Barcode"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <datalist id="form-brand-suggestions">
+                {managedBrands.map(b => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="inventory-footer" style={styles.footer}>
+            <button type="button" onClick={handleModalClose} style={styles.cancelBtn}>
+              Cancel
+            </button>
+            <button type="submit" style={styles.submitBtn}>
+              <CheckCircle size={16} style={{ marginRight: '6px' }} />
+              {item ? 'Save Changes' : 'Add Product'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return ReactDOM.createPortal(modalMarkup, document.body);
+  }
+  return modalMarkup;
+}
+
+// Inject Responsive Mobile CSS Styles
+if (typeof document !== 'undefined') {
+  const styleElId = 'inventory-form-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .inventory-modal-container {
+          max-height: 94vh !important;
+          width: 95% !important;
+          border-radius: 12px !important;
+        }
+        .inventory-main-grid {
+          grid-template-columns: 1fr !important;
+          gap: 1rem !important;
+        }
+        .inventory-summary-card {
+          flex-direction: row !important;
+          align-items: center !important;
+          gap: 0.75rem !important;
+          padding: 0.75rem !important;
+        }
+        .inventory-summary-card > div:first-child {
+          width: 90px !important;
+          height: 100px !important;
+          flex-shrink: 0 !important;
+        }
+        .inventory-form-row-2col {
+          grid-template-columns: 1fr !important;
+          gap: 0.75rem !important;
+        }
+        .inventory-footer {
+          flex-direction: column-reverse !important;
+          gap: 0.5rem !important;
+        }
+        .inventory-footer button {
+          width: 100% !important;
+          justify-content: center !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+}
+
+const styles = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100vw',
+    height: '100vh',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999999,
+    padding: '1.25rem',
+    boxSizing: 'border-box',
+  },
+  container: {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    width: '100%',
+    maxWidth: '920px',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+    border: '1px solid #e2e8f0',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    maxHeight: '92vh',
+    position: 'relative',
+    margin: 'auto',
+  },
+  header: {
+    padding: '1.25rem 1.75rem',
+    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+    borderBottom: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerTitleGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+  },
+  badge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    backgroundColor: '#d1fae5',
+    color: '#047857',
+    fontSize: '0.7rem',
+    fontWeight: '700',
+    padding: '0.2rem 0.6rem',
+    borderRadius: '20px',
+    letterSpacing: '0.05em',
+    width: 'fit-content',
+  },
+  title: {
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: 0,
+  },
+  subtitle: {
+    fontSize: '0.825rem',
+    color: '#64748b',
+    margin: 0,
+  },
+  closeBtn: {
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    borderRadius: '50%',
+    width: '34px',
+    height: '34px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#64748b',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  errorBox: {
+    margin: '1rem 1.75rem 0',
+    padding: '0.75rem 1rem',
+    backgroundColor: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
+    color: '#dc2626',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+  },
+  formContent: {
+    padding: '1.5rem 1.75rem',
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.25rem',
+  },
+  mainGrid: {
+    display: 'grid',
+    gridTemplateColumns: '240px 1fr',
+    gap: '1.5rem',
+    alignItems: 'start',
+  },
+  summaryCard: {
+    backgroundColor: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+    alignItems: 'center',
+  },
+  imagePreviewContainer: {
+    width: '100%',
+    height: '180px',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    border: '1px solid #cbd5e1',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    backgroundColor: '#ffffff',
+  },
+  placeholderImg: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryDetails: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    borderTop: '1px solid #e2e8f0',
+    paddingTop: '0.75rem',
+  },
+  summaryRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '0.75rem',
+  },
+  summaryLabel: {
+    color: '#64748b',
+    fontWeight: '600',
+    fontSize: '0.68rem',
+  },
+  summaryValueSKU: {
+    fontWeight: '700',
+    color: '#1e293b',
+    backgroundColor: '#e2e8f0',
+    padding: '0.1rem 0.4rem',
+    borderRadius: '4px',
+    fontFamily: 'monospace',
+  },
+  summaryValueBrand: {
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  summaryValueCat: {
+    fontWeight: '600',
+    color: '#059669',
+    backgroundColor: '#d1fae5',
+    padding: '0.1rem 0.4rem',
+    borderRadius: '4px',
+    fontSize: '0.68rem',
+  },
+  summaryValueSize: {
+    fontWeight: '700',
+    color: '#475569',
+    backgroundColor: '#f1f5f9',
+    padding: '0.1rem 0.4rem',
+    borderRadius: '4px',
+  },
+  summaryValueCost: {
+    fontWeight: '600',
+    color: '#475569',
+  },
+  summaryValueRetail: {
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  formFieldsGrid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.1rem',
+  },
+  formRow2Col: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '1rem',
+  },
+  fieldCol: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.35rem',
+  },
+  fieldColFull: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.35rem',
+  },
+  label: {
+    fontSize: '0.78rem',
+    fontWeight: '600',
+    color: '#334155',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem',
+  },
+  input: {
+    width: '100%',
+    padding: '0.55rem 0.75rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    fontSize: '0.85rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s ease',
+  },
+  footer: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: '0.75rem',
+    paddingTop: '1rem',
+    borderTop: '1px solid #e2e8f0',
+    marginTop: '0.5rem',
+  },
+  cancelBtn: {
+    padding: '0.6rem 1.25rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    color: '#475569',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  submitBtn: {
+    padding: '0.6rem 1.5rem',
+    borderRadius: '8px',
+    border: 'none',
+    backgroundColor: '#059669',
+    color: '#ffffff',
+    fontSize: '0.875rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.3)',
+    transition: 'all 0.15s ease',
+  },
+  uniwareSearchBtn: {
+    marginTop: '0.35rem',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.4rem',
+    padding: '0.45rem 0.75rem',
+    borderRadius: '6px',
+    border: '1px solid #059669',
+    backgroundColor: '#ecfdf5',
+    color: '#047857',
+    fontSize: '0.78rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    width: '100%',
+  },
+  uniwareStatusSuccess: {
+    marginTop: '0.35rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '6px',
+    backgroundColor: '#f0fdf4',
+    border: '1px solid #bbf7d0',
+    color: '#15803d',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+  },
+  uniwareStatusWarning: {
+    marginTop: '0.35rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '6px',
+    backgroundColor: '#fffbeb',
+    border: '1px solid #fde68a',
+    color: '#b45309',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+  },
+};
+

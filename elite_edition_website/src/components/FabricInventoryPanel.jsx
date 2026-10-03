@@ -1,0 +1,7514 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { api } from '../services/api';
+import CatalogManagerModal from './CatalogManagerModal';
+import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
+import ScreenGroupRoster from './ScreenGroupRoster';
+import { dispatchScreenGroupEvent } from '../services/screenGroupService';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
+import { cleanDesignNameString } from '../utils/designUtils';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import { openPrintOptionsDialog } from '../utils/printService';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import { useFormDraft } from '../utils/useFormDraft';
+import {
+  RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
+  Layers, Database, Settings, Trash2, FileDown, Search, X,
+  AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
+  Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock, Truck, Calendar
+} from 'lucide-react';
+import '../styles/fabricEnterprise.css';
+import { SmartActionGroup } from './common/SmartActionGroup';
+import InfiniteScrollPagination from './InfiniteScrollPagination';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+
+export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
+  const defaultThisMonth = getDatePresetRange('this_month');
+  const [activeTab, setActiveTab] = useState(onlyChallan ? 'challan' : initialTab);
+  const currentUser = api.getCurrentUser();
+
+  const renderJobNoBadge = (jobNoRaw) => {
+    if (!jobNoRaw) return '—';
+    const cleanStr = String(jobNoRaw).replace(/^#?JOB\s*NO\.?\s*-\s*/i, '').trim();
+    if (!cleanStr) return '—';
+
+    const parts = cleanStr.split(/[,/]+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length === 0) return '—';
+
+    if (parts.length === 1) {
+      const num = parts[0].replace(/^#?JOB-?/i, '');
+      return (
+        <span style={{
+          display: 'inline-block',
+          whiteSpace: 'nowrap',
+          padding: '0.2rem 0.5rem',
+          borderRadius: 4,
+          fontWeight: 800,
+          color: '#38bdf8',
+          background: 'rgba(56,189,248,0.12)',
+          border: '1px solid rgba(56,189,248,0.25)',
+          fontSize: '0.78rem'
+        }}>
+          #{num}
+        </span>
+      );
+    }
+
+    const firstTwo = parts.slice(0, 2).map(p => `#${p.replace(/^#?JOB-?/i, '')}`).join(', ');
+    const remainingCount = parts.length - 2;
+    const fullTooltip = parts.map(p => `#${p.replace(/^#?JOB-?/i, '')}`).join(', ');
+
+    return (
+      <span
+        title={`Linked Job Cards (${parts.length}): ${fullTooltip}`}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          padding: '0.2rem 0.5rem',
+          borderRadius: 4,
+          fontWeight: 800,
+          color: '#38bdf8',
+          background: 'rgba(56,189,248,0.12)',
+          border: '1px solid rgba(56,189,248,0.25)',
+          fontSize: '0.78rem',
+          cursor: 'help'
+        }}
+      >
+        <span>{firstTwo}</span>
+        {remainingCount > 0 && (
+          <span style={{
+            background: 'rgba(56,189,248,0.25)',
+            color: '#38bdf8',
+            fontSize: '0.68rem',
+            padding: '1px 5px',
+            borderRadius: 4,
+            fontWeight: 900
+          }}>
+            +{remainingCount}
+          </span>
+        )}
+      </span>
+    );
+  };
+
+  const normalizeFabricName = (val, pannaVal = '') => {
+    if (!val) return '';
+    let str = String(val).trim().toUpperCase();
+
+    let extractedPanna = '';
+    const pannaMatches = str.match(/(?:\s+(\d+))+\s*$/);
+    if (pannaMatches) {
+      const digits = pannaMatches[0].trim().split(/\s+/);
+      extractedPanna = digits[digits.length - 1];
+      str = str.replace(/(?:\s+(\d+))+\s*$/, '').trim();
+    }
+
+    let base = str;
+    if (base === 'LINEN' || base === 'KOINUR LINEN' || base === 'KOHINUR LINEN' || base === 'KOHINOOR LINEN' || base.includes('KOINUR') || base.includes('KOHINOOR') || base.includes('KOHINUR')) {
+      base = 'KOHINOOR LINEN';
+    } else if (base === 'REYON' || base === 'RAYON' || base === 'POLY REYON' || base === 'POLY RAYON' || base.includes('REYON') || base.includes('RAYON')) {
+      if (base.includes('30 SPN')) {
+        base = 'POLY REYON 30 SPN';
+      } else {
+        base = 'POLY REYON';
+      }
+    } else if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
+      base = 'FRENCH CREPE';
+    } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
+      base = 'CAMBRIC';
+    } else if (base === 'MAL' || base === 'POLY MAL' || base === 'POLYMALL' || base === 'POLY MLL' || base === 'POLLY MAL') {
+      base = 'POLLY MAL';
+    }
+
+    let finalPanna = extractedPanna || (pannaVal ? String(pannaVal).trim().replace(/['"]/g, '') : '');
+    if (finalPanna === '38' || finalPanna === '46' || finalPanna === '56') finalPanna = '58';
+    if (!finalPanna || finalPanna.toUpperCase() === 'UNKNOWN' || isNaN(parseInt(finalPanna, 10))) {
+      if (base.includes('ARMANI')) finalPanna = '44';
+      else finalPanna = '58';
+    }
+
+    return `${base} ${finalPanna}`;
+  };
+
+  const getDefaultPannaForFabric = (fabricName, currentPanna = '') => {
+    let clean = currentPanna ? String(currentPanna).trim().replace(/['"]/g, '') : '';
+    if (clean === '46' || clean === '56') return '58';
+    if (!clean || clean.toUpperCase() === 'UNKNOWN') {
+      const fabUpper = String(fabricName || '').trim().toUpperCase();
+      if (fabUpper.includes('ARMANI')) {
+        return '44';
+      }
+      return '58';
+    }
+    return clean;
+  };
+
+  const matchesTransferFabric = (lot, selectedFabric) => {
+    if (!selectedFabric) return true;
+    if (!lot) return false;
+    const targetNorm = normalizeFabricName(selectedFabric).toUpperCase().trim();
+    const lotNorm = normalizeFabricName(lot.fabricQuality, lot.panna).toUpperCase().trim();
+    if (targetNorm && lotNorm && targetNorm === lotNorm) return true;
+
+    // Base name comparison without trailing panna
+    const targetBase = targetNorm.replace(/\s+\d+.*$/, '').trim();
+    const lotBase = lotNorm.replace(/\s+\d+.*$/, '').trim();
+    if (targetBase && lotBase && targetBase === lotBase) return true;
+
+    const sUpper = String(selectedFabric).trim().toUpperCase();
+    const lUpper = String(lot.fabricQuality || '').trim().toUpperCase();
+    if (sUpper === lUpper) return true;
+    if (sUpper.includes(lUpper) || lUpper.includes(sUpper)) return true;
+
+    return false;
+  };
+
+  const isAdmin = String(currentUser?.role || '').toLowerCase() === 'admin' || !!currentUser?.isMainAdmin || currentUser?.email === 'harshitsidapara2468@gmail.com';
+  const [stock, setStock] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [fabricsList, setFabricsList] = useState([]);
+  const [vendorsList, setVendorsList] = useState([]);
+  const [partiesList, setPartiesList] = useState([]);
+  const [widthsList, setWidthsList] = useState([]);
+  const [inProgressJobCards, setInProgressJobCards] = useState([]);
+  const [lotList, setLotList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [lotLoading, setLotLoading] = useState(false);
+
+  // Challan state
+  const [challans, setChallans] = useState([]);
+  const [challanSearch, setChallanSearch] = useState('');
+  const [challanFilters, setChallanFilters] = useState({ status: [], party: [] });
+  const [challanStatusFilter, setChallanStatusFilter] = useState('All');
+  const [challanVisibleCount, setChallanVisibleCount] = useState(50);
+  const [challanLoadingMore, setChallanLoadingMore] = useState(false);
+  // Ref to always hold latest challan filter values — prevents stale closure in setInterval
+  const challanFiltersRef = useRef({ search: '', dateStart: defaultThisMonth.dateStart, dateEnd: defaultThisMonth.dateEnd, status: 'All' });
+  const [challanDatePreset, setChallanDatePreset] = useState('this_month');
+  const [challanDateStart, setChallanDateStart] = useState(defaultThisMonth.dateStart);
+  const [challanDateEnd, setChallanDateEnd] = useState(defaultThisMonth.dateEnd);
+  const [customChallanDateStart, setCustomChallanDateStart] = useState('');
+  const [customChallanDateEnd, setCustomChallanDateEnd] = useState('');
+  const [isChallanOpen, setIsChallanOpen] = useState(false);
+  const [editingChallan, setEditingChallan] = useState(null);
+  const [challanMobileTab, setChallanMobileTab] = useState('info'); // 'info' | 'tp'
+  const [challanLotLoading, setChallanLotLoading] = useState(false);
+  const [challanDeleteTarget, setChallanDeleteTarget] = useState(null);
+  const [viewChallanModal, setViewChallanModal] = useState(null);
+  const [selectedChallanMap, setSelectedChallanMap] = useState({});
+  const selectedChallanIds = Object.keys(selectedChallanMap);
+  const [availableLots, setAvailableLots] = useState([]);
+  const [billToOptions, setBillToOptions] = useState([]);
+  const [shipToOptions, setShipToOptions] = useState([]);
+  const [deliveryByOptions, setDeliveryByOptions] = useState([]);
+  const [lotPartyMap, setLotPartyMap] = useState({});
+
+  const emptyTpRows = () => [{ tpNo: 1, tpMeter: '', lotNo: '' }];
+  const [challanForm, setChallanForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    partyName: '',
+    lotNo: '',
+    vendorChallanNo: '',
+    deliveryBy: '',
+    fabricName: '',
+    shortagePct: '',
+    jobNo: '',
+    designNo: '',
+    colour: '',
+    panna: '',
+    pcs: '',
+    billTo: '',
+    shipTo: '',
+    tpDetails: emptyTpRows(),
+    notes: '',
+  });
+
+  // Stock Adjustment (SA) state
+  const [stockAdjustments, setStockAdjustments] = useState([]);
+  const [saSearch, setSaSearch] = useState('');
+  const [saDatePreset, setSaDatePreset] = useState('all');
+  const [saDateStart, setSaDateStart] = useState('');
+  const [saDateEnd, setSaDateEnd] = useState('');
+  const [customSaDateStart, setCustomSaDateStart] = useState('');
+  const [customSaDateEnd, setCustomSaDateEnd] = useState('');
+  const [isSaFormOpen, setIsSaFormOpen] = useState(false);
+  const [saDeleteTarget, setSaDeleteTarget] = useState(null);
+  const [saAvailableLots, setSaAvailableLots] = useState([]);
+  const [editingSa, setEditingSa] = useState(null);
+  const [saForm, setSaForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    partyName: '',
+    vendorChallanNo: '',
+    adjustmentType: 'RETURN_REJECTED',
+    fabricQuality: '',
+    panna: '',
+    lotNo: '',
+    reason: 'Fabric Return / Rejection',
+    notes: '',
+    tpDetails: [{ tpNo: 1, tpMeter: '', lotNo: '' }]
+  });
+
+  // Lot Transfer state
+  const [selectedChallanHistory, setSelectedChallanHistory] = useState(null);
+  const [lotTransfers, setLotTransfers] = useState([]);
+  const [transferSearch, setTransferSearch] = useState('');
+  const [transferDatePreset, setTransferDatePreset] = useState('all');
+  const [transferDateStart, setTransferDateStart] = useState('');
+  const [transferDateEnd, setTransferDateEnd] = useState('');
+  const [customTransferDateStart, setCustomTransferDateStart] = useState('');
+  const [customTransferDateEnd, setCustomTransferDateEnd] = useState('');
+  const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    fabricQuality: '',
+    panna: '58',
+    sourceLotNo: '',
+    destLotNo: '',
+    partyName: '',
+    qty: '',
+    notes: '',
+  });
+
+  const { clearDraft: clearTransferDraft } = useFormDraft('fabric_lot_transfer', transferForm, setTransferForm, isTransferFormOpen);
+
+  // Stock Dashboard Date Range & Filtered Stock state
+  const [stockDatePreset, setStockDatePreset] = useState('this_month');
+  const [stockDateStart, setStockDateStart] = useState(defaultThisMonth.dateStart);
+  const [stockDateEnd, setStockDateEnd] = useState(defaultThisMonth.dateEnd);
+  const [customStockDateStart, setCustomStockDateStart] = useState('');
+  const [customStockDateEnd, setCustomStockDateEnd] = useState('');
+
+  const openQuickTransfer = (targetLot) => {
+    const rawDeficit = Math.abs(targetLot.currentStock || 0);
+    const targetParty = targetLot.outwardTxs?.find(o => o.partyName)?.partyName || targetLot.vendorName || '';
+    setTransferForm({
+      date: new Date().toISOString().split('T')[0],
+      fabricQuality: targetLot.fabricQuality || '',
+      panna: targetLot.panna || '58',
+      sourceLotNo: '',
+      destLotNo: String(targetLot.lotNo),
+      partyName: targetParty,
+      qty: rawDeficit > 0 ? String(rawDeficit.toFixed(2)) : '',
+      notes: `Deficit Clearance for Lot #${targetLot.lotNo}`
+    });
+    setIsTransferFormOpen(true);
+    setActiveTab('lotTransfer');
+  };
+
+  // Compute date-filtered stock dynamically when date range is selected
+  const displayStock = React.useMemo(() => {
+    if (!stockDateStart && !stockDateEnd) return stock;
+
+    const map = new Map();
+    transactions.forEach(t => {
+      if (!t.date) return;
+      const tDate = t.date.slice(0, 10);
+      if (stockDateStart && tDate < stockDateStart) return;
+      if (stockDateEnd && tDate > stockDateEnd) return;
+
+      const fName = String(t.fabricQuality || '').trim().toUpperCase();
+      if (!fName) return;
+
+      if (!map.has(fName)) {
+        map.set(fName, { fabricQuality: fName, totalInward: 0, totalOutward: 0, currentStock: 0 });
+      }
+      const item = map.get(fName);
+      const qty = Number(t.qty || 0);
+      if (t.type === 'INWARD') {
+        item.totalInward += qty;
+      } else {
+        item.totalOutward += qty;
+      }
+    });
+
+    map.forEach(item => {
+      item.currentStock = item.totalInward - item.totalOutward;
+    });
+
+    const result = Array.from(map.values());
+    return result.length > 0 ? result : stock;
+  }, [stock, transactions, stockDateStart, stockDateEnd]);
+
+  // Download PDF Report for Stock & Fabric Consumption with Advance Print Settings
+  const handleDownloadStockPDF = async () => {
+    const listToExport = displayStock && displayStock.length > 0 ? displayStock : stock;
+    if (!listToExport || listToExport.length === 0) {
+      triggerEliteAlert('No Data', 'No stock data available to export.', 'warning');
+      return;
+    }
+
+    const totRec = listToExport.reduce((a, i) => a + (i.totalInward || 0), 0);
+    const totUsed = listToExport.reduce((a, i) => a + (i.totalOutward || 0), 0);
+    const totNet = listToExport.reduce((a, i) => a + (i.currentStock || 0), 0);
+
+    const dateRangeStr = stockDateStart && stockDateEnd
+      ? `${stockDateStart} to ${stockDateEnd}`
+      : stockDateStart
+      ? `From ${stockDateStart}`
+      : 'All Time';
+
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #1e293b; background: #ffffff;">
+        <style>
+          .header { text-align: center; border-bottom: 3px solid #4f46e5; padding-bottom: 14px; margin-bottom: 20px; }
+          .company { font-size: 24px; font-weight: 900; color: #1e1b4b; text-transform: uppercase; letter-spacing: 1px; }
+          .subtitle { font-size: 15px; font-weight: 800; color: #4f46e5; margin-top: 4px; }
+          .meta { font-size: 11px; color: #64748b; margin-top: 6px; font-weight: 600; }
+          .summary-bar { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 24px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px 18px; }
+          .kpi { flex: 1; text-align: center; }
+          .kpi-title { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 800; letter-spacing: 0.5px; }
+          .kpi-value { font-size: 18px; font-weight: 900; margin-top: 4px; }
+          .green { color: #047857; }
+          .red { color: #b91c1c; }
+          .blue { color: #0369a1; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+          th { background: #1e293b; color: #ffffff; text-align: left; padding: 10px 14px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 800; }
+          td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }
+          tr:nth-child(even) { background: #f8fafc; }
+          .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; display: inline-block; }
+          .badge-ok { background: #d1fae5; color: #047857; border: 1px solid #a7f3d0; }
+          .badge-low { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+          .badge-empty { background: #ffe4e6; color: #be123c; border: 1px solid #fecdd3; }
+          .footer { margin-top: 36px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; font-weight: 600; }
+        </style>
+        <div class="header">
+          <div class="company">Elite Digital Prints</div>
+          <div class="subtitle">Fabric Stock & Consumption Report</div>
+          <div class="meta">Generated: ${new Date().toLocaleString('en-IN')} | Date Filter: ${dateRangeStr}</div>
+        </div>
+
+        <div class="summary-bar">
+          <div class="kpi"><div class="kpi-title">Total Fabrics</div><div class="kpi-value">${listToExport.length}</div></div>
+          <div class="kpi"><div class="kpi-title">Total Received</div><div class="kpi-value green">${totRec.toFixed(2)} mtr</div></div>
+          <div class="kpi"><div class="kpi-title">Total Used</div><div class="kpi-value red">${totUsed.toFixed(2)} mtr</div></div>
+          <div class="kpi"><div class="kpi-title">Net Available Stock</div><div class="kpi-value blue">${totNet.toFixed(2)} mtr</div></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Fabric Quality</th>
+              <th style="text-align: right;">Total Received (Inward)</th>
+              <th style="text-align: right;">Total Used (Outward)</th>
+              <th style="text-align: right;">Net Available Stock</th>
+              <th style="text-align: center;">Stock Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${listToExport.map((item, index) => {
+              const cur = Number(item.currentStock || 0);
+              const statusClass = cur <= 0 ? 'badge-empty' : cur <= 50 ? 'badge-low' : 'badge-ok';
+              const statusText = cur <= 0 ? 'Out of Stock' : cur <= 50 ? 'Low Stock' : 'In Stock';
+              return `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td style="font-weight: 800; color: #0f172a;">${item.fabricQuality}</td>
+                  <td style="text-align: right; font-weight: 700; color: #047857;">${Number(item.totalInward || 0).toFixed(2)} m</td>
+                  <td style="text-align: right; font-weight: 700; color: #b91c1c;">${Number(item.totalOutward || 0).toFixed(2)} m</td>
+                  <td style="text-align: right; font-weight: 900; color: #0369a1; background: #f0f9ff;">${cur.toFixed(2)} m</td>
+                  <td style="text-align: center;"><span class="status-badge ${statusClass}">${statusText}</span></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          This is a computer-generated report from Elite Digital Prints ERP System.
+        </div>
+      </div>
+    `;
+
+    await openPrintOptionsDialog({
+      title: 'Fabric Stock & Consumption Report',
+      content: htmlContent,
+      defaultSettings: {
+        paperSize: 'A4',
+        orientation: 'portrait',
+        margin: 'default'
+      }
+    });
+  };
+
+  const fileInputRef = useRef(null);
+
+  const handleExportCsv = () => {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const itemsMap = new Map();
+
+    // 1. Gather combinations from transactions
+    transactions.forEach(t => {
+      const fName = String(t.fabricQuality || '').trim().toUpperCase();
+      const pVal = String(t.panna || '').trim();
+      if (!fName) return;
+
+      const key = `${fName}|||${pVal}`;
+      if (!itemsMap.has(key)) {
+        itemsMap.set(key, { fabricQuality: fName, panna: pVal, openingStock: 0, inwardQty: 0, outwardQty: 0, currentStock: 0 });
+      }
+
+      const item = itemsMap.get(key);
+      const qty = Number(t.qty || 0);
+      const tDate = new Date(t.date);
+      const isPrev = tDate < startOfMonth;
+      const isAdj = t.notes && t.notes.includes('Adjustment');
+
+      if (isPrev) {
+        if (t.type === 'INWARD') {
+          item.openingStock += qty;
+        } else {
+          item.openingStock -= qty;
+        }
+      } else {
+        if (t.type === 'INWARD') {
+          if (!isAdj) item.inwardQty += qty;
+        } else {
+          if (!isAdj) item.outwardQty += qty;
+        }
+      }
+    });
+
+    // 2. Add configured fabrics from fabricsList if not present
+    fabricsList.forEach(f => {
+      const fName = String(f || '').trim().toUpperCase();
+      if (!fName) return;
+      const widths = widthsList.length > 0 ? widthsList : [''];
+      widths.forEach(w => {
+        const pVal = String(w || '').trim();
+        const key = `${fName}|||${pVal}`;
+        if (!itemsMap.has(key)) {
+          itemsMap.set(key, { fabricQuality: fName, panna: pVal, openingStock: 0, inwardQty: 0, outwardQty: 0, currentStock: 0 });
+        }
+      });
+    });
+
+    // 3. Compute final currentStock and format as CSV
+    const rows = [];
+    itemsMap.forEach(item => {
+      let totalIn = 0;
+      let totalOut = 0;
+      transactions.forEach(t => {
+        if (String(t.fabricQuality || '').trim().toUpperCase() === item.fabricQuality &&
+          String(t.panna || '').trim() === item.panna) {
+          if (t.type === 'INWARD') totalIn += Number(t.qty || 0);
+          else totalOut += Number(t.qty || 0);
+        }
+      });
+      item.currentStock = totalIn - totalOut;
+      rows.push(item);
+    });
+
+    // Generate CSV string
+    const headers = ['Fabric Quality', 'Panna', 'Opening Stock', 'Inward Qty', 'Outward Qty', 'Current Stock', 'Date', 'Challan No', 'Vendor Name', 'Job No', 'Party Name', 'Notes'];
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => [
+        `"${r.fabricQuality}"`,
+        `"${r.panna}"`,
+        r.openingStock.toFixed(2),
+        r.inwardQty.toFixed(2),
+        r.outwardQty.toFixed(2),
+        r.currentStock.toFixed(2),
+        '""', // Date
+        '""', // Challan No
+        '""', // Vendor Name
+        '""', // Job No
+        '""', // Party Name
+        '""'  // Notes
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `fabric-stock-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportCsv = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target.result;
+        const lines = text.split(/\r?\n/);
+        if (lines.length < 2) {
+          alert('CSV file is empty.');
+          return;
+        }
+
+        const rows = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const cols = [];
+          let insideQuote = false;
+          let currentWord = '';
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            if (char === '"') {
+              insideQuote = !insideQuote;
+            } else if (char === ',' && !insideQuote) {
+              cols.push(currentWord.trim());
+              currentWord = '';
+            } else {
+              currentWord += char;
+            }
+          }
+          cols.push(currentWord.trim());
+
+          const fabricQuality = cols[0];
+          const panna = cols[1];
+          const openingStock = cols[2];
+          const inwardQty = cols[3];
+          const outwardQty = cols[4];
+          const currentStock = cols[5];
+          const date = cols[6];
+          const challanNo = cols[7];
+          const vendorName = cols[8];
+          const jobNo = cols[9];
+          const partyName = cols[10];
+          const notes = cols[11];
+
+          if (!fabricQuality) continue;
+
+          rows.push({
+            fabricQuality,
+            panna,
+            openingStock: openingStock !== undefined && openingStock !== '' ? parseFloat(openingStock) : 0,
+            inwardQty: inwardQty !== undefined && inwardQty !== '' ? parseFloat(inwardQty) : 0,
+            outwardQty: outwardQty !== undefined && outwardQty !== '' ? parseFloat(outwardQty) : 0,
+            currentStock: currentStock !== undefined && currentStock !== '' ? parseFloat(currentStock) : 0,
+            date: date || '',
+            challanNo: challanNo || '',
+            vendorName: vendorName || '',
+            jobNo: jobNo || '',
+            partyName: partyName || '',
+            notes: notes || ''
+          });
+        }
+
+        if (rows.length === 0) {
+          alert('No valid rows found in CSV.');
+          return;
+        }
+
+        setLoading(true);
+        const res = await api.importFabricStock(rows);
+        if (res.success) {
+          alert(res.message || 'Fabric stock imported successfully.');
+          fetchData();
+        } else {
+          alert(res.error || 'Failed to import fabric stock.');
+        }
+      } catch (err) {
+        alert('Error parsing CSV: ' + err.message);
+      } finally {
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Panna-wise stock & requirement
+  const [pannaStock, setPannaStock] = useState([]);
+  const [requirement, setRequirement] = useState([]);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [expandedFabric, setExpandedFabric] = useState(null);
+  const [stockSortOrder, setStockSortOrder] = useState('highToLow');
+
+  // Search / filter state
+  const [inwardSearch, setInwardSearch] = useState('');
+  const [outwardSearch, setOutwardSearch] = useState('');
+
+  const [inwardDatePreset, setInwardDatePreset] = useState('all');
+  const [inwardDateStart, setInwardDateStart] = useState('');
+  const [inwardDateEnd, setInwardDateEnd] = useState('');
+  const [customInwardDateStart, setCustomInwardDateStart] = useState('');
+  const [customInwardDateEnd, setCustomInwardDateEnd] = useState('');
+  const [inwardSortBy, setInwardSortBy] = useState('date');
+  const [inwardSortOrder, setInwardSortOrder] = useState('desc');
+
+  const [outwardDatePreset, setOutwardDatePreset] = useState('all');
+  const [outwardDateStart, setOutwardDateStart] = useState('');
+  const [outwardDateEnd, setOutwardDateEnd] = useState('');
+  const [customOutwardDateStart, setCustomOutwardDateStart] = useState('');
+  const [customOutwardDateEnd, setCustomOutwardDateEnd] = useState('');
+  const [outwardSortBy, setOutwardSortBy] = useState('date');
+  const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
+
+  // Lot-Wise Management state
+  const [lotSearch, setLotSearch] = useState('');
+  const [lotFilters, setLotFilters] = useState({ status: [], fabric: [], vendor: [] });
+  const [lotStatusFilter, setLotStatusFilter] = useState('All');
+  const [lotDatePreset, setLotDatePreset] = useState('all');
+  const [lotDateStart, setLotDateStart] = useState('');
+  const [lotDateEnd, setLotDateEnd] = useState('');
+  const [customLotDateStart, setCustomLotDateStart] = useState('');
+  const [customLotDateEnd, setCustomLotDateEnd] = useState('');
+  const [expandedLotNo, setExpandedLotNo] = useState(null);
+  const [lotPdfLoading, setLotPdfLoading] = useState(false);
+  const [lotDownloadingNo, setLotDownloadingNo] = useState(null);
+
+  const handleDownloadSingleLotPdf = async (lot) => {
+    if (!lot || !lot.lotNo) return;
+    try {
+      setLotDownloadingNo(lot.lotNo);
+      await api.downloadSingleLotPdf(
+        lot.lotNo,
+        `Fabric_Lot_${lot.lotNo}_Statement_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+    } catch (err) {
+      alert('Failed to download Lot PDF statement: ' + err.message);
+    } finally {
+      setLotDownloadingNo(null);
+    }
+  };
+
+  // PDF download filter state
+  const [pdfFilter, setPdfFilter] = useState({
+    dateStart: '',
+    dateEnd: '',
+    fabricQuality: ''
+  });
+  const [isPdfFilterOpen, setIsPdfFilterOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  // Combined Multi-Report Modal state
+  const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
+  const [combinedDateStart, setCombinedDateStart] = useState(() => new Date().toISOString().split('T')[0]);
+  const [combinedDateEnd, setCombinedDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'lotwise', 'stock', 'machine']);
+  const [combinedLoading, setCombinedLoading] = useState(false);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, type, label }
+
+  // Editing transaction
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [editingOutwardTransaction, setEditingOutwardTransaction] = useState(null);
+
+  // Modals
+  const [isInwardOpen, setIsInwardOpen] = useState(false);
+  const [isOutwardOpen, setIsOutwardOpen] = useState(false);
+  const [isManagerOpen, setIsManagerOpen] = useState(false);
+
+  // Inward TP (Roll-wise Details) state
+  const [inwardTpModalTransaction, setInwardTpModalTransaction] = useState(null);
+  const [inwardTpRows, setInwardTpRows] = useState([]);
+  const [syncInwardQty, setSyncInwardQty] = useState(false);
+  const [inwardBulkPasteOpen, setInwardBulkPasteOpen] = useState(false);
+  const [inwardBulkPasteText, setInwardBulkPasteText] = useState('');
+  const [inwardTpSaving, setInwardTpSaving] = useState(false);
+  const [showRollRemarks, setShowRollRemarks] = useState(false);
+  const tpListRef = useRef(null);
+  const prevTpLenRef = useRef(0);
+
+  useEffect(() => {
+    if (inwardTpRows.length > prevTpLenRef.current && tpListRef.current) {
+      setTimeout(() => {
+        if (tpListRef.current) {
+          tpListRef.current.scrollTop = tpListRef.current.scrollHeight;
+        }
+      }, 50);
+    }
+    prevTpLenRef.current = inwardTpRows.length;
+  }, [inwardTpRows.length]);
+
+  // Form states
+  const [inwardForm, setInwardForm] = useState({
+    challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct', date: new Date().toISOString().split('T')[0], notes: ''
+  });
+  const [outwardForm, setOutwardForm] = useState({
+    jobNo: '', challanNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: ''
+  });
+
+  const fetchData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    setError('');
+    try {
+      const cfg = await api.getPrintConfig();
+      if (cfg && Array.isArray(cfg.fabrics)) {
+        setFabricsList(cfg.fabrics);
+      } else if (cfg && cfg.fabrics) {
+        setFabricsList(Object.keys(cfg.fabrics));
+      }
+
+      try {
+        const vRes = await api.getFabricVendors();
+        if (vRes) setVendorsList(vRes);
+      } catch (e) {
+        console.warn('Failed to fetch fabric vendors', e);
+      }
+
+      if (cfg && cfg.parties) setPartiesList(cfg.parties);
+      if (cfg && cfg.widths) {
+        const defaultWidths = ['58', '44', '36'];
+        const cleanWidths = cfg.widths.map(w => String(w).replace(/['"]/g, '')).filter(Boolean);
+        const combined = Array.from(new Set([...defaultWidths, ...cleanWidths]));
+        setWidthsList(combined);
+      } else {
+        setWidthsList(['58', '44', '36']);
+      }
+      if (cfg && cfg.billToOptions) setBillToOptions(cfg.billToOptions);
+      if (cfg && cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
+      if (cfg && Array.isArray(cfg.deliveryOptions) && cfg.deliveryOptions.length > 0) {
+        setDeliveryByOptions(cfg.deliveryOptions);
+      }
+      if (cfg && cfg.lotPartyMap) setLotPartyMap(cfg.lotPartyMap);
+
+      try {
+        const jRes = await api.getJobCards({ limit: 5000 });
+        if (jRes && jRes.data) setInProgressJobCards(jRes.data);
+      } catch (e) {
+        console.warn('Failed to fetch job cards', e);
+      }
+
+      const stockRes = await api.getFabricStock({ department });
+      if (stockRes.success) setStock(stockRes.data);
+
+      const transRes = await api.getFabricTransactions({ department });
+      if (transRes.success) setTransactions(transRes.data);
+
+      // Panna-wise stock
+      try {
+        const pRes = await api.getFabricStockByPanna({ department });
+        if (pRes && pRes.success) setPannaStock(pRes.data || []);
+      } catch (e) { console.warn('Failed to fetch panna stock', e); }
+
+      // Lot Transfers
+      try {
+        const ltRes = await api.getLotTransfers();
+        if (ltRes && ltRes.success) setLotTransfers(ltRes.data || []);
+      } catch (e) { console.warn('Failed to fetch lot transfers', e); }
+
+    } catch (err) {
+      if (!isSilent) setError(err.message || 'Failed to load fabric inventory data.');
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
+  };
+
+  // Flexible job card lookup helper
+  const findMatchingJobCard = (val) => {
+    if (!val) return null;
+    const cleanVal = String(val).trim().toUpperCase();
+    const numVal = cleanVal.replace(/\D/g, '');
+
+    return inProgressJobCards.find(j => {
+      if (!j.jobNo) return false;
+      const jStr = String(j.jobNo).trim().toUpperCase();
+      const jNum = jStr.replace(/\D/g, '');
+
+      return (
+        jStr === cleanVal ||
+        (numVal && jNum === numVal) ||
+        jStr === `JOB-${cleanVal}` ||
+        jStr === `EDP-${cleanVal}` ||
+        `JOB-${jStr}` === cleanVal ||
+        `EDP-${jStr}` === cleanVal
+      );
+    });
+  };
+
+  // fetch requirement from job cards
+  const fetchRequirement = async (isSilent = false) => {
+    if (!isSilent) setReqLoading(true);
+    try {
+      const res = await api.getFabricRequirement();
+      if (res && res.success) setRequirement(res.data || []);
+    } catch (e) {
+      console.warn('Failed to fetch requirement', e);
+    } finally {
+      if (!isSilent) setReqLoading(false);
+    }
+  };
+
+  const fetchStockAdjustments = async () => {
+    try {
+      const res = await api.getStockAdjustments();
+      if (res && res.success) setStockAdjustments(res.data || []);
+    } catch (e) {
+      console.warn('Failed to fetch stock adjustments', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchData(false);
+    fetchRequirement(false);
+    fetchChallans();
+    fetchStockAdjustments();
+    const intervalId = setInterval(() => {
+      fetchData(true);
+      fetchRequirement(true);
+      // NOTE: fetchChallans is intentionally excluded here.
+      // It has its own useEffect that fires on challanSearch/date changes.
+      // Including it here with a stale closure would reset search results every 5s.
+      fetchStockAdjustments();
+    }, 5000); // 5s real-time auto-sync
+
+    const handleDataRefresh = () => {
+      fetchData(true);
+      fetchRequirement(true);
+      fetchChallans(); // Uses ref — always reads current search/date values
+      fetchStockAdjustments();
+    };
+    window.addEventListener('elite-data-refresh', handleDataRefresh);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('elite-data-refresh', handleDataRefresh);
+    };
+  }, []);
+
+  // ─── Fetch ALL lots (no filter) — client side will filter by fabric ───
+  const fetchAllLots = async () => {
+    setLotLoading(true);
+    try {
+      const res = await api.getFabricLotStock({});
+      if (res && res.success) setLotList(res.data || []);
+    } catch (e) {
+      console.warn('Failed to fetch lot stock', e);
+    } finally {
+      setLotLoading(false);
+    }
+  };
+
+  // Re-fetch lots whenever outward modal opens
+  useEffect(() => {
+    if (isOutwardOpen) fetchAllLots();
+  }, [isOutwardOpen]);
+
+  const handleLotNoChange = (e) => {
+    const val = e.target.value;
+    setOutwardForm(prev => {
+      const updated = { ...prev, lotNo: val };
+      const lot = lotList.find(l => String(l.lotNo) === String(val));
+      if (lot && lot.panna) updated.panna = lot.panna;
+      return updated;
+    });
+  };
+
+  const handleInwardSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const cleanFabric = normalizeFabricName(inwardForm.fabricQuality, inwardForm.panna);
+    const payload = { ...inwardForm, fabricQuality: cleanFabric || inwardForm.fabricQuality, department: department || 'digital_print' };
+    try {
+      if (editingTransaction) {
+        await api.updateFabricTransaction(editingTransaction._id, payload);
+        triggerPushNotification('🧵 Fabric Transaction Updated', 'Inward fabric transaction updated.', 'info');
+      } else {
+        await api.createFabricInward(payload);
+        triggerPushNotification('🧵 Fabric Inward Added', `${inwardForm.qty || ''}M of ${cleanFabric || inwardForm.fabricQuality} inward recorded!`, 'success');
+      }
+      setIsInwardOpen(false);
+      setEditingTransaction(null);
+      setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', date: new Date().toISOString().split('T')[0], notes: '' });
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+    } catch (err) {
+      alert(err.message);
+      setLoading(false);
+    }
+  };
+
+  const handleOutwardSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const cleanFabric = normalizeFabricName(outwardForm.fabricQuality, outwardForm.panna);
+    const payload = { ...outwardForm, fabricQuality: cleanFabric || outwardForm.fabricQuality, department: department || 'digital_print' };
+    try {
+      if (editingOutwardTransaction) {
+        await api.updateFabricTransaction(editingOutwardTransaction._id, payload);
+        triggerPushNotification('📦 Outward Transaction Updated', `Outward transaction for Job #${outwardForm.jobNo} updated.`, 'info');
+      } else {
+        await api.createFabricOutward(payload);
+        triggerPushNotification('📦 Fabric Outward Recorded', `${outwardForm.qty || ''}M fabric outward recorded for Job #${outwardForm.jobNo}.`, 'success');
+      }
+      setIsOutwardOpen(false);
+      setEditingOutwardTransaction(null);
+      setOutwardForm({ jobNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: '' });
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditOutward = (t) => {
+    setEditingOutwardTransaction(t);
+    setOutwardForm({
+      jobNo: t.jobNo || '',
+      partyName: t.partyName || '',
+      fabricQuality: t.fabricQuality || '',
+      panna: t.panna || '58',
+      lotNo: t.lotNo ? String(t.lotNo) : '',
+      qty: t.qty != null ? String(t.qty) : '',
+      date: t.date ? new Date(t.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      notes: t.notes || ''
+    });
+    setIsOutwardOpen(true);
+  };
+
+  const handleTransferSubmit = async (e) => {
+    e.preventDefault();
+    if (!transferForm.sourceLotNo || !transferForm.destLotNo || !transferForm.qty) {
+      alert('Please select both Source Lot, Destination Lot, and enter Transfer Quantity.');
+      return;
+    }
+    const transferQty = parseFloat(transferForm.qty);
+    if (isNaN(transferQty) || transferQty <= 0) {
+      alert('Transfer quantity must be greater than 0.');
+      return;
+    }
+    if (String(transferForm.sourceLotNo) === String(transferForm.destLotNo)) {
+      alert('Source Lot and Destination Lot must be different.');
+      return;
+    }
+
+    const srcLot = lotRecords.find(l => String(l.lotNo) === String(transferForm.sourceLotNo));
+    if (srcLot && transferQty > srcLot.currentStock) {
+      const proceed = await triggerEliteConfirm({
+        title: 'Source Lot Stock Warning',
+        message: `Source Lot #${transferForm.sourceLotNo} currently has only ${srcLot.currentStock.toFixed(2)}m available. Transferring ${transferQty.toFixed(2)}m will leave it in negative deficit. Do you want to proceed?`,
+        confirmText: 'Yes, Proceed',
+        type: 'warning'
+      });
+      if (!proceed) return;
+    }
+
+    setLoading(true);
+    const effFabric = transferForm.fabricQuality || (srcLot && (normalizeFabricName(srcLot.fabricQuality, srcLot.panna) || srcLot.fabricQuality)) || '';
+    const effPanna = transferForm.panna || (srcLot && srcLot.panna) || '58';
+    const cleanFabric = normalizeFabricName(effFabric, effPanna);
+    const resolvedParty = (transferForm.partyName || srcLot?.outwardTxs?.find(o => o.partyName)?.partyName || srcLot?.vendorName || '').trim();
+    const payload = {
+      ...transferForm,
+      fabricQuality: cleanFabric || effFabric,
+      panna: effPanna,
+      partyName: resolvedParty,
+      department: department || 'digital_print'
+    };
+    try {
+      const res = await api.createLotTransfer(payload);
+      if (res.success) {
+        triggerPushNotification('🔄 Lot Transfer Complete', res.message || `Transferred ${transferForm.qty}m to Lot #${transferForm.destLotNo}`, 'success');
+        setIsTransferFormOpen(false);
+        clearTransferDraft();
+        setTransferForm({
+          date: new Date().toISOString().split('T')[0],
+          fabricQuality: '',
+          panna: '58',
+          sourceLotNo: '',
+          destLotNo: '',
+          partyName: '',
+          qty: '',
+          notes: '',
+        });
+        triggerGlobalDataRefresh('fabric');
+        fetchData();
+      } else {
+        alert(res.error || 'Failed to create lot transfer');
+      }
+    } catch (err) {
+      alert('Error creating lot transfer: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [autoTransferLoading, setAutoTransferLoading] = useState(false);
+
+  const handleAutoLotTransfer = async () => {
+    const negLots = lotRecords.filter(l => l.currentStock < 0);
+    const negCount = negLots.length;
+    if (negCount === 0) {
+      triggerEliteAlert('Inventory Clean', 'No negative deficit lots found. Inventory stock balances are clean!', 'success');
+      return;
+    }
+
+    const totalDeficit = negLots.reduce((sum, l) => sum + Math.abs(l.currentStock), 0);
+
+    const confirmed = await triggerEliteConfirm({
+      title: 'Auto Rebalance Lots',
+      message: `Found ${negCount} negative stock lots with a total deficit of ${totalDeficit.toFixed(2)} mtr.\n\nDo you want to automatically transfer stock from matching positive lots to eliminate these deficits?`,
+      confirmText: 'Run Auto Rebalance',
+      type: 'warning'
+    });
+    if (!confirmed) return;
+
+    setAutoTransferLoading(true);
+    try {
+      const res = await api.autoLotTransfer();
+      if (res.success) {
+        triggerPushNotification('⚡ Auto Lot Rebalance Complete', res.message || 'Deficit lots rebalanced successfully!', 'success');
+        triggerGlobalDataRefresh('fabric');
+        fetchData();
+      } else {
+        triggerEliteAlert('Rebalance Error', res.error || 'Failed to auto-rebalance lot stock.', 'error');
+      }
+    } catch (err) {
+      triggerEliteAlert('Rebalance Error', 'Error running auto lot transfer: ' + err.message, 'error');
+    } finally {
+      setAutoTransferLoading(false);
+    }
+  };
+
+  const handleDeleteTransfer = async (transfer) => {
+    if (!transfer || !transfer.transferRefId) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Undo Lot Transfer',
+      message: `Are you sure you want to undo/delete this lot transfer (${transfer.transferRefId}) of ${transfer.qty} mtr from Lot #${transfer.sourceLotNo} to Lot #${transfer.destLotNo}?\n\nThis will reverse the transfer and restore the original lot balances.`,
+      confirmText: 'Undo Transfer',
+      type: 'danger'
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await api.deleteLotTransfer(transfer.transferRefId);
+      if (res && res.success) {
+        triggerPushNotification('Lot Transfer Reverted', res.message || 'Transfer undone successfully.', 'success');
+        triggerGlobalDataRefresh('fabric');
+        fetchData();
+      } else {
+        triggerEliteAlert('Error', res?.error || 'Failed to delete lot transfer.', 'error');
+      }
+    } catch (err) {
+      triggerEliteAlert('Error', 'Failed to delete lot transfer: ' + err.message, 'error');
+    }
+  };
+
+  const startEditInward = (t) => {
+    setEditingTransaction(t);
+    setInwardForm({
+      challanNo: t.challanNo || '',
+      vendorName: t.vendorName || '',
+      fabricQuality: t.fabricQuality || '',
+      panna: t.panna || '',
+      qty: t.qty || '',
+      shortagePct: t.shortagePct != null ? String(t.shortagePct) : '',
+      shortageMtr: t.shortageMtr != null ? String(t.shortageMtr) : '',
+      shortageMode: t.shortageMode || (t.shortageMtr != null && !t.shortagePct ? 'mtr' : 'pct'),
+      date: t.date ? new Date(t.date).toISOString().split('T')[0] : '',
+      notes: t.notes || ''
+    });
+    setIsInwardOpen(true);
+  };
+
+  const closeInwardModal = () => {
+    setIsInwardOpen(false);
+    setEditingTransaction(null);
+    setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct', date: new Date().toISOString().split('T')[0], notes: '' });
+  };
+
+  // ── Inward TP / Roll-wise Details Handlers ──
+  const openInwardTpModal = (t) => {
+    setInwardTpModalTransaction(t);
+    const existingTps = Array.isArray(t.tpDetails) && t.tpDetails.length > 0
+      ? t.tpDetails.map((r, i) => ({
+          id: Date.now() + i + Math.random(),
+          tpNo: r.tpNo || (i + 1),
+          tpMeter: r.tpMeter != null ? String(r.tpMeter) : '',
+          notes: r.notes || ''
+        }))
+      : Array.from({ length: 5 }, (_, i) => ({
+          id: Date.now() + i + Math.random(),
+          tpNo: i + 1,
+          tpMeter: '',
+          notes: ''
+        }));
+    setInwardTpRows(existingTps);
+    setSyncInwardQty(false);
+    setInwardBulkPasteOpen(false);
+    setInwardBulkPasteText('');
+    const hasNotes = existingTps.some(r => r.notes && r.notes.trim());
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    setShowRollRemarks(isMobile ? Boolean(hasNotes) : true);
+  };
+
+  const closeInwardTpModal = () => {
+    setInwardTpModalTransaction(null);
+    setInwardTpRows([]);
+    setInwardBulkPasteOpen(false);
+    setInwardBulkPasteText('');
+    setInwardTpSaving(false);
+  };
+
+  const addInwardTpRows = (count = 1) => {
+    setInwardTpRows(prev => {
+      const currentLen = prev.length;
+      const newRows = Array.from({ length: count }, (_, idx) => ({
+        id: Date.now() + idx + Math.random(),
+        tpNo: currentLen + idx + 1,
+        tpMeter: '',
+        notes: ''
+      }));
+      return [...prev, ...newRows];
+    });
+  };
+
+  const removeInwardTpRow = (index) => {
+    setInwardTpRows(prev => {
+      const filtered = prev.filter((_, i) => i !== index);
+      return filtered.map((row, i) => ({
+        ...row,
+        tpNo: i + 1
+      }));
+    });
+  };
+
+  const updateInwardTpRow = (index, field, value) => {
+    setInwardTpRows(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const applyInwardBulkPaste = () => {
+    if (!inwardBulkPasteText.trim()) return;
+    const rawTokens = inwardBulkPasteText
+      .split(/[\n,\t\r\s]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    const parsedMeters = rawTokens
+      .map(v => parseFloat(v))
+      .filter(v => !isNaN(v) && v > 0);
+    if (parsedMeters.length === 0) {
+      triggerEliteAlert('Bulk Paste', 'No valid meter numbers found. Please paste numbers separated by commas, spaces, or line breaks.', 'warning');
+      return;
+    }
+    setInwardTpRows(prev => {
+      const nonEmpty = prev.filter(r => r.tpMeter !== '' && parseFloat(r.tpMeter) > 0);
+      const startTpNo = nonEmpty.length + 1;
+      const pastedRows = parsedMeters.map((m, idx) => ({
+        id: Date.now() + idx + Math.random(),
+        tpNo: startTpNo + idx,
+        tpMeter: String(m),
+        notes: ''
+      }));
+      return [...nonEmpty, ...pastedRows];
+    });
+    setInwardBulkPasteText('');
+    setInwardBulkPasteOpen(false);
+    triggerEliteAlert('Success', `Imported ${parsedMeters.length} TP roll values!`, 'success');
+  };
+
+  const handleSaveInwardTps = async () => {
+    if (!inwardTpModalTransaction) return;
+    setInwardTpSaving(true);
+    try {
+      const validRows = inwardTpRows.filter(r => r.tpMeter !== '' && !isNaN(parseFloat(r.tpMeter)));
+      const cleanedTps = validRows.map((r, idx) => ({
+        tpNo: Number(r.tpNo) || idx + 1,
+        tpMeter: parseFloat(r.tpMeter),
+        notes: r.notes ? r.notes.trim() : ''
+      }));
+      const sumMeters = cleanedTps.reduce((acc, r) => acc + (r.tpMeter || 0), 0);
+      const totalTpCount = cleanedTps.length;
+
+      const payload = {
+        tpDetails: cleanedTps,
+        totalTp: totalTpCount
+      };
+
+      if (syncInwardQty && sumMeters > 0) {
+        payload.qty = Number(sumMeters.toFixed(2));
+      }
+
+      await api.updateFabricTransaction(inwardTpModalTransaction._id, payload);
+      triggerPushNotification(
+        '📦 TP Details Saved',
+        `Lot #${inwardTpModalTransaction.lotNo}: ${totalTpCount} TPs (${sumMeters.toFixed(2)} Mtr) recorded.${syncInwardQty ? ' Total Qty updated.' : ''}`,
+        'success'
+      );
+      closeInwardTpModal();
+      fetchData(true);
+    } catch (err) {
+      triggerEliteAlert('Error', 'Failed to save TP details: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setInwardTpSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api.deleteFabricTransaction(deleteTarget.id);
+      setDeleteTarget(null);
+      fetchData();
+    } catch (err) {
+      alert('Failed to delete: ' + err.message);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    setPdfLoading(true);
+    try {
+      await api.downloadFabricLedgerPdf(pdfFilter);
+      setIsPdfFilterOpen(false);
+    } catch (err) {
+      alert('Failed to generate PDF: ' + err.message);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  // ── Modal scroll lock & smooth reset helper ──
+  useEffect(() => {
+    if (isChallanOpen || isInwardOpen || isOutwardOpen || isSaFormOpen || isTransferFormOpen || !!inwardTpModalTransaction) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isChallanOpen, isInwardOpen, isOutwardOpen, isSaFormOpen, isTransferFormOpen, inwardTpModalTransaction]);
+
+  useEffect(() => {
+    const handleOpenModal = (event) => {
+      resetChallanForm();
+      setEditingChallan(null);
+      if (event && event.detail) {
+        const d = event.detail;
+        const totalMtrVal = parseFloat(d.totalMtr) || parseFloat(d.pcs) || '';
+        setChallanForm(prev => ({
+          ...prev,
+          date: d.date ? String(d.date).split('T')[0] : new Date().toISOString().split('T')[0],
+          partyName: d.party || d.partyName || d.customerName || '',
+          billTo: d.party || d.partyName || d.customerName || '',
+          jobNo: d.jobNo || '',
+          fabricName: d.fabric || d.fabricName || '',
+          designNo: cleanDesignNameString(d.designNo || d.designName || ''),
+          lotNo: d.lotNo || '',
+          vendorChallanNo: d.partyChallan || d.vendorChallanNo || '',
+          tpDetails: totalMtrVal ? [{ id: 1, tpNo: 1, tpMeter: String(totalMtrVal), lotNo: '' }] : emptyTpRows()
+        }));
+      }
+      setIsChallanOpen(true);
+    };
+    window.addEventListener('open-new-challan', handleOpenModal);
+    return () => window.removeEventListener('open-new-challan', handleOpenModal);
+  }, []);
+
+  const closeChallanModal = () => {
+    setIsChallanOpen(false);
+    setEditingChallan(null);
+    setChallanMobileTab('info');
+    resetChallanForm();
+    document.body.style.overflow = '';
+
+    const executeScrollTop = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      const selectors = '.main-content, .app-container, .content-area, .dashboard-container, .table-responsive, section, main, .panel-body';
+      document.querySelectorAll(selectors).forEach(c => {
+        if (c) {
+          c.scrollTop = 0;
+          if (typeof c.scrollTo === 'function') c.scrollTo(0, 0);
+        }
+      });
+    };
+
+    executeScrollTop();
+    requestAnimationFrame(executeScrollTop);
+    setTimeout(executeScrollTop, 50);
+    setTimeout(executeScrollTop, 150);
+  };
+
+  // ── Challan helpers ────────────────────────────────────────────────────
+  const resetChallanForm = () => {
+    setChallanForm({
+      date: new Date().toISOString().split('T')[0],
+      partyName: '', lotNo: '', vendorChallanNo: '', deliveryBy: '', fabricName: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct',
+      jobNo: '', designNo: '', colour: '', panna: '', pcs: '', billTo: '', shipTo: '',
+      tpDetails: emptyTpRows(), notes: '',
+    });
+    setAvailableLots([]);
+  };
+
+  const fetchChallans = async () => {
+    try {
+      // Always read from ref so stale closures (e.g. setInterval) get current filter values
+      const { search, dateStart, dateEnd, status } = challanFiltersRef.current;
+      const res = await api.getFabricChallans({
+        dateStart,
+        dateEnd,
+        search,
+        status
+      });
+      if (res.success) setChallans(res.data || []);
+    } catch (e) {
+      console.warn('Failed to fetch challans', e);
+    }
+  };
+
+  // Keep ref in sync with state so fetchChallans always reads current values.
+  // Debounce search input: wait 400ms after user stops typing before firing API.
+  // Date changes fire immediately (no delay). Cleanup cancels stale requests.
+  const effectiveChallanStatus = challanFilters.status && challanFilters.status.length > 0
+    ? challanFilters.status.join(',')
+    : (challanStatusFilter !== 'All' ? challanStatusFilter : 'All');
+
+  useEffect(() => {
+    challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd, status: effectiveChallanStatus };
+    setChallanVisibleCount(50);
+    // No debounce for date/status filter changes, only for text search
+    const delay = challanSearch !== challanFiltersRef.current.search ? 400 : 0;
+    const debounceTimer = setTimeout(() => {
+      fetchChallans();
+    }, challanSearch ? 400 : 0); // Instant clear when search is emptied, 400ms delay while typing
+    return () => clearTimeout(debounceTimer); // Cancel previous timer on next keystroke
+  }, [challanDateStart, challanDateEnd, challanSearch, effectiveChallanStatus]);
+
+  const getVendorShortForm = (name) => {
+    if (!name) return '';
+    const u = name.toUpperCase().trim();
+    if (u.includes('AVSAR')) return 'AV';
+    if (u.includes('ELITE')) return 'EL';
+    if (u.includes('FABTEX')) return 'FT';
+    if (u.includes('MAHAGAURI')) return 'MG';
+    if (u.includes('OEQUAL') || u.includes('OE')) return 'OE';
+    if (u.includes('OZONE')) return 'OZ';
+    if (u.includes('YAMUNAJI')) return 'YM';
+    return u.substring(0, 2);
+  };
+
+  // When Lot No changes — auto-fill vendor challans, fabric, shortage, panna
+  const handleChallanLotChange = async (val) => {
+    const lotsList = String(val)
+      .split(/[,\s&]+/)
+      .map(x => x.trim())
+      .filter(Boolean);
+    const defaultLot = lotsList[0] || '';
+
+    // Auto-fill partyName if mapped in lotPartyMap
+    let mappedParty = '';
+    for (const lotStr of lotsList) {
+      if (lotPartyMap[lotStr]) {
+        mappedParty = lotPartyMap[lotStr];
+        break;
+      }
+    }
+
+    setChallanForm(prev => {
+      const updatedTps = prev.tpDetails.map(tp => {
+        if (!tp.lotNo || (!tp.isCustomLot && lotsList.length > 0 && !lotsList.includes(String(tp.lotNo)))) {
+          return { ...tp, lotNo: defaultLot };
+        }
+        return tp;
+      });
+
+      return {
+        ...prev,
+        lotNo: val,
+        partyName: mappedParty || prev.partyName,
+        tpDetails: updatedTps
+      };
+    });
+    if (!val) return;
+
+    if (lotsList.length === 0) return;
+
+    setChallanLotLoading(true);
+    try {
+      // Fetch details for all selected lots concurrently
+      const promises = lotsList.map(lot => api.getFabricLotInfo(lot).catch(() => null));
+      const results = await Promise.all(promises);
+
+      const validResults = results.filter(r => r && r.success && r.data);
+      if (validResults.length > 0) {
+        // Collect all vendor challans with their vendor short prefix
+        const vendorChallans = validResults
+          .map(r => {
+            const shortName = getVendorShortForm(r.data.vendorName);
+            const vNo = r.data.vendorChallanNo || '';
+            if (shortName && vNo) {
+              const cleanNo = vNo.replace(/^[A-Za-z0-9]{2,3}-/i, '');
+              return `${shortName}-${cleanNo}`;
+            }
+            return vNo;
+          })
+          .filter(Boolean);
+
+        // Remove duplicates and join with commas
+        const uniqueChallans = [...new Set(vendorChallans)].join(', ');
+
+        // Collect fabricName, shortage, panna from first valid response
+        const first = validResults[0].data;
+
+        setChallanForm(prev => ({
+          ...prev,
+          vendorChallanNo: uniqueChallans || prev.vendorChallanNo,
+          fabricName: first.fabricName || prev.fabricName,
+          shortagePct: first.shortagePct != null ? String(first.shortagePct) : prev.shortagePct,
+          panna: prev.panna || first.panna || '',
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch multiple lot info', e);
+    } finally {
+      setChallanLotLoading(false);
+    }
+  };
+
+  const handleJobNoChange = async (e) => {
+    const val = e.target.value;
+    const rawTokens = String(val || '').split(',').map(s => s.trim()).filter(Boolean);
+    const matchedJobs = rawTokens.map(token => findMatchingJobCard(token)).filter(Boolean);
+
+    if (matchedJobs.length > 0) {
+      const primaryJob = matchedJobs[0];
+      const combinedJobNo = Array.from(new Set(matchedJobs.map(j => j.jobNo))).join(', ');
+
+      setOutwardForm(prev => ({
+        ...prev,
+        jobNo: val.includes(',') ? val : (combinedJobNo || val),
+        partyName: primaryJob.party || prev.partyName,
+        fabricQuality: primaryJob.fabric || prev.fabricQuality,
+        panna: primaryJob.panna || prev.panna,
+        lotNo: prev.lotNo
+      }));
+    } else {
+      setOutwardForm(prev => ({ ...prev, jobNo: val }));
+    }
+    fetchAllLots();
+  };
+
+  const toggleOutwardJobPill = (jobNoToToggle) => {
+    const currentTokens = String(outwardForm.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    let updatedTokens;
+
+    const existsIndex = currentTokens.findIndex(tok => {
+      const j1 = findMatchingJobCard(tok);
+      const j2 = findMatchingJobCard(jobNoToToggle);
+      return (j1 && j2 && j1._id === j2._id) || tok.toUpperCase() === jobNoToToggle.toUpperCase();
+    });
+
+    if (existsIndex >= 0) {
+      updatedTokens = currentTokens.filter((_, idx) => idx !== existsIndex);
+    } else {
+      updatedTokens = [...currentTokens, jobNoToToggle];
+    }
+
+    const newVal = updatedTokens.join(', ');
+    handleJobNoChange({ target: { value: newVal } });
+  };
+
+  // When Job No changes — handles single or multiple comma-separated Job Nos
+  const handleChallanJobChange = async (val) => {
+    const rawTokens = String(val || '').split(',').map(s => s.trim()).filter(Boolean);
+    const matchedJobs = rawTokens.map(token => findMatchingJobCard(token)).filter(Boolean);
+
+    if (matchedJobs.length > 0) {
+      const combinedJobNo = Array.from(new Set(matchedJobs.map(j => j.jobNo))).join(', ');
+      const combinedDesigns = cleanDesignNameString(Array.from(new Set(matchedJobs.map(j => j.designNo).filter(Boolean))).join(', '));
+      const combinedColors = Array.from(new Set(matchedJobs.map(j => j.colors).filter(Boolean))).join(', ');
+      const primaryJob = matchedJobs[0];
+
+      // ── Workflow Pipeline Validation ──
+      const pStatus = (primaryJob.printStatus || '').toLowerCase();
+      const pMtr = parseFloat(primaryJob.printMtr || 0);
+      const isPrintDone = pStatus.includes('done') || pMtr > 0;
+      
+      const fStatus = (primaryJob.fusingStatus || '').toLowerCase();
+      const fusedMtr = parseFloat(primaryJob.fusingMtr || primaryJob.freshMtr || 0);
+      const isFusingDone = fStatus.includes('done');
+      const deliveredMtr = parseFloat(primaryJob.deliveredMtr || 0);
+      const remainingFused = Math.max(0, fusedMtr - deliveredMtr);
+
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin === true;
+
+      if (!isPrintDone && !isAdmin) {
+        triggerEliteAlert(
+          'Printing Stage Incomplete',
+          `Cannot link Job #${primaryJob.jobNo}: This Job Card is still in Printing stage (Status: ${primaryJob.printStatus || 'Printing Pending'}). Please complete Printing first.`,
+          'warning'
+        );
+        return;
+      }
+
+      if (!isFusingDone && fusedMtr <= 0 && !isAdmin) {
+        triggerEliteAlert(
+          'Fusing Stage Incomplete',
+          `Cannot link Job #${primaryJob.jobNo}: This Job Card has not completed Fusing yet (0m fused). Only fused goods can be dispatched via Delivery Challan.`,
+          'warning'
+        );
+        return;
+      }
+
+      // If partial quantities available, auto-set TP meter to remaining fused meters if empty
+      const defaultMtr = remainingFused > 0 ? remainingFused : (parseFloat(primaryJob.freshMtr || primaryJob.totalMtr) || '');
+
+      setChallanForm(prev => {
+        const needsTpUpdate = prev.tpDetails.length <= 1 && (!prev.tpDetails[0]?.tpMeter || prev.tpDetails[0]?.tpMeter === '0' || prev.tpDetails[0]?.tpMeter === '');
+        return {
+          ...prev,
+          jobNo: val.includes(',') ? val : (combinedJobNo || val),
+          designNo: combinedDesigns || prev.designNo,
+          colour: combinedColors || prev.colour,
+          panna: primaryJob.panna || prev.panna,
+          fabricName: primaryJob.fabric || prev.fabricName,
+          partyName: primaryJob.party || prev.partyName,
+          billTo: primaryJob.billTo || prev.billTo || '',
+          shipTo: primaryJob.shipTo || prev.shipTo || '',
+          tpDetails: needsTpUpdate && defaultMtr ? [{
+            id: 1,
+            tpNo: 1,
+            tpMeter: String(defaultMtr),
+            lotNo: prev.lotNo || ''
+          }] : prev.tpDetails
+        };
+      });
+
+      if (remainingFused > 0) {
+        triggerPushNotification(
+          '📦 Fused Batch Ready',
+          `Job #${primaryJob.jobNo}: ${remainingFused}m available fused fabric ready for Delivery Challan.`,
+          'info'
+        );
+      }
+
+      // Fetch lot numbers that have this fabric
+      if (primaryJob.fabric) {
+        try {
+          const res = await api.getFabricLotStock({ fabricQuality: primaryJob.fabric, panna: primaryJob.panna });
+          if (res.success && res.data) {
+            setAvailableLots(res.data);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch lot stock for fabric', e);
+        }
+      }
+    } else {
+      setChallanForm(prev => ({ ...prev, jobNo: val }));
+      setAvailableLots([]);
+    }
+  };
+
+  useEffect(() => {
+    if (isChallanOpen && challanForm.fabricName) {
+      api.getFabricLotStock({ fabricQuality: challanForm.fabricName, panna: challanForm.panna || undefined })
+        .then(res => {
+          if (res.success && res.data) setAvailableLots(res.data);
+        }).catch(() => { });
+    }
+  }, [isChallanOpen, challanForm.fabricName, challanForm.panna]);
+
+  // Toggle job card pill selection for Challan form
+  const toggleChallanJobPill = (jobNoToToggle) => {
+    const currentTokens = String(challanForm.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    let updatedTokens;
+
+    const existsIndex = currentTokens.findIndex(tok => {
+      const j1 = findMatchingJobCard(tok);
+      const j2 = findMatchingJobCard(jobNoToToggle);
+      return (j1 && j2 && j1._id === j2._id) || tok.toUpperCase() === jobNoToToggle.toUpperCase();
+    });
+
+    if (existsIndex >= 0) {
+      updatedTokens = currentTokens.filter((_, idx) => idx !== existsIndex);
+    } else {
+      updatedTokens = [...currentTokens, jobNoToToggle];
+    }
+
+    const newVal = updatedTokens.join(', ');
+    handleChallanJobChange(newVal);
+  };
+
+  // Re-sync all details from current Job Card into Challan form
+  const handleResyncChallanFromJobCard = async () => {
+    if (!challanForm.jobNo) {
+      alert('Please enter or select a Job No first.');
+      return;
+    }
+    const rawTokens = String(challanForm.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    let matchedJobs = rawTokens.map(tok => findMatchingJobCard(tok)).filter(Boolean);
+
+    if (matchedJobs.length === 0 && rawTokens.length > 0) {
+      try {
+        const cleanNo = rawTokens[0].replace(/\D/g, '');
+        const res = await api.getJobCards({ search: cleanNo || rawTokens[0], limit: 20 });
+        if (res && res.data && res.data.length > 0) {
+          matchedJobs = res.data.filter(j => {
+            const jNum = String(j.jobNo || '').replace(/\D/g, '');
+            return jNum === cleanNo || String(j.jobNo).toUpperCase() === rawTokens[0].toUpperCase();
+          });
+          if (matchedJobs.length === 0) matchedJobs = [res.data[0]];
+        }
+      } catch (e) {
+        console.warn('API job card fetch failed:', e);
+      }
+    }
+
+    if (matchedJobs.length > 0) {
+      const combinedJobNo = Array.from(new Set(matchedJobs.map(j => j.jobNo))).join(', ');
+      const combinedDesigns = cleanDesignNameString(Array.from(new Set(matchedJobs.map(j => j.designNo || j.designName).filter(Boolean))).join(', '));
+      const combinedColors = Array.from(new Set(matchedJobs.map(j => j.colors || j.colourMatching).filter(Boolean))).join(', ');
+      const primaryJob = matchedJobs[0];
+
+      setChallanForm(prev => ({
+        ...prev,
+        jobNo: prev.jobNo?.includes(',') ? prev.jobNo : (combinedJobNo || prev.jobNo),
+        designNo: combinedDesigns || prev.designNo,
+        colour: combinedColors || prev.colour,
+        panna: primaryJob.panna || prev.panna,
+        fabricName: primaryJob.fabric || prev.fabricName,
+        partyName: primaryJob.party || prev.partyName,
+        billTo: primaryJob.billTo || prev.billTo || '',
+        shipTo: primaryJob.shipTo || prev.shipTo || '',
+      }));
+
+      triggerPushNotification('🔄 Challan Synced from Job Card', `Pulled latest details for Job #${primaryJob.jobNo}: Design "${combinedDesigns || '—'}", Colour "${combinedColors || '—'}", Fabric "${primaryJob.fabric || '—'}"`, 'success');
+    } else {
+      alert(`Could not find Job Card details for "${challanForm.jobNo}". Please verify Job No.`);
+    }
+  };
+
+  // TP detail update
+  const updateTpRow = (index, field, value) => {
+    setChallanForm(prev => {
+      const tpDetails = [...prev.tpDetails];
+      tpDetails[index] = { ...tpDetails[index], [field]: value };
+      return { ...prev, tpDetails };
+    });
+  };
+
+  const addTpRow = () => {
+    setChallanForm(prev => {
+      if (prev.tpDetails.length >= 30) return prev;
+      const nextNo = prev.tpDetails.length + 1;
+      const lots = String(prev.lotNo || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      const defaultLot = lots[0] || '';
+      return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot }] };
+    });
+    setChallanMobileTab('tp');
+  };
+
+  const removeTpRow = (index) => {
+    setChallanForm(prev => {
+      const filtered = prev.tpDetails.filter((_, i) => i !== index);
+      const reindexed = filtered.map((r, i) => ({ ...r, tpNo: i + 1 }));
+      return { ...prev, tpDetails: reindexed };
+    });
+  };
+
+  // Computed totals from tpDetails
+  const challanTotalMtr = challanForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0);
+  const challanTotalTp = challanForm.tpDetails.filter(r => (parseFloat(r.tpMeter) > 0)).length;
+
+  const handleChallanSubmit = async (e, forceAdminOverride = false) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setLoading(true);
+    const cleanFabric = normalizeFabricName(challanForm.fabricName, challanForm.panna);
+    try {
+      // ── Workflow Pipeline Validation ──
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin === true;
+
+      const rawTokens = String(challanForm.jobNo || '')
+        .split(',')
+        .map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, ''))
+        .filter(Boolean);
+
+      const matchedJobs = rawTokens.map(tok => findMatchingJobCard(tok)).filter(Boolean);
+
+      let needsOverride = false;
+      let overrideReasons = [];
+
+      for (const j of matchedJobs) {
+        const pStatus = (j.printStatus || '').toLowerCase();
+        const pMtr = parseFloat(j.printMtr || 0);
+        const isPrintDone = pStatus.includes('done') || pMtr > 0;
+
+        const fStatus = (j.fusingStatus || '').toLowerCase();
+        const fusedMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+        const deliveredMtr = parseFloat(j.deliveredMtr || 0);
+        const availableFused = Math.max(0, fusedMtr - deliveredMtr);
+        const isFusingDone = fStatus.includes('done');
+
+        if (!isPrintDone) {
+          if (!isAdmin) {
+            setLoading(false);
+            await triggerEliteAlert(
+              'Printing Stage Incomplete',
+              `Job Card #${j.jobNo} is still in Printing (${j.printStatus || 'Printing Pending'}). Production flow requires Printing to be done before creating a Delivery Challan.`,
+              'warning'
+            );
+            return;
+          } else {
+            needsOverride = true;
+            overrideReasons.push(`• Job #${j.jobNo}: Printing is not completed (${j.printStatus || 'Pending'}).`);
+          }
+        } else if (!isFusingDone && fusedMtr <= 0) {
+          if (!isAdmin) {
+            setLoading(false);
+            await triggerEliteAlert(
+              'Fusing Stage Incomplete',
+              `Job Card #${j.jobNo} has not completed Fusing (0m fused). Production flow requires Fusing to be done before dispatching a Delivery Challan.`,
+              'warning'
+            );
+            return;
+          } else {
+            needsOverride = true;
+            overrideReasons.push(`• Job #${j.jobNo}: Fusing has not started (0m fused).`);
+          }
+        } else if (fusedMtr > 0 && challanTotalMtr > (availableFused + 2.0)) {
+          if (!isAdmin) {
+            setLoading(false);
+            await triggerEliteAlert(
+              'Exceeds Available Fused Meters',
+              `Requested Challan quantity (${challanTotalMtr.toFixed(1)}m) exceeds available fused fabric (${availableFused.toFixed(1)}m available, ${deliveredMtr.toFixed(1)}m already delivered) for Job #${j.jobNo}.`,
+              'warning'
+            );
+            return;
+          } else {
+            needsOverride = true;
+            overrideReasons.push(`• Job #${j.jobNo}: Requested ${challanTotalMtr.toFixed(1)}m exceeds available fused quantity (${availableFused.toFixed(1)}m).`);
+          }
+        }
+      }
+
+      if (needsOverride && !forceAdminOverride) {
+        setLoading(false);
+        const confirmed = await triggerEliteConfirm({
+          title: '⚠️ Admin Workflow Override',
+          message: `The following Job Card stage requirements were not met:\n\n${overrideReasons.join('\n')}\n\nAs an Administrator, do you want to override the pipeline and generate this Delivery Challan anyway?`,
+          confirmText: 'Yes, Override & Create',
+          cancelText: 'Cancel'
+        });
+        if (!confirmed) return;
+        return handleChallanSubmit(e, true);
+      }
+
+      // Compute effective totalMtr: prefer the sum of TP rows; fall back to the
+      // manually-entered totalMtr field, then to pcs — prevents saving 0 when the
+      // TP rows were not filled in (old challans, event-opened challans, etc.)
+      const effectiveTotalMtr = challanTotalMtr > 0
+        ? challanTotalMtr
+        : (parseFloat(challanForm.totalMtr) || parseFloat(challanForm.pcs) || 0);
+
+      const payload = {
+        ...challanForm,
+        fabricName: cleanFabric || challanForm.fabricName,
+        totalMtr: effectiveTotalMtr,
+        totalTp: challanTotalTp,
+        adminOverride: forceAdminOverride || (isAdmin && needsOverride),
+        tpDetails: challanForm.tpDetails
+          .filter(r => (r.tpMeter !== '' && r.tpMeter != null && parseFloat(r.tpMeter) > 0))
+          .map((r, i) => ({
+            tpNo: i + 1,
+            tpMeter: parseFloat(r.tpMeter) || 0,
+            lotNo: r.lotNo || (challanForm.lotNo ? String(challanForm.lotNo).split(/[,\s&]+/)[0] : '') || ''
+          })),
+      };
+      if (editingChallan) {
+        await api.updateFabricChallan(editingChallan._id, payload);
+      } else {
+        const createRes = await api.createFabricChallan(payload);
+        const newNo = createRes?.data?.challanNo || createRes?.challanNo || 'EDP';
+        dispatchScreenGroupEvent('jobcards_fabric', 'New Delivery Challan Created 🚚', `Delivery Challan EDP-${newNo} for ${challanForm.partyName || 'Party'} (${challanTotalMtr.toFixed(2)} mtr) was created and dispatched to Fabric Group.`, 'challan');
+      }
+      closeChallanModal();
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+      fetchChallans();
+    } catch (err) {
+      const currentUser = api.getCurrentUser() || {};
+      const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin === true;
+      if (isAdmin && !forceAdminOverride && (err.message?.includes('Workflow Validation') || err.message?.includes('stageError') || err.message?.includes('Printing') || err.message?.includes('Fusing'))) {
+        const confirmed = await triggerEliteConfirm({
+          title: '⚠️ Admin Override Required',
+          message: `${err.message}\n\nDo you want to override and create this Challan as Admin?`,
+          confirmText: 'Yes, Override & Create',
+          cancelText: 'Cancel'
+        });
+        if (confirmed) {
+          return handleChallanSubmit(e, true);
+        }
+      } else {
+        triggerEliteAlert('Challan Error', err.message || 'Failed to save Challan.', 'error');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditChallan = (c) => {
+    setEditingChallan(c);
+    const tpRows = c.tpDetails && c.tpDetails.length > 0
+      ? c.tpDetails.map((r, idx) => ({
+          tpNo: idx + 1,
+          tpMeter: String(r.tpMeter != null ? r.tpMeter : (parseFloat(r.freshMtr) || '')),
+          lotNo: r.lotNo || ''
+        }))
+      : emptyTpRows();
+    setChallanForm({
+      date: c.date ? new Date(c.date).toISOString().split('T')[0] : '',
+      partyName: c.partyName || '',
+      lotNo: c.lotNo != null ? String(c.lotNo) : '',
+      vendorChallanNo: c.vendorChallanNo || '',
+      deliveryBy: c.deliveryBy || '',
+      fabricName: c.fabricName || '',
+      shortagePct: c.shortagePct != null ? String(c.shortagePct) : '',
+      shortageMtr: c.shortageMtr != null ? String(c.shortageMtr) : '',
+      shortageMode: c.shortageMode || (c.shortageMtr != null && !c.shortagePct ? 'mtr' : 'pct'),
+      jobNo: c.jobNo || '',
+      designNo: c.designNo || '',
+      colour: c.colour || '',
+      panna: c.panna || '',
+      pcs: c.pcs != null ? String(c.pcs) : '',
+      billTo: c.billTo || '',
+      shipTo: c.shipTo || '',
+      tpDetails: tpRows,
+      notes: c.notes || '',
+    });
+
+    if (c.fabricName) {
+      api.getFabricLotStock({ fabricQuality: c.fabricName, panna: c.panna }).then(res => {
+        if (res.success && res.data) setAvailableLots(res.data);
+      }).catch(() => { });
+    } else {
+      setAvailableLots([]);
+    }
+
+    setIsChallanOpen(true);
+  };
+
+  const handleChallanDelete = async () => {
+    if (!challanDeleteTarget) return;
+    try {
+      await api.deleteFabricChallan(challanDeleteTarget.id);
+      setChallanDeleteTarget(null);
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+      fetchChallans();
+    } catch (err) {
+      alert('Failed to delete challan: ' + err.message);
+    }
+  };
+
+  const handleDownloadChallanPdf = async (id, challanNo) => {
+    try {
+      await api.downloadFabricChallanPdf(id, challanNo);
+    } catch (err) {
+      alert('Failed to download PDF: ' + err.message);
+    }
+  };
+
+  // Create Bill / Tax Invoice directly from a Delivery Challan
+  const handleCreateBillFromChallan = async (ch) => {
+    if (!ch) return;
+    const challanList = Array.isArray(ch) ? ch : [ch];
+    const alreadyBilled = challanList.filter(c => c && (c.status === 'INVOICED' || c.billingStatus === 'INVOICED' || c.isBilled || Boolean(c.invoiceNo)));
+    if (alreadyBilled.length > 0) {
+      const details = alreadyBilled.map(c => `EDP-${c.challanNo}${c.invoiceNo ? ` (Invoice #${c.invoiceNo})` : ''}`).join(', ');
+      alert(`⚠️ Cannot generate bill: The following challan(s) are already billed:\n${details}\n\nA delivery challan cannot be billed a 2nd time.`);
+      return;
+    }
+    if (onNavigateToBilling) {
+      onNavigateToBilling(ch);
+      return;
+    }
+    try {
+      const mtr = parseFloat(ch.totalMtr || 0) || parseFloat(ch.pcs || 0) || 1;
+      const party = ch.billTo || ch.partyName || 'Client';
+      const defaultRate = '25';
+
+      // Look up saved customer to map Contact Person Name, Business Name, Phone, GSTIN, Address
+      let contactPersonName = party;
+      let businessName = party;
+      let phone = ch.phone || '';
+      let gstin = ch.gstin || '';
+      let billingAddress = ch.address || '';
+      let customerId = null;
+
+      try {
+        const custRes = await api.getBillingCustomers();
+        const customerList = (custRes && custRes.data && Array.isArray(custRes.data)) ? custRes.data : Array.isArray(custRes) ? custRes : [];
+        const matched = customerList.find(c =>
+          (c.businessName && c.businessName.trim().toLowerCase() === party.trim().toLowerCase()) ||
+          (c.name && c.name.trim().toLowerCase() === party.trim().toLowerCase())
+        );
+        if (matched) {
+          contactPersonName = matched.name || party;
+          businessName = matched.businessName || party;
+          phone = matched.phone || phone;
+          gstin = matched.gstin || gstin;
+          billingAddress = matched.billingAddress || billingAddress;
+          customerId = matched._id;
+        }
+      } catch (e) {
+        console.warn('Customer lookup warning:', e);
+      }
+
+      // Dynamic Item Name mapping based on Panna (36", 44", 58")
+      const pannaStr = String(ch.panna || '').trim();
+      let itemName = 'DIGITAL PRINT JOB WORK 58"';
+      if (pannaStr.includes('36')) {
+        itemName = 'DIGITAL PRINT JOB WORK 36"';
+      } else if (pannaStr.includes('44')) {
+        itemName = 'DIGITAL PRINT JOB WORK 44"';
+      } else if (pannaStr.includes('58')) {
+        itemName = 'DIGITAL PRINT JOB WORK 58"';
+      } else if (pannaStr) {
+        itemName = `DIGITAL PRINT JOB WORK ${pannaStr.replace(/['"]/g, '')}"`;
+      }
+
+      const rateInput = window.prompt(
+        `🧾 CREATE BILL / INVOICE FROM CHALLAN #EDP-${ch.challanNo}\n\nParty (Billed To): ${businessName} ${contactPersonName !== businessName ? `(${contactPersonName})` : ''}\nItem: ${itemName}\nFabric: ${ch.fabricName || 'Fabric'}\nTotal Meters: ${mtr.toFixed(2)} mtr\n\nEnter Rate per Meter (₹):`,
+        defaultRate
+      );
+
+      if (rateInput === null) return;
+      const unitPrice = parseFloat(rateInput);
+      if (isNaN(unitPrice) || unitPrice < 0) {
+        alert('Please enter a valid numeric rate per meter.');
+        return;
+      }
+
+      const taxableAmount = Math.round((mtr * unitPrice) * 100) / 100;
+      const taxRate = 18;
+      const taxAmount = Math.round((taxableAmount * 0.18) * 100) / 100;
+      const grandTotal = Math.round(taxableAmount + taxAmount);
+
+      const payload = {
+        customer: {
+          customerId: customerId || undefined,
+          name: contactPersonName,
+          businessName: businessName,
+          phone: phone,
+          gstin: gstin,
+          billingAddress: billingAddress,
+          state: 'Gujarat',
+          stateCode: '24'
+        },
+        partyName: businessName || contactPersonName,
+        challanNo: `EDP-${ch.challanNo}`,
+        ourChallanNo: `EDP-${ch.challanNo}`,
+        jobNo: ch.jobNo || '',
+        date: new Date().toISOString().split('T')[0],
+        items: [{
+          itemName: itemName,
+          description: `${ch.fabricName || 'Fabric'} Delivery Challan #EDP-${ch.challanNo}${ch.jobNo ? ` | Job #${ch.jobNo}` : ''}${ch.designNo ? ` | Design: ${ch.designNo}` : ''}`,
+          hsnCode: '998821',
+          qty: mtr,
+          unit: 'Meters',
+          unitPrice: unitPrice,
+          taxRate: taxRate,
+          taxableAmount: taxableAmount,
+          taxAmount: taxAmount,
+          totalAmount: grandTotal
+        }],
+        subtotal: taxableAmount,
+        subTotal: taxableAmount,
+        taxRate: taxRate,
+        totalTax: taxAmount,
+        grandTotal: grandTotal,
+        status: 'Unpaid',
+        paymentStatus: 'Unpaid',
+        notes: `Auto-generated from Delivery Challan #EDP-${ch.challanNo}`
+      };
+
+      const res = await api.createBillingInvoice(payload);
+      if (res && res.success) {
+        const invNo = res.data?.invoiceNo || '';
+        triggerPushNotification('🧾 Tax Bill Created', `Invoice ${invNo} generated for Challan #EDP-${ch.challanNo} (Total: ₹${grandTotal.toLocaleString('en-IN')})!`, 'success');
+        triggerGlobalDataRefresh('billing');
+        if (window.confirm(`✅ Tax Bill "${invNo}" created successfully for ₹${grandTotal.toLocaleString('en-IN')}!\n\nWould you like to open Billing & Invoicing to view/print it?`)) {
+          window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'billing' }));
+        }
+      } else {
+        alert(res?.error || 'Failed to create bill');
+      }
+    } catch (err) {
+      alert('Error creating bill: ' + (err.message || err));
+    }
+  };
+
+  // Stock Adjustment (SA) Helpers
+  const handleSaFabricChange = (e) => {
+    const fName = e.target.value;
+    setSaForm(prev => ({ ...prev, fabricQuality: fName, lotNo: '' }));
+    if (fName) {
+      api.getFabricLotStock({ fabricQuality: fName }).then(res => {
+        if (res && res.success) setSaAvailableLots(res.data || []);
+      }).catch(() => { });
+    } else {
+      setSaAvailableLots([]);
+    }
+  };
+
+  const addSaTpRow = () => {
+    setSaForm(prev => ({
+      ...prev,
+      tpDetails: [...prev.tpDetails, { tpNo: prev.tpDetails.length + 1, tpMeter: '', lotNo: prev.lotNo || '' }]
+    }));
+  };
+
+  const removeSaTpRow = (idx) => {
+    setSaForm(prev => ({
+      ...prev,
+      tpDetails: prev.tpDetails.filter((_, i) => i !== idx).map((r, i) => ({ ...r, tpNo: i + 1 }))
+    }));
+  };
+
+  const updateSaTpRow = (idx, field, val) => {
+    setSaForm(prev => {
+      const updated = [...prev.tpDetails];
+      updated[idx] = { ...updated[idx], [field]: val };
+      return { ...prev, tpDetails: updated };
+    });
+  };
+
+  const handleEditSa = (sa) => {
+    setEditingSa(sa);
+    setSaForm({
+      date: sa.date ? new Date(sa.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      partyName: sa.partyName || '',
+      vendorChallanNo: sa.vendorChallanNo || '',
+      adjustmentType: sa.adjustmentType || 'RETURN_REJECTED',
+      fabricQuality: sa.fabricQuality || '',
+      panna: sa.panna || '',
+      lotNo: sa.lotNo || '',
+      reason: sa.reason || 'Fabric Return / Rejection',
+      notes: sa.notes || '',
+      tpDetails: sa.tpDetails && sa.tpDetails.length > 0 ? sa.tpDetails : [{ tpNo: 1, tpMeter: sa.totalMtr || '', lotNo: sa.lotNo || '' }]
+    });
+    if (sa.fabricQuality) {
+      api.getFabricLotStock({ fabricQuality: sa.fabricQuality }).then(res => {
+        if (res && res.success) setSaAvailableLots(res.data || []);
+      }).catch(() => { });
+    }
+    setIsSaFormOpen(true);
+  };
+
+  const handleSaLotChange = (e) => {
+    const selectedLotNo = e.target.value;
+    const foundLot = saAvailableLots.find(l => String(l.lotNo) === String(selectedLotNo));
+
+    let rawChallan = foundLot?.vendorChallanNo || '';
+    const vName = foundLot?.vendorName || saForm.partyName || '';
+
+    if (rawChallan && vName) {
+      const shortName = getVendorShortForm(vName);
+      if (shortName && !/^[A-Za-z0-9]{2,4}-/.test(rawChallan)) {
+        rawChallan = `${shortName}-${rawChallan}`;
+      }
+    }
+
+    setSaForm(prev => ({
+      ...prev,
+      lotNo: selectedLotNo,
+      vendorChallanNo: rawChallan || prev.vendorChallanNo,
+      partyName: prev.partyName || foundLot?.vendorName || ''
+    }));
+  };
+
+  const handleCreateSaSubmit = async (e) => {
+    e.preventDefault();
+    if (!saForm.fabricQuality) {
+      alert('Please select a Fabric Quality.');
+      return;
+    }
+    const calculatedTotalMtr = saForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0);
+    if (calculatedTotalMtr <= 0) {
+      alert('Please enter return meters for at least one TP / Roll.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        ...saForm,
+        totalMtr: calculatedTotalMtr,
+        totalTp: saForm.tpDetails.length
+      };
+
+      let res;
+      if (editingSa) {
+        res = await api.updateStockAdjustment(editingSa._id, payload);
+        triggerPushNotification('✏️ Stock Return Updated', `Stock Adjustment ${editingSa.saNo} updated successfully.`, 'success');
+      } else {
+        res = await api.createStockAdjustment(payload);
+        triggerPushNotification('📦 Stock Return / Adjustment Saved', `Stock Adjustment ${res.data.saNo} recorded successfully.`, 'success');
+      }
+
+      setIsSaFormOpen(false);
+      setEditingSa(null);
+      setSaForm({
+        date: new Date().toISOString().split('T')[0],
+        partyName: '',
+        vendorChallanNo: '',
+        adjustmentType: 'RETURN_REJECTED',
+        fabricQuality: '',
+        panna: '',
+        lotNo: '',
+        reason: 'Fabric Return / Rejection',
+        notes: '',
+        tpDetails: [{ tpNo: 1, tpMeter: '', lotNo: '' }]
+      });
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+      fetchStockAdjustments();
+    } catch (err) {
+      alert('Failed to save Stock Adjustment: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSa = async () => {
+    if (!saDeleteTarget) return;
+    try {
+      await api.deleteStockAdjustment(saDeleteTarget._id);
+      setSaDeleteTarget(null);
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+      fetchStockAdjustments();
+    } catch (err) {
+      alert('Failed to delete Stock Adjustment: ' + err.message);
+    }
+  };
+
+  const handleDownloadSaPdf = async (id, saNo) => {
+    try {
+      await api.downloadStockAdjustmentPdf(id, saNo);
+    } catch (err) {
+      alert('Failed to download SA PDF: ' + err.message);
+    }
+  };
+
+  const allInwardLots = transactions
+    .filter(t => t.type === 'INWARD' && t.lotNo != null)
+    .map(t => Number(t.lotNo))
+    .filter(lot => !isNaN(lot));
+  const maxLotNo = allInwardLots.length > 0 ? Math.max(...allInwardLots) : 0;
+  const nextLotNo = maxLotNo + 1;
+
+  // Filtered transaction lists
+  const inwardTx = transactions.filter(t => {
+    if (t.type !== 'INWARD') return false;
+    if (inwardDateStart && t.date < inwardDateStart) return false;
+    if (inwardDateEnd && t.date > inwardDateEnd + 'T23:59:59') return false;
+    return matchSearchQuery(t, inwardSearch, ['fabricQuality', 'vendorName', 'challanNo', 'lotNo', 'notes']);
+  }).sort((a, b) => {
+    let valA = a[inwardSortBy];
+    let valB = b[inwardSortBy];
+    if (inwardSortBy === 'date') {
+      valA = new Date(a.date);
+      valB = new Date(b.date);
+    }
+    if (valA < valB) return inwardSortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return inwardSortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const outwardTx = transactions.filter(t => {
+    if (t.type !== 'OUTWARD') return false;
+    if (outwardDateStart && t.date < outwardDateStart) return false;
+    if (outwardDateEnd && t.date > outwardDateEnd + 'T23:59:59') return false;
+    return matchSearchQuery(t, outwardSearch, ['fabricQuality', 'partyName', 'jobNo', 'challanNo', 'lotNo', 'notes']);
+  }).sort((a, b) => {
+    let valA = a[outwardSortBy];
+    let valB = b[outwardSortBy];
+    if (outwardSortBy === 'date') {
+      valA = new Date(a.date);
+      valB = new Date(b.date);
+    }
+    if (valA < valB) return outwardSortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return outwardSortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const inputStyle = {
+    width: '100%', padding: '0.5rem', borderRadius: '4px',
+    border: '1px solid var(--border-light)', background: 'var(--nav-bg)',
+    color: 'var(--text-primary)', boxSizing: 'border-box'
+  };
+
+  const labelStyle = {
+    display: 'block', fontSize: '0.75rem', marginBottom: '0.3rem', fontWeight: 600
+  };
+
+  const tabs = [
+    { id: 'dashboard', label: 'Stock Overview', icon: Database },
+    { id: 'inward', label: 'Inward Register', icon: ArrowDownToLine },
+    { id: 'lotwise', label: 'Lot Wise Details', icon: Layers },
+    { id: 'lotTransfer', label: 'Lot Transfer', icon: ArrowRightLeft },
+    { id: 'stockAdjustment', label: 'Stock Adjustment', icon: RefreshCw },
+    { id: 'requirement', label: 'Fabric Requirements', icon: AlertTriangle },
+  ];
+
+  // Group all transactions by Lot No for Lot-Wise Management View
+  const lotMap = new Map();
+  const seenTxIds = new Set();
+  transactions.forEach(t => {
+    if (t.lotNo == null || t.lotNo === '') return;
+    const txKey = t._id ? String(t._id) : `${t.type}-${t.challanNo || ''}-${t.lotNo}-${t.qty}-${t.date}`;
+    if (seenTxIds.has(txKey)) return;
+    seenTxIds.add(txKey);
+
+    const lotNoKey = String(t.lotNo).trim();
+    if (!lotMap.has(lotNoKey)) {
+      lotMap.set(lotNoKey, {
+        lotNo: lotNoKey,
+        fabricQuality: t.fabricQuality || '',
+        panna: t.panna || '58',
+        vendorName: t.vendorName || '',
+        vendorChallanNo: t.type === 'INWARD' ? (t.challanNo || '') : '',
+        totalInward: 0,
+        totalOutward: 0,
+        inwardTxs: [],
+        outwardTxs: [],
+        firstDate: t.date
+      });
+    }
+    const item = lotMap.get(lotNoKey);
+    const qty = Number(t.qty || 0);
+
+    if (t.type === 'INWARD') {
+      item.totalInward += qty;
+      if (t.challanNo) item.vendorChallanNo = t.challanNo;
+      if (t.vendorName) item.vendorName = t.vendorName;
+      if (t.fabricQuality) item.fabricQuality = t.fabricQuality;
+      // Inward transaction defines the physical roll's true Panna width
+      if (t.panna) item.panna = t.panna;
+      item.inwardTxs.push(t);
+    } else if (t.type === 'OUTWARD') {
+      item.totalOutward += qty;
+      item.outwardTxs.push(t);
+      if (t.fabricQuality && !item.fabricQuality) item.fabricQuality = t.fabricQuality;
+      if (t.panna && !item.panna) item.panna = t.panna;
+      if (t.vendorName && !item.vendorName) item.vendorName = t.vendorName;
+    }
+
+    if (t.date) {
+      if (!item.firstDate || new Date(t.date) < new Date(item.firstDate)) item.firstDate = t.date;
+      if (!item.lastDate || new Date(t.date) > new Date(item.lastDate)) item.lastDate = t.date;
+    }
+  });
+
+  const lotRecords = Array.from(lotMap.values()).map(l => {
+    const rawStock = l.totalInward - l.totalOutward;
+    // Real-Time Safeguard: Only positive stock between 0 and 5m (0 < rawStock <= 5) converts to 0! Negative stock (< 0) is preserved as true deficit.
+    const netStock = (rawStock > 0 && rawStock <= 5.0) ? 0 : rawStock;
+    return {
+      ...l,
+      currentStock: netStock
+    };
+  }).sort((a, b) => {
+    const numA = parseInt(a.lotNo, 10);
+    const numB = parseInt(b.lotNo, 10);
+    if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+    return b.lotNo.localeCompare(a.lotNo);
+  });
+
+  const dateFilteredLots = React.useMemo(() => {
+    if (!lotDateStart && !lotDateEnd) return lotRecords;
+
+    return lotRecords.filter(l => {
+      const hasMatchingInward = (l.inwardTxs || []).some(tx => {
+        if (!tx.date) return false;
+        const d = String(tx.date).slice(0, 10);
+        if (lotDateStart && d < lotDateStart) return false;
+        if (lotDateEnd && d > lotDateEnd) return false;
+        return true;
+      });
+
+      const hasMatchingOutward = (l.outwardTxs || []).some(tx => {
+        if (!tx.date) return false;
+        const d = String(tx.date).slice(0, 10);
+        if (lotDateStart && d < lotDateStart) return false;
+        if (lotDateEnd && d > lotDateEnd) return false;
+        return true;
+      });
+
+      return hasMatchingInward || hasMatchingOutward;
+    });
+  }, [lotRecords, lotDateStart, lotDateEnd]);
+
+  const filteredLots = dateFilteredLots.filter(l => {
+    if (lotFilters.status && lotFilters.status.length > 0) {
+      const hasInStock = lotFilters.status.includes('InStock');
+      const hasExhausted = lotFilters.status.includes('Exhausted');
+      if (hasInStock && !hasExhausted && l.currentStock <= 0) return false;
+      if (hasExhausted && !hasInStock && l.currentStock > 0) return false;
+    } else if (lotStatusFilter !== 'All') {
+      if (lotStatusFilter === 'InStock' && l.currentStock <= 0) return false;
+      if (lotStatusFilter === 'Exhausted' && l.currentStock > 0) return false;
+    }
+    if (lotFilters.fabric && lotFilters.fabric.length > 0) {
+      if (!lotFilters.fabric.includes(l.fabricQuality)) return false;
+    }
+    if (lotFilters.vendor && lotFilters.vendor.length > 0) {
+      if (!lotFilters.vendor.includes(l.vendorName)) return false;
+    }
+    if (!lotSearch) return true;
+    const s = lotSearch.toLowerCase();
+    return String(l.lotNo).toLowerCase().includes(s) ||
+      (l.fabricQuality || '').toLowerCase().includes(s) ||
+      (l.vendorName || '').toLowerCase().includes(s) ||
+      l.outwardTxs.some(ot => (ot.partyName || '').toLowerCase().includes(s) || (ot.jobNo || '').toLowerCase().includes(s));
+  });
+
+  const lotFilterCategories = React.useMemo(() => [
+    {
+      id: 'status',
+      name: 'Stock Status',
+      multi: true,
+      options: [
+        { value: 'InStock', label: 'In-Stock Only' },
+        { value: 'Exhausted', label: 'Exhausted Only' }
+      ]
+    },
+    {
+      id: 'fabric',
+      name: 'Fabric Quality',
+      multi: true,
+      options: Array.from(new Set(dateFilteredLots.map(l => l.fabricQuality).filter(Boolean))).sort().map(f => ({ value: f, label: f }))
+    },
+    {
+      id: 'vendor',
+      name: 'Vendor',
+      multi: true,
+      options: Array.from(new Set(dateFilteredLots.map(l => l.vendorName).filter(Boolean))).sort().map(v => ({ value: v, label: v }))
+    }
+  ], [dateFilteredLots]);
+
+  const challanFilterCategories = React.useMemo(() => [
+    {
+      id: 'status',
+      name: 'Status',
+      multi: true,
+      options: [
+        { value: 'PENDING', label: 'Pending' },
+        { value: 'INVOICED', label: 'Invoiced' }
+      ]
+    },
+    {
+      id: 'party',
+      name: 'Party / Customer',
+      multi: true,
+      options: Array.from(new Set(challans.map(c => c.partyName || c.billTo).filter(Boolean))).sort().map(p => ({ value: p, label: p }))
+    }
+  ], [challans]);
+
+  const availableTransferFabrics = React.useMemo(() => {
+    const set = new Set();
+    (fabricsList || []).forEach(f => {
+      if (f) set.add(normalizeFabricName(f) || f);
+    });
+    (lotRecords || []).forEach(l => {
+      const norm = normalizeFabricName(l.fabricQuality, l.panna);
+      if (norm) set.add(norm);
+      else if (l.fabricQuality) set.add(l.fabricQuality);
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [fabricsList, lotRecords]);
+
+  const sourceLotOptions = React.useMemo(() => {
+    return (lotRecords || [])
+      .filter(l => matchesTransferFabric(l, transferForm.fabricQuality))
+      .filter(l => l.currentStock > 0);
+  }, [lotRecords, transferForm.fabricQuality]);
+
+  const destLotOptions = React.useMemo(() => {
+    const list = (lotRecords || [])
+      .filter(l => matchesTransferFabric(l, transferForm.fabricQuality))
+      .filter(l => String(l.lotNo) !== String(transferForm.sourceLotNo));
+    return list.sort((a, b) => {
+      if (a.currentStock < 0 && b.currentStock >= 0) return -1;
+      if (a.currentStock >= 0 && b.currentStock < 0) return 1;
+      return a.currentStock - b.currentStock;
+    });
+  }, [lotRecords, transferForm.fabricQuality, transferForm.sourceLotNo]);
+
+  // Parse lot numbers from the comma-separated lotNo field
+  const parseSelectedLots = (lotNoStr) => {
+    if (!lotNoStr) return [];
+    return String(lotNoStr)
+      .split(/[,\s&]+/)
+      .map(x => x.trim())
+      .filter(Boolean);
+  };
+
+  const selectedLotsList = parseSelectedLots(challanForm.lotNo);
+
+  // Calculate sum of available meters from the selected lots (searching both lotRecords and availableLots)
+  const selectedLotsTotalStock = selectedLotsList.reduce((sum, lotNo) => {
+    const lotStockItem = lotRecords.find(l => String(l.lotNo) === lotNo) || availableLots.find(l => String(l.lotNo) === lotNo);
+    return sum + (lotStockItem ? (lotStockItem.currentStock || 0) : 0);
+  }, 0);
+
+  const activeJob = findMatchingJobCard(challanForm.jobNo);
+  const jobMtrNeeded = activeJob ? parseFloat(activeJob.totalMtr) || 0 : 0;
+
+  // Fusing department output metrics for the selected job card(s)
+  const challanFusingStats = React.useMemo(() => {
+    if (!challanForm.jobNo) return null;
+    const rawTokens = String(challanForm.jobNo || '')
+      .split(/[,\s&]+/)
+      .map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, ''))
+      .filter(Boolean);
+    const matched = rawTokens.map(tok => findMatchingJobCard(tok)).filter(Boolean);
+    if (matched.length === 0) return null;
+
+    let totalFresh = 0;
+    let totalWest = 0;
+    let totalFused = 0;
+    let hasAnyData = false;
+
+    matched.forEach(j => {
+      const fresh = parseFloat(j.freshMtr || 0);
+      const waste = parseFloat(
+        j.totalWastageMtr ||
+        j.fabricWastageMtr ||
+        ((parseFloat(j.fabricFaultMtr) || 0) +
+         (parseFloat(j.fusingFaultMtr) || 0) +
+         (parseFloat(j.printFaultMtr) || 0) +
+         (parseFloat(j.genuineFaultMtr) || 0)) ||
+        0
+      );
+      const fused = parseFloat(j.fusingMtr || 0);
+
+      if (fresh > 0 || waste > 0 || fused > 0) {
+        hasAnyData = true;
+      }
+
+      const calculatedItemTotal = (fresh > 0 || waste > 0) ? (fresh + waste) : fused;
+      totalFresh += fresh > 0 ? fresh : (fused > 0 && waste === 0 ? fused : 0);
+      totalWest += waste;
+      totalFused += calculatedItemTotal;
+    });
+
+    return {
+      hasData: hasAnyData,
+      freshMtr: totalFresh,
+      westMtr: totalWest,
+      totalMtr: totalFused,
+      jobsCount: matched.length,
+      jobLabels: matched.map(j => `#${j.jobNo}`).join(', ')
+    };
+  }, [challanForm.jobNo, inProgressJobCards]);
+
+  return (
+    <div className="fabric-container">
+      {/* ── UNIFIED ENTERPRISE HEADER & SUB-TABS ── */}
+      {!onlyChallan && (
+        <div className="ent-screen-header has-subtabs" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
+            <div className="ent-header-title-wrap">
+              <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#0284c7,#2563eb)' }}>
+                <Database size={18} color="#fff" />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h2 className="ent-header-title">
+                  {department === 'stitching' ? 'Elite Stitching Fabric' : 'Fabric Management'}
+                </h2>
+                <ScreenGroupRoster screenId={department === 'stitching' ? 'jobcards_stitching_challan' : 'jobcards_fabric'} />
+              </div>
+            </div>
+
+            {/* Header Action Buttons */}
+            <div className="ent-header-actions">
+              <button
+                onClick={() => setIsInwardOpen(true)}
+                className="ent-btn ent-btn-primary"
+              >
+                <PlusCircle size={14} /> Inward Fabric
+              </button>
+              <button
+                onClick={() => setIsCombinedModalOpen(true)}
+                className="ent-btn ent-btn-secondary"
+              >
+                <FileDown size={14} /> PDF Report
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-Tabs Bar */}
+          <div className="ent-tab-bar">
+            {tabs.map(tab => {
+              const TabIcon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`ent-tab-btn ${isActive ? 'active' : ''}`}
+                >
+                  {TabIcon && <TabIcon size={14} />}
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
+
+      {/* Main Content Area */}
+      <div className={onlyChallan ? '' : 'glass-panel fabric-content-panel'}>
+
+        {/* Dashboard Tab */}
+        {activeTab === 'dashboard' && (
+          <div>
+            <div className="fabric-stock-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <Layers size={20} color="var(--primary, #0284c7)" /> Current Fabric Stock
+              </h2>
+
+              <div className="fabric-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <DateRangePicker
+                  preset={stockDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setStockDatePreset(p);
+                    setStockDateStart(ds || '');
+                    setStockDateEnd(de || '');
+                  }}
+                  customStart={customStockDateStart}
+                  customEnd={customStockDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomStockDateStart(s);
+                    setCustomStockDateEnd(e);
+                    setStockDateStart(s);
+                    setStockDateEnd(e);
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleDownloadStockPDF}
+                  style={{
+                    background: '#059669', color: '#ffffff', border: 'none',
+                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: 700,
+                    fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
+                  }}
+                >
+                  <Download size={15} /> Download PDF
+                </button>
+
+                <div className="fabric-sort-group" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f1f5f9', padding: '3px 6px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap', paddingRight: '2px' }}>Sort:</span>
+                  <button
+                    type="button"
+                    onClick={() => setStockSortOrder('highToLow')}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: stockSortOrder === 'highToLow' ? '#0284c7' : 'transparent',
+                      color: stockSortOrder === 'highToLow' ? '#ffffff' : '#475569',
+                      boxShadow: stockSortOrder === 'highToLow' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    High to Low
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStockSortOrder('lowToHigh')}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: stockSortOrder === 'lowToHigh' ? '#0284c7' : 'transparent',
+                      color: stockSortOrder === 'lowToHigh' ? '#ffffff' : '#475569',
+                      boxShadow: stockSortOrder === 'lowToHigh' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    Low to High
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStockSortOrder('nameAsc')}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: stockSortOrder === 'nameAsc' ? '#0284c7' : 'transparent',
+                      color: stockSortOrder === 'nameAsc' ? '#ffffff' : '#475569',
+                      boxShadow: stockSortOrder === 'nameAsc' ? '0 1px 3px rgba(2,132,199,0.3)' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    Name (A-Z)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Bar & Yield Reconciliation */}
+            {displayStock.length > 0 && (() => {
+              const totalInward = displayStock.reduce((a, i) => a + (i.totalInward || 0), 0);
+              const totalOutward = displayStock.reduce((a, i) => a + (i.totalOutward || 0), 0);
+              const netAvailable = displayStock.reduce((a, i) => a + (i.currentStock || 0), 0);
+              const lowStockItems = displayStock.filter(i => i.currentStock > 0 && i.currentStock <= 50);
+              const outOfStockItems = displayStock.filter(i => i.currentStock <= 0);
+              const deliveryYieldPct = totalInward > 0 ? ((totalOutward / totalInward) * 100).toFixed(1) : '0';
+
+              return (
+                <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{
+                    padding: '1rem',
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
+                    gap: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                  }}>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #edf2f7' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Fabrics</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '3px' }}>{displayStock.length}</div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #dcfce7' }}>
+                      <span style={{ color: '#166534', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Received</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#15803d', marginTop: '3px' }}>{totalInward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', borderRadius: '10px', border: '1px solid #fee2e2' }}>
+                      <span style={{ color: '#991b1b', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Total Used</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#b91c1c', marginTop: '3px' }}>{totalOutward.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0f9ff', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
+                      <span style={{ color: '#0369a1', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Net Available</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0284c7', marginTop: '3px' }}>{netAvailable.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>mtr</span></div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: '#f0fdfa', borderRadius: '10px', border: '1px solid #ccfbf1' }}>
+                      <span style={{ color: '#0f766e', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Dispatched Yield</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0d9488', marginTop: '3px' }}>{deliveryYieldPct}%</div>
+                    </div>
+                    <div style={{ padding: '0.65rem 0.85rem', background: lowStockItems.length + outOfStockItems.length > 0 ? '#fff1f2' : '#f0fdf4', borderRadius: '10px', border: `1px solid ${lowStockItems.length + outOfStockItems.length > 0 ? '#ffe4e6' : '#dcfce7'}` }}>
+                      <span style={{ color: lowStockItems.length + outOfStockItems.length > 0 ? '#be123c' : '#166534', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Low Stock Alert</span>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 800, color: lowStockItems.length + outOfStockItems.length > 0 ? '#e11d48' : '#15803d', marginTop: '3px' }}>{lowStockItems.length + outOfStockItems.length} Qualities</div>
+                    </div>
+                  </div>
+
+                  {/* Critical Low Stock Warning Banner */}
+                  {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
+                    <div style={{ padding: '0.85rem 1.1rem', borderRadius: '10px', background: '#fff5f5', border: '1px solid #fed7d7', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', boxShadow: '0 1px 3px rgba(239,68,68,0.06)' }}>
+                      <AlertTriangle size={18} color="#e53e3e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', color: '#9b2c2c', lineHeight: 1.5 }}>
+                        <strong style={{ color: '#c53030' }}>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey fabric for upcoming job cards.</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Fabric Quality Cards with Panna breakdown */}
+            {displayStock.length === 0 && !loading && <p>No stock data found.</p>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {[...displayStock].sort((a, b) => {
+                const stockA = Number(a.currentStock || 0);
+                const stockB = Number(b.currentStock || 0);
+                if (stockSortOrder === 'highToLow') return stockB - stockA;
+                if (stockSortOrder === 'lowToHigh') return stockA - stockB;
+                return String(a.fabricQuality || '').localeCompare(String(b.fabricQuality || ''));
+              }).map((item, idx) => {
+                const isLow = item.currentStock <= 50;
+                const isEmpty = item.currentStock <= 0;
+                const isExpanded = expandedFabric === item.fabricQuality;
+                // Get panna-wise rows for this fabric
+                const pannaRows = pannaStock.filter(p =>
+                  p.fabricQuality.toLowerCase().trim() === item.fabricQuality.toLowerCase().trim()
+                );
+                return (
+                  <div key={idx} style={{
+                    background: isEmpty ? '#fef2f2' : isLow ? '#fffbeb' : '#ffffff',
+                    border: `1px solid ${isEmpty ? '#fecaca' : isLow ? '#fde68a' : '#e2e8f0'}`,
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                    overflow: 'hidden'
+                  }}>
+                    {/* Header row */}
+                    <div
+                      onClick={() => setExpandedFabric(isExpanded ? null : item.fabricQuality)}
+                      style={{ display: 'flex', alignItems: 'center', padding: '0.9rem 1.1rem', cursor: 'pointer', gap: '0.75rem', flexWrap: 'wrap' }}
+                    >
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>{item.fabricQuality}</span>
+                          {isLow && !isEmpty && (
+                            <span style={{ fontSize: '0.65rem', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '4px', padding: '2px 6px', fontWeight: 800 }}>LOW</span>
+                          )}
+                          {isEmpty && (
+                            <span style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '4px', padding: '2px 6px', fontWeight: 800 }}>EMPTY</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.85rem', marginTop: '0.35rem', fontSize: '0.75rem', color: '#64748b', flexWrap: 'wrap' }}>
+                          <span>In: <strong style={{ color: '#16a34a' }}>{Number(item.totalInward || 0).toFixed(2)} mtr</strong></span>
+                          <span>Out: <strong style={{ color: '#dc2626' }}>{Number(item.freshOutward || (item.totalOutward - (item.totalShortage || 0)) || item.totalOutward).toFixed(2)} mtr</strong></span>
+                          {item.totalShortage > 0 && (
+                            <span>Shortage: <strong style={{ color: '#d97706' }}>+{Number(item.totalShortage).toFixed(2)} mtr</strong></span>
+                          )}
+                          <span>Net Out: <strong style={{ color: '#b91c1c' }}>{Number(item.totalOutward || 0).toFixed(2)} mtr</strong></span>
+                          <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', color: '#475569' }}>{pannaRows.length} panna variant{pannaRows.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: isEmpty ? '#dc2626' : isLow ? '#d97706' : '#0284c7' }}>
+                            {Number(item.currentStock || 0).toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '-3px' }}>mtr available</div>
+                        </div>
+                        <div style={{ color: '#94a3b8' }}>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Panna-wise breakdown (collapsible) */}
+                    {isExpanded && pannaRows.length > 0 && (
+                      <div style={{ borderTop: '1px solid #f1f5f9', padding: '0.5rem 1rem 1rem' }}>
+                        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                          <table style={{ width: '100%', minWidth: '380px', borderCollapse: 'collapse', marginTop: '0.5rem', fontSize: '0.82rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                <th style={{ textAlign: 'left', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Panna (Width)</th>
+                                <th style={{ textAlign: 'right', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Inward (mtr)</th>
+                                <th style={{ textAlign: 'right', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Outward (mtr)</th>
+                                <th style={{ textAlign: 'right', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Available (mtr)</th>
+                                <th style={{ textAlign: 'center', padding: '0.45rem 0.5rem', color: '#64748b', fontWeight: 700 }}>Lots</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {pannaRows.map((p, pi) => {
+                                const rowIsLow = p.currentStock <= 50;
+                                const rowIsEmpty = p.currentStock <= 0;
+                                return (
+                                  <tr key={pi} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                    <td style={{ padding: '0.5rem 0.5rem', fontWeight: 700 }}>
+                                      <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', borderRadius: '4px', padding: '2px 8px', fontSize: '0.78rem' }}>
+                                        {p.panna && p.panna !== 'Unknown' ? String(p.panna).replace(/['"]/g, '') : '—'}
+                                      </span>
+                                    </td>
+                                    <td style={{ textAlign: 'right', padding: '0.5rem', color: '#16a34a', fontWeight: 700 }}>+{Number(p.totalInward || 0).toFixed(2)}</td>
+                                    <td style={{ textAlign: 'right', padding: '0.5rem', color: '#dc2626', fontWeight: 700 }}>-{Number(p.totalOutward || 0).toFixed(2)}</td>
+                                    <td style={{ textAlign: 'right', padding: '0.5rem', fontWeight: 800, color: rowIsEmpty ? '#dc2626' : rowIsLow ? '#d97706' : '#0284c7' }}>
+                                      {Number(p.currentStock || 0).toFixed(2)}
+                                    </td>
+                                    <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                                      <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '20px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }}>{p.lotCount}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    {isExpanded && pannaRows.length === 0 && (
+                      <div style={{ padding: '0.75rem 1.2rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem', borderTop: '1px solid var(--border-light)' }}>
+                        No panna-wise breakdown available. Set Panna when adding Inward.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Lot-Wise Management Tab */}
+        {activeTab === 'lotwise' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
+                  <Layers size={22} color="var(--primary)" />
+                  Lot Wise Details
+                </h2>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  Track inward receipts, outward dispatches, and net available stock for every fabric lot.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {isAdmin && (
+                  <button
+                    onClick={handleAutoLotTransfer}
+                    disabled={autoTransferLoading}
+                    className="btn-primary"
+                    style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
+                    title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
+                  >
+                    <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
+                    {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
+                  </button>
+                )}
+
+                <button
+                  onClick={async () => {
+                    try {
+                      setLotPdfLoading(true);
+                      await api.downloadFabricLotWisePdf(
+                        lotDateStart,
+                        lotDateEnd,
+                        `Fabric_LotWise_Management_Report_${lotDateStart || 'all'}_to_${lotDateEnd || 'all'}.pdf`
+                      );
+                    } catch (err) {
+                      alert('Failed to download Lot Report PDF: ' + err.message);
+                    } finally {
+                      setLotPdfLoading(false);
+                    }
+                  }}
+                  disabled={lotPdfLoading}
+                  className="btn-primary"
+                  style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none' }}
+                >
+                  <FileDown size={16} className={lotPdfLoading ? 'spin-loader' : ''} />
+                  {lotPdfLoading ? 'Generating PDF...' : 'Download Lot Report (PDF)'}
+                </button>
+              </div>
+            </div>
+
+            {/* Lot Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Total Lots Tracked {(lotDateStart || lotDateEnd) ? '(Filtered)' : ''}
+                </span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>{dateFilteredLots.length}</div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.06)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                <span style={{ color: 'var(--success)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>In-Stock Lots</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--success)' }}>
+                  {dateFilteredLots.filter(l => l.currentStock > 0).length}
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.06)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <span style={{ color: '#f87171', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Exhausted / Deficit Lots</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#ef4444' }}>
+                  {dateFilteredLots.filter(l => l.currentStock <= 0).length}
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.06)', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                <span style={{ color: '#38bdf8', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Positive Lot Stock (Gross)</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', color: '#38bdf8' }}>
+                  {Number(dateFilteredLots.reduce((acc, l) => acc + Math.max(0, l.currentStock), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(167, 139, 250, 0.06)', borderRadius: '8px', border: '1px solid rgba(167, 139, 250, 0.2)' }}>
+                <span style={{ color: '#c4b5fd', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Net Available Stock</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', color: '#c4b5fd' }}>
+                  {Number(dateFilteredLots.reduce((acc, l) => acc + (l.currentStock || 0), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '0.6rem', flex: 1, minWidth: '280px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '190px' }}>
+                  <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search Lot #, Fabric Quality, Vendor, or Party Name..."
+                    value={lotSearch}
+                    onChange={e => setLotSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '2.2rem', paddingRight: '0.75rem', paddingTop: '0.45rem', paddingBottom: '0.45rem', fontSize: '0.85rem' }}
+                  />
+                  {lotSearch && (
+                    <X size={14} onClick={() => setLotSearch('')} style={{ position: 'absolute', right: '0.65rem', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-muted)' }} />
+                  )}
+                </div>
+
+                <UnifiedFilterPopover
+                  categories={lotFilterCategories}
+                  activeFilters={lotFilters}
+                  onChange={setLotFilters}
+                  placeholder="Filters"
+                />
+
+                <DateRangePicker
+                  preset={lotDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setLotDatePreset(p);
+                    setLotDateStart(ds || '');
+                    setLotDateEnd(de || '');
+                  }}
+                  customStart={customLotDateStart}
+                  customEnd={customLotDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomLotDateStart(s);
+                    setCustomLotDateEnd(e);
+                    setLotDateStart(s);
+                    setLotDateEnd(e);
+                  }}
+                />
+
+                {(lotDateStart || lotDateEnd || lotDatePreset !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLotDatePreset('all');
+                      setLotDateStart('');
+                      setLotDateEnd('');
+                      setCustomLotDateStart('');
+                      setCustomLotDateEnd('');
+                    }}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#ef4444',
+                      borderRadius: '8px',
+                      padding: '0.45rem 0.65rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                    title="Reset Date Filter to All Time"
+                  >
+                    <X size={13} /> Clear Date
+                  </button>
+                )}
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Showing <strong>{filteredLots.length}</strong> of <strong>{dateFilteredLots.length}</strong> lots
+                {(lotDateStart || lotDateEnd) && ` (filtered from ${lotRecords.length})`}
+              </div>
+            </div>
+
+            {/* Lot Cards List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {filteredLots.map(lot => {
+                const isExpanded = expandedLotNo === lot.lotNo;
+                const isLow = lot.currentStock <= 50 && lot.currentStock > 0;
+                const isEmpty = lot.currentStock <= 0;
+                const statusLabel = isEmpty ? 'EXHAUSTED' : isLow ? 'LOW STOCK' : 'IN STOCK';
+                const statusBg = isEmpty ? 'rgba(239,68,68,0.12)' : isLow ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)';
+                const statusBorder = isEmpty ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)';
+                const statusColor = isEmpty ? '#ef4444' : isLow ? '#f59e0b' : 'var(--success)';
+
+                return (
+                  <div
+                    key={lot.lotNo}
+                    style={{
+                      background: 'rgba(255,255,255,0.02)',
+                      border: isExpanded ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {/* Header Summary Row */}
+                    <div
+                      onClick={() => setExpandedLotNo(isExpanded ? null : lot.lotNo)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.9rem 1.25rem',
+                        cursor: 'pointer',
+                        background: isExpanded ? 'rgba(124, 58, 237, 0.05)' : 'transparent',
+                        flexWrap: 'wrap',
+                        gap: '1rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '220px' }}>
+                        <span style={{
+                          background: 'linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%)',
+                          color: '#ffffff',
+                          fontWeight: 800,
+                          fontSize: '0.9rem',
+                          padding: '4px 12px',
+                          borderRadius: '6px',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                        }}>
+                          Lot #{lot.lotNo}
+                        </span>
+
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                            {lot.fabricQuality || 'Unspecified Fabric'}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', marginTop: '2px' }}>
+                            <span>Panna: <strong>{String(lot.panna || '').replace(/['"]/g, '')}"</strong></span>
+                            {lot.vendorName && <span>Vendor: <strong>{lot.vendorName}</strong></span>}
+                            {lot.vendorChallanNo && <span>Vendor Ch: <strong>{lot.vendorChallanNo}</strong></span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stock Totals & Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        <div style={{ textAlign: 'right', fontSize: '0.82rem' }}>
+                          <div style={{ color: 'var(--success)', fontWeight: 600 }}>Inward: +{Number(lot.totalInward || 0).toFixed(2)} mtr</div>
+                          <div style={{ color: 'var(--danger)', fontWeight: 600 }}>Outward: -{Number(lot.totalOutward || 0).toFixed(2)} mtr</div>
+                        </div>
+
+                        <div style={{ textAlign: 'right', minWidth: '130px' }}>
+                          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: statusColor }}>
+                            {Number(lot.currentStock || 0).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
+                          </div>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: statusColor,
+                            background: statusBg,
+                            border: `1px solid ${statusBorder}`,
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            display: 'inline-block',
+                            marginTop: '2px'
+                          }}>
+                            {statusLabel}
+                          </span>
+                          {lot.totalInward > 0 && (() => {
+                            const usagePct = Math.min(100, Math.round(((lot.totalOutward || 0) / lot.totalInward) * 100));
+                            const pColor = usagePct >= 100 ? '#ef4444' : usagePct >= 85 ? '#f59e0b' : '#10b981';
+                            return (
+                              <div style={{ marginTop: '5px', width: '120px' }} title={`Dispatched: ${(lot.totalOutward || 0).toFixed(1)}m of ${lot.totalInward.toFixed(1)}m Inward (${usagePct}% used)`}>
+                                <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${usagePct}%`, height: '100%', background: pColor, borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                                </div>
+                                <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '1px', textAlign: 'center', fontWeight: 600 }}>
+                                  {usagePct}% Dispatched
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {lot.currentStock < 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openQuickTransfer(lot);
+                            }}
+                            className="btn-primary"
+                            style={{
+                              background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                              color: '#ffffff',
+                              fontSize: '0.78rem',
+                              padding: '0.35rem 0.75rem',
+                              gap: '0.35rem',
+                              border: 'none',
+                              boxShadow: '0 2px 6px rgba(220,38,38,0.3)',
+                              flexShrink: 0
+                            }}
+                            title="Transfer stock from another lot to clear this negative deficit"
+                          >
+                            <ArrowRightLeft size={14} /> Clear Deficit ({Math.abs(lot.currentStock).toFixed(2)}m)
+                          </button>
+                        )}
+
+                        {/* Download Single Lot PDF Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadSingleLotPdf(lot);
+                          }}
+                          disabled={lotDownloadingNo === lot.lotNo}
+                          className="btn-secondary"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.7rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            borderRadius: '6px',
+                            background: 'rgba(56, 189, 248, 0.1)',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            color: '#38bdf8',
+                            cursor: 'pointer',
+                            flexShrink: 0
+                          }}
+                          title={`Download Inward & Outward Statement PDF for Lot #${lot.lotNo}`}
+                        >
+                          <FileDown size={14} className={lotDownloadingNo === lot.lotNo ? 'spin-loader' : ''} />
+                          <span>{lotDownloadingNo === lot.lotNo ? 'PDF...' : 'PDF'}</span>
+                        </button>
+
+                        <button
+                          className="btn-icon"
+                          style={{ padding: '0.35rem', color: 'var(--text-muted)' }}
+                          title={isExpanded ? 'Collapse History' : 'View Inward & Outward Breakdown'}
+                        >
+                          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detailed History Breakdown Drawer */}
+                    {isExpanded && (
+                      <div style={{ borderTop: '1px solid var(--border-light)', padding: '1.25rem', background: 'rgba(0,0,0,0.15)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            Detailed breakdown of all receipts and dispatches for <strong>Lot #{lot.lotNo}</strong>
+                          </div>
+                          <button
+                            onClick={() => handleDownloadSingleLotPdf(lot)}
+                            disabled={lotDownloadingNo === lot.lotNo}
+                            className="btn-secondary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              padding: '0.4rem 0.9rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              borderRadius: '6px',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              border: '1px solid rgba(56, 189, 248, 0.35)',
+                              color: '#38bdf8',
+                              cursor: 'pointer'
+                            }}
+                            title={`Download full PDF statement for Lot #${lot.lotNo}`}
+                          >
+                            <FileDown size={15} className={lotDownloadingNo === lot.lotNo ? 'spin-loader' : ''} />
+                            <span>{lotDownloadingNo === lot.lotNo ? 'Generating PDF...' : `Download Lot #${lot.lotNo} Statement (PDF)`}</span>
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+
+                          {/* Inward Transactions Box */}
+                          <div style={{ background: 'rgba(16, 185, 129, 0.03)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '8px', padding: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                              <h4 style={{ margin: 0, fontSize: '0.88rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <ArrowDownToLine size={16} /> Inward Receipts ({lot.inwardTxs.length})
+                              </h4>
+                              <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--success)' }}>
+                                Total: +{Number(lot.totalInward || 0).toFixed(2)} mtr
+                              </span>
+                            </div>
+
+                            {lot.inwardTxs.length === 0 ? (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No inward transactions logged.</div>
+                            ) : (
+                              <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                                      <th style={{ padding: '0.35rem' }}>Date</th>
+                                      <th style={{ padding: '0.35rem' }}>Vendor</th>
+                                      <th style={{ padding: '0.35rem' }}>Challan</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'right' }}>Qty (mtr)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {lot.inwardTxs.map((inTx, iIdx) => {
+                                      const isLotTransferIn = Boolean(
+                                        inTx.notes && (
+                                          /Lot Transfer/i.test(inTx.notes) ||
+                                          /Auto Lot.*Rebalance/i.test(inTx.notes) ||
+                                          /\[Ref:\s*LT-/i.test(inTx.notes)
+                                        )
+                                      );
+                                      const srcLotMatch = inTx.notes && (
+                                        inTx.notes.match(/(?:from Lot|Lot #(\d+)\s*->)\s*#?\s*(\d+)/i) ||
+                                        inTx.notes.match(/Lot #(\d+)\s*->/i)
+                                      );
+                                      const srcLotNum = srcLotMatch ? (srcLotMatch[1] || srcLotMatch[2]) : (inTx.partyName?.match(/Lot #(\d+)/i)?.[1] || inTx.vendorName?.match(/Lot #(\d+)/i)?.[1] || null);
+                                      const inRefIdMatch = inTx.notes && inTx.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                                      const inRefId = inRefIdMatch ? inRefIdMatch[1] : null;
+
+                                      let inTransferReason = '';
+                                      if (isLotTransferIn && inTx.notes) {
+                                        const noteParts = inTx.notes.split('|');
+                                        if (noteParts.length > 1) {
+                                          inTransferReason = noteParts.slice(1).join(' • ').replace(/\[Ref:\s*[^\]]+\]/i, '').trim();
+                                        }
+                                      }
+
+                                      const displayInChallan = inTx.challanNo || inRefId || (isLotTransferIn && srcLotNum ? `LT-#${srcLotNum}` : '—');
+                                      const matchedSrcLot = srcLotNum ? lotRecords.find(l => String(l.lotNo) === String(srcLotNum)) : null;
+                                      const srcChallan = matchedSrcLot?.vendorChallanNo || matchedSrcLot?.inwardTxs?.find(i => i.challanNo && !String(i.challanNo).startsWith('LT-'))?.challanNo || '';
+                                      const srcChallanStr = srcChallan ? ` (${srcChallan})` : '';
+
+                                      const displayVendor = isLotTransferIn
+                                        ? (inTx.partyName && inTx.partyName.includes('(')
+                                            ? inTx.partyName
+                                            : (inTx.vendorName && inTx.vendorName.includes('(')
+                                                ? inTx.vendorName
+                                                : (srcLotNum ? `Lot #${srcLotNum}${srcChallanStr}` : 'Lot Transfer')))
+                                        : (inTx.vendorName || inTx.partyName || matchedSrcLot?.vendorName || lot.vendorName || '—');
+
+                                      return (
+                                        <tr key={inTx._id || iIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                          <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(inTx.date)}</td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 700, color: isLotTransferIn ? '#10b981' : 'var(--text-primary)' }}>{displayVendor}</div>
+                                            {isLotTransferIn && (
+                                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontSize: '0.68rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                                <ArrowRightLeft size={10} /> Transfer In
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 600, color: isLotTransferIn ? '#a78bfa' : 'inherit' }}>{displayInChallan}</div>
+                                            {isLotTransferIn && inTransferReason && (
+                                              <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', marginTop: '1px', lineHeight: 1.2 }}>
+                                                {inTransferReason}
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
+                                            +{Number(inTx.qty || 0).toFixed(2)}
+                                            {isLotTransferIn && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 5px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}>Transfer</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Outward Dispatches Box */}
+                          <div style={{ background: 'rgba(239, 68, 68, 0.03)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: '8px', padding: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                              <h4 style={{ margin: 0, fontSize: '0.88rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <ArrowUpFromLine size={16} /> Outward Dispatches ({lot.outwardTxs.length})
+                              </h4>
+                              <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#ef4444' }}>
+                                Total: -{Number(lot.totalOutward || 0).toFixed(2)} mtr
+                              </span>
+                            </div>
+
+                            {lot.outwardTxs.length === 0 ? (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No outward dispatches against this lot.</div>
+                            ) : (
+                              <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                                      <th style={{ padding: '0.35rem' }}>Date</th>
+                                      <th style={{ padding: '0.35rem' }}>Party Name</th>
+                                      <th style={{ padding: '0.35rem' }}>Challan No.</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'right' }}>Qty (mtr)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {lot.outwardTxs.map((outTx, oIdx) => {
+                                      const isLotTransfer = Boolean(
+                                        outTx.notes && (
+                                          /Lot Transfer/i.test(outTx.notes) ||
+                                          /Auto Lot.*Rebalance/i.test(outTx.notes) ||
+                                          /\[Ref:\s*LT-/i.test(outTx.notes)
+                                        )
+                                      );
+                                      const destLotMatch = outTx.notes && (
+                                        outTx.notes.match(/(?:to Lot|-> Lot|->\s*Lot|Transfer to Lot)\s*#?\s*(\d+)/i) ||
+                                        outTx.notes.match(/Lot #\d+\s*->\s*Lot #?(\d+)/i)
+                                      );
+                                      const destLotNum = destLotMatch ? (destLotMatch[1] || destLotMatch[2]) : (outTx.partyName?.match(/Lot #(\d+)/i)?.[1] || null);
+                                      const refIdMatch = outTx.notes && outTx.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                                      const refId = refIdMatch ? refIdMatch[1] : null;
+
+                                      let transferReason = '';
+                                      if (isLotTransfer && outTx.notes) {
+                                        const noteParts = outTx.notes.split('|');
+                                        if (noteParts.length > 1) {
+                                          transferReason = noteParts.slice(1).join(' • ').replace(/\[Ref:\s*[^\]]+\]/i, '').trim();
+                                        }
+                                      }
+
+                                      const displayChallan = outTx.challanNo
+                                        || (outTx.notes && outTx.notes.match(/(EDP-\d+|Challan\s*#?\s*\d+)/i)?.[0])
+                                        || refId
+                                        || outTx.jobNo
+                                        || (isLotTransfer && destLotNum ? `LT-#${destLotNum}` : '—');
+
+                                      const matchedDestLot = destLotNum ? lotRecords.find(l => String(l.lotNo) === String(destLotNum)) : null;
+                                      const destChallan = matchedDestLot?.vendorChallanNo || matchedDestLot?.inwardTxs?.find(i => i.challanNo && !String(i.challanNo).startsWith('LT-'))?.challanNo || '';
+                                      const destChallanStr = destChallan ? ` (${destChallan})` : '';
+
+                                      const fallbackParty = outTx.partyName
+                                        || matchedDestLot?.outwardTxs?.find(o => o.partyName)?.partyName
+                                        || (matchedDestLot?.vendorName && matchedDestLot.vendorName !== lot.vendorName ? matchedDestLot.vendorName : '')
+                                        || lot.outwardTxs?.find(o => o.partyName && !o.notes?.includes('Lot Transfer'))?.partyName
+                                        || outTx.vendorName
+                                        || lot.vendorName
+                                        || '';
+
+                                      const displayParty = isLotTransfer
+                                        ? (outTx.partyName && outTx.partyName.includes('(')
+                                            ? outTx.partyName
+                                            : (destLotNum ? `Lot #${destLotNum}${destChallanStr}` : (outTx.partyName || 'Lot Transfer')))
+                                        : (outTx.partyName || fallbackParty || '—');
+
+                                      return (
+                                        <tr key={outTx._id || oIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                          <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(outTx.date)}</td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 700, color: isLotTransfer ? '#38bdf8' : 'var(--text-primary)' }}>
+                                              {displayParty}
+                                            </div>
+                                            {isLotTransfer && (
+                                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontSize: '0.68rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                                <ArrowRightLeft size={10} /> Transfer Out
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 600, color: isLotTransfer ? '#a78bfa' : 'inherit' }}>
+                                              {displayChallan}
+                                            </div>
+                                            {isLotTransfer && transferReason && (
+                                              <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', marginTop: '1px', lineHeight: 1.2 }}>
+                                                {transferReason}
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
+                                            -{Number(outTx.qty || 0).toFixed(2)}
+                                            {isLotTransfer && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '1px 5px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(167, 139, 250, 0.3)', fontWeight: 600 }}>Transfer</span>
+                                            )}
+                                            {(outTx.notes || '').includes('+2% French Crepe Applied') && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(124, 58, 237, 0.3)' }}>+2%</span>
+                                            )}
+                                            {(outTx.notes || '').includes('Remnant Stock Auto-Clear') && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Cleared (≤5m)</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {filteredLots.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  No lot records found matching your filters.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Lot Transfer Tab */}
+        {activeTab === 'lotTransfer' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
+                  <ArrowRightLeft size={22} color="var(--primary)" />
+                  Fabric Lot Transfer & Deficit Rebalancing
+                </h2>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  Transfer stock meters between lots to eliminate negative balances and keep lot stock clean.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {isAdmin && (
+                  <button
+                    onClick={handleAutoLotTransfer}
+                    disabled={autoTransferLoading}
+                    className="btn-primary"
+                    style={{ gap: '0.4rem', padding: '0.55rem 1.1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
+                    title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
+                  >
+                    <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
+                    {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setTransferForm({
+                      date: new Date().toISOString().split('T')[0],
+                      fabricQuality: '',
+                      panna: '58',
+                      sourceLotNo: '',
+                      destLotNo: '',
+                      qty: '',
+                      notes: '',
+                    });
+                    setIsTransferFormOpen(true);
+                  }}
+                  className="btn-primary"
+                  style={{ gap: '0.4rem', padding: '0.55rem 1.1rem', fontSize: '0.85rem' }}
+                >
+                  <PlusCircle size={16} /> New Lot Transfer
+                </button>
+              </div>
+            </div>
+
+            {/* Transfer Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Transfers Done</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>{lotTransfers.length}</div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(124, 58, 237, 0.06)', borderRadius: '8px', border: '1px solid rgba(124, 58, 237, 0.2)' }}>
+                <span style={{ color: '#a78bfa', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Meters Transferred</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#c4b5fd' }}>
+                  {lotTransfers.reduce((sum, t) => sum + (t.qty || 0), 0).toFixed(2)} mtr
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.06)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <span style={{ color: '#f87171', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Negative Lots Remaining</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#ef4444' }}>
+                  {lotRecords.filter(l => l.currentStock < 0).length} Lots
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Search by fabric, lot #, or notes..."
+                  value={transferSearch}
+                  onChange={e => setTransferSearch(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2.2rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <DateRangePicker
+                preset={transferDatePreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setTransferDatePreset(p);
+                  setTransferDateStart(ds || '');
+                  setTransferDateEnd(de || '');
+                }}
+                customStart={customTransferDateStart}
+                customEnd={customTransferDateEnd}
+                onCustomChange={(s, e) => {
+                  setCustomTransferDateStart(s);
+                  setCustomTransferDateEnd(e);
+                  setTransferDateStart(s);
+                  setTransferDateEnd(e);
+                }}
+              />
+            </div>
+
+            {/* Transfers Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Date</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Fabric Quality</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Party / Client</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>From Lot (Source)</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>To Lot (Destination)</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>Transferred Qty</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Notes / Reason</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lotTransfers.filter(t => {
+                    if (transferDateStart && new Date(t.date) < new Date(transferDateStart)) return false;
+                    if (transferDateEnd && new Date(t.date) > new Date(transferDateEnd + 'T23:59:59')) return false;
+                    if (!transferSearch) return true;
+                    const s = transferSearch.toLowerCase();
+                    return (t.fabricQuality || '').toLowerCase().includes(s) ||
+                      (t.partyName || '').toLowerCase().includes(s) ||
+                      (t.vendorName || '').toLowerCase().includes(s) ||
+                      String(t.sourceLotNo || '').includes(s) ||
+                      String(t.destLotNo || '').includes(s) ||
+                      (t.notes || '').toLowerCase().includes(s);
+                  }).map((t, idx) => {
+                    const matchedDest = lotRecords.find(l => String(l.lotNo) === String(t.destLotNo));
+                    const matchedSrc = lotRecords.find(l => String(l.lotNo) === String(t.sourceLotNo));
+                    const displayTransferParty = t.partyName || matchedDest?.outwardTxs?.find(o => o.partyName)?.partyName || matchedSrc?.outwardTxs?.find(o => o.partyName)?.partyName || t.vendorName || matchedSrc?.vendorName || '—';
+
+                    return (
+                      <tr key={t.transferRefId || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '0.75rem 1rem' }}>{formatDateDDMMYYYY(t.date)}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{t.fabricQuality}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{displayTransferParty}</span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                            Lot #{t.sourceLotNo || '—'}{matchedSrc?.vendorChallanNo ? ` (${matchedSrc.vendorChallanNo})` : ''}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                            Lot #{t.destLotNo || '—'}{matchedDest?.vendorChallanNo ? ` (${matchedDest.vendorChallanNo})` : ''}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#a78bfa' }}>
+                          {Number(t.qty || 0).toFixed(2)} mtr
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{t.notes || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleDeleteTransfer(t)}
+                            className="btn-icon"
+                            title="Undo / Delete Lot Transfer"
+                            style={{ color: '#ef4444', padding: '0.3rem' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {lotTransfers.length === 0 && (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                        No lot transfers performed yet. Click "New Lot Transfer" to move stock between lots.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Inward Tab */}
+        {activeTab === 'inward' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <h2>Inward Transactions</h2>
+                {maxLotNo > 0 && (
+                  <span style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--success)',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.15)',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    marginLeft: '12px',
+                    fontWeight: 600
+                  }}>
+                    Latest Lot: #{maxLotNo}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search fabric, vendor, lot..."
+                    value={inwardSearch}
+                    onChange={e => setInwardSearch(e.target.value)}
+                    style={{ ...inputStyle, width: '200px', paddingLeft: '1.8rem' }}
+                  />
+                </div>
+                <DateRangePicker
+                  preset={inwardDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setInwardDatePreset(p);
+                    setInwardDateStart(ds || '');
+                    setInwardDateEnd(de || '');
+                  }}
+                  customStart={customInwardDateStart}
+                  customEnd={customInwardDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomInwardDateStart(s);
+                    setCustomInwardDateEnd(e);
+                    setInwardDateStart(s);
+                    setInwardDateEnd(e);
+                  }}
+                />
+
+                <button className="btn-primary" onClick={() => { fetchData(); setEditingTransaction(null); setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', date: new Date().toISOString().split('T')[0], notes: '' }); setIsInwardOpen(true); }}>
+                  <PlusCircle size={16} /> New Inward
+                </button>
+              </div>
+            </div>
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th
+                      onClick={() => {
+                        if (inwardSortBy === 'date') {
+                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setInwardSortBy('date');
+                          setInwardSortOrder('desc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Date {inwardSortBy === 'date' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (inwardSortBy === 'lotNo') {
+                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setInwardSortBy('lotNo');
+                          setInwardSortOrder('desc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Lot No {inwardSortBy === 'lotNo' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (inwardSortBy === 'challanNo') {
+                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setInwardSortBy('challanNo');
+                          setInwardSortOrder('asc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Challan No {inwardSortBy === 'challanNo' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (inwardSortBy === 'vendorName') {
+                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setInwardSortBy('vendorName');
+                          setInwardSortOrder('asc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Vendor {inwardSortBy === 'vendorName' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (inwardSortBy === 'fabricQuality') {
+                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setInwardSortBy('fabricQuality');
+                          setInwardSortOrder('asc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Fabric Quality {inwardSortBy === 'fabricQuality' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th>Panna</th>
+                    <th
+                      onClick={() => {
+                        if (inwardSortBy === 'qty') {
+                          setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setInwardSortBy('qty');
+                          setInwardSortOrder('desc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Qty (mtr) {inwardSortBy === 'qty' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th>Shortage %</th>
+                    <th>Notes</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inwardTx.map(t => {
+                    const isTransfer = t.notes && (/Lot Transfer/i.test(t.notes) || /Auto Lot.*Rebalance/i.test(t.notes) || /\[Ref:\s*LT-/i.test(t.notes));
+                    const refIdMatch = t.notes && t.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                    const srcLotMatch = t.notes && (
+                      t.notes.match(/(?:from Lot|Lot #(\d+)\s*->)\s*#?\s*(\d+)/i) ||
+                      t.notes.match(/Lot #(\d+)\s*->/i)
+                    );
+                    const srcLotNum = srcLotMatch ? (srcLotMatch[1] || srcLotMatch[2]) : (t.partyName?.match(/Lot #(\d+)/i)?.[1] || t.vendorName?.match(/Lot #(\d+)/i)?.[1] || null);
+                    const displayChallan = t.challanNo || refIdMatch?.[1] || (isTransfer && srcLotNum ? `LT-#${srcLotNum}` : '-');
+                    const displayVendor = isTransfer
+                      ? (srcLotNum ? `Lot #${srcLotNum}` : (t.vendorName?.startsWith('Lot #') ? t.vendorName : (t.partyName?.startsWith('Lot #') ? t.partyName : 'Lot Transfer')))
+                      : (t.vendorName || t.partyName || '-');
+
+                    return (
+                    <tr key={t._id}>
+                      <td>{formatDateDDMMYYYY(t.date)}</td>
+                      <td><span style={{ fontWeight: 600 }}>#{t.lotNo}</span></td>
+                      <td>
+                        <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
+                      </td>
+                      <td>
+                        <div>{displayVendor}</div>
+                        {isTransfer && (
+                          <span style={{ fontSize: '0.68rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '1px 5px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.25)', display: 'inline-block', marginTop: '2px' }}>
+                            🔄 Transfer {srcLotNum ? `← #${srcLotNum}` : ''}
+                          </span>
+                        )}
+                      </td>
+                      <td>{t.fabricQuality}</td>
+                      <td>{t.panna || '-'}</td>
+                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>
+                        <div>
+                          +{Number(t.qty || 0).toFixed(2)}
+                          {isTransfer && (
+                            <span style={{ fontSize: '0.68rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 5px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-block' }}>Transfer</span>
+                          )}
+                        </div>
+                        {Array.isArray(t.tpDetails) && t.tpDetails.length > 0 && (
+                          <div
+                            onClick={() => openInwardTpModal(t)}
+                            title="Click to view/edit TP details"
+                            style={{
+                              fontSize: '0.69rem',
+                              color: '#0284c7',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              marginTop: '2px',
+                              background: '#f0f9ff',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              border: '1px solid #bae6fd',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Layers size={11} /> {t.tpDetails.length} TPs ({t.tpDetails.reduce((a, b) => a + (Number(b.tpMeter) || 0), 0).toFixed(1)}m)
+                          </div>
+                        )}
+                      </td>
+                      <td>{t.shortagePct != null ? `${t.shortagePct}%` : '-'}</td>
+                      <td>{t.notes}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          title={Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `TP Details (${t.tpDetails.length} Rolls / TPs)` : "Add TP Details (Roll-wise meters)"}
+                          style={{
+                            color: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? '#0369a1' : '#0284c7',
+                            background: Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.12)' : 'rgba(2, 132, 199, 0.05)',
+                            border: `1px solid ${Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? 'rgba(2, 132, 199, 0.35)' : 'rgba(2, 132, 199, 0.2)'}`,
+                            borderRadius: '6px',
+                            marginRight: '0.45rem',
+                            padding: '3px 8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.74rem',
+                            fontWeight: 700
+                          }}
+                          onClick={() => openInwardTpModal(t)}
+                        >
+                          <Layers size={13} />
+                          <span>{Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `${t.tpDetails.length} TP` : '+ TP'}</span>
+                        </button>
+                        {isAdmin && (
+                          <button
+                            className="btn-icon"
+                            title="Edit"
+                            style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
+                            onClick={() => startEditInward(t)}
+                          >
+                            <Edit size={15} />
+                          </button>
+                        )}
+                        <button
+                          className="btn-icon"
+                          title="Delete"
+                          style={{ color: 'var(--danger)' }}
+                          onClick={() => setDeleteTarget({ id: t._id, type: 'INWARD', label: `Lot #${t.lotNo} — ${t.fabricQuality} (${t.qty} mtr)` })}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                  {inwardTx.length === 0 && (
+                    <tr><td colSpan="9" style={{ textAlign: 'center' }}>No inward transactions found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Showing {inwardTx.length} of {transactions.filter(t => t.type === 'INWARD').length} inward records
+            </div>
+          </div>
+        )}
+
+        {/* Outward Tab */}
+        {activeTab === 'outward' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <h2>Outward Transactions</h2>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search fabric, party, job, lot..."
+                    value={outwardSearch}
+                    onChange={e => setOutwardSearch(e.target.value)}
+                    style={{ ...inputStyle, width: '200px', paddingLeft: '1.8rem' }}
+                  />
+                </div>
+                <DateRangePicker
+                  preset={outwardDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setOutwardDatePreset(p);
+                    setOutwardDateStart(ds || '');
+                    setOutwardDateEnd(de || '');
+                  }}
+                  customStart={customOutwardDateStart}
+                  customEnd={customOutwardDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomOutwardDateStart(s);
+                    setCustomOutwardDateEnd(e);
+                    setOutwardDateStart(s);
+                    setOutwardDateEnd(e);
+                  }}
+                />
+
+                <button className="btn-primary" onClick={() => { fetchData(); setOutwardForm({ jobNo: '', challanNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: '' }); setIsOutwardOpen(true); }} style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                  <PlusCircle size={16} /> New Outward
+                </button>
+              </div>
+            </div>
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th
+                      onClick={() => {
+                        if (outwardSortBy === 'date') {
+                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOutwardSortBy('date');
+                          setOutwardSortOrder('desc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Date {outwardSortBy === 'date' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (outwardSortBy === 'jobNo') {
+                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOutwardSortBy('jobNo');
+                          setOutwardSortOrder('desc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Job Card No {outwardSortBy === 'jobNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (outwardSortBy === 'challanNo') {
+                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOutwardSortBy('challanNo');
+                          setOutwardSortOrder('asc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Challan No {outwardSortBy === 'challanNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (outwardSortBy === 'partyName') {
+                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOutwardSortBy('partyName');
+                          setOutwardSortOrder('asc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Party {outwardSortBy === 'partyName' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (outwardSortBy === 'fabricQuality') {
+                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOutwardSortBy('fabricQuality');
+                          setOutwardSortOrder('asc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Fabric Quality {outwardSortBy === 'fabricQuality' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (outwardSortBy === 'lotNo') {
+                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOutwardSortBy('lotNo');
+                          setOutwardSortOrder('desc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Lot No {outwardSortBy === 'lotNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th>Panna</th>
+                    <th
+                      onClick={() => {
+                        if (outwardSortBy === 'qty') {
+                          setOutwardSortOrder(outwardSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOutwardSortBy('qty');
+                          setOutwardSortOrder('asc');
+                        }
+                      }}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Qty (mtr) {outwardSortBy === 'qty' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                    <th>Notes</th>
+                    <th>Logged By</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {outwardTx.map(t => {
+                    const isTransfer = t.notes && (/Lot Transfer/i.test(t.notes) || /Auto Lot.*Rebalance/i.test(t.notes) || /\[Ref:\s*LT-/i.test(t.notes));
+                    const refIdMatch = t.notes && t.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                    const destLotMatch = t.notes && (
+                      t.notes.match(/(?:to Lot|-> Lot|->\s*Lot|Transfer to Lot)\s*#?\s*(\d+)/i) ||
+                      t.notes.match(/Lot #\d+\s*->\s*Lot #?(\d+)/i)
+                    );
+                    const destLotNum = destLotMatch ? (destLotMatch[1] || destLotMatch[2]) : (t.partyName?.match(/Lot #(\d+)/i)?.[1] || null);
+                    const displayChallan = t.challanNo || refIdMatch?.[1] || (isTransfer && destLotNum ? `LT-#${destLotNum}` : '-');
+                    const displayParty = isTransfer
+                      ? (destLotNum ? `Lot #${destLotNum}` : (t.partyName?.startsWith('Lot #') ? t.partyName : 'Lot Transfer'))
+                      : (t.partyName || '-');
+
+                    return (
+                    <tr key={t._id}>
+                      <td>{formatDateDDMMYYYY(t.date)}</td>
+                      <td>
+                        {isTransfer ? (
+                          <span style={{ fontSize: '0.72rem', color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(59, 130, 246, 0.25)', display: 'inline-block' }}>
+                            🔄 Transfer {destLotNum ? `→ #${destLotNum}` : ''}
+                          </span>
+                        ) : renderJobNoBadge(t.jobNo)}
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
+                      </td>
+                      <td>{displayParty}</td>
+                      <td>{t.fabricQuality}</td>
+                      <td>{t.lotNo ? `#${t.lotNo}` : '-'}</td>
+                      <td>{t.panna || '-'}</td>
+                      <td style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                        -{Number(t.qty || 0).toFixed(2)}
+                        {isTransfer && (
+                          <span style={{ fontSize: '0.68rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(167, 139, 250, 0.3)', display: 'inline-block' }}>Transfer</span>
+                        )}
+                        {(t.notes || '').includes('+2% French Crepe Applied') && (
+                          <span style={{ fontSize: '0.68rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(124, 58, 237, 0.3)', display: 'inline-block' }}>+2%</span>
+                        )}
+                        {(t.notes || '').includes('Remnant Stock Auto-Clear') && (
+                          <span style={{ fontSize: '0.68rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'inline-block' }}>Cleared (≤5m)</span>
+                        )}
+                      </td>
+                      <td>
+                        {(() => {
+                          const notes = t.notes || '';
+                          if (notes.startsWith('Auto: EDP-') || notes.startsWith('Auto: Job ')) {
+                            const parts = notes.split('|');
+                            if (parts.length >= 2) {
+                              const header = parts[0].trim();
+                              const badges = parts.slice(1).map(p => p.trim());
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                                  <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.8rem' }}>
+                                    {header}
+                                  </span>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {badges.map((badge, bIdx) => (
+                                      <span key={bIdx} style={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        color: bIdx === 0 ? '#38bdf8' : '#34d399',
+                                        background: bIdx === 0 ? 'rgba(14, 165, 233, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                                        border: bIdx === 0 ? '1px solid rgba(14, 165, 233, 0.15)' : '1px solid rgba(16, 185, 129, 0.15)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        display: 'inline-block',
+                                        marginTop: '2px',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {badge}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }
+                          return t.notes || '—';
+                        })()}
+                      </td>
+                      <td>
+                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                          {t.createdByName || t.createdBy || 'HASI'}
+                        </span>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <button
+                          className="btn-icon"
+                          title="View Audit History"
+                          style={{ color: '#fbbf24', marginRight: '0.5rem' }}
+                          onClick={() => setSelectedChallanHistory(t)}
+                        >
+                          <Clock size={15} />
+                        </button>
+                        <button
+                          className="btn-icon"
+                          title="Edit Outward Transaction"
+                          style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
+                          onClick={() => startEditOutward(t)}
+                        >
+                          <Edit size={15} />
+                        </button>
+                        <button
+                          className="btn-icon"
+                          title="Delete"
+                          style={{ color: 'var(--danger)' }}
+                          onClick={() => setDeleteTarget({ id: t._id, type: 'OUTWARD', label: `Job ${t.jobNo} — ${t.fabricQuality} (${t.qty} mtr)` })}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                  {outwardTx.length === 0 && (
+                    <tr><td colSpan="10" style={{ textAlign: 'center' }}>No outward transactions found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Showing {outwardTx.length} of {transactions.filter(t => t.type === 'OUTWARD').length} outward records
+            </div>
+          </div>
+        )}
+
+        {/* ── Requirement Tab ── */}
+        {activeTab === 'requirement' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                  <AlertTriangle size={20} color="#f59e0b" /> Fabric Requirement
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                  Calculated from all <strong>In Progress</strong> job cards. Click a row to see job-wise breakdown.
+                </p>
+              </div>
+              <button className="btn-secondary" onClick={fetchRequirement} disabled={reqLoading}>
+                <RefreshCw size={15} className={reqLoading ? 'spin-loader' : ''} />
+                {reqLoading ? 'Calculating...' : 'Refresh'}
+              </button>
+            </div>
+
+            {/* Summary chips */}
+            {requirement.length > 0 && (
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <div style={{ padding: '0.5rem 1rem', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  <CheckCircle size={13} style={{ color: 'var(--success)', marginRight: '4px', verticalAlign: 'middle' }} />
+                  <strong>{requirement.filter(r => r.status === 'Sufficient').length}</strong> Sufficient
+                </div>
+                <div style={{ padding: '0.5rem 1rem', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  <AlertCircle size={13} style={{ color: '#f59e0b', marginRight: '4px', verticalAlign: 'middle' }} />
+                  <strong>{requirement.filter(r => r.status === 'Short').length}</strong> Short
+                </div>
+                <div style={{ padding: '0.5rem 1rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  <AlertTriangle size={13} style={{ color: 'var(--danger)', marginRight: '4px', verticalAlign: 'middle' }} />
+                  <strong>{requirement.filter(r => r.status === 'No Stock').length}</strong> No Stock
+                </div>
+                <div style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  Total Needed: <strong>{Number(requirement.reduce((a, r) => a + (r.totalMtrRequired || 0), 0)).toFixed(2)} mtr</strong>
+                </div>
+                <div style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  Total Shortfall: <strong style={{ color: 'var(--danger)' }}>{Number(requirement.reduce((a, r) => a + (r.shortfall || 0), 0)).toFixed(2)} mtr</strong>
+                </div>
+              </div>
+            )}
+
+            {reqLoading && (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <RefreshCw size={24} className="spin-loader" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                Calculating requirement from job cards...
+              </div>
+            )}
+
+            {!reqLoading && requirement.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <AlertTriangle size={40} style={{ opacity: 0.3, display: 'block', margin: '0 auto 1rem' }} />
+                <p>No fabric requirement found.</p>
+                <p style={{ fontSize: '0.85rem' }}>Add Job Cards with "In Progress" status and set the Fabric + Total Meters fields.</p>
+              </div>
+            )}
+
+            {!reqLoading && requirement.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {requirement.map((req, idx) => {
+                  const isExpanded = expandedFabric === `req_${idx}`;
+                  const statusColor = req.status === 'Sufficient' ? 'var(--success)' : req.status === 'Short' ? '#f59e0b' : 'var(--danger)';
+                  const statusBg = req.status === 'Sufficient' ? 'rgba(34,197,94,0.08)' : req.status === 'Short' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
+                  const StatusIcon = req.status === 'Sufficient' ? CheckCircle : req.status === 'Short' ? AlertCircle : AlertTriangle;
+
+                  return (
+                    <div key={idx} style={{ background: statusBg, border: `1px solid ${statusColor}40`, borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                      {/* Main row */}
+                      <div
+                        onClick={() => setExpandedFabric(isExpanded ? null : `req_${idx}`)}
+                        style={{ display: 'flex', alignItems: 'center', padding: '1rem 1.2rem', cursor: 'pointer', gap: '1rem' }}
+                      >
+                        <StatusIcon size={20} style={{ color: statusColor, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{req.fabricQuality}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                            <span>Panna: <strong>{req.panna !== 'Unknown' ? String(req.panna).replace(/['"]/g, '') : '—'}</strong></span>
+                            <span>{req.jobs.length} job card{req.jobs.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', textAlign: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>REQUIRED</div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{Number(req.totalMtrRequired || 0).toFixed(2)} <span style={{ fontSize: '0.7rem' }}>mtr</span></div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>IN STOCK</div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem', color: req.currentStock > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                              {Number(req.currentStock || 0).toFixed(2)} <span style={{ fontSize: '0.7rem' }}>mtr</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>SHORTFALL</div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem', color: req.shortfall > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                              {req.shortfall > 0 ? `-${Number(req.shortfall || 0).toFixed(2)}` : '✓'} <span style={{ fontSize: '0.7rem' }}>{req.shortfall > 0 ? 'mtr' : ''}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.min(100, req.totalMtrRequired > 0 ? (req.currentStock / req.totalMtrRequired) * 100 : 0)}%`,
+                          background: statusColor,
+                          transition: 'width 0.5s ease'
+                        }} />
+                      </div>
+
+                      {/* Job breakdown (collapsible) */}
+                      {isExpanded && (
+                        <div style={{ borderTop: '1px solid var(--border-light)', padding: '0 1.2rem 1rem' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.75rem', fontSize: '0.82rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Job No</th>
+                                <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Party</th>
+                                <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Date</th>
+                                <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Net Required</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {req.jobs.map((job, ji) => (
+                                <tr key={ji} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                  <td style={{ padding: '0.45rem 0.5rem', fontWeight: 600, color: 'var(--primary)' }}>{job.jobNo}</td>
+                                  <td style={{ padding: '0.45rem 0.5rem' }}>{job.party || '—'}</td>
+                                  <td style={{ padding: '0.45rem 0.5rem', color: 'var(--text-muted)' }}>{job.date || '—'}</td>
+                                  <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                                    {job.remainingMtr > 0 ? `${Number(job.remainingMtr).toFixed(2)} mtr` : (job.totalMtr > 0 ? `${Number(job.totalMtr).toFixed(2)} mtr` : '—')}
+                                    {job.printedMtr > 0 && (
+                                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                        ({Number(job.printedMtr).toFixed(1)}m printed of {Number(job.totalMtr).toFixed(1)}m)
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Stock Adjustment (SA) Tab ── */}
+      {activeTab === 'stockAdjustment' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <RefreshCw size={20} className="text-purple-400" /> Stock Adjustment & Fabric Return (SA)
+              </h2>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Return rejected fabric to vendors & adjust stock with auto-assigned SA-01 voucher numbers.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {!isSaFormOpen && (
+                <>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      placeholder="Search voucher, party, fabric, lot..."
+                      value={saSearch}
+                      onChange={e => setSaSearch(e.target.value)}
+                      style={{ ...inputStyle, width: '220px', paddingLeft: '1.8rem' }}
+                    />
+                  </div>
+                  <DateRangePicker
+                    preset={saDatePreset}
+                    onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                      setSaDatePreset(p);
+                      setSaDateStart(ds || '');
+                      setSaDateEnd(de || '');
+                    }}
+                    customStart={customSaDateStart}
+                    customEnd={customSaDateEnd}
+                    onCustomChange={(s, e) => {
+                      setCustomSaDateStart(s);
+                      setCustomSaDateEnd(e);
+                      setSaDateStart(s);
+                      setSaDateEnd(e);
+                    }}
+                  />
+                </>
+              )}
+
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  if (isSaFormOpen) {
+                    setIsSaFormOpen(false);
+                    setEditingSa(null);
+                  } else {
+                    setEditingSa(null);
+                    setSaForm({
+                      date: new Date().toISOString().split('T')[0],
+                      partyName: '',
+                      vendorChallanNo: '',
+                      adjustmentType: 'RETURN_REJECTED',
+                      fabricQuality: '',
+                      panna: '',
+                      lotNo: '',
+                      reason: 'Fabric Return / Rejection',
+                      notes: '',
+                      tpDetails: [{ tpNo: 1, tpMeter: '', lotNo: '' }]
+                    });
+                    setIsSaFormOpen(true);
+                  }
+                }}
+                style={{ background: isSaFormOpen ? 'var(--secondary)' : 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)' }}
+              >
+                {isSaFormOpen ? <X size={16} /> : <PlusCircle size={16} />}
+                {isSaFormOpen ? 'Back to SA Register' : 'New Fabric Return (SA)'}
+              </button>
+            </div>
+          </div>
+
+          {/* Form Mode */}
+          {isSaFormOpen ? (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '1.5rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {editingSa ? <Edit size={18} /> : <PlusCircle size={18} />}
+                  {editingSa ? `Edit Stock Return Voucher (${(editingSa.saNo || '').replace(/^SA-/i, 'RE-')})` : 'Issue Stock Return Voucher (Auto Return #: RE-01...)'}
+                </h3>
+                <span style={{ fontSize: '0.78rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                  No Job Card Needed
+                </span>
+              </div>
+
+              <form onSubmit={handleCreateSaSubmit}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.2rem' }}>
+                  <div>
+                    <label style={labelStyle}>Date *</label>
+                    <input
+                      type="date"
+                      value={saForm.date}
+                      onChange={e => setSaForm(prev => ({ ...prev, date: e.target.value }))}
+                      style={inputStyle}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Party / Vendor Name *</label>
+                    <input
+                      type="text"
+                      list="saPartyOptions"
+                      placeholder="Type or select Party / Vendor..."
+                      value={saForm.partyName}
+                      onChange={e => setSaForm(prev => ({ ...prev, partyName: e.target.value }))}
+                      style={inputStyle}
+                      required
+                    />
+                    <datalist id="saPartyOptions">
+                      {Array.from(new Set([...partiesList, ...vendorsList.map(v => v.vendorName || v)])).map((p, idx) => (
+                        <option key={idx} value={p} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Vendor Challan No (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. VC-10492 / Bill No..."
+                      value={saForm.vendorChallanNo}
+                      onChange={e => setSaForm(prev => ({ ...prev, vendorChallanNo: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Adjustment Type</label>
+                    <select
+                      value={saForm.adjustmentType}
+                      onChange={e => setSaForm(prev => ({ ...prev, adjustmentType: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      <option value="RETURN_REJECTED">Fabric Return / Rejected Outward (Deducts Stock)</option>
+                      <option value="STOCK_DEDUCTION">Stock Deduction / Loss (Deducts Stock)</option>
+                      <option value="STOCK_ADDITION">Stock Addition / Adjustment (Adds Stock)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Fabric Quality *</label>
+                    <select
+                      value={saForm.fabricQuality}
+                      onChange={handleSaFabricChange}
+                      style={inputStyle}
+                      required
+                    >
+                      <option value="">Select Fabric Quality…</option>
+                      {fabricsList.map((f, idx) => (
+                        <option key={idx} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Panna (Width)</label>
+                    <select
+                      value={saForm.panna}
+                      onChange={e => setSaForm(prev => ({ ...prev, panna: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select Panna…</option>
+                      {widthsList.map((w, idx) => (
+                        <option key={idx} value={w}>{w}"</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Lot No *</label>
+                    <select
+                      value={saForm.lotNo}
+                      onChange={handleSaLotChange}
+                      style={inputStyle}
+                    >
+                      <option value="">Select Lot No…</option>
+                      {saAvailableLots.map((l, idx) => (
+                        <option key={idx} value={l.lotNo}>
+                          Lot #{l.lotNo} ({l.currentStock} mtr avail)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Reason / Remark</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Defective Fabric Return, Quality Rejection..."
+                      value={saForm.reason}
+                      onChange={e => setSaForm(prev => ({ ...prev, reason: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Additional Notes</label>
+                    <input
+                      type="text"
+                      placeholder="Additional notes or remarks..."
+                      value={saForm.notes}
+                      onChange={e => setSaForm(prev => ({ ...prev, notes: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
+                {/* TP / Rolls Entry Grid */}
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '1.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                      TP / Roll Details ({saForm.tpDetails.length} Rolls)
+                    </span>
+                    <button type="button" onClick={addSaTpRow} className="btn-secondary" style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}>
+                      <Plus size={14} /> Add Roll Row
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {saForm.tpDetails.map((tp, idx) => (
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 40px', gap: '0.75rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>TP-{tp.tpNo}</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Return Meters (mtr)..."
+                          value={tp.tpMeter}
+                          onChange={e => updateSaTpRow(idx, 'tpMeter', e.target.value)}
+                          style={inputStyle}
+                          required
+                        />
+                        <input
+                          type="text"
+                          placeholder="Lot No (optional)..."
+                          value={tp.lotNo || saForm.lotNo}
+                          onChange={e => updateSaTpRow(idx, 'lotNo', e.target.value)}
+                          style={inputStyle}
+                        />
+                        {saForm.tpDetails.length > 1 && (
+                          <button type="button" onClick={() => removeSaTpRow(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.3rem' }}>
+                            <X size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      Total Rolls: <strong>{saForm.tpDetails.length}</strong>
+                    </span>
+                    <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                      Total Return Meters: {saForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0).toFixed(2)} mtr
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button type="button" onClick={() => { setIsSaFormOpen(false); setEditingSa(null); }} className="btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={loading} style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)' }}>
+                    {loading ? 'Saving...' : editingSa ? 'Update SA Voucher' : 'Save & Issue SA Voucher'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* Register Table Mode */
+            <div className="table-responsive" style={{ marginTop: '1rem' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Voucher #</th>
+                    <th>Date</th>
+                    <th>Party / Vendor</th>
+                    <th>Vendor Challan</th>
+                    <th>Fabric Quality</th>
+                    <th>Lot No(s)</th>
+                    <th>Type</th>
+                    <th style={{ textAlign: 'center' }}>TP / Rolls</th>
+                    <th style={{ textAlign: 'right' }}>Total Return (mtr)</th>
+                    <th>Reason</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const filteredSa = stockAdjustments.filter(sa => {
+                      if (saDateStart && new Date(sa.date) < new Date(saDateStart)) return false;
+                      if (saDateEnd && new Date(sa.date) > new Date(saDateEnd + 'T23:59:59')) return false;
+                      if (!saSearch) return true;
+                      const s = saSearch.toLowerCase();
+                      return (sa.saNo || '').toLowerCase().includes(s) ||
+                        (sa.partyName || '').toLowerCase().includes(s) ||
+                        (sa.vendorChallanNo || '').toLowerCase().includes(s) ||
+                        (sa.fabricQuality || '').toLowerCase().includes(s) ||
+                        (sa.lotNo || '').toLowerCase().includes(s) ||
+                        (sa.reason || '').toLowerCase().includes(s);
+                    });
+
+                    if (filteredSa.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="11" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                            No stock adjustment / fabric return records found. Click <strong>"New Fabric Return (SA)"</strong> to create one.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredSa.map((sa, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{(sa.saNo || '').replace(/^SA-/i, 'RE-')}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>
+                          {formatDateDDMMYYYY(sa.date)}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{sa.partyName || '—'}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{sa.vendorChallanNo || '—'}</td>
+                        <td>{sa.fabricQuality}{sa.panna ? ` (${sa.panna}")` : ''}</td>
+                        <td>{sa.lotNo ? `#${sa.lotNo}` : '—'}</td>
+                        <td>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: sa.adjustmentType === 'STOCK_ADDITION' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                            color: sa.adjustmentType === 'STOCK_ADDITION' ? '#10b981' : '#f87171',
+                            border: `1px solid ${sa.adjustmentType === 'STOCK_ADDITION' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                          }}>
+                            {sa.adjustmentType === 'RETURN_REJECTED' ? 'Return / Rejected' : sa.adjustmentType}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{sa.totalTp || (sa.tpDetails ? sa.tpDetails.length : 1)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: sa.adjustmentType === 'STOCK_ADDITION' ? 'var(--success)' : 'var(--danger)' }}>
+                          {sa.adjustmentType === 'STOCK_ADDITION' ? '+' : '-'}{Number(sa.totalMtr || 0).toFixed(2)} mtr
+                        </td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{sa.reason || '—'}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => handleDownloadSaPdf(sa._id, sa.saNo)}
+                              className="btn-icon"
+                              title="Download Printable SA Voucher PDF"
+                              style={{ color: '#8b5cf6' }}
+                            >
+                              <FileDown size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleEditSa(sa)}
+                              className="btn-icon"
+                              title="Edit Stock Adjustment Voucher"
+                              style={{ color: 'var(--primary)' }}
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              onClick={() => setSaDeleteTarget(sa)}
+                              className="btn-icon"
+                              title="Delete SA Voucher & Restore Stock"
+                              style={{ color: 'var(--danger)' }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Delete SA Confirmation Modal */}
+          {saDeleteTarget && (
+            <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '1.5rem', maxWidth: '420px', width: '90%' }}>
+                <h3 style={{ margin: 0, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={20} /> Delete Stock Adjustment {saDeleteTarget.saNo}?
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.75rem 0 1.25rem' }}>
+                  Deleting this Stock Adjustment voucher will revert all corresponding lot outward/inward dispatches and restore lot stock balances.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button className="btn-secondary" onClick={() => setSaDeleteTarget(null)}>Cancel</button>
+                  <button className="btn-primary" style={{ background: 'var(--danger)' }} onClick={handleDeleteSa}>Confirm Delete</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Challan Tab ── */}
+      {activeTab === 'challan' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Header Banner & Metrics Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Challans</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{challans.length} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>records</span></div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={18} color="#38bdf8" />
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #34d399', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Invoiced & Billed</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>
+                  {challans.filter(c => c.status === 'INVOICED').length} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>billed</span>
+                </div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(52,211,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle size={18} color="#34d399" />
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Invoice</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#fbbf24', marginTop: 2 }}>
+                  {challans.filter(c => c.status !== 'INVOICED').length} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>pending</span>
+                </div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(251,191,36,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={18} color="#fbbf24" />
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #a78bfa', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Dispatched Mtr</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>
+                  {challans.reduce((sum, c) => sum + (parseFloat(c.totalMtr) || 0), 0).toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>mtr</span>
+                </div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(167,139,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Receipt size={18} color="#a78bfa" />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Toolbar & Filters */}
+          <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                📜 Fabric Dispatch Challans Register
+              </h2>
+              <ScreenGroupRoster screenId="jobcards_fabric" />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {selectedChallanIds.length > 0 && (
+                <button
+                  className="btn-primary"
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', fontSize: '0.78rem', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)' }}
+                  onClick={() => {
+                    if (selectedChallanIds.length > 10) {
+                      alert('Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.');
+                      return;
+                    }
+                    const selected = Object.values(selectedChallanMap);
+                    const alreadyBilled = selected.filter(c => c && (c.status === 'INVOICED' || c.billingStatus === 'INVOICED' || c.isBilled || Boolean(c.invoiceNo)));
+                    if (alreadyBilled.length > 0) {
+                      const details = alreadyBilled.map(c => `EDP-${c.challanNo}${c.invoiceNo ? ` (Invoice #${c.invoiceNo})` : ''}`).join(', ');
+                      alert(`⚠️ Cannot merge or create bill: The following selected challan(s) are already billed:\n${details}\n\nA delivery challan cannot be billed a 2nd time.`);
+                      return;
+                    }
+                    const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const customerKeys = new Set(selected.map(c => normalizeKey(c.billTo || c.partyName)).filter(Boolean));
+                    const partyNameKeys = new Set(selected.map(c => normalizeKey(c.partyName || c.billTo)).filter(Boolean));
+
+                    if (customerKeys.size > 1 && partyNameKeys.size > 1) {
+                      const partyList = [...new Set(selected.map(c => c.billTo || c.partyName).filter(Boolean))].join(', ');
+                      alert(`Cannot merge Challans from different customers. Selected Challans belong to multiple customers: ${partyList}`);
+                      return;
+                    }
+                    if (onNavigateToBilling) onNavigateToBilling(selected);
+                  }}
+                >
+                  <Receipt size={14} /> Merge & Create Invoice ({selectedChallanIds.length}/10)
+                </button>
+              )}
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input type="text" placeholder="Search challan no, party, job, fabric..." value={challanSearch} onChange={e => setChallanSearch(e.target.value)} style={{ ...inputStyle, width: '230px', paddingLeft: '2rem' }} />
+              </div>
+              <UnifiedFilterPopover
+                categories={challanFilterCategories}
+                activeFilters={challanFilters}
+                onChange={setChallanFilters}
+                placeholder="Filters"
+              />
+              <DateRangePicker
+                preset={challanDatePreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setChallanDatePreset(p);
+                  setChallanDateStart(ds);
+                  setChallanDateEnd(de);
+                }}
+                customStart={customChallanDateStart}
+                customEnd={customChallanDateEnd}
+                onCustomChange={(s, e) => {
+                  setCustomChallanDateStart(s);
+                  setCustomChallanDateEnd(e);
+                }}
+              />
+              <button className="btn-primary" onClick={() => { resetChallanForm(); setEditingChallan(null); setIsChallanOpen(true); }} style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', fontWeight: 800 }}>
+                <PlusCircle size={16} /> New Challan
+              </button>
+            </div>
+          </div>
+
+          {/* Bulk Challans Selection Action Bar */}
+          {Object.keys(selectedChallanMap).length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 1.1rem', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid #38bdf8', borderRadius: '10px', boxShadow: '0 4px 14px rgba(56, 189, 248, 0.2)', marginBottom: '0.8rem' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle size={16} color="#38bdf8" />
+                <span>{Object.keys(selectedChallanMap).length} Delivery Challan{Object.keys(selectedChallanMap).length > 1 ? 's' : ''} Selected</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={async () => {
+                    const ids = Object.keys(selectedChallanMap);
+                    if (ids.length === 0) return;
+                    try {
+                      await api.downloadBulkFabricChallanPdf(ids, `Combined_Fabric_Challans_${ids.length}_Items.pdf`);
+                      triggerPushNotification('📥 Combined Challans PDF Downloaded', `${ids.length} Fabric Challans merged into 1 single multi-page PDF document.`, 'success');
+                    } catch (e) {
+                      alert('Error downloading combined PDF: ' + e.message);
+                    }
+                  }}
+                  className="btn-primary"
+                  style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <FileDown size={15} />
+                  Download Combined PDF ({Object.keys(selectedChallanMap).length})
+                </button>
+                <button
+                  onClick={() => handleCreateBillFromChallan(Object.values(selectedChallanMap))}
+                  className="btn-primary"
+                  style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #7c3aed, #6366f1)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Receipt size={15} />
+                  Create Bill ({Object.keys(selectedChallanMap).length})
+                </button>
+                <button
+                  onClick={() => setSelectedChallanMap({})}
+                  className="btn-secondary"
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Table Container */}
+          <div className="table-responsive-wrapper" style={{ padding: 0, border: '1px solid var(--border-light)' }}>
+            <div className="table-responsive" style={{ width: '100%' }}>
+              {(() => {
+                const filteredChallans = challans.filter(c => {
+                  if (challanFilters.party && challanFilters.party.length > 0) {
+                    const p = c.partyName || c.billTo;
+                    if (!challanFilters.party.includes(p)) return false;
+                  }
+                  return true;
+                });
+                const displayedChallans = filteredChallans.slice(0, challanVisibleCount);
+
+                return (
+                  <table className="data-table" style={{ width: '100%', minWidth: '950px', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9))', borderBottom: '1px solid var(--border-light)' }}>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', width: '38px' }}>
+                          <input
+                            type="checkbox"
+                            checked={displayedChallans.length > 0 && displayedChallans.every(c => !!selectedChallanMap[c._id])}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedChallanMap(prev => {
+                                  const copy = { ...prev };
+                                  displayedChallans.forEach(c => { copy[c._id] = c; });
+                                  return copy;
+                                });
+                              } else {
+                                setSelectedChallanMap({});
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Ch. No</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '85px' }}>Status</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Date</th>
+                        <th style={{ padding: '0.65rem 0.5rem' }}>Bill To / Party</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '75px' }}>Lot No</th>
+                        <th style={{ padding: '0.65rem 0.5rem' }}>Fabric</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '110px' }}>Job No</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '60px' }}>Panna</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '45px' }}>TP</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Total Mtr</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '200px' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedChallans.length === 0 && (
+                        <tr><td colSpan={12} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>No challans found matching filters. Click "New Challan" to create one.</td></tr>
+                      )}
+                      {displayedChallans.map(ch => (
+                        <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s' }}>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedChallanMap[ch._id]}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedChallanMap(prev => ({ ...prev, [ch._id]: ch }));
+                                } else {
+                                  setSelectedChallanMap(prev => {
+                                    const copy = { ...prev };
+                                    delete copy[ch._id];
+                                    return copy;
+                                  });
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                            <span style={{ padding: '0.2rem 0.5rem', borderRadius: 4, fontWeight: 900, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', fontSize: '0.78rem' }}>
+                              EDP-{ch.challanNo}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem' }}>
+                            {ch.status === 'INVOICED' ? (
+                              <span
+                                title={ch.invoiceNo ? `Tax Invoice #${ch.invoiceNo}` : 'Invoiced'}
+                                style={{
+                                  background: 'rgba(52,211,153,0.15)',
+                                  color: '#34d399',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid rgba(52,211,153,0.3)',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                INVOICED {ch.invoiceNo ? `(${ch.invoiceNo})` : ''}
+                              </span>
+                            ) : (
+                              <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                                PENDING
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(ch.date)}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', maxWidth: '220px' }}>
+                            {ch.lotNo != null && String(ch.lotNo).trim() !== '' ? (
+                              <div>
+                                <span
+                                  title={`#${ch.lotNo}`}
+                                  style={{
+                                    display: 'inline-block',
+                                    maxWidth: '200px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    verticalAlign: 'middle',
+                                    background: 'rgba(16,185,129,0.12)',
+                                    color: '#10b981',
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem',
+                                    border: '1px solid rgba(16,185,129,0.25)'
+                                  }}
+                                >
+                                  #{ch.lotNo}
+                                </span>
+                                {(() => {
+                                  const lotInfo = lotRecords.find(l => String(l.lotNo) === String(ch.lotNo));
+                                  if (!lotInfo || !lotInfo.totalInward) return null;
+                                  const totalIn = lotInfo.totalInward;
+                                  const totalOut = lotInfo.totalOutward;
+                                  const usagePct = Math.min(100, Math.round((totalOut / totalIn) * 100));
+                                  const pColor = usagePct >= 100 ? '#ef4444' : usagePct >= 85 ? '#f59e0b' : '#10b981';
+                                  return (
+                                    <div style={{ marginTop: '3px', width: '100%', maxWidth: '140px' }} title={`Lot #${ch.lotNo}: ${totalOut.toFixed(1)}m dispatched of ${totalIn.toFixed(1)}m inward (${usagePct}% used)`}>
+                                      <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                        <div style={{ width: `${usagePct}%`, height: '100%', background: pColor, borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                                      </div>
+                                      <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '1px', fontWeight: 600 }}>
+                                        {usagePct}% used ({lotInfo.currentStock.toFixed(0)}m left)
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{ch.fabricName || '—'}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                            {renderJobNoBadge(ch.jobNo)}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap', fontSize: '0.88rem' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
+                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            {(() => {
+                              const challanActions = [
+                                {
+                                  id: 'view',
+                                  icon: Eye,
+                                  label: 'View',
+                                  tooltip: 'View Delivery Challan',
+                                  variant: 'default',
+                                  color: '#38bdf8',
+                                  onClick: () => setViewChallanModal(ch),
+                                  isPrimary: true
+                                },
+                                ...((ch.status !== 'INVOICED' && !ch.isBilled && !ch.invoiceNo) ? [
+                                  {
+                                    id: 'bill',
+                                    icon: Receipt,
+                                    label: 'Create Bill',
+                                    tooltip: 'Create Tax Invoice / Bill',
+                                    variant: 'purple',
+                                    color: '#a78bfa',
+                                    onClick: () => handleCreateBillFromChallan(ch),
+                                    isPrimary: true
+                                  }
+                                ] : [
+                                  {
+                                    id: 'bill',
+                                    icon: CheckCircle,
+                                    label: ch.invoiceNo ? `Billed #${ch.invoiceNo}` : 'Billed',
+                                    tooltip: `Already Billed in Invoice #${ch.invoiceNo || ''}`,
+                                    variant: 'success',
+                                    color: '#10b981',
+                                    onClick: () => {
+                                      alert(`Challan EDP-${ch.challanNo} is already billed in Invoice #${ch.invoiceNo || 'N/A'}. A delivery challan cannot be billed a 2nd time.`);
+                                    },
+                                    isPrimary: false
+                                  }
+                                ]),
+                                {
+                                  id: 'download',
+                                  icon: FileDown,
+                                  label: 'Download PDF',
+                                  tooltip: 'Download Challan PDF',
+                                  variant: 'success',
+                                  color: '#34d399',
+                                  onClick: () => handleDownloadChallanPdf(ch._id, ch.challanNo),
+                                  isPrimary: false
+                                },
+                                ...(ch.status !== 'INVOICED' ? [
+                                  {
+                                    id: 'edit',
+                                    icon: Edit,
+                                    label: 'Edit',
+                                    tooltip: 'Edit Challan',
+                                    variant: 'primary',
+                                    color: 'var(--primary)',
+                                    onClick: () => startEditChallan(ch),
+                                    isPrimary: false
+                                  },
+                                  {
+                                    id: 'delete',
+                                    icon: Trash2,
+                                    label: 'Delete',
+                                    tooltip: 'Delete Challan',
+                                    variant: 'danger',
+                                    color: '#f87171',
+                                    onClick: () => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` }),
+                                    isPrimary: false
+                                  }
+                                ] : [])
+                              ];
+
+                              return <SmartActionGroup actions={challanActions} maxInlineMobile={2} align="center" />;
+                            })()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Infinite Scroll & Chunking Dock */}
+          <InfiniteScrollPagination
+            hasMore={challans.length > challanVisibleCount}
+            loading={false}
+            loadingMore={challanLoadingMore}
+            onLoadMore={() => {
+              if (challanLoadingMore || challans.length <= challanVisibleCount) return;
+              setChallanLoadingMore(true);
+              setTimeout(() => {
+                setChallanVisibleCount(c => Math.min(challans.length, c + 50));
+                setChallanLoadingMore(false);
+              }, 120);
+            }}
+            page={Math.ceil(challanVisibleCount / 50)}
+            pages={Math.max(1, Math.ceil(challans.length / 50))}
+            total={challans.length}
+            currentCount={Math.min(challanVisibleCount, challans.length)}
+            itemName="challans"
+            onLoadAll={() => setChallanVisibleCount(challans.length)}
+          />
+        </div>
+      )}
+
+      {/* ── Challan Delete Confirm ── */}
+      {challanDeleteTarget && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-panel" style={{ width: '380px', padding: '2rem', textAlign: 'center' }}>
+            <AlertTriangle size={36} style={{ color: 'var(--danger)', marginBottom: '1rem' }} />
+            <p style={{ marginBottom: '1.5rem' }}>Delete <strong>{challanDeleteTarget.label}</strong>?</p>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setChallanDeleteTarget(null)}>Cancel</button>
+              <button className="btn-danger" style={{ flex: 1 }} onClick={handleChallanDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Challan View Modal (White & Blue Theme) ── */}
+      {viewChallanModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', color: '#0f172a' }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#2563eb', fontWeight: 800, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  📄 Delivery Challan EDP-{viewChallanModal.challanNo}
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                  Date: {formatDateDDMMYYYY(viewChallanModal.date)}
+                </span>
+              </div>
+              <button onClick={() => setViewChallanModal(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.4rem', cursor: 'pointer', color: '#475569' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Details Grid - White & Blue */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.85rem', marginBottom: '1.25rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Billed To:</span> <strong style={{ color: '#2563eb', fontWeight: 800 }}>{viewChallanModal.billTo || viewChallanModal.partyName || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Party / Delivery:</span> <strong style={{ color: '#0f172a', fontWeight: 700 }}>{viewChallanModal.partyName || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Job No:</span> <strong style={{ color: '#1d4ed8', fontWeight: 800 }}>#{viewChallanModal.jobNo || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Design / Name:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.designNo || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Fabric Quality:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.fabricName || '—'}</strong> ({viewChallanModal.panna || '58'}")</div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Lot No:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.lotNo ? `#${viewChallanModal.lotNo}` : '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Delivery By:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.deliveryBy || '—'}</strong></div>
+              {viewChallanModal.vendorChallanNo && <div><span style={{ color: '#64748b', fontWeight: 600 }}>Vendor Ch:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.vendorChallanNo}</strong></div>}
+              {viewChallanModal.pcs && <div><span style={{ color: '#64748b', fontWeight: 600 }}>PCS:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.pcs} pcs</strong></div>}
+            </div>
+
+            {/* TP Details List - Full Breakdown with Assigned Lot & Percentage */}
+            {viewChallanModal.tpDetails && viewChallanModal.tpDetails.length > 0 && (() => {
+              const activeTps = viewChallanModal.tpDetails.filter(tp => (parseFloat(tp.tpMeter) || 0) > 0 || (parseFloat(tp.freshMtr) || 0) > 0);
+              const displayList = activeTps.length > 0 ? activeTps : viewChallanModal.tpDetails;
+              const totalRolls = displayList.length;
+              const hasDetailedMeters = displayList.some(tp => (parseFloat(tp.freshMtr) || 0) > 0 || (parseFloat(tp.westMtr) || 0) > 0);
+              const sumFresh = displayList.reduce((acc, r) => acc + (parseFloat(r.freshMtr) || 0), 0);
+              const sumWest = displayList.reduce((acc, r) => acc + (parseFloat(r.westMtr) || 0), 0);
+              const sumMtr = displayList.reduce((acc, r) => acc + (parseFloat(r.tpMeter) || 0), 0) || parseFloat(viewChallanModal.totalMtr || 0);
+
+              return (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>📦 TP / Roll Breakdown</span>
+                      <span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                        {totalRolls} Rolls
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+                      Avg: {totalRolls > 0 ? (sumMtr / totalRolls).toFixed(1) : 0} m/roll
+                    </span>
+                  </div>
+
+                  <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1.5px solid #bfdbfe', borderRadius: '10px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+                    <table style={{ width: '100%', fontSize: '0.84rem', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#eff6ff', borderBottom: '1.5px solid #bfdbfe', textAlign: 'left', color: '#1e40af', position: 'sticky', top: 0, zIndex: 2 }}>
+                          <th style={{ padding: '0.6rem 0.75rem', fontWeight: '800' }}>TP #</th>
+                          <th style={{ padding: '0.6rem 0.75rem', fontWeight: '800' }}>Assigned Lot</th>
+                          {hasDetailedMeters && <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#059669' }}>Fresh Mtr</th>}
+                          {hasDetailedMeters && <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#d97706' }}>West Mtr</th>}
+                          <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800' }}>Total Mtr</th>
+                          <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: '800' }}>Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayList.map((tp, idx) => {
+                          const mtrVal = parseFloat(tp.tpMeter) || ((parseFloat(tp.freshMtr) || 0) + (parseFloat(tp.westMtr) || 0));
+                          const sharePct = sumMtr > 0 ? ((mtrVal / sumMtr) * 100).toFixed(1) : '0.0';
+                          const assignedLot = tp.lotNo || viewChallanModal.lotNo || '—';
+
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', transition: 'background 0.15s ease' }}>
+                              <td style={{ padding: '0.55rem 0.75rem' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  background: '#e0f2fe',
+                                  border: '1px solid #bae6fd',
+                                  color: '#0369a1',
+                                  fontWeight: 800,
+                                  fontSize: '0.8rem'
+                                }}>
+                                  TP-{idx + 1}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.55rem 0.75rem', fontWeight: '700', color: '#334155' }}>
+                                {assignedLot !== '—' ? (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '2px 7px',
+                                    borderRadius: '5px',
+                                    background: '#f1f5f9',
+                                    border: '1px solid #cbd5e1',
+                                    color: '#0f172a',
+                                    fontSize: '0.76rem',
+                                    fontWeight: 700
+                                  }}>
+                                    Lot #{String(assignedLot).replace(/^#/, '')}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#94a3b8' }}>—</span>
+                                )}
+                              </td>
+                              {hasDetailedMeters && (
+                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#059669', fontSize: '0.86rem' }}>
+                                  {(parseFloat(tp.freshMtr) || 0).toFixed(2)}m
+                                </td>
+                              )}
+                              {hasDetailedMeters && (
+                                <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#d97706', fontSize: '0.86rem' }}>
+                                  {(parseFloat(tp.westMtr) || 0).toFixed(2)}m
+                                </td>
+                              )}
+                              <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: '800', color: '#16a34a', fontSize: '0.88rem' }}>
+                                {mtrVal.toFixed(2)} mtr
+                              </td>
+                              <td style={{ padding: '0.55rem 0.75rem', textAlign: 'right', color: '#64748b', fontSize: '0.78rem', fontWeight: 600 }}>
+                                {sharePct}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0', fontWeight: 800 }}>
+                          <td colSpan={2} style={{ padding: '0.6rem 0.75rem', color: '#1e40af' }}>
+                            Total Breakdown ({totalRolls} Rolls)
+                          </td>
+                          {hasDetailedMeters && (
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#059669', fontSize: '0.88rem' }}>
+                              {sumFresh.toFixed(2)}m
+                            </td>
+                          )}
+                          {hasDetailedMeters && (
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#d97706', fontSize: '0.88rem' }}>
+                              {sumWest.toFixed(2)}m
+                            </td>
+                          )}
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#16a34a', fontSize: '0.92rem' }}>
+                            {sumMtr.toFixed(2)} mtr
+                          </td>
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#64748b', fontSize: '0.8rem' }}>
+                            100%
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Summary Totals - Light Blue Theme (Accurate Dynamic Rolls & Meters) */}
+            {(() => {
+              const activeTps = (viewChallanModal.tpDetails || []).filter(tp => (parseFloat(tp.tpMeter) || 0) > 0);
+              const computedRolls = activeTps.length > 0 ? activeTps.length : (viewChallanModal.totalTp || 0);
+              const computedMtr = activeTps.length > 0
+                ? activeTps.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0)
+                : parseFloat(viewChallanModal.totalMtr || 0);
+
+              return (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.1rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', marginBottom: '1.25rem' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af' }}>Total Outward Quantity:</span>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1d4ed8' }}>
+                    {computedMtr.toFixed(2)} mtr ({computedRolls} Rolls)
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Action Buttons - White & Blue Theme */}
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button onClick={() => setViewChallanModal(null)} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#475569', fontWeight: '600', cursor: 'pointer' }}>
+                Close
+              </button>
+              {(viewChallanModal && (viewChallanModal.status === 'INVOICED' || viewChallanModal.billingStatus === 'INVOICED' || viewChallanModal.isBilled || Boolean(viewChallanModal.invoiceNo))) ? (
+                <div style={{ padding: '0.55rem 1rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid #10b981', color: '#059669', fontWeight: '700', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <CheckCircle size={15} /> Billed: {viewChallanModal.invoiceNo ? `Invoice #${viewChallanModal.invoiceNo}` : 'Invoiced'}
+                </div>
+              ) : (
+                <button onClick={() => { setViewChallanModal(null); handleCreateBillFromChallan(viewChallanModal); }} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' }}>
+                  <Receipt size={15} /> Create Bill
+                </button>
+              )}
+              <button onClick={() => handleDownloadChallanPdf(viewChallanModal._id, viewChallanModal.challanNo)} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none', backgroundColor: '#0284c7', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)' }}>
+                <FileDown size={15} /> Download PDF
+              </button>
+              <button onClick={() => { setViewChallanModal(null); startEditChallan(viewChallanModal); }} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid #2563eb', backgroundColor: '#ffffff', color: '#2563eb', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Edit size={15} /> Edit Challan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Challan Form Modal (Responsive 2-Column Desktop + Mobile Tabbed Flow — WHITE THEME) ── */}
+      {isChallanOpen && (
+        <div className="challan-modal-overlay">
+          <div className="challan-modal-box">
+
+            {/* Modal Header Bar */}
+            <div className="challan-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.1)', border: '1px solid rgba(2, 132, 199, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a', lineHeight: 1.2 }}>
+                    {editingChallan ? `Edit Fabric Challan EDP-${editingChallan.challanNo}` : 'New Fabric Challan Dispatch'}
+                  </h2>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Enter challan metadata &amp; TP meter values</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeChallanModal}
+                style={{ background: '#e2e8f0', border: 'none', color: '#475569', borderRadius: '50%', width: '32px', height: '32px', minWidth: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Mobile Tab Switcher (Visible on Mobile/Tablet <= 860px) */}
+            <div className="challan-mobile-tabs-bar">
+              <button
+                type="button"
+                className={`challan-mobile-tab-btn ${challanMobileTab === 'info' ? 'active' : ''}`}
+                onClick={() => setChallanMobileTab('info')}
+              >
+                <FileText size={15} />
+                <span>1. Challan Info</span>
+              </button>
+              <button
+                type="button"
+                className={`challan-mobile-tab-btn ${challanMobileTab === 'tp' ? 'active' : ''}`}
+                onClick={() => setChallanMobileTab('tp')}
+              >
+                <Layers size={15} />
+                <span>2. TP Meters</span>
+                {challanTotalTp > 0 && (
+                  <span className="challan-tab-badge">
+                    {challanTotalTp}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Modal Form Body */}
+            <form onSubmit={handleChallanSubmit} className="challan-modal-form">
+
+              {/* LEFT COLUMN: Metadata, Job & Lot Details */}
+              <div className={`challan-col-left ${challanMobileTab !== 'info' ? 'tab-hidden' : ''}`}>
+
+                {/* Section Header: Basic & Party */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 120px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Date</label>
+                    <input type="date" required value={challanForm.date} onChange={e => setChallanForm({ ...challanForm, date: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ flex: '1.8 1 180px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Party Name</label>
+                    <input type="text" list="challan-parties" value={challanForm.partyName} onChange={e => setChallanForm({ ...challanForm, partyName: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Select or type party..." />
+                    <datalist id="challan-parties">
+                      {partiesList.map((p, i) => <option key={i} value={typeof p === 'string' ? p : p.name} />)}
+                    </datalist>
+                  </div>
+                </div>
+
+                {/* Job Selection & Interactive Pills */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Job No(s) <span style={{ color: '#64748b', fontSize: '0.7rem' }}>(select multiple or type)</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {challanForm.partyName && (
+                        <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700 }}>
+                          Party: {challanForm.partyName}
+                        </span>
+                      )}
+                      {challanForm.jobNo && (
+                        <button
+                          type="button"
+                          onClick={handleResyncChallanFromJobCard}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '4px',
+                            color: '#1d4ed8',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            padding: '2px 7px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Sync latest design, colour, fabric & party details from this Job Card"
+                        >
+                          <RefreshCw size={11} /> Sync from Job Card
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="e.g. JOB-2252, JOB-2253..." />
+                  <datalist id="challan-jobs">
+                    {inProgressJobCards
+                      .filter(j => {
+                        const fStatus = (j.fusingStatus || '').toLowerCase();
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        return fStatus.includes('done') || fMtr > 0;
+                      })
+                      .map(j => {
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        const dMtr = parseFloat(j.deliveredMtr || 0);
+                        const avail = Math.max(0, fMtr - dMtr);
+                        return (
+                          <option key={j._id} value={j.jobNo}>
+                            {j.jobNo} [🔥 Fused: {fMtr.toFixed(1)}m{avail > 0 ? `, Avail: ${avail.toFixed(0)}m` : ''}] — {j.party} ({j.designNo || ''})
+                          </option>
+                        );
+                      })}
+                  </datalist>
+
+                  {/* Interactive Job Pills - Only show Job Cards that are Done in Fusing */}
+                  <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '85px', overflowY: 'auto' }}>
+                    {(() => {
+                      const fusedJobs = inProgressJobCards.filter(j => {
+                        const fStatus = (j.fusingStatus || '').toLowerCase();
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        const isDone = fStatus.includes('done') || fMtr > 0;
+                        if (!isDone) return false;
+                        if (challanForm.partyName && (!j.party || j.party.toLowerCase().trim() !== challanForm.partyName.toLowerCase().trim())) {
+                          return false;
+                        }
+                        return true;
+                      });
+
+                      if (fusedJobs.length === 0) {
+                        return (
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.2rem 0.3rem' }}>
+                            {challanForm.partyName
+                              ? `No Fusing-completed job cards found for ${challanForm.partyName}.`
+                              : 'No Fusing-completed job cards available.'}
+                          </div>
+                        );
+                      }
+
+                      return fusedJobs.slice(0, 30).map(j => {
+                        const isSelected = String(challanForm.jobNo || '').toUpperCase().includes(String(j.jobNo).toUpperCase());
+                        const fMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
+                        const dMtr = parseFloat(j.deliveredMtr || 0);
+                        const avail = Math.max(0, fMtr - dMtr);
+
+                        return (
+                          <button
+                            key={j._id}
+                            type="button"
+                            onClick={() => toggleChallanJobPill(j.jobNo)}
+                            title={`Fusing Done: ${fMtr.toFixed(1)}m fused${avail > 0 ? ` (${avail.toFixed(1)}m available)` : ''}`}
+                            style={{
+                              padding: '0.22rem 0.55rem',
+                              fontSize: '0.72rem',
+                              borderRadius: '10px',
+                              border: `1px solid ${isSelected ? '#0284c7' : '#86efac'}`,
+                              background: isSelected ? '#0284c7' : '#f0fdf4',
+                              color: isSelected ? '#ffffff' : '#166534',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <span>{isSelected ? '✓ ' : '+ '} {j.jobNo}</span>
+                            <span style={{ fontSize: '0.62rem', opacity: isSelected ? 0.9 : 0.85, fontWeight: 800 }}>
+                              🔥 {fMtr > 0 ? `${fMtr.toFixed(0)}m` : 'Done'}
+                            </span>
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* Design Name/No, Colour & Panna */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 180px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Design No / Name
+                    </label>
+                    <input
+                      type="text"
+                      value={challanForm.designNo}
+                      onChange={e => setChallanForm({ ...challanForm, designNo: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      placeholder="e.g. ED-709, Floral Design..."
+                    />
+                  </div>
+                  <div style={{ flex: '1.2 1 120px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Colour / Matching
+                    </label>
+                    <input
+                      type="text"
+                      value={challanForm.colour}
+                      onChange={e => setChallanForm({ ...challanForm, colour: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      placeholder="e.g. Red, Blue, Matching 1..."
+                    />
+                  </div>
+                  <div style={{ flex: '0 0 85px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Panna
+                    </label>
+                    <input
+                      type="text"
+                      value={challanForm.panna}
+                      onChange={e => setChallanForm({ ...challanForm, panna: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box', textAlign: 'center' }}
+                      placeholder='58"'
+                    />
+                  </div>
+                </div>
+
+                {/* Bill To & Ship To */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 140px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Bill To</label>
+                    <select
+                      value={challanForm.billTo}
+                      onChange={e => setChallanForm({ ...challanForm, billTo: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                    >
+                      <option value="">-- Select Bill To --</option>
+                      {billToOptions.map((opt, i) => (
+                        <option key={i} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ flex: '1 1 140px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Ship To</label>
+                    <select
+                      value={challanForm.shipTo}
+                      onChange={e => setChallanForm({ ...challanForm, shipTo: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                    >
+                      <option value="">-- Select Ship To --</option>
+                      {shipToOptions.map((opt, i) => (
+                        <option key={i} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Lot No & Available Lot Chips */}
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Lot No {challanLotLoading && <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Loading…</span>}</label>
+                  <input
+                    type="text"
+                    list="challan-lot-options"
+                    value={challanForm.lotNo}
+                    onChange={e => handleChallanLotChange(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                    placeholder="Select or type e.g. 252, 280, 291..."
+                  />
+                  <datalist id="challan-lot-options">
+                    {(() => {
+                      const sorted = [...availableLots].sort((a, b) => {
+                        const numA = parseInt(a.lotNo, 10);
+                        const numB = parseInt(b.lotNo, 10);
+                        if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+                        return String(b.lotNo).localeCompare(String(a.lotNo));
+                      });
+                      return sorted.map((l, i) => (
+                        <option key={i} value={String(l.lotNo)}>
+                          Lot #{l.lotNo} — {l.fabricQuality} ({l.panna ? String(l.panna).replace(/['"]/g, '') : '58'}) [{l.currentStock ? `${parseFloat(l.currentStock).toFixed(2)}m` : ''}]
+                        </option>
+                      ));
+                    })()}
+                  </datalist>
+
+                  {/* Available Lot Buttons Chips */}
+                  {availableLots.length > 0 ? (
+                    <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxHeight: '90px', overflowY: 'auto' }}>
+                      {(() => {
+                        const sortedLots = [...availableLots].sort((a, b) => {
+                          const numA = parseInt(a.lotNo, 10);
+                          const numB = parseInt(b.lotNo, 10);
+                          if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+                          return String(b.lotNo).localeCompare(String(a.lotNo));
+                        });
+                        return sortedLots.slice(0, 35).map((lot, idx) => {
+                          const selectedList = String(challanForm.lotNo || '').split(/[,\s&]+/).map(s => s.trim()).filter(Boolean);
+                          const isSelected = selectedList.includes(String(lot.lotNo));
+                          const formattedStock = lot.currentStock != null ? parseFloat(lot.currentStock).toFixed(2) : '0.00';
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                let newLotStr;
+                                if (isSelected) {
+                                  newLotStr = selectedList.filter(x => x !== String(lot.lotNo)).join(', ');
+                                } else {
+                                  newLotStr = [...selectedList, String(lot.lotNo)].join(', ');
+                                }
+                                handleChallanLotChange(newLotStr);
+                              }}
+                              style={{
+                                padding: '0.18rem 0.5rem',
+                                fontSize: '0.7rem',
+                                borderRadius: '10px',
+                                border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                                background: isSelected ? '#0284c7' : '#ffffff',
+                                color: isSelected ? '#ffffff' : '#475569',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isSelected ? '✓ ' : '+ '} Lot #{lot.lotNo} ({formattedStock}m)
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  ) : (
+                    challanForm.fabricName ? (
+                      <div style={{ marginTop: '0.35rem', fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic' }}>
+                        No in-stock lots found for {challanForm.fabricName}
+                      </div>
+                    ) : null
+                  )}
+
+                  {/* DYNAMIC PROPER LOT STOCK PROGRESS BAR */}
+                  {selectedLotsList.length > 0 && (
+                    <div style={{
+                      marginTop: '0.65rem',
+                      padding: '0.75rem 0.9rem',
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      border: challanTotalMtr > selectedLotsTotalStock ? '1px solid #fca5a5' : '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                    }}>
+                      {/* Mathematical Progress Calculations (Including Shortage) */}
+                      {(() => {
+                        const dispatchedMtr = challanTotalMtr > 0 ? challanTotalMtr : (parseFloat(challanForm.totalMtr) || 0);
+
+                        // Proportional wastage share from fusing
+                        let proportionalWasteMtr = 0;
+                        if (challanFusingStats && challanFusingStats.freshMtr > 0 && challanFusingStats.westMtr > 0) {
+                          const baseFresh = challanFusingStats.freshMtr;
+                          const ratio = Math.min(1.0, dispatchedMtr / baseFresh);
+                          proportionalWasteMtr = parseFloat((ratio * challanFusingStats.westMtr).toFixed(2));
+                        }
+
+                        const fabricWithWasteMtr = dispatchedMtr + proportionalWasteMtr;
+
+                        let shortageMtrVal = 0;
+                        if (challanForm.shortageMode === 'mtr') {
+                          shortageMtrVal = parseFloat(challanForm.shortageMtr) || 0;
+                        } else if (challanForm.shortagePct !== '' && challanForm.shortagePct != null) {
+                          const p = parseFloat(challanForm.shortagePct) || 0;
+                          shortageMtrVal = (fabricWithWasteMtr * p) / 100;
+                        }
+                        const effectiveTakenMtr = fabricWithWasteMtr + shortageMtrVal;
+
+                        const hasStock = selectedLotsTotalStock > 0;
+                        const realPct = hasStock ? Math.round((effectiveTakenMtr / selectedLotsTotalStock) * 100) : (effectiveTakenMtr > 0 ? 999 : 0);
+                        const fillWidth = Math.min(100, realPct);
+                        const isOver = effectiveTakenMtr > selectedLotsTotalStock + 0.01;
+                        const isNearFull = realPct >= 85 && !isOver;
+
+                        const barBg = isOver
+                          ? 'linear-gradient(90deg, #ef4444 0%, #b91c1c 100%)'
+                          : isNearFull
+                            ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
+                            : 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+
+                        let balance = selectedLotsTotalStock - effectiveTakenMtr;
+                        if (Math.abs(balance) < 0.01) balance = 0;
+
+                        return (
+                          <>
+                            {/* Top Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '1rem' }}>📊</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                                  Lot Stock Fulfillment ({selectedLotsList.length} {selectedLotsList.length === 1 ? 'Lot' : 'Lots'})
+                                </span>
+                                <span style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: '10px',
+                                  background: '#e2e8f0',
+                                  color: '#334155'
+                                }}>
+                                  {selectedLotsList.length <= 3 ? `#${selectedLotsList.join(', #')}` : `#${selectedLotsList.slice(0, 3).join(', #')} +${selectedLotsList.length - 3} more`}
+                                </span>
+                              </div>
+
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                <span style={{ color: isOver ? '#dc2626' : '#0284c7' }}>
+                                  {effectiveTakenMtr.toFixed(2)}m taken in Outward
+                                </span>
+                                <span style={{ color: '#64748b' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
+                              </div>
+                            </div>
+
+                            {/* Track Container */}
+                            <div style={{
+                              width: '100%',
+                              height: '12px',
+                              background: '#e2e8f0',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              position: 'relative',
+                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
+                            }}>
+                              <div style={{
+                                width: `${fillWidth}%`,
+                                height: '100%',
+                                background: barBg,
+                                borderRadius: '8px',
+                                transition: 'width 0.35s ease'
+                              }} />
+                            </div>
+
+                            {/* Status Footer Metrics */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700, flexWrap: 'wrap', gap: '4px' }}>
+                              <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {isOver ? (
+                                  <>⚠️ <span>{realPct}% Allocated — EXCEEDED AVAILABLE STOCK!</span></>
+                                ) : (
+                                  <>✅ <span>{realPct}% Stock Taken ({fillWidth}% of Lot Capacity)</span></>
+                                )}
+                              </span>
+
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                background: isOver ? '#fee2e2' : '#dcfce7',
+                                color: isOver ? '#991b1b' : '#166534',
+                                border: isOver ? '1px solid #fca5a5' : '1px solid #86efac'
+                              }}>
+                                {isOver ? `Deficit: ${Math.abs(balance).toFixed(2)} mtr` : `Remaining: ${Math.abs(balance) < 0.01 ? '0.00' : balance.toFixed(2)} mtr`}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Vendor Challan, Delivery By, PCS */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1.2 1 120px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Vendor Challan</label>
+                    <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Vendor Challan #" />
+                  </div>
+                  <div style={{ flex: '1.2 1 120px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Delivery By</label>
+                    <input
+                      type="text"
+                      list="delivery-by-options"
+                      value={challanForm.deliveryBy}
+                      onChange={e => setChallanForm({ ...challanForm, deliveryBy: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      placeholder="Driver/person..."
+                    />
+                    <datalist id="delivery-by-options">
+                      {deliveryByOptions.map((opt, i) => (
+                        <option key={i} value={opt} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div style={{ flex: '0.8 1 70px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>PCS</label>
+                    <input type="number" min="0" value={challanForm.pcs} onChange={e => setChallanForm({ ...challanForm, pcs: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Pcs" />
+                  </div>
+                </div>
+
+                {/* Fabric Name & Shortage */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 180px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Fabric Quality</label>
+                    <input
+                      type="text"
+                      list="challan-fabrics"
+                      value={challanForm.fabricName}
+                      onChange={e => {
+                        setChallanForm({ ...challanForm, fabricName: e.target.value });
+                      }}
+                      onBlur={e => {
+                        if (e.target.value) {
+                          const normFab = normalizeFabricName(e.target.value);
+                          const autoP = getDefaultPannaForFabric(normFab, challanForm.panna);
+                          setChallanForm(prev => ({ ...prev, fabricName: normFab, panna: autoP }));
+                        }
+                      }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      placeholder="Fabric quality..."
+                    />
+                    <datalist id="challan-fabrics">
+                      {fabricsList.map((f, i) => <option key={i} value={f} />)}
+                    </datalist>
+                  </div>
+                  <div style={{ flex: '1.2 1 150px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Shortage ({challanForm.shortageMode === 'mtr' ? 'Meters' : '%'})
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', width: '100%' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={challanForm.shortageMode === 'mtr' ? (challanForm.shortageMtr || '') : (challanForm.shortagePct || '')}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (challanForm.shortageMode === 'mtr') {
+                            setChallanForm({ ...challanForm, shortageMtr: val, shortagePct: '' });
+                          } else {
+                            setChallanForm({ ...challanForm, shortagePct: val, shortageMtr: '' });
+                          }
+                        }}
+                        style={{
+                          flex: '1 1 auto',
+                          minWidth: '70px',
+                          width: '100%',
+                          padding: '0.5rem 0.6rem',
+                          fontSize: '0.85rem',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          boxSizing: 'border-box'
+                        }}
+                        placeholder={challanForm.shortageMode === 'mtr' ? "e.g. 5 mtr" : "Shortage %"}
+                      />
+                      <select
+                        value={challanForm.shortageMode || 'pct'}
+                        onChange={e => {
+                          const newMode = e.target.value;
+                          setChallanForm(prev => ({ ...prev, shortageMode: newMode }));
+                        }}
+                        style={{
+                          flex: '0 0 68px',
+                          width: '68px',
+                          minWidth: '68px',
+                          maxWidth: '68px',
+                          height: '38px',
+                          padding: '0.4rem 0.25rem',
+                          fontSize: '0.85rem',
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          color: '#0f172a',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <option value="pct">%</option>
+                        <option value="mtr">mtr</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Optional Notes */}
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Notes</label>
+                  <input type="text" value={challanForm.notes} onChange={e => setChallanForm({ ...challanForm, notes: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Optional challan notes…" />
+                </div>
+
+                {/* Mobile Tab 1 Navigation Bar (Next: TP Meters) */}
+                <div className="challan-mobile-next-bar">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={closeChallanModal}
+                    style={{
+                      flex: 1,
+                      padding: '0.65rem 0.75rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      background: '#e2e8f0',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChallanMobileTab('tp')}
+                    style={{
+                      flex: 2,
+                      padding: '0.65rem 0.9rem',
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                      color: '#ffffff',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      border: 'none',
+                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>Next: TP Meters ({challanTotalTp} TPs)</span>
+                    <ArrowRightLeft size={14} />
+                  </button>
+                </div>
+
+              </div>
+
+              {/* RIGHT COLUMN: Dedicated TP Meters Entry & Immediate Action Bar */}
+              <div className={`challan-col-right ${challanMobileTab !== 'tp' ? 'tab-hidden' : ''}`}>
+
+                {/* Right Top Header: TP Section Title & Summary Banner */}
+                <div className="challan-tp-header">
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP METERS VALUES</span>
+                    <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700 }}>Manual Lot No &amp; TP meters entry per row</div>
+                  </div>
+                  <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
+                    <PlusCircle size={14} /> Add TP Row
+                  </button>
+                </div>
+
+                {/* ── FUSING DEPARTMENT METRICS DISPLAY ── */}
+                <div style={{
+                  margin: '0.5rem 0.75rem 0.35rem 0.75rem',
+                  padding: '0.6rem 0.85rem',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 40%, #eff6ff 100%)',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '10px',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        🔥 Fusing Department Output {challanFusingStats?.jobLabels ? `(${challanFusingStats.jobLabels})` : ''}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '1px 8px', borderRadius: '12px' }}>
+                      Fusing Reference
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                    <div style={{ background: '#ffffff', padding: '0.4rem 0.5rem', borderRadius: '8px', border: '1.5px solid #bbf7d0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Fresh Meter</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#047857', marginTop: '1px' }}>
+                        {challanFusingStats ? challanFusingStats.freshMtr.toFixed(2) : '0.00'}m
+                      </div>
+                    </div>
+                    <div style={{ background: '#ffffff', padding: '0.4rem 0.5rem', borderRadius: '8px', border: '1.5px solid #fde68a', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.02em' }}>West Mtr</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#b45309', marginTop: '1px' }}>
+                        {challanFusingStats ? challanFusingStats.westMtr.toFixed(2) : '0.00'}m
+                      </div>
+                    </div>
+                    <div style={{ background: '#ffffff', padding: '0.4rem 0.5rem', borderRadius: '8px', border: '1.5px solid #bfdbfe', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Total Mtr</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1d4ed8', marginTop: '1px' }}>
+                        {challanFusingStats ? challanFusingStats.totalMtr.toFixed(2) : '0.00'}m
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TP Meters Entry Scrollable Area */}
+                <div className="challan-tp-list">
+
+                  {/* Table Column Headers (Desktop only) */}
+                  <div className="challan-tp-grid-header">
+                    <span>TP No</span>
+                    <span>Assigned Lot</span>
+                    <span>TP Meters (mtr)</span>
+                    <span></span>
+                  </div>
+
+                  {(() => {
+                    const currentLots = String(challanForm.lotNo || '')
+                      .split(/[,\s&]+/)
+                      .map(s => s.trim())
+                      .filter(Boolean);
+                    return challanForm.tpDetails.map((row, idx) => {
+                      const isCustom = row.isCustomLot;
+                      return (
+                        <div key={idx} className="challan-tp-row">
+                          <div className="challan-tp-badge" style={{ padding: '0.5rem 0.3rem', fontSize: '0.82rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '6px', textAlign: 'center', fontWeight: 900, color: '#0369a1', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            TP {idx + 1}
+                          </div>
+                          <div className="challan-tp-lot-container" style={{ position: 'relative', width: '100%' }}>
+                            {!isCustom ? (
+                              <select
+                                value={row.lotNo || currentLots[0] || ''}
+                                onChange={e => {
+                                  if (e.target.value === '__custom__') {
+                                    updateTpRow(idx, 'isCustomLot', true);
+                                    updateTpRow(idx, 'lotNo', '');
+                                  } else {
+                                    updateTpRow(idx, 'lotNo', e.target.value);
+                                  }
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.3rem',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 800,
+                                  color: '#0f172a',
+                                  background: '#ffffff',
+                                  border: '1.5px solid #0284c7',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {currentLots.length > 0 ? (
+                                  <>
+                                    <optgroup label="Selected Challan Lots">
+                                      {currentLots.map((l, i) => {
+                                        const avail = availableLots.find(al => String(al.lotNo) === String(l));
+                                        return (
+                                          <option key={`cur-${i}`} value={l}>
+                                            Lot #{l} {avail?.currentStock != null ? `(${parseFloat(avail.currentStock).toFixed(1)}m)` : ''}
+                                          </option>
+                                        );
+                                      })}
+                                    </optgroup>
+                                    {availableLots.filter(al => !currentLots.includes(String(al.lotNo))).length > 0 && (
+                                      <optgroup label="Other Available Lots">
+                                        {availableLots.filter(al => !currentLots.includes(String(al.lotNo))).slice(0, 25).map((al, i) => (
+                                          <option key={`avail-${i}`} value={String(al.lotNo)}>
+                                            Lot #{al.lotNo} ({parseFloat(al.currentStock || 0).toFixed(1)}m)
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <option value="">Select Lot…</option>
+                                    {availableLots.slice(0, 35).map((al, i) => (
+                                      <option key={`avail-${i}`} value={String(al.lotNo)}>
+                                        Lot #{al.lotNo} ({parseFloat(al.currentStock || 0).toFixed(1)}m)
+                                      </option>
+                                    ))}
+                                  </>
+                                )}
+                                {row.lotNo && !currentLots.includes(String(row.lotNo)) && !availableLots.some(al => String(al.lotNo) === String(row.lotNo)) && (
+                                  <option value={row.lotNo}>Lot #{row.lotNo} (Manual)</option>
+                                )}
+                                <option value="__custom__">✏️ Custom Lot #…</option>
+                              </select>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', width: '100%' }}>
+                                <input
+                                  type="text"
+                                  value={row.lotNo ?? ''}
+                                  onChange={e => updateTpRow(idx, 'lotNo', e.target.value)}
+                                  placeholder="Lot #"
+                                  autoFocus
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.5rem 0.3rem',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    background: '#ffffff',
+                                    border: '1.5px solid #0284c7',
+                                    borderRadius: '6px',
+                                    textAlign: 'center',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  title="Switch to dropdown"
+                                  onClick={() => {
+                                    updateTpRow(idx, 'isCustomLot', false);
+                                    updateTpRow(idx, 'lotNo', currentLots[0] || '');
+                                  }}
+                                  style={{
+                                    border: '1px solid #cbd5e1',
+                                    background: '#f8fafc',
+                                    color: '#64748b',
+                                    borderRadius: '4px',
+                                    padding: '0.45rem 0.3rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    lineHeight: 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="challan-tp-meter-wrapper" style={{ position: 'relative', width: '100%' }}>
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              autoFocus={idx === 0}
+                              value={row.tpMeter ?? ''}
+                              onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.45rem',
+                                fontSize: '0.92rem',
+                                fontWeight: 900,
+                                color: '#0f172a',
+                                background: '#ffffff',
+                                border: '2px solid #0284c7',
+                                borderRadius: '6px',
+                                boxSizing: 'border-box',
+                                textAlign: 'right'
+                              }}
+                              placeholder="Meters (mtr)"
+                              title="Roll / TP meters"
+                            />
+                          </div>
+
+                          <button type="button" className="challan-tp-remove-btn" onClick={() => removeTpRow(idx)} style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', height: '36px', width: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Right Bottom Footer: Live Total & STICKY SAVE / CANCEL BUTTONS */}
+                <div className="challan-tp-footer">
+
+                  {/* Total Summary Row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total TPs</span>
+                      <div style={{ fontWeight: 900, fontSize: '1rem', color: '#0284c7' }}>{challanTotalTp} Rolls</div>
+                    </div>
+                    {challanFusingStats && challanFusingStats.totalMtr > 0 && (
+                      <div style={{ textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', padding: '0 0.75rem' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#059669', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Fusing Fresh</span>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#059669' }}>{challanFusingStats.freshMtr.toFixed(2)}m</div>
+                      </div>
+                    )}
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.65rem', color: '#0f172a', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total Dispatched Mtr</span>
+                      <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#0284c7' }}>{challanTotalMtr.toFixed(2)}m</div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Bar */}
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary challan-mobile-back-btn"
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        background: '#f1f5f9',
+                        color: '#475569',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      onClick={() => setChallanMobileTab('info')}
+                    >
+                      ⬅ Info
+                    </button>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700, background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '8px' }} onClick={closeChallanModal}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary" style={{ flex: 1.8, padding: '0.65rem 1rem', fontSize: '0.95rem', fontWeight: 900, background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#ffffff', border: 'none', borderRadius: '8px', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)', cursor: 'pointer' }}>
+                      {editingChallan ? '💾 Save Changes' : '🚀 Save Challan'}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Inward Modal ── */}
+      {isInwardOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-panel" style={{ width: '500px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '1.5rem' }}>{editingTransaction ? 'Edit Fabric Inward' : 'Add Fabric Inward'}</h2>
+            <form onSubmit={handleInwardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Date</label>
+                  <input type="date" required value={inwardForm.date} onChange={e => setInwardForm({ ...inwardForm, date: e.target.value })} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Lot No</label>
+                  <input type="text" disabled value={editingTransaction ? `#${editingTransaction.lotNo}` : `Auto (Next: #${nextLotNo})`} style={{ ...inputStyle, background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Challan No</label>
+                  <input type="text" value={inwardForm.challanNo} onChange={e => setInwardForm({ ...inwardForm, challanNo: e.target.value })} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Vendor Name</label>
+                  <input type="text" list="inward-vendors" value={inwardForm.vendorName} onChange={e => setInwardForm({ ...inwardForm, vendorName: e.target.value })} style={inputStyle} placeholder="Select or type vendor..." />
+                  <datalist id="inward-vendors">
+                    {vendorsList.map(v => <option key={v._id} value={v.name} />)}
+                  </datalist>
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Fabric Quality *</label>
+                <input
+                  type="text"
+                  required
+                  list="inward-fabrics"
+                  value={inwardForm.fabricQuality}
+                  onChange={e => {
+                    const normFab = normalizeFabricName(e.target.value);
+                    const autoP = getDefaultPannaForFabric(normFab, inwardForm.panna);
+                    setInwardForm({ ...inwardForm, fabricQuality: normFab, panna: autoP });
+                  }}
+                  style={inputStyle}
+                  placeholder="Select or type fabric..."
+                />
+                <datalist id="inward-fabrics">
+                  {fabricsList.map(f => <option key={f} value={f} />)}
+                </datalist>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Fabric Panna (Width)</label>
+                <input type="text" list="inward-widths" value={inwardForm.panna} onChange={e => setInwardForm({ ...inwardForm, panna: e.target.value })} style={inputStyle} placeholder="Select or type panna..." />
+                <datalist id="inward-widths">
+                  {widthsList.map(w => <option key={w} value={w} />)}
+                </datalist>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Quantity (mtr) *</label>
+                <input type="number" step="0.01" required min="0.1" value={inwardForm.qty} onChange={e => setInwardForm({ ...inwardForm, qty: e.target.value })} style={inputStyle} />
+              </div>
+
+
+
+              <div>
+                <label style={labelStyle}>Notes</label>
+                <input type="text" value={inwardForm.notes} onChange={e => setInwardForm({ ...inwardForm, notes: e.target.value })} style={inputStyle} placeholder="Optional notes..." />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={closeInwardModal}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>{editingTransaction ? 'Save Changes' : 'Save Inward'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Inward TP Details Modal ── */}
+      {inwardTpModalTransaction && (() => {
+        const validTps = inwardTpRows.filter(r => r.tpMeter !== '' && !isNaN(parseFloat(r.tpMeter)));
+        const totalTpMeters = validTps.reduce((acc, r) => acc + parseFloat(r.tpMeter), 0);
+        const lotQty = Number(inwardTpModalTransaction.qty) || 0;
+        const diffMtr = totalTpMeters - lotQty;
+        const isBalanced = Math.abs(diffMtr) < 0.01;
+
+        return (
+          <div className="inward-tp-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeInwardTpModal(); }}>
+            <div className="inward-tp-modal-box" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="inward-tp-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                      Lot #{inwardTpModalTransaction.lotNo} — TP Details (Rolls)
+                    </h3>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      Add or edit roll-wise meter breakdown for this inward lot
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeInwardTpModal}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px', borderRadius: '6px' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Meta Banner */}
+              <div className="inward-tp-meta-banner">
+                <div>
+                  <span style={{ color: '#64748b' }}>Quality: </span>
+                  <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.fabricQuality}</strong>
+                </div>
+                {inwardTpModalTransaction.panna && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Panna: </span>
+                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.panna}"</strong>
+                  </div>
+                )}
+                {inwardTpModalTransaction.challanNo && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Challan: </span>
+                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.challanNo}</strong>
+                  </div>
+                )}
+                {inwardTpModalTransaction.vendorName && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Vendor: </span>
+                    <strong style={{ color: '#0f172a' }}>{inwardTpModalTransaction.vendorName}</strong>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: '#64748b' }}>Inward Qty: </span>
+                  <strong style={{ color: '#16a34a' }}>{lotQty.toFixed(2)} Mtr</strong>
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: '#64748b' }}>TP Total:</span>
+                  <strong style={{ color: '#0284c7', fontSize: '0.9rem' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
+                  {validTps.length > 0 && (
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 7px',
+                      borderRadius: '12px',
+                      background: isBalanced ? '#dcfce7' : (diffMtr > 0 ? '#fef9c3' : '#fee2e2'),
+                      color: isBalanced ? '#15803d' : (diffMtr > 0 ? '#a16207' : '#b91c1c'),
+                      border: `1px solid ${isBalanced ? '#bbf7d0' : (diffMtr > 0 ? '#fde047' : '#fecaca')}`
+                    }}>
+                      {isBalanced ? '✓ Balanced' : `Diff: ${diffMtr > 0 ? '+' : ''}${diffMtr.toFixed(2)}m`}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Tools Bar */}
+              <div className="inward-tp-tools-bar">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => addInwardTpRows(1)}
+                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={13} /> +1 TP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addInwardTpRows(5)}
+                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+                  >
+                    +5 TPs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addInwardTpRows(10)}
+                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+                  >
+                    +10 TPs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInwardBulkPasteOpen(!inwardBulkPasteOpen)}
+                    style={{ background: inwardBulkPasteOpen ? '#e0f2fe' : '#f0fdf4', border: `1px solid ${inwardBulkPasteOpen ? '#7dd3fc' : '#86efac'}`, color: inwardBulkPasteOpen ? '#0369a1' : '#15803d', padding: '4px 10px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    ⚡ Bulk Paste
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRollRemarks(!showRollRemarks)}
+                    style={{
+                      background: showRollRemarks ? '#e0f2fe' : '#f8fafc',
+                      border: `1px solid ${showRollRemarks ? '#7dd3fc' : '#cbd5e1'}`,
+                      color: showRollRemarks ? '#0369a1' : '#334155',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title={showRollRemarks ? 'Hide Remarks column to give full width to Meter entry' : 'Show Roll No / Remarks column'}
+                  >
+                    <span>{showRollRemarks ? '✓ Remarks ON' : '+ Remarks'}</span>
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    {validTps.length} entered ({inwardTpRows.length} rows)
+                  </span>
+                  {inwardTpRows.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setInwardTpRows([])}
+                      style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.74rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Bulk Paste Box (Collapsible) */}
+              {inwardBulkPasteOpen && (
+                <div style={{ padding: '0.75rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                    Paste roll meter numbers separated by commas, spaces, or lines (e.g., 95.5, 102.3, 88.0):
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={inwardBulkPasteText}
+                    onChange={e => setInwardBulkPasteText(e.target.value)}
+                    placeholder="98.50, 104.20, 89.00, 112.50..."
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setInwardBulkPasteOpen(false); setInwardBulkPasteText(''); }}
+                      style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 12px', fontSize: '0.76rem', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applyInwardBulkPaste}
+                      style={{ background: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '4px 14px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Apply Values
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Table Column Headers */}
+              <div className={`inward-tp-table-header ${showRollRemarks ? 'with-remarks' : 'no-remarks'}`}>
+                <div>TP #</div>
+                <div>Meter (Mtr) *</div>
+                {showRollRemarks && <div>Roll No / Remarks</div>}
+                <div style={{ textAlign: 'center' }}>Del</div>
+              </div>
+
+              {/* Rows List */}
+              <div className="inward-tp-list" ref={tpListRef}>
+                {inwardTpRows.map((row, idx) => (
+                  <div key={row.id || idx} className={`inward-tp-row ${showRollRemarks ? 'with-remarks' : 'no-remarks'}`}>
+                    <div className="inward-tp-num-cell">
+                      #{row.tpNo || idx + 1}
+                    </div>
+                    <div>
+                      <input
+                        id={`tp-meter-input-${idx}`}
+                        type="number"
+                        inputMode="decimal"
+                        pattern="[0-9]*[.,]?[0-9]*"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={row.tpMeter}
+                        onChange={e => updateInwardTpRow(idx, 'tpMeter', e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (idx === inwardTpRows.length - 1) {
+                              addInwardTpRows(1);
+                              setTimeout(() => {
+                                const nextInput = document.getElementById(`tp-meter-input-${idx + 1}`);
+                                if (nextInput) nextInput.focus();
+                              }, 60);
+                            } else {
+                              const nextInput = document.getElementById(`tp-meter-input-${idx + 1}`);
+                              if (nextInput) nextInput.focus();
+                            }
+                          }
+                        }}
+                        className="inward-tp-meter-input"
+                      />
+                    </div>
+                    {showRollRemarks && (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="e.g. Roll A-1 / Tag"
+                          value={row.notes}
+                          onChange={e => updateInwardTpRow(idx, 'notes', e.target.value)}
+                          className="inward-tp-notes-input"
+                        />
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => removeInwardTpRow(idx)}
+                        className="inward-tp-del-btn"
+                        title="Remove row"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {inwardTpRows.length === 0 && (
+                  <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                    No TP rows added. Click "+1 TP" or "+5 TPs" above to begin entering roll meters.
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="inward-tp-footer">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: '#334155', cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={syncInwardQty}
+                      onChange={e => setSyncInwardQty(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#0284c7' }}
+                    />
+                    <span>
+                      Sync Lot Inward Quantity to match sum of TP meters (<strong>{totalTpMeters.toFixed(2)} Mtr</strong>)
+                    </span>
+                  </label>
+                  <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                    Valid TPs: <strong style={{ color: '#0f172a' }}>{validTps.length}</strong> | Total: <strong style={{ color: '#0284c7' }}>{totalTpMeters.toFixed(2)} Mtr</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={closeInwardTpModal}
+                    disabled={inwardTpSaving}
+                    style={{ padding: '0.55rem 1.25rem', borderRadius: '8px', fontSize: '0.85rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleSaveInwardTps}
+                    disabled={inwardTpSaving}
+                    style={{ padding: '0.55rem 1.5rem', borderRadius: '8px', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Check size={16} />
+                    {inwardTpSaving ? 'Saving...' : 'Save TP Details'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Outward Modal ── */}
+      {isOutwardOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-panel" style={{ width: '500px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '1.5rem' }}>Add Fabric Outward</h2>
+            <form onSubmit={handleOutwardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Date</label>
+                  <input type="date" required value={outwardForm.date} onChange={e => setOutwardForm({ ...outwardForm, date: e.target.value })} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Job Card No *</label>
+                  <input type="text" required list="outward-jobs" value={outwardForm.jobNo} onChange={handleJobNoChange} style={inputStyle} placeholder="Select or type Job No..." />
+                  <datalist id="outward-jobs">
+                    {inProgressJobCards.map(j => <option key={j._id} value={j.jobNo} />)}
+                  </datalist>
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Challan No</label>
+                <input type="text" value={outwardForm.challanNo} onChange={e => setOutwardForm({ ...outwardForm, challanNo: e.target.value })} style={inputStyle} placeholder="Outward challan number..." />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Party Name</label>
+                <input type="text" list="outward-parties" value={outwardForm.partyName} onChange={e => setOutwardForm({ ...outwardForm, partyName: e.target.value })} style={inputStyle} placeholder="Auto-filled from job card..." />
+                <datalist id="outward-parties">
+                  {partiesList.map((p, idx) => <option key={idx} value={p} />)}
+                </datalist>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Fabric Quality *</label>
+                <input type="text" required list="outward-fabrics" value={outwardForm.fabricQuality} onChange={e => setOutwardForm({ ...outwardForm, fabricQuality: e.target.value })} style={inputStyle} placeholder="Auto-filled from job card..." />
+                <datalist id="outward-fabrics">
+                  {fabricsList.map(f => <option key={f} value={f} />)}
+                </datalist>
+              </div>
+
+              <div>
+                <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Lot No *</span>
+                  <button
+                    type="button"
+                    onClick={fetchAllLots}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', padding: 0 }}
+                  >
+                    <RefreshCw size={11} className={lotLoading ? 'spin-loader' : ''} /> {lotLoading ? 'Loading...' : 'Reload'}
+                  </button>
+                </label>
+                <select
+                  required
+                  value={outwardForm.lotNo}
+                  onChange={handleLotNoChange}
+                  style={inputStyle}
+                  disabled={lotLoading}
+                >
+                  <option value="">
+                    {lotLoading ? 'Loading lots...' : '-- Select Active Lot --'}
+                  </option>
+                  {(() => {
+                    // Client-side filter by fabricQuality (case-insensitive match)
+                    const filtered = outwardForm.fabricQuality
+                      ? lotList.filter(l => l.fabricQuality.toLowerCase().trim() === outwardForm.fabricQuality.toLowerCase().trim())
+                      : lotList;
+                    return filtered.map(lot => (
+                      <option key={lot.lotNo} value={lot.lotNo}>
+                        Lot #{lot.lotNo} — {lot.fabricQuality} | Stock: {Number(lot.currentStock || 0).toFixed(2)} mtr{lot.panna ? ` | Panna: ${lot.panna}` : ''}
+                      </option>
+                    ));
+                  })()}
+                </select>
+                {/* Status messages */}
+                {!lotLoading && lotList.length === 0 && (
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.3rem', display: 'block' }}>
+                    ⚠️ No lots with available stock found. Please add Inward first.
+                  </span>
+                )}
+                {!lotLoading && lotList.length > 0 && outwardForm.fabricQuality &&
+                  lotList.filter(l => l.fabricQuality.toLowerCase().trim() === outwardForm.fabricQuality.toLowerCase().trim()).length === 0 && (
+                    <span style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.3rem', display: 'block' }}>
+                      ⚠️ No lots found for "{outwardForm.fabricQuality}". Check fabric name spelling or add Inward first.
+                    </span>
+                  )}
+                {outwardForm.lotNo && lotList.find(l => String(l.lotNo) === String(outwardForm.lotNo)) && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '0.25rem', display: 'block' }}>
+                    ✓ Available stock: {Number(lotList.find(l => String(l.lotNo) === String(outwardForm.lotNo)).currentStock || 0).toFixed(2)} mtr
+                  </span>
+                )}
+              </div>
+
+
+              <div>
+                <label style={labelStyle}>Fabric Panna (Width)</label>
+                <input type="text" list="outward-widths" value={outwardForm.panna} onChange={e => setOutwardForm({ ...outwardForm, panna: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot..." />
+                <datalist id="outward-widths">
+                  {widthsList.map(w => <option key={w} value={w} />)}
+                </datalist>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Quantity (mtr) *</label>
+                <input type="number" step="0.01" required min="0.1" value={outwardForm.qty} onChange={e => setOutwardForm({ ...outwardForm, qty: e.target.value })} style={inputStyle} />
+                {(outwardForm.fabricQuality || '').toUpperCase().includes('CREPE') && (
+                  <span style={{ fontSize: '0.75rem', color: '#8b5cf6', marginTop: '0.3rem', display: 'block', fontWeight: 600 }}>
+                    💡 +2% Auto-Added for French Crepe {outwardForm.qty && !isNaN(outwardForm.qty) ? `(${outwardForm.qty} mtr → ${(parseFloat(outwardForm.qty) * 1.02).toFixed(2)} mtr outward)` : '(e.g. 100 mtr → 102.00 mtr)'}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label style={labelStyle}>Notes</label>
+                <input type="text" value={outwardForm.notes} onChange={e => setOutwardForm({ ...outwardForm, notes: e.target.value })} style={inputStyle} placeholder="Optional notes..." />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsOutwardOpen(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{ flex: 1, background: 'var(--danger)', borderColor: 'var(--danger)' }}>Save Outward</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteTarget && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '2rem', textAlign: 'center' }}>
+            <Trash2 size={36} style={{ color: 'var(--danger)', margin: '0 auto 1rem' }} />
+            <h3 style={{ marginBottom: '0.5rem' }}>Delete Transaction?</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              This will permanently delete:<br />
+              <strong style={{ color: 'var(--text-primary)' }}>{deleteTarget.label}</strong>
+            </p>
+            <p style={{ color: '#f59e0b', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+              ⚠️ Stock levels will be recalculated after deletion.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>
+                <X size={15} /> Cancel
+              </button>
+              <button className="btn-primary" style={{ flex: 1, background: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={handleDelete}>
+                <Trash2 size={15} /> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PDF Report Filter Modal ── */}
+      {isPdfFilterOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-panel" style={{ width: '440px', padding: '2rem' }}>
+            <h2 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FileDown size={20} /> Download Fabric Ledger PDF
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ ...labelStyle, marginBottom: '0.4rem' }}>Quick Date Range</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'this_week', label: 'This Week' },
+                    { id: 'this_month', label: 'This Month' },
+                    { id: 'last_30_days', label: 'Last 30 Days' },
+                    { id: 'all', label: 'All Time' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        const { dateStart, dateEnd } = getDatePresetRange(p.id);
+                        setPdfFilter(prev => ({ ...prev, dateStart: dateStart || '', dateEnd: dateEnd || '' }));
+                      }}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-light, #cbd5e1)',
+                        background: 'rgba(255,255,255,0.06)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Date From</label>
+                    <input type="date" value={pdfFilter.dateStart} onChange={e => setPdfFilter({ ...pdfFilter, dateStart: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Date To</label>
+                    <input type="date" value={pdfFilter.dateEnd} onChange={e => setPdfFilter({ ...pdfFilter, dateEnd: e.target.value })} style={inputStyle} />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Fabric Quality (optional — leave blank for all)</label>
+                <input type="text" list="pdf-fabrics" value={pdfFilter.fabricQuality} onChange={e => setPdfFilter({ ...pdfFilter, fabricQuality: e.target.value })} style={inputStyle} placeholder="All fabrics..." />
+                <datalist id="pdf-fabrics">
+                  {fabricsList.map(f => <option key={f} value={f} />)}
+                </datalist>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Leave date fields blank to include all transactions.</p>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsPdfFilterOpen(false)}>Cancel</button>
+                <button className="btn-primary" style={{ flex: 1 }} onClick={handleDownloadPdf} disabled={pdfLoading}>
+                  {pdfLoading ? <RefreshCw size={15} className="spin-loader" /> : <FileDown size={15} />}
+                  {pdfLoading ? 'Generating...' : 'Download PDF'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Catalog Manager Modal */}
+      {isManagerOpen && (
+        <CatalogManagerModal
+          initialTab="vendors"
+          context="elite_print"
+          onClose={() => {
+            setIsManagerOpen(false);
+            fetchData();
+          }}
+        />
+      )}
+
+      {/* COMBINED / INDIVIDUAL DEPARTMENT PDF REPORT MODAL (WHITE & BLUE THEME) */}
+      {isCombinedModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+          <div style={{ background: '#ffffff', width: '100%', maxWidth: '560px', borderRadius: '16px', padding: '1.5rem', border: '1px solid #bfdbfe', color: '#0f172a', boxShadow: '0 25px 50px -12px rgba(30, 58, 138, 0.25), 0 0 0 1px rgba(191, 219, 254, 0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ background: '#eff6ff', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bfdbfe' }}>
+                  <FileText size={20} color="#2563eb" />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#1e3a8a' }}>Download PDF Reports (Elite Digital Prints)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCombinedModalOpen(false)}
+                style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'pointer', padding: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '1rem', lineHeight: '1.4' }}>
+              Select the date period and choose individual department reports or combine them into a single report PDF.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.35rem' }}>Quick Date Range</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'this_week', label: 'This Week' },
+                    { id: 'this_month', label: 'This Month' },
+                    { id: 'last_30_days', label: 'Last 30 Days' },
+                    { id: 'all', label: 'All Time' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        const { dateStart, dateEnd } = getDatePresetRange(p.id);
+                        setCombinedDateStart(dateStart || '');
+                        setCombinedDateEnd(dateEnd || '');
+                      }}
+                      style={{
+                        padding: '0.25rem 0.6rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        border: '1px solid #bfdbfe',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>Date Start</label>
+                    <input
+                      type="date"
+                      value={combinedDateStart}
+                      onChange={e => setCombinedDateStart(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>Date End</label>
+                    <input
+                      type="date"
+                      value={combinedDateEnd}
+                      onChange={e => setCombinedDateEnd(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e3a8a', margin: 0 }}>Select Department Reports:</label>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCombinedReports(['stock', 'inward', 'lotwise', 'lotTransfer', 'stockAdjustment', 'requirement', 'challan'])}
+                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tabToReport = {
+                          dashboard: 'stock',
+                          inward: 'inward',
+                          lotwise: 'lotwise',
+                          lotTransfer: 'lotTransfer',
+                          stockAdjustment: 'stockAdjustment',
+                          requirement: 'requirement'
+                        };
+                        const targetRep = tabToReport[activeTab] || 'stock';
+                        setSelectedCombinedReports([targetRep]);
+                      }}
+                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: '#eff6ff', border: '1px solid #93c5fd', color: '#0284c7', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      Active Tab Only
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid #e2e8f0', maxHeight: '240px', overflowY: 'auto' }}>
+                  {[
+                    { id: 'stock', label: 'Stock Overview', desc: 'Fabric quality stock levels, inward/outward totals & net available stock' },
+                    { id: 'inward', label: 'Inward Register', desc: 'Supplier inward receipts, lot numbers, vendor names & inward meters' },
+                    { id: 'lotwise', label: 'Lot Wise Details', desc: 'Lot-wise fabric stock balance, net remaining meters & vendor details' },
+                    { id: 'lotTransfer', label: 'Lot Transfer Logs', desc: 'Lot-to-lot transfer transactions & fabric quality movements' },
+                    { id: 'stockAdjustment', label: 'Stock Adjustment (SA)', desc: 'Physical audit adjustments, stock (+/-) entries & SA vouchers' },
+                    { id: 'requirement', label: 'Fabric Requirements', desc: 'Required vs available fabric meters & shortage alerts' },
+                    { id: 'challan', label: 'Delivery Challans Register', desc: 'Dispatched challans, party names, billing & TP rolls' }
+                  ].map(rep => {
+                    const isSelected = selectedCombinedReports.includes(rep.id);
+                    return (
+                      <label
+                        key={rep.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.65rem',
+                          cursor: 'pointer',
+                          fontSize: '0.83rem',
+                          padding: '0.4rem 0.5rem',
+                          borderRadius: '6px',
+                          background: isSelected ? '#eff6ff' : 'transparent',
+                          border: isSelected ? '1px solid #bfdbfe' : '1px solid transparent',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedCombinedReports([...selectedCombinedReports, rep.id]);
+                            } else {
+                              if (selectedCombinedReports.length <= 1) {
+                                alert('Please select at least 1 report.');
+                                return;
+                              }
+                              setSelectedCombinedReports(selectedCombinedReports.filter(r => r !== rep.id));
+                            }
+                          }}
+                          style={{ marginTop: '0.15rem', accentColor: '#2563eb', cursor: 'pointer' }}
+                        />
+                        <div>
+                          <strong style={{ color: isSelected ? '#1e40af' : '#1e293b' }}>{rep.label}</strong>
+                          <div style={{ fontSize: '0.73rem', color: isSelected ? '#3b82f6' : '#64748b' }}>{rep.desc}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setIsCombinedModalOpen(false)}
+                style={{
+                  padding: '0.55rem 1.2rem',
+                  fontSize: '0.85rem',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#334155',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setCombinedLoading(true);
+                  try {
+                    await api.downloadFabricCombinedReportPdf(combinedDateStart, combinedDateEnd, selectedCombinedReports, `Elite_Digital_Prints_Report_${combinedDateStart}_to_${combinedDateEnd}.pdf`);
+                    setIsCombinedModalOpen(false);
+                  } catch (err) {
+                    alert(err.message);
+                  } finally {
+                    setCombinedLoading(false);
+                  }
+                }}
+                disabled={combinedLoading}
+                style={{
+                  padding: '0.55rem 1.35rem',
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
+                }}
+              >
+                <Download size={16} color="#ffffff" /> {combinedLoading ? 'Generating Report PDF...' : 'Download Report PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lot Transfer Modal - Crisp White & Blue Theme */}
+      {isTransferFormOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '1rem'
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '580px',
+            background: '#ffffff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(37, 99, 235, 0.08)',
+            overflow: 'hidden'
+          }}>
+            {/* Header: White & Soft Blue gradient */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '1.2rem 1.5rem',
+              background: 'linear-gradient(135deg, #f0f7ff 0%, #e0edfe 100%)',
+              borderBottom: '1px solid #dbeafe'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.3)'
+                }}>
+                  <ArrowRightLeft size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                    Perform Fabric Lot Transfer
+                  </h3>
+                  <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 500, marginTop: '2px' }}>
+                    Rebalance batch stock & clear negative deficit lots
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTransferFormOpen(false)}
+                style={{
+                  background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px',
+                  padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#64748b', transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleTransferSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.15rem', background: '#ffffff' }}>
+              {/* Informational hint banner */}
+              <div style={{
+                padding: '0.75rem 1rem',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                fontSize: '0.8rem',
+                color: '#1e40af'
+              }}>
+                <AlertCircle size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+                <span>
+                  Transfers stock in meters between batches. <strong>Source Lot</strong> stock will decrease and <strong>Destination Lot</strong> will increase.
+                </span>
+              </div>
+
+              {/* Date & Fabric Quality */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={transferForm.date}
+                    onChange={e => setTransferForm({ ...transferForm, date: e.target.value })}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                      fontSize: '0.88rem', outline: 'none'
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                    Fabric Quality
+                  </label>
+                  <select
+                    value={transferForm.fabricQuality}
+                    onChange={e => {
+                      const fab = e.target.value;
+                      setTransferForm(prev => {
+                        const curSrc = lotRecords.find(l => String(l.lotNo) === String(prev.sourceLotNo));
+                        const curDest = lotRecords.find(l => String(l.lotNo) === String(prev.destLotNo));
+                        return {
+                          ...prev,
+                          fabricQuality: fab,
+                          sourceLotNo: matchesTransferFabric(curSrc, fab) ? prev.sourceLotNo : '',
+                          destLotNo: matchesTransferFabric(curDest, fab) ? prev.destLotNo : '',
+                        };
+                      });
+                    }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                      fontSize: '0.88rem', outline: 'none', fontWeight: 500
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
+                  >
+                    <option value="">All Fabric Qualities</option>
+                    {availableTransferFabrics.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Source Lot and Destination Lot */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    fontSize: '0.82rem', color: '#b91c1c', marginBottom: '0.35rem', fontWeight: 700
+                  }}>
+                    <span>Source Lot (From)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>- Decreases</span>
+                  </label>
+                  <select
+                    required
+                    value={transferForm.sourceLotNo}
+                    onChange={e => {
+                      const sLotNo = e.target.value;
+                      const matched = lotRecords.find(l => String(l.lotNo) === String(sLotNo));
+                      const candidateParty = matched?.outwardTxs?.find(o => o.partyName)?.partyName || matched?.vendorName || '';
+                      if (matched) {
+                        const mNorm = normalizeFabricName(matched.fabricQuality, matched.panna);
+                        setTransferForm(prev => ({
+                          ...prev,
+                          sourceLotNo: sLotNo,
+                          partyName: prev.partyName || candidateParty,
+                          fabricQuality: prev.fabricQuality || mNorm || matched.fabricQuality || '',
+                          panna: matched.panna || prev.panna || '58'
+                        }));
+                      } else {
+                        setTransferForm(prev => ({ ...prev, sourceLotNo: sLotNo, partyName: prev.partyName || candidateParty }));
+                      }
+                    }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#fff5f5', border: '1.5px solid #fca5a5', color: '#991b1b',
+                      fontSize: '0.85rem', outline: 'none', fontWeight: 600
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#dc2626'; e.target.style.boxShadow = '0 0 0 3px rgba(220, 38, 38, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#fca5a5'; e.target.style.boxShadow = 'none'; }}
+                  >
+                    <option value="">Select Source Lot</option>
+                    {sourceLotOptions.map(l => (
+                      <option key={l.lotNo} value={l.lotNo}>
+                        Lot #{l.lotNo} ({l.currentStock.toFixed(2)}m avail) {!transferForm.fabricQuality ? `- ${l.fabricQuality}` : ''}
+                      </option>
+                    ))}
+                    {sourceLotOptions.length === 0 && (
+                      <option value="" disabled>No positive stock lots available</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    fontSize: '0.82rem', color: '#1d4ed8', marginBottom: '0.35rem', fontWeight: 700
+                  }}>
+                    <span>Destination Lot (To)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600 }}>+ Increases</span>
+                  </label>
+                  <select
+                    required
+                    value={transferForm.destLotNo}
+                    onChange={e => {
+                      const dLotNo = e.target.value;
+                      const matched = lotRecords.find(l => String(l.lotNo) === String(dLotNo));
+                      const candidateParty = matched?.outwardTxs?.find(o => o.partyName)?.partyName || matched?.vendorName || '';
+                      let autoQty = transferForm.qty;
+                      if (matched && matched.currentStock < 0) {
+                        autoQty = String(Math.abs(matched.currentStock).toFixed(2));
+                      }
+                      if (matched) {
+                        const mNorm = normalizeFabricName(matched.fabricQuality, matched.panna);
+                        setTransferForm(prev => ({
+                          ...prev,
+                          destLotNo: dLotNo,
+                          partyName: prev.partyName || candidateParty,
+                          qty: autoQty || prev.qty,
+                          fabricQuality: prev.fabricQuality || mNorm || matched.fabricQuality || '',
+                          panna: matched.panna || prev.panna || '58'
+                        }));
+                      } else {
+                        setTransferForm(prev => ({ ...prev, destLotNo: dLotNo, partyName: prev.partyName || candidateParty, qty: autoQty }));
+                      }
+                    }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#eff6ff', border: '1.5px solid #93c5fd', color: '#1e40af',
+                      fontSize: '0.85rem', outline: 'none', fontWeight: 600
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#93c5fd'; e.target.style.boxShadow = 'none'; }}
+                  >
+                    <option value="">Select Destination Lot</option>
+                    {destLotOptions.map(l => (
+                      <option key={l.lotNo} value={l.lotNo}>
+                        {l.currentStock < 0 ? `⚠️ DEFICIT: Lot #${l.lotNo} (${l.currentStock.toFixed(2)}m)` : `Lot #${l.lotNo} (${l.currentStock.toFixed(2)}m stock)`} {!transferForm.fabricQuality ? `- ${l.fabricQuality}` : ''}
+                      </option>
+                    ))}
+                    {destLotOptions.length === 0 && (
+                      <option value="" disabled>No destination lots available</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Party / Client Name for Clearness */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                  Party Name (For Reconciliation & Statement Clearness)
+                </label>
+                <input
+                  type="text"
+                  list="transfer-parties"
+                  placeholder="Select or enter Party Name (e.g. VG, Client)..."
+                  value={transferForm.partyName}
+                  onChange={e => setTransferForm({ ...transferForm, partyName: e.target.value })}
+                  style={{
+                    width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                    fontSize: '0.88rem', outline: 'none', fontWeight: 500
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
+                />
+                <datalist id="transfer-parties">
+                  {Array.from(new Set([...partiesList, ...vendorsList.map(v => v.vendorName || v)])).filter(Boolean).sort().map((p, idx) => (
+                    <option key={idx} value={p} />
+                  ))}
+                </datalist>
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                    Transfer Quantity (Meters)
+                  </label>
+                  {transferForm.destLotNo && (() => {
+                    const matched = lotRecords.find(l => String(l.lotNo) === String(transferForm.destLotNo));
+                    if (matched && matched.currentStock < 0) {
+                      const defVal = Math.abs(matched.currentStock);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setTransferForm(prev => ({ ...prev, qty: String(defVal.toFixed(2)) }))}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            color: '#2563eb',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          Auto-fill Deficit ({defVal.toFixed(2)}m)
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  placeholder="e.g. 15.5"
+                  value={transferForm.qty}
+                  onChange={e => setTransferForm({ ...transferForm, qty: e.target.value })}
+                  style={{
+                    width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px',
+                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                    fontWeight: 700, fontSize: '1rem', outline: 'none'
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                  Notes / Reason (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rebalance negative lot stock balance"
+                  value={transferForm.notes}
+                  onChange={e => setTransferForm({ ...transferForm, notes: e.target.value })}
+                  style={{
+                    width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                    fontSize: '0.88rem', outline: 'none'
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{
+                display: 'flex', justifyContent: 'flex-end', gap: '0.75rem',
+                marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setIsTransferFormOpen(false)}
+                  style={{
+                    padding: '0.6rem 1.25rem', fontSize: '0.88rem', fontWeight: 600,
+                    background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#475569',
+                    borderRadius: '8px', cursor: 'pointer', transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#1e293b'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    padding: '0.6rem 1.5rem', fontSize: '0.88rem', fontWeight: 700,
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    border: 'none', color: '#ffffff', borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <ArrowRightLeft size={16} color="#ffffff" />
+                  {loading ? 'Processing Transfer...' : 'Execute Transfer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Challan Staff Audit History Modal */}
+      {selectedChallanHistory && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '600px', background: '#ffffff', border: '1px solid #e2e8f0',
+            borderRadius: '14px', padding: '1.25rem', color: '#0f172a', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={18} /> Delivery Challan #{selectedChallanHistory.challanNo || selectedChallanHistory.jobNo} — Staff Audit Log
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Staff attribution for this fabric dispatch / delivery transaction.
+                </p>
+              </div>
+              <button className="btn-icon" onClick={() => setSelectedChallanHistory(null)} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Logged By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: 800, fontSize: '0.85rem', border: '1px solid #bfdbfe' }}>
+                  {selectedChallanHistory.createdByName || selectedChallanHistory.createdBy || 'HASI'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Party: <strong style={{ color: '#0f172a' }}>{selectedChallanHistory.partyName || 'Client'}</strong></div>
+                <div>Fabric: <strong style={{ color: '#0f172a' }}>{selectedChallanHistory.fabricQuality} ({selectedChallanHistory.qty} mtr)</strong></div>
+                <div>Date Logged: <strong style={{ color: '#0f172a' }}>{formatDateDDMMYYYY(selectedChallanHistory.date)}</strong></div>
+                {selectedChallanHistory.notes && <div>Notes: <strong style={{ color: '#0f172a' }}>{selectedChallanHistory.notes}</strong></div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Barcode Stickers - S-337_XL (20 Stickers) - EON</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <style>
+    @page {
+      size: 100mm 25mm;
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f1f5f9;
+      color: #000;
+    }
+    
+    /* Top Toolbar (Hidden during print) */
+    .toolbar {
+      position: sticky;
+      top: 0;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+    }
+    .toolbar h2 {
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toolbar .badge {
+      background: #10b981;
+      color: #fff;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .toolbar button {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+      transition: all 0.2s;
+    }
+    .toolbar button:hover {
+      background: #1e40af;
+      transform: translateY(-1px);
+    }
+    
+    .preview-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 12px;
+      gap: 12px;
+    }
+
+    /* Thermal Sheet: 100mm x 25mm (holds 2 stickers side-by-side) */
+    .sheet {
+      display: flex;
+      width: 100mm;
+      height: 25mm;
+      background: #ffffff;
+      overflow: hidden;
+      page-break-after: always;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      border: 1px dashed #cbd5e1;
+    }
+    .sheet:last-child {
+      page-break-after: avoid;
+    }
+
+    /* Individual Sticker: 50mm x 25mm */
+    .sticker {
+      flex: 1;
+      width: 50mm;
+      height: 25mm;
+      padding: 1.8mm 3mm 1.2mm 3mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow: hidden;
+      background: #fff;
+      border-right: 1px dashed #e2e8f0;
+    }
+    .sticker:last-child {
+      border-right: none;
+    }
+
+    .title {
+      font-size: 8.5pt;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+      color: #000;
+    }
+    .barcode-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 12.5mm;
+      width: 100%;
+    }
+    .barcode-img {
+      max-width: 44mm;
+      height: 11mm;
+    }
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      font-size: 7.5pt;
+      font-weight: 600;
+      color: #000;
+    }
+    .sku-text {
+      font-family: monospace;
+      font-weight: 800;
+      font-size: 8pt;
+    }
+    .size-text {
+      font-weight: 800;
+      font-size: 8pt;
+    }
+
+    /* Print Overrides */
+    @media print {
+      .toolbar {
+        display: none !important;
+      }
+      body {
+        background: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .preview-container {
+        padding: 0 !important;
+        gap: 0 !important;
+      }
+      .sheet {
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .sticker {
+        border-right: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <div>
+      <h2>🏷️ EON Barcode Print Preview — <strong>S-337_XL</strong> <span class="badge">20 Stickers</span></h2>
+      <p style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Format: 100mm × 25mm 2-Up Thermal Labels (10 Sheets / 20 Stickers)</p>
+    </div>
+    <button onclick="window.print()">
+      🖨️ Print 20 Stickers
+    </button>
+  </div>
+
+  <div class="preview-container">
+    <!-- 10 Sheets = 20 Stickers -->
+    <!-- Sheet 1 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_0"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_1"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 2 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_2"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_3"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 3 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_4"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_5"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 4 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_6"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_7"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 5 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_8"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_9"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 6 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_10"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_11"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 7 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_12"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_13"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 8 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_14"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_15"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 9 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_16"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_17"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+
+    <!-- Sheet 10 -->
+    <div class="sheet">
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_18"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+      <div class="sticker">
+        <div class="title">EON</div>
+        <div class="barcode-container"><svg class="barcode-img" id="barcode_19"></svg></div>
+        <div class="footer-row"><span class="sku-text">S-337_XL</span><span class="size-text">Size: XL</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      for (var i = 0; i < 20; i++) {
+        try {
+          JsBarcode("#barcode_" + i, "S-337_XL", {
+            format: "CODE128",
+            displayValue: false,
+            margin: 0,
+            background: "transparent",
+            lineColor: "#000",
+            width: 2,
+            height: 40
+          });
+        } catch(e) {
+          console.error("Barcode generation error for index " + i, e);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

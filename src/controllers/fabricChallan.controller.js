@@ -657,9 +657,23 @@ const createChallan = async (req, res) => {
 // ── GET /fabric-challan ────────────────────────────────────────────────────
 const getChallans = async (req, res) => {
   try {
-    const { dateStart, dateEnd, search, status, page = 1, limit = 500 } = req.query;
+    const { dateStart, dateEnd, search, status, jobNo, page = 1, limit = 500 } = req.query;
     const filter = {};
     const andConditions = [];
+
+    if (jobNo) {
+      const jStr = String(jobNo).trim();
+      const cleanNo = jStr.replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+      const digits = cleanNo.match(/\d+/)?.[0];
+      const jOr = [
+        { jobNo: jStr },
+        { jobNo: new RegExp('\\b' + cleanNo.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '\\b', 'i') }
+      ];
+      if (digits) {
+        jOr.push({ jobNo: new RegExp('\\b' + digits + '\\b', 'i') });
+      }
+      andConditions.push({ $or: jOr });
+    }
 
     if (status && status !== 'All') {
       const statuses = String(status).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);

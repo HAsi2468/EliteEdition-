@@ -1066,10 +1066,129 @@ const getNextJobCardNumber = async (req, res) => {
     const maxNo = result ? Math.max(result.maxNo, startingNo - 1) : startingNo - 1;
     res.json({ nextJobNo: `JOB NO.- ${maxNo+1}` });
   } catch (err) {
-    logger.error('getNextJobCardNumber error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+/**
+ * Builds the 5-column TP Meter & Wastage Meter grid from linked Fabric Challans and Job Card faults.
+ * Slots:
+ * Row 1: 1), 6), 11), 16), 20) | 1)
+ * Row 2: 2), 7), 12), 17), 21) | 2)
+ * Row 3: 3), 8), 13), 18), 22) | 3)
+ * Row 4: 4), 9), 14), 19), 23) | 
+ * Row 5: 5), 10), 15), TOTAL :- | TOT:
+ */
+function buildTpAndWasteGrid(challans = [], card = {}) {
+  const chList = Array.isArray(challans) ? challans : [];
+  const allTpMtrs = [];
+  const allWestMtrs = [];
+
+  for (const ch of chList) {
+    const details = Array.isArray(ch.tpDetails) ? ch.tpDetails : [];
+    for (const tp of details) {
+      const mtr = parseFloat(tp.tpMeter);
+      if (!isNaN(mtr) && mtr > 0) {
+        allTpMtrs.push(String(Number(mtr.toFixed(2))));
+      }
+      const w = parseFloat(tp.westMtr);
+      if (!isNaN(w) && w > 0) {
+        allWestMtrs.push(String(Number(w.toFixed(2))));
+      }
+    }
+  }
+
+  // Column capacities: Col 0: 5, Col 1: 5, Col 2: 5, Col 3: 4, Col 4: 4 (Total 23 TP slots)
+  const colCapacities = [5, 5, 5, 4, 4];
+  const colLabels = [
+    ['1)', '2)', '3)', '4)', '5)'],
+    ['6)', '7)', '8)', '9)', '10)'],
+    ['11)', '12)', '13)', '14)', '15)'],
+    ['16)', '17)', '18)', '19)'],
+    ['20)', '21)', '22)', '23)']
+  ];
+
+  const cols = [[], [], [], [], []];
+  let ptr = 0;
+  for (let c = 0; c < 5; c++) {
+    for (let r = 0; r < colCapacities[c]; r++) {
+      cols[c].push(ptr < allTpMtrs.length ? allTpMtrs[ptr++] : '');
+    }
+  }
+
+  // Wastage items (roll-wise westMtr first, then faults from job card)
+  const wItems = [...allWestMtrs];
+  const ff = parseFloat(card.fabricFaultMtr) || 0;
+  const pf = parseFloat(card.printFaultMtr) || 0;
+  const fs = parseFloat(card.fusingFaultMtr) || 0;
+  const gf = parseFloat(card.genuineFaultMtr) || 0;
+  let cw = 0;
+  chList.forEach(ch => {
+    cw += (parseFloat(ch.proportionalWasteMtr) || 0);
+  });
+
+  if (ff > 0) wItems.push(`FF:${ff}`);
+  if (pf > 0) wItems.push(`PF:${pf}`);
+  if (fs > 0) wItems.push(`FS:${fs}`);
+  if (gf > 0) wItems.push(`GF:${gf}`);
+  if (cw > 0) wItems.push(`CW:${Number(cw.toFixed(2))}`);
+
+  const totalW = parseFloat(card.totalWastageMtr) || (
+    allWestMtrs.reduce((s, w) => s + parseFloat(w), 0) + ff + pf + fs + gf + cw
+  );
+
+  const wSlots = [
+    wItems[0] || '',
+    wItems[1] || '',
+    wItems[2] || '',
+    wItems[3] || ''
+  ];
+  const wTotalLbl = totalW > 0 ? 'TOT:' : '';
+  const wTotalVal = totalW > 0 ? String(Number(totalW.toFixed(2))) : (wItems[4] || '');
+
+  const sumMtr = allTpMtrs.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+  const finalTotalMtr = sumMtr > 0
+    ? String(Number(sumMtr.toFixed(2)))
+    : (card.printMtr || card.totalMtr || '');
+
+  function makeCell(lbl, val, isHeader = false) {
+    const arr = [lbl, val, isHeader];
+    arr.lbl = lbl;
+    arr.val = val;
+    arr.isHeader = isHeader;
+    return arr;
+  }
+
+  function makeWCell(wLbl, wVal) {
+    const arr = [wLbl, wVal, false];
+    arr.wLbl = wLbl;
+    arr.wVal = wVal;
+    return arr;
+  }
+
+  // 5 rows of grid (each row has 6 cells: 5 TP columns + 1 Wastage column)
+  const rows = [];
+  for (let r = 0; r < 5; r++) {
+    const row = [];
+    for (let c = 0; c < 5; c++) {
+      if (r === 4 && c === 3) {
+        row.push(makeCell('TOTAL :-', ''));
+      } else if (r === 4 && c === 4) {
+        row.push(makeCell('', finalTotalMtr));
+      } else {
+        row.push(makeCell(colLabels[c][r], cols[c][r]));
+      }
+    }
+    const wLbl = r === 4 ? wTotalLbl : (r < 3 ? `${r + 1})` : '');
+    const wVal = r === 4 ? wTotalVal : wSlots[r];
+    row.push(makeWCell(wLbl, wVal));
+    rows.push(row);
+  }
+
+  const challanNosStr = chList.map(c => `EDP-${c.challanNo}`).join(', ');
+
+  return { rows, totalMtr: finalTotalMtr, challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
+}
 
 // ─── Render Job Card PDF A5 Page (Image 2 Exact Spec Layout) ──────────────────
 async function renderJobCardA5Page(doc, jobCard, activeLogo) {
@@ -1427,19 +1546,13 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   const westageSubLabelW = 14;
   const westageSubValW = westageW - westageSubLabelW;
 
-  const gridData = [
-    [['1)', ''], ['6)', ''], ['11)', ''], ['16)', ''], ['20)', ''], ['1)', '']],
-    [['2)', ''], ['7)', ''], ['12)', ''], ['17)', ''], ['21)', ''], ['2)', '']],
-    [['3)', ''], ['8)', ''], ['13)', ''], ['18)', ''], ['22)', ''], ['3)', '']],
-    [['4)', ''], ['9)', ''], ['14)', ''], ['19)', ''], ['23)', ''], ['', '']],
-    [['5)', ''], ['10)', ''], ['15)', ''], ['TOTAL :-', ''], ['', ''], ['', '']]
-  ];
+  const { rows: gridData, totalMtr: finalTotalMtr } = buildTpAndWasteGrid(jobCard.challans || [], jobCard);
 
   const tpGridRowH = 12;
   gridData.forEach((row, rIdx) => {
     let tX = ML;
     for (let cIdx = 0; cIdx < 5; cIdx++) {
-      const [lbl, val] = row[cIdx];
+      const [lbl, val, isHeader] = row[cIdx];
       if (rIdx === 4 && cIdx === 3) {
         const totalSpanW = subPairW + subLabelW;
         doc.rect(tX, curY, totalSpanW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
@@ -1447,7 +1560,7 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
         tX += totalSpanW;
         cIdx++;
         doc.rect(tX, curY, subValW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
-        doc.fillColor('#000000').fontSize(6.5).font('Helvetica').text('', tX + 2, curY + 2.5);
+        doc.fillColor('#000000').fontSize(6.5).font('Helvetica-Bold').text(finalTotalMtr, tX + 2, curY + 2.5);
         tX += subValW;
         continue;
       }
@@ -1457,7 +1570,11 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
       tX += subLabelW;
 
       doc.rect(tX, curY, subValW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
-      doc.fillColor('#000000').fontSize(6.5).font('Helvetica').text(val, tX + 2, curY + 2.5);
+      if (isHeader) {
+        doc.fillColor('#1e40af').fontSize(6).font('Helvetica-Bold').text(val, tX + 1, curY + 2.5, { width: subValW - 2, lineBreak: false });
+      } else {
+        doc.fillColor('#000000').fontSize(6.5).font('Helvetica').text(val, tX + 1, curY + 2.5, { width: subValW - 2, lineBreak: false });
+      }
       tX += subValW;
     }
 
@@ -1467,10 +1584,12 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
     tX += westageSubLabelW;
 
     doc.rect(tX, curY, westageSubValW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
-    doc.fillColor('#000000').fontSize(6.5).font('Helvetica').text(wVal, tX + 2, curY + 2.5);
+    doc.fillColor('#b91c1c').fontSize(5.6).font('Helvetica-Bold').text(wVal, tX + 1, curY + 2.5, { width: westageSubValW - 2, lineBreak: false });
 
     curY += tpGridRowH;
   });
+
+  doc.fillColor('#64748b').fontSize(4.8).font('Helvetica').text('Wastage: FF: Fabric Fault | PF: Print Fault | FS: Fusing Fault | GF: Genuine Fault | CW: Challan Waste   •   CH: Delivery Challan No.', ML, curY + 1.5, { width: CW, align: 'center' });
 }
 
 const downloadJobCardPdf = async (req, res) => {
@@ -1492,6 +1611,20 @@ const downloadJobCardPdf = async (req, res) => {
 
     if (!jobCard) {
       return res.status(404).json({ error: 'Job card not found' });
+    }
+
+    // Fetch linked Fabric Challans for TP meter grid
+    if (db.FabricChallan && jobCard.jobNo) {
+      const cleanNo = String(jobCard.jobNo).replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+      const digits = cleanNo.match(/\d+/)?.[0];
+      const or = [
+        { jobNo: String(jobCard.jobNo).trim() },
+        { jobNo: new RegExp('\\b' + cleanNo.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '\\b', 'i') }
+      ];
+      if (digits) {
+        or.push({ jobNo: new RegExp('\\b' + digits + '\\b', 'i') });
+      }
+      jobCard.challans = await db.FabricChallan.find({ $or: or }).sort({ challanNo: 1 }).lean();
     }
 
     const logoPath = path.join(__dirname, 'DigitalLogo.png');
@@ -1528,6 +1661,23 @@ const downloadBulkJobCardsPdf = async (req, res) => {
     const jobCards = await db.JobCard.find({ _id: { $in: ids } }).sort({ created_date_time: -1 }).lean();
     if (jobCards.length === 0) {
       return res.status(404).send('No matching Job Cards found.');
+    }
+
+    if (db.FabricChallan && jobCards.length > 0) {
+      for (const jc of jobCards) {
+        if (jc.jobNo) {
+          const cleanNo = String(jc.jobNo).replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+          const digits = cleanNo.match(/\d+/)?.[0];
+          const or = [
+            { jobNo: String(jc.jobNo).trim() },
+            { jobNo: new RegExp('\\b' + cleanNo.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '\\b', 'i') }
+          ];
+          if (digits) {
+            or.push({ jobNo: new RegExp('\\b' + digits + '\\b', 'i') });
+          }
+          jc.challans = await db.FabricChallan.find({ $or: or }).sort({ challanNo: 1 }).lean();
+        }
+      }
     }
 
     const logoPath = path.join(__dirname, 'DigitalLogo.png');

@@ -27,38 +27,88 @@ function getDesignCandidates(rawUrl, designName) {
   const raw = (rawUrl || '').trim();
   const dName = (designName || '').trim();
 
+  // 1. Google Drive Links
+  if (raw.includes('drive.google.com') || raw.includes('googleusercontent') || raw.includes('lh3.google')) {
+    let fid = '';
+    const m1 = raw.match(/\/d\/([-\w]{20,})/);
+    if (m1) fid = m1[1];
+    if (!fid) {
+      const m2 = raw.match(/[?&]id=([-\w]{20,})/);
+      if (m2) fid = m2[1];
+    }
+    if (!fid) {
+      const m3 = raw.match(/([-\w]{25,})/);
+      if (m3) fid = m3[1];
+    }
+    if (fid) {
+      return [`https://lh3.googleusercontent.com/d/${fid}=s1600`];
+    }
+  }
+
+  // 2. Direct absolute HTTP/HTTPS URL
   if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
     add(raw);
   }
 
-  const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
+  // Extract clean filename
+  let rawFilename = raw;
+  if (raw.includes('/designs/')) {
+    rawFilename = raw.split('/designs/')[1];
+  } else if (raw.includes('/design_samples/')) {
+    rawFilename = 'design_samples/' + raw.split('/design_samples/')[1];
+  } else if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    rawFilename = raw.split('/').pop() || '';
+  }
+  rawFilename = rawFilename.split('?')[0].split('#')[0];
+  try { rawFilename = decodeURIComponent(rawFilename); } catch (e) {}
 
-  if (raw) {
-    const fn = raw.split('/').pop().split('?')[0].split('#')[0];
-    if (fn) {
-      add(`${R2_BASE}/designs/${encodeURIComponent(fn)}`);
-      add(`/v1/designs/${encodeURIComponent(fn)}`);
+  const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '').trim();
+
+  if (rawFilename) {
+    if (rawFilename.startsWith('design_samples/')) {
+      add(`${R2_BASE}/${rawFilename}`);
+    } else {
+      add(`${R2_BASE}/designs/${encodeURIComponent(rawFilename)}`);
+      add(`https://erp.eliteedition.in/v1/designs/${encodeURIComponent(rawFilename)}`);
+      add(`/v1/designs/${encodeURIComponent(rawFilename)}`);
+    }
+
+    const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
+    if (baseWithoutExt && !rawFilename.startsWith('blob-') && !rawFilename.startsWith('image-')) {
+      add(`${R2_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
+      add(`${R2_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpeg`);
+      add(`${R2_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.png`);
+      add(`${R2_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.webp`);
+      add(`/v1/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
     }
   }
 
   if (cleanDesign) {
     add(`${R2_BASE}/designs/${encodeURIComponent(cleanDesign)}.jpg`);
+    add(`https://erp.eliteedition.in/v1/designs/${encodeURIComponent(cleanDesign)}.jpg`);
     add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg`);
     add(`${R2_BASE}/designs/${encodeURIComponent(cleanDesign)}.jpeg`);
     add(`${R2_BASE}/designs/${encodeURIComponent(cleanDesign)}.png`);
+    add(`${R2_BASE}/designs/${encodeURIComponent(cleanDesign)}.webp`);
 
-    const stripped = cleanDesign.replace(/\s+[A-Za-z0-9]$/, '').trim();
-    if (stripped && stripped !== cleanDesign) {
-      add(`${R2_BASE}/designs/${encodeURIComponent(stripped)}.jpg`);
-      add(`/v1/designs/${encodeURIComponent(stripped)}.jpg`);
-    }
-
-    const strippedParens = cleanDesign.replace(/\([0-9]+\)$/, '').trim();
-    if (strippedParens && strippedParens !== cleanDesign) {
-      add(`${R2_BASE}/designs/${encodeURIComponent(strippedParens)}.jpg`);
-      add(`/v1/designs/${encodeURIComponent(strippedParens)}.jpg`);
+    // Suffix stripping (e.g. 'ED-523 D' -> 'ED-523', 'ED-435(1)' -> 'ED-435')
+    const s1 = cleanDesign.replace(/\s+[A-Za-z0-9]$/, '').trim();
+    const s2 = cleanDesign.replace(/\s*\([0-9]+\)$/, '').trim();
+    const s3 = cleanDesign.replace(/jpe?g$/i, '').trim();
+    for (const s of [s1, s2, s3]) {
+      if (s && s !== cleanDesign) {
+        add(`${R2_BASE}/designs/${encodeURIComponent(s)}.jpg`);
+        add(`https://erp.eliteedition.in/v1/designs/${encodeURIComponent(s)}.jpg`);
+        add(`/v1/designs/${encodeURIComponent(s)}.jpg`);
+        add(`${R2_BASE}/designs/${encodeURIComponent(s)}.jpeg`);
+        add(`${R2_BASE}/designs/${encodeURIComponent(s)}.png`);
+      }
     }
   }
+
+  // Fallback badge URL (server-generated SVG or placeholder) so it NEVER breaks
+  const fallbackToken = cleanDesign || rawFilename || 'DESIGN';
+  add(`/v1/designs/${encodeURIComponent(fallbackToken)}.jpg?fallback=1`);
 
   return candidates;
 }
@@ -125,21 +175,55 @@ const verifyJobCard = async (req, res) => {
       card.totalMtr = (consNum * pcsNum).toFixed(2);
     }
 
-    const raw1 = card.imageUrl1 || card.imageUrl || '';
-    const raw2 = card.imageUrl2 || '';
+    let raw1 = card.imageUrl1 || card.imageUrl || card.proofing?.artworkUrl || '';
+    let raw2 = card.imageUrl2 || '';
     const designNo = card.designNo || card.designName || '';
     const hasMultipleDesigns = designNo.includes(',') || (card.designName && card.designName.includes(','));
     const showTwoImages = Boolean(raw2 && raw2.trim()) || (hasMultipleDesigns && Boolean(card.designName));
+
+    // Fallback: If raw1 is empty, check Design DB collection for design image
+    if (!raw1 && designNo && db.Design) {
+      try {
+        const cleanD = designNo.trim().replace(/^ED-/i, '');
+        const dDoc = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: new RegExp(`^(ED-)?${cleanD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+            { designNo: { $regex: new RegExp(`^(ED-)?${cleanD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+          ]
+        }).lean();
+        if (dDoc) {
+          raw1 = dDoc.imageUrl || dDoc.imageUrl1 || '';
+          if (!raw2 && dDoc.imageUrl2) raw2 = dDoc.imageUrl2;
+        }
+      } catch (e) {}
+    }
 
     const candidates1 = getDesignCandidates(raw1, designNo);
     const candidates2 = showTwoImages
       ? getDesignCandidates(raw2, hasMultipleDesigns ? designNo.split(',')[1].trim() : '')
       : [];
 
+    // Fetch linked Fabric Challans for this Job Card to populate TP meters
+    let challans = [];
+    if (db.FabricChallan && card.jobNo) {
+      const cleanNo = String(card.jobNo).replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '').replace(/^JC-/i, '').trim();
+      const digits = cleanNo.match(/\d+/)?.[0];
+      const or = [
+        { jobNo: String(card.jobNo).trim() },
+        { jobNo: new RegExp('\\b' + cleanNo.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '\\b', 'i') }
+      ];
+      if (digits) {
+        or.push({ jobNo: new RegExp('\\b' + digits + '\\b', 'i') });
+        or.push({ jobNo: `JOB-${digits}` });
+        or.push({ jobNo: `JOB NO.- ${digits}` });
+      }
+      challans = await db.FabricChallan.find({ $or: or }).sort({ challanNo: 1 }).lean();
+    }
+
     const nonce = res.locals.cspNonce || '';
 
     if (req.accepts('html')) {
-      return res.status(200).send(renderValidJobCardHtml(card, { candidates1, candidates2, nonce }));
+      return res.status(200).send(renderValidJobCardHtml(card, { candidates1, candidates2, challans, nonce }));
     }
 
     return res.json({
@@ -154,10 +238,132 @@ const verifyJobCard = async (req, res) => {
 };
 
 /**
+ * /**
+ * Builds the 5-column TP Meter & Wastage Meter grid from linked Fabric Challans and Job Card faults.
+ * Slots:
+ * Row 1: 1), 6), 11), 16), 20) | 1)
+ * Row 2: 2), 7), 12), 17), 21) | 2)
+ * Row 3: 3), 8), 13), 18), 22) | 3)
+ * Row 4: 4), 9), 14), 19), 23) | 
+ * Row 5: 5), 10), 15), TOTAL :- | TOT:
+ */
+function buildTpAndWasteGrid(challans = [], card = {}) {
+  const chList = Array.isArray(challans) ? challans : [];
+  const allTpMtrs = [];
+  const allWestMtrs = [];
+
+  for (const ch of chList) {
+    const details = Array.isArray(ch.tpDetails) ? ch.tpDetails : [];
+    for (const tp of details) {
+      const mtr = parseFloat(tp.tpMeter);
+      if (!isNaN(mtr) && mtr > 0) {
+        allTpMtrs.push(String(Number(mtr.toFixed(2))));
+      }
+      const w = parseFloat(tp.westMtr);
+      if (!isNaN(w) && w > 0) {
+        allWestMtrs.push(String(Number(w.toFixed(2))));
+      }
+    }
+  }
+
+  // Column capacities: Col 0: 5, Col 1: 5, Col 2: 5, Col 3: 4, Col 4: 4 (Total 23 TP slots)
+  const colCapacities = [5, 5, 5, 4, 4];
+  const colLabels = [
+    ['1)', '2)', '3)', '4)', '5)'],
+    ['6)', '7)', '8)', '9)', '10)'],
+    ['11)', '12)', '13)', '14)', '15)'],
+    ['16)', '17)', '18)', '19)'],
+    ['20)', '21)', '22)', '23)']
+  ];
+
+  const cols = [[], [], [], [], []];
+  let ptr = 0;
+  for (let c = 0; c < 5; c++) {
+    for (let r = 0; r < colCapacities[c]; r++) {
+      cols[c].push(ptr < allTpMtrs.length ? allTpMtrs[ptr++] : '');
+    }
+  }
+
+  // Wastage items (roll-wise westMtr first, then faults from job card)
+  const wItems = [...allWestMtrs];
+  const ff = parseFloat(card.fabricFaultMtr) || 0;
+  const pf = parseFloat(card.printFaultMtr) || 0;
+  const fs = parseFloat(card.fusingFaultMtr) || 0;
+  const gf = parseFloat(card.genuineFaultMtr) || 0;
+  let cw = 0;
+  chList.forEach(ch => {
+    cw += (parseFloat(ch.proportionalWasteMtr) || 0);
+  });
+
+  if (ff > 0) wItems.push(`FF:${ff}`);
+  if (pf > 0) wItems.push(`PF:${pf}`);
+  if (fs > 0) wItems.push(`FS:${fs}`);
+  if (gf > 0) wItems.push(`GF:${gf}`);
+  if (cw > 0) wItems.push(`CW:${Number(cw.toFixed(2))}`);
+
+  const totalW = parseFloat(card.totalWastageMtr) || (
+    allWestMtrs.reduce((s, w) => s + parseFloat(w), 0) + ff + pf + fs + gf + cw
+  );
+
+  const wSlots = [
+    wItems[0] || '',
+    wItems[1] || '',
+    wItems[2] || '',
+    wItems[3] || ''
+  ];
+  const wTotalLbl = totalW > 0 ? 'TOT:' : '';
+  const wTotalVal = totalW > 0 ? String(Number(totalW.toFixed(2))) : (wItems[4] || '');
+
+  const sumMtr = allTpMtrs.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+  const finalTotalMtr = sumMtr > 0
+    ? String(Number(sumMtr.toFixed(2)))
+    : (card.printMtr || card.totalMtr || '');
+
+  function makeCell(lbl, val, isHeader = false) {
+    const arr = [lbl, val, isHeader];
+    arr.lbl = lbl;
+    arr.val = val;
+    arr.isHeader = isHeader;
+    return arr;
+  }
+
+  function makeWCell(wLbl, wVal) {
+    const arr = [wLbl, wVal, false];
+    arr.wLbl = wLbl;
+    arr.wVal = wVal;
+    return arr;
+  }
+
+  // 5 rows of grid (each row has 6 cells: 5 TP columns + 1 Wastage column)
+  const rows = [];
+  for (let r = 0; r < 5; r++) {
+    const row = [];
+    for (let c = 0; c < 5; c++) {
+      if (r === 4 && c === 3) {
+        row.push(makeCell('TOTAL :-', ''));
+      } else if (r === 4 && c === 4) {
+        row.push(makeCell('', finalTotalMtr));
+      } else {
+        row.push(makeCell(colLabels[c][r], cols[c][r]));
+      }
+    }
+    const wLbl = r === 4 ? wTotalLbl : (r < 3 ? `${r + 1})` : '');
+    const wVal = r === 4 ? wTotalVal : wSlots[r];
+    row.push(makeWCell(wLbl, wVal));
+    rows.push(row);
+  }
+
+  const challanNosStr = chList.map(c => `EDP-${c.challanNo}`).join(', ');
+
+  return { rows, totalMtr: finalTotalMtr, challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
+}
+
+/**
  * HTML Template for Valid Job Card with authentic Job Card Layout & High-Res Zoomable Design Preview
  */
 function renderValidJobCardHtml(card, options = {}) {
-  const { candidates1 = [], candidates2 = [], nonce = '' } = options;
+  const { candidates1 = [], candidates2 = [], challans = [], nonce = '' } = options;
+  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr } = buildTpAndWasteGrid(challans, card);
   const jobNo = card.jobNo || '—';
   const designNo = card.designNo || card.designName || '—';
   const machine = (card.machineName || 'PRINTDOT').toUpperCase();
@@ -170,38 +376,6 @@ function renderValidJobCardHtml(card, options = {}) {
     ? (card.printDate.includes('-') ? card.printDate.split('-').reverse().join('/') : card.printDate)
     : '—';
 
-  // Compute Stage
-  const pStatus = (card.printStatus || '').toLowerCase();
-  const isPrintDone = pStatus.includes('done') || parseFloat(card.printMtr || 0) > 0;
-  const fStatus = (card.fusingStatus || '').toLowerCase();
-  const fusedMtr = parseFloat(card.fusingMtr || card.freshMtr || 0);
-  const isFusingDone = fStatus.includes('done');
-  const deliveredMtr = parseFloat(card.deliveredMtr || 0);
-  const totalMtr = parseFloat(card.totalMtr || card.totalQty || 0);
-  const isDispatched = (card.deliveryStatus || '').toLowerCase().includes('done') || (totalMtr > 0 && deliveredMtr >= totalMtr);
-
-  let stageLabel = '1. Printing Pending';
-  let stageColor = '#b45309';
-  let stageBg = '#fffbeb';
-  let stageBorder = '#fde68a';
-
-  if (isDispatched) {
-    stageLabel = `4. Dispatched (${deliveredMtr}m)`;
-    stageColor = '#047857';
-    stageBg = '#ecfdf5';
-    stageBorder = '#a7f3d0';
-  } else if (isFusingDone || fusedMtr > 0) {
-    stageLabel = `3. Ready for Challan (${fusedMtr}m Fused)`;
-    stageColor = '#1d4ed8';
-    stageBg = '#eff6ff';
-    stageBorder = '#bfdbfe';
-  } else if (isPrintDone) {
-    stageLabel = '2. Fusing Pending';
-    stageColor = '#d97706';
-    stageBg = '#fef3c7';
-    stageBorder = '#fde68a';
-  }
-
   const hasImg1 = candidates1.length > 0;
   const hasImg2 = candidates2.length > 0;
   const primaryImg1 = candidates1[0] || card.imageUrl1 || '';
@@ -213,37 +387,29 @@ function renderValidJobCardHtml(card, options = {}) {
   let artworkHtml = '';
   if (hasImg1 && hasImg2) {
     artworkHtml = `
-      <div class="artwork-item" onclick="openLightbox(0)" title="Tap to zoom Artwork 1">
-        <div class="artwork-tag">TOP / DESIGN 1</div>
-        <img class="artwork-img" id="designImg0" src="${primaryImg1}" data-candidates="${c1Json}" data-idx="0" alt="${designNo} - 1" onerror="handleImgError(this)" />
+      <div class="artwork-item" onclick="openLightbox(0)" title="Click to view full image">
+        <img class="artwork-img" id="designImg0" src="${primaryImg1}" data-candidates="${c1Json}" data-idx="0" alt="${designNo} - 1" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
-      <div class="artwork-item" onclick="openLightbox(1)" title="Tap to zoom Artwork 2">
-        <div class="artwork-tag">DUPATTA / DESIGN 2</div>
-        <img class="artwork-img" id="designImg1" src="${primaryImg2}" data-candidates="${c2Json}" data-idx="0" alt="${designNo} - 2" onerror="handleImgError(this)" />
+      <div class="artwork-item" onclick="openLightbox(1)" title="Click to view full image">
+        <img class="artwork-img" id="designImg1" src="${primaryImg2}" data-candidates="${c2Json}" data-idx="0" alt="${designNo} - 2" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
     `;
   } else if (hasImg1) {
     artworkHtml = `
-      <div class="artwork-item" onclick="openLightbox(0)" title="Tap to zoom Design Artwork">
-        <img class="artwork-img" id="designImg0" src="${primaryImg1}" data-candidates="${c1Json}" data-idx="0" alt="${designNo}" onerror="handleImgError(this)" />
+      <div class="artwork-item" onclick="openLightbox(0)" title="Click to view full image">
+        <img class="artwork-img" id="designImg0" src="${primaryImg1}" data-candidates="${c1Json}" data-idx="0" alt="${designNo}" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
     `;
   } else if (hasImg2) {
     artworkHtml = `
-      <div class="artwork-item" onclick="openLightbox(0)" title="Tap to zoom Design Artwork">
-        <img class="artwork-img" id="designImg0" src="${primaryImg2}" data-candidates="${c2Json}" data-idx="0" alt="${designNo}" onerror="handleImgError(this)" />
+      <div class="artwork-item" onclick="openLightbox(0)" title="Click to view full image">
+        <img class="artwork-img" id="designImg0" src="${primaryImg2}" data-candidates="${c2Json}" data-idx="0" alt="${designNo}" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
     `;
   } else {
     artworkHtml = `
       <div class="no-design-box">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-          <polyline points="21 15 16 10 5 21"></polyline>
-        </svg>
-        <div style="font-weight: 800; font-size: 11pt; color: #64748b; margin-top: 6px;">NO DESIGN ARTWORK ATTACHED</div>
-        <div style="font-size: 9pt; color: #94a3b8;">${designNo}</div>
+        <div style="font-weight: 800; font-size: 10pt; color: #94a3b8;">NO DESIGN IMAGE</div>
       </div>
     `;
   }
@@ -270,160 +436,87 @@ function renderValidJobCardHtml(card, options = {}) {
     .qr-verified-box { width: 110px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 1.5px solid #000; background: #f8fafc; text-align: center; }
     .verified-pill { font-size: 7.5pt; font-weight: 800; color: #166534; background: #dcfce7; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 2px; }
 
-    /* Stage Banner */
-    .stage-banner { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: ${stageBg}; border-bottom: 1.5px solid #000; font-size: 11.5px; font-weight: 800; color: ${stageColor}; }
-    .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: ${stageColor}; display: inline-block; margin-right: 6px; }
-
     /* Tables */
-    table { width: 100%; border-collapse: collapse; margin-top: 0; }
-    td, th { border: 1px solid #000000; padding: 4px 6px; font-size: 9pt; vertical-align: middle; line-height: 1.25; }
-    .label { font-weight: 800; background: #ffffff; width: 16%; white-space: nowrap; font-size: 8pt; text-align: left; }
-    .val { font-weight: 600; font-size: 9pt; }
-    .val-highlight { font-weight: 800; color: #000000; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1px; }
+    td, th { border: 1.2px solid #000000; padding: 3px 5px; font-size: 9pt; vertical-align: middle; line-height: 1.25; }
+    .label { font-weight: 800; background: #ffffff; width: 1%; white-space: nowrap; font-size: 8.5pt; text-align: left; }
+    .val { font-weight: 500; font-size: 9pt; }
     .total-header { text-align: center; font-weight: 800; font-size: 9pt; background: #ffffff; }
-    .total-val { font-weight: 900; font-size: 12pt; padding-left: 8px; }
+    .total-val { font-weight: 900; font-size: 11.5pt; padding-left: 8px; }
 
-    /* DESIGN PREVIEW CONTAINER */
-    .design-preview-container {
+    /* DESIGN IMAGE BOX */
+    .jobcard-img-box {
+      display: flex;
       width: 100%;
-      border-bottom: 1.5px solid #000000;
-      border-top: 1px solid #000000;
+      border: 1.2px solid #000000;
+      border-top: none;
+      min-height: 180px;
+      max-height: 320px;
+      margin-top: 0;
       background: #ffffff;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 250px;
-      max-height: 380px;
       overflow: hidden;
-      box-sizing: border-box;
-    }
-    .artworks-flex {
-      display: flex;
-      width: 100%;
-      height: 100%;
-      align-items: center;
-      justify-content: center;
     }
     .artwork-item {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 100%;
-      min-height: 250px;
-      padding: 10px;
-      position: relative;
+      overflow: hidden;
+      padding: 6px;
       cursor: zoom-in;
       background: #ffffff;
     }
     .artwork-item + .artwork-item {
-      border-left: 1.5px solid #000000;
-    }
-    .artwork-tag {
-      position: absolute;
-      top: 8px;
-      left: 10px;
-      font-size: 7.5pt;
-      font-weight: 800;
-      background: rgba(0,0,0,0.06);
-      color: #334155;
-      padding: 2px 6px;
-      border-radius: 3px;
-      pointer-events: none;
+      border-left: 1.2px solid #000000;
     }
     .artwork-img {
-      max-width: 95%;
-      max-height: 270px;
-      height: auto;
-      width: auto;
+      max-width: 100%;
+      max-height: 305px;
       object-fit: contain;
       display: block;
       margin: 0 auto;
-      transition: transform 0.18s ease-in-out;
     }
-    .artwork-item:hover .artwork-img {
-      transform: scale(1.02);
-    }
-
-    /* Direction Indicator (FONCH) */
-    .fonch-badge {
-      position: absolute;
-      bottom: 6px;
-      left: 10px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 8pt;
-      font-weight: 800;
-      color: #64748b;
-      letter-spacing: 0.5px;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 2px 6px;
-      border-radius: 3px;
-      pointer-events: none;
-      z-index: 2;
-    }
-    .fonch-arrow {
-      font-size: 11pt;
-      line-height: 1;
-      color: #000;
-    }
-
-    /* Zoom pill */
-    .zoom-pill {
-      position: absolute;
-      top: 8px;
-      right: 10px;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: #0f172a;
-      color: #ffffff;
-      font-size: 8pt;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.18);
-      transition: all 0.15s ease;
-      z-index: 3;
-    }
-    .zoom-pill:hover {
-      background: #2563eb;
-      transform: translateY(-1px);
-    }
-
     .no-design-box {
-      text-align: center;
-      padding: 30px;
       display: flex;
-      flex-direction: column;
+      width: 100%;
+      min-height: 140px;
       align-items: center;
       justify-content: center;
+      padding: 20px;
     }
 
-    /* Notes */
-    .notes-container { border-bottom: 1.5px solid #000; }
-    .note-row { padding: 4px 8px; border-bottom: 1px solid #000; font-size: 8pt; font-weight: 700; line-height: 1.3; }
-    .note-row:last-child { border-bottom: none; }
-    .emrg-note { color: #cc0000; font-weight: 800; }
-
-    /* Fusing & Technical */
-    .tech-table { margin-top: 0; }
+    /* Notes Section */
+    .notes-container {
+      width: 100%;
+      border-left: 1.2px solid #000;
+      border-right: 1.2px solid #000;
+      margin-top: 1px;
+    }
+    .note-row {
+      background: #f3f3f3;
+      border-bottom: 1.2px solid #000;
+      padding: 3px 6px;
+      font-size: 9pt;
+      font-weight: 700;
+      min-height: 18px;
+    }
+    .note-row-emergency {
+      background: #f3f3f3;
+      border-bottom: 1.2px solid #000;
+      padding: 3px 6px;
+      font-size: 9pt;
+      font-weight: 700;
+      color: #cc0000;
+      min-height: 18px;
+    }
 
     /* T.P. Meter Table */
-    .tp-table { width: 100%; border-collapse: collapse; margin-top: 0; }
-    .tp-label { width: 22px; font-weight: 800; text-align: center; font-size: 7pt; background: #ffffff; padding: 2px; }
-    .tp-val { height: 18px; font-size: 7.5pt; text-align: center; padding: 2px; }
-
-    /* Actions Bar */
-    .actions-bar { padding: 12px; background: #f8fafc; display: flex; gap: 8px; justify-content: center; border-top: 1px solid #000; flex-wrap: wrap; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: 6px; font-weight: 700; font-size: 13px; text-decoration: none; cursor: pointer; border: none; }
-    .btn-primary { background: #2563eb; color: #ffffff; }
-    .btn-dark { background: #0f172a; color: #ffffff; }
-    .btn-outline { background: #ffffff; color: #0f172a; border: 1.5px solid #cbd5e1; }
+    .tp-table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+    .tp-table td { text-align: center; padding: 2px 4px; font-size: 8.5pt; border: 1.2px solid #000; height: 26px; }
+    .tp-table th { font-size: 9pt; font-weight: 800; border: 1.2px solid #000; background: #fff; padding: 3px; }
+    .tp-label { font-weight: 700; width: 1%; white-space: nowrap; font-size: 7.5pt; background: #ffffff; text-align: center; }
+    .tp-val { width: 14%; font-size: 8pt; font-weight: 700; text-align: center; color: #000000; }
+    .tp-waste-val { font-weight: 800; color: #b91c1c; font-size: 7.2pt; text-align: center; }
 
     /* Interactive Fullscreen Lightbox */
     .lightbox-modal {
@@ -462,33 +555,18 @@ function renderValidJobCardHtml(card, options = {}) {
       color: #94a3b8;
       font-weight: 600;
     }
-    .lightbox-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .lb-btn {
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #ffffff;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 700;
+    .lb-close-icon {
       cursor: pointer;
-      transition: all 0.15s ease;
+      font-size: 24px;
+      font-weight: 800;
+      color: #ef4444;
+      padding: 0 10px;
+      line-height: 1;
+      transition: transform 0.15s ease;
     }
-    .lb-btn:hover {
-      background: rgba(255, 255, 255, 0.25);
-    }
-    .lb-close {
-      background: #dc2626;
-      border-color: #ef4444;
-      font-size: 14px;
-      padding: 6px 14px;
-    }
-    .lb-close:hover {
-      background: #b91c1c;
+    .lb-close-icon:hover {
+      transform: scale(1.15);
+      color: #f87171;
     }
     .lightbox-body {
       flex: 1;
@@ -502,38 +580,17 @@ function renderValidJobCardHtml(card, options = {}) {
     }
     .lightbox-image-wrap {
       display: inline-block;
-      transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1);
+      transition: transform 0.18s cubic-bezier(0.2, 0, 1);
       transform-origin: center center;
     }
     #lbImg {
       max-width: 92vw;
-      max-height: 75vh;
+      max-height: 85vh;
       object-fit: contain;
       border-radius: 4px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
       display: block;
       margin: 0 auto;
-    }
-    .lightbox-footer {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      padding: 8px 16px;
-      background: rgba(15, 23, 42, 0.9);
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      color: #94a3b8;
-      font-size: 11.5px;
-    }
-    .lb-nav-btn {
-      background: #2563eb;
-      border: none;
-      color: #fff;
-      padding: 5px 12px;
-      border-radius: 4px;
-      font-weight: 700;
-      font-size: 11px;
-      cursor: pointer;
     }
 
     @media (max-width: 480px) {
@@ -541,8 +598,8 @@ function renderValidJobCardHtml(card, options = {}) {
       td, th { padding: 3px 4px; font-size: 8pt; }
       .label { font-size: 7.2pt; width: 18%; }
       .company-title { font-size: 12pt; }
-      .design-preview-container { min-height: 220px; max-height: 320px; }
-      .artwork-img { max-height: 240px; }
+      .jobcard-img-box { min-height: 180px; max-height: 320px; }
+      .artwork-img { max-height: 280px; }
       .total-val { font-size: 11pt; }
     }
   </style>
@@ -564,15 +621,6 @@ function renderValidJobCardHtml(card, options = {}) {
         <div style="font-size: 7.5pt; font-weight: 900; letter-spacing: 0.5px; color: #000;">OFFICIAL ERP</div>
         <div class="verified-pill">✓ VERIFIED</div>
       </div>
-    </div>
-
-    <!-- STAGE BANNER -->
-    <div class="stage-banner">
-      <div>
-        <span class="badge-dot"></span>
-        <span>STATUS: <strong>${card.status || 'Active'}</strong></span>
-      </div>
-      <div>${stageLabel}</div>
     </div>
 
     <!-- MAIN FIELDS TABLE -->
@@ -614,28 +662,9 @@ function renderValidJobCardHtml(card, options = {}) {
       </tr>
     </table>
 
-    <!-- CENTRAL DESIGN PREVIEW HERO -->
-    <div class="design-preview-container">
-      ${(hasImg1 || hasImg2) ? `
-        <button type="button" class="zoom-pill" onclick="openLightbox(0)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            <line x1="11" y1="8" x2="11" y2="14"></line>
-            <line x1="8" y1="11" x2="14" y2="11"></line>
-          </svg>
-          <span>Tap to Zoom</span>
-        </button>
-      ` : ''}
-
-      <div class="artworks-flex">
-        ${artworkHtml}
-      </div>
-
-      <div class="fonch-badge">
-        <span class="fonch-arrow">→</span>
-        <span class="fonch-text">FONCH</span>
-      </div>
+    <!-- CENTRAL DESIGN PREVIEW -->
+    <div class="jobcard-img-box">
+      ${artworkHtml}
     </div>
 
     <!-- NOTES CONTAINER -->
@@ -692,91 +721,84 @@ function renderValidJobCardHtml(card, options = {}) {
 
     <!-- T.P. METER TABLE -->
     <table class="tp-table">
-      <tr>
-        <th colspan="10" style="text-align: center; font-weight: 800; font-size: 8pt; background: #ffffff;">T.P. METER</th>
-        <th colspan="2" style="font-size: 6.5pt; font-weight: 800; line-height: 1.1; padding: 2px; text-align: center; background: #ffffff;">T.P.<br/>WESTAGE<br/>METER</th>
-      </tr>
-      <tr>
-        <td class="tp-label">1)</td><td class="tp-val"></td>
-        <td class="tp-label">6)</td><td class="tp-val"></td>
-        <td class="tp-label">11)</td><td class="tp-val"></td>
-        <td class="tp-label">16)</td><td class="tp-val"></td>
-        <td class="tp-label">20)</td><td class="tp-val"></td>
-        <td class="tp-label" style="width: 24px;">1)</td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">2)</td><td class="tp-val"></td>
-        <td class="tp-label">7)</td><td class="tp-val"></td>
-        <td class="tp-label">12)</td><td class="tp-val"></td>
-        <td class="tp-label">17)</td><td class="tp-val"></td>
-        <td class="tp-label">21)</td><td class="tp-val"></td>
-        <td class="tp-label">2)</td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">3)</td><td class="tp-val"></td>
-        <td class="tp-label">8)</td><td class="tp-val"></td>
-        <td class="tp-label">13)</td><td class="tp-val"></td>
-        <td class="tp-label">18)</td><td class="tp-val"></td>
-        <td class="tp-label">22)</td><td class="tp-val"></td>
-        <td class="tp-label">3)</td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">4)</td><td class="tp-val"></td>
-        <td class="tp-label">9)</td><td class="tp-val"></td>
-        <td class="tp-label">14)</td><td class="tp-val"></td>
-        <td class="tp-label">19)</td><td class="tp-val"></td>
-        <td class="tp-label">23)</td><td class="tp-val"></td>
-        <td class="tp-label"></td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">5)</td><td class="tp-val"></td>
-        <td class="tp-label">10)</td><td class="tp-val"></td>
-        <td class="tp-label">15)</td><td class="tp-val"></td>
-        <td colspan="3" style="font-weight: 800; font-size: 7.2pt; text-align: right; padding-right: 5px;">TOTAL :-</td><td class="tp-val"></td>
-        <td class="tp-label"></td><td class="tp-val"></td>
-      </tr>
+      <thead>
+        <tr>
+          <th colspan="10" style="text-align: center; font-weight: 800; font-size: 8pt; background: #ffffff;">T.P. METER</th>
+          <th colspan="2" style="font-size: 6.5pt; font-weight: 800; line-height: 1.1; padding: 2px; text-align: center; background: #ffffff;">T.P.<br/>WESTAGE<br/>METER</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Row 1 -->
+        <tr>
+          <td class="tp-label">1)</td><td class="tp-val">${tpRows[0][0].val}</td>
+          <td class="tp-label">6)</td><td class="tp-val">${tpRows[0][1].val}</td>
+          <td class="tp-label">11)</td><td class="tp-val">${tpRows[0][2].val}</td>
+          <td class="tp-label">16)</td><td class="tp-val">${tpRows[0][3].val}</td>
+          <td class="tp-label">20)</td><td class="tp-val">${tpRows[0][4].val}</td>
+          <td class="tp-label" style="width: 24px; background: #fff1f2;">1)</td><td class="tp-val tp-waste-val">${tpRows[0][5].wVal}</td>
+        </tr>
+        <!-- Row 2 -->
+        <tr>
+          <td class="tp-label">2)</td><td class="tp-val">${tpRows[1][0].val}</td>
+          <td class="tp-label">7)</td><td class="tp-val">${tpRows[1][1].val}</td>
+          <td class="tp-label">12)</td><td class="tp-val">${tpRows[1][2].val}</td>
+          <td class="tp-label">17)</td><td class="tp-val">${tpRows[1][3].val}</td>
+          <td class="tp-label">21)</td><td class="tp-val">${tpRows[1][4].val}</td>
+          <td class="tp-label" style="background: #fff1f2;">2)</td><td class="tp-val tp-waste-val">${tpRows[1][5].wVal}</td>
+        </tr>
+        <!-- Row 3 -->
+        <tr>
+          <td class="tp-label">3)</td><td class="tp-val">${tpRows[2][0].val}</td>
+          <td class="tp-label">8)</td><td class="tp-val">${tpRows[2][1].val}</td>
+          <td class="tp-label">13)</td><td class="tp-val">${tpRows[2][2].val}</td>
+          <td class="tp-label">18)</td><td class="tp-val">${tpRows[2][3].val}</td>
+          <td class="tp-label">22)</td><td class="tp-val">${tpRows[2][4].val}</td>
+          <td class="tp-label" style="background: #fff1f2;">3)</td><td class="tp-val tp-waste-val">${tpRows[2][5].wVal}</td>
+        </tr>
+        <!-- Row 4 -->
+        <tr>
+          <td class="tp-label">4)</td><td class="tp-val">${tpRows[3][0].val}</td>
+          <td class="tp-label">9)</td><td class="tp-val">${tpRows[3][1].val}</td>
+          <td class="tp-label">14)</td><td class="tp-val">${tpRows[3][2].val}</td>
+          <td class="tp-label">19)</td><td class="tp-val">${tpRows[3][3].val}</td>
+          <td class="tp-label">23)</td><td class="tp-val">${tpRows[3][4].val}</td>
+          <td class="tp-label" style="background: #f8fafc;">${tpRows[3][5].wLbl}</td><td class="tp-val tp-waste-val">${tpRows[3][5].wVal}</td>
+        </tr>
+        <!-- Row 5 -->
+        <tr>
+          <td class="tp-label">5)</td><td class="tp-val">${tpRows[4][0].val}</td>
+          <td class="tp-label">10)</td><td class="tp-val">${tpRows[4][1].val}</td>
+          <td class="tp-label">15)</td><td class="tp-val">${tpRows[4][2].val}</td>
+          <td colspan="3" style="font-weight: 800; font-size: 7.2pt; text-align: right; padding-right: 5px; background: #f8fafc;">TOTAL :-</td>
+          <td class="tp-val" style="font-weight: 900; color: #1e3a8a;">${finalTpTotal}</td>
+          <td class="tp-label" style="background: #fef2f2; font-weight: 800; font-size: 6.5pt;">${(tpRows[4][5] || tpRows[4][3]).wLbl}</td>
+          <td class="tp-val tp-waste-val" style="font-weight: 900;">${(tpRows[4][5] || tpRows[4][3]).wVal}</td>
+        </tr>
+      </tbody>
     </table>
 
-    <!-- ACTIONS -->
-    <div class="actions-bar">
-      ${(hasImg1 || hasImg2) ? `
-        <button type="button" class="btn btn-primary" onclick="openLightbox(0)">
-          🔍 Zoom Artwork
-        </button>
-      ` : ''}
-      <a href="/v1/jobcards/pdf/${card._id}" class="btn btn-dark" download>
-        ⬇ Download PDF
-      </a>
-      <button type="button" class="btn btn-outline" onclick="window.print()">
-        🖨 Print Job Card
-      </button>
+    <!-- LEGEND / DETAILS FOR SHORT FORMS -->
+    <div style="padding: 3px 6px; border: 1.2px solid #000; border-top: none; font-size: 6.5pt; color: #334155; background: #ffffff; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; line-height: 1.25;">
+      <span><strong>Wastage:</strong> <strong>FF</strong>: Fabric Fault | <strong>PF</strong>: Print Fault | <strong>FS</strong>: Fusing Fault | <strong>GF</strong>: Genuine Fault | <strong>CW</strong>: Challan Waste | <strong>TOT</strong>: Total Wastage</span>
+      <span>${challanNosStr ? `<strong>Linked Challan:</strong> ${challanNosStr}` : ''}</span>
     </div>
   </div>
 
-  <!-- INTERACTIVE FULLSCREEN LIGHTBOX -->
-  <div id="lightbox" class="lightbox-modal">
+  <!-- INTERACTIVE FULLSCREEN LIGHTBOX (No buttons) -->
+  <div id="lightbox" class="lightbox-modal" onclick="handleBodyClick(event)">
     <div class="lightbox-header">
       <div class="lightbox-title">
-        <span id="lbTitle">Design Preview</span>
-        <span class="lightbox-subtitle">${designNo} — Job #${jobNo}</span>
+        <span id="lbTitle">${designNo}</span>
+        <span class="lightbox-subtitle">Job #${jobNo}</span>
       </div>
       <div class="lightbox-controls">
-        <button type="button" class="lb-btn" onclick="zoomIn()" title="Zoom In">+</button>
-        <button type="button" class="lb-btn" onclick="zoomOut()" title="Zoom Out">−</button>
-        <button type="button" class="lb-btn" onclick="resetZoom()" title="Reset">100%</button>
-        <button type="button" class="lb-btn lb-close" onclick="closeLightbox()" title="Close">✕</button>
+        <span class="lb-close-icon" onclick="closeLightbox()" title="Close">&times;</span>
       </div>
     </div>
-    <div class="lightbox-body" onclick="handleBodyClick(event)">
+    <div class="lightbox-body">
       <div class="lightbox-image-wrap" id="lbImgWrap">
-        <img id="lbImg" src="" alt="Zoomed Design" />
+        <img id="lbImg" src="" alt="Zoomed Design" referrerpolicy="no-referrer" />
       </div>
-    </div>
-    <div class="lightbox-footer">
-      <span id="lbCounter" style="display:none;">Artwork 1 of 2</span>
-      <button type="button" class="lb-nav-btn" id="lbPrevBtn" onclick="prevArtwork()" style="display:none;">◀ Prev</button>
-      <button type="button" class="lb-nav-btn" id="lbNextBtn" onclick="nextArtwork()" style="display:none;">Next ▶</button>
-      <span>Pinch or click buttons to zoom</span>
     </div>
   </div>
 
@@ -796,7 +818,6 @@ function renderValidJobCardHtml(card, options = {}) {
         if (idx < list.length) {
           img.setAttribute('data-idx', idx);
           img.src = list[idx];
-          // Update imagesList as well
           var elId = img.id;
           if (elId === 'designImg0') imagesList[0] = list[idx];
           if (elId === 'designImg1') imagesList[1] = list[idx];
@@ -823,73 +844,47 @@ function renderValidJobCardHtml(card, options = {}) {
     function updateLightboxDisplay() {
       var lbImg = document.getElementById('lbImg');
       var lbWrap = document.getElementById('lbImgWrap');
-      var lbCounter = document.getElementById('lbCounter');
-      var prevBtn = document.getElementById('lbPrevBtn');
-      var nextBtn = document.getElementById('lbNextBtn');
       var lbTitle = document.getElementById('lbTitle');
 
-      lbImg.src = imagesList[currentImgIdx] || '';
-      lbWrap.style.transform = 'scale(1)';
+      if (lbImg) lbImg.src = imagesList[currentImgIdx] || '';
+      if (lbWrap) lbWrap.style.transform = 'scale(1)';
       currentZoom = 1;
 
-      if (imagesList.length > 1) {
-        lbCounter.style.display = 'inline-block';
-        lbCounter.innerText = 'Artwork ' + (currentImgIdx + 1) + ' of ' + imagesList.length;
-        prevBtn.style.display = 'inline-block';
-        nextBtn.style.display = 'inline-block';
-        lbTitle.innerText = currentImgIdx === 0 ? 'Artwork 1 (Top)' : 'Artwork 2 (Dupatta)';
-      } else {
-        lbCounter.style.display = 'none';
-        prevBtn.style.display = 'none';
-        nextBtn.style.display = 'none';
-        lbTitle.innerText = 'Design Artwork';
+      if (lbTitle) {
+        if (imagesList.length > 1) {
+          lbTitle.innerText = currentImgIdx === 0 ? 'Artwork 1 (Top)' : 'Artwork 2 (Dupatta)';
+        } else {
+          lbTitle.innerText = 'Design Artwork';
+        }
       }
     }
 
     function zoomIn() {
       currentZoom = Math.min(currentZoom + 0.35, 3.5);
-      document.getElementById('lbImgWrap').style.transform = 'scale(' + currentZoom + ')';
-    }
-
-    function zoomOut() {
-      currentZoom = Math.max(currentZoom - 0.35, 0.7);
-      document.getElementById('lbImgWrap').style.transform = 'scale(' + currentZoom + ')';
+      var wrap = document.getElementById('lbImgWrap');
+      if (wrap) wrap.style.transform = 'scale(' + currentZoom + ')';
     }
 
     function resetZoom() {
       currentZoom = 1;
-      document.getElementById('lbImgWrap').style.transform = 'scale(1)';
-    }
-
-    function prevArtwork() {
-      if (imagesList.length <= 1) return;
-      currentImgIdx = (currentImgIdx - 1 + imagesList.length) % imagesList.length;
-      updateLightboxDisplay();
-    }
-
-    function nextArtwork() {
-      if (imagesList.length <= 1) return;
-      currentImgIdx = (currentImgIdx + 1) % imagesList.length;
-      updateLightboxDisplay();
+      var wrap = document.getElementById('lbImgWrap');
+      if (wrap) wrap.style.transform = 'scale(1)';
     }
 
     function handleBodyClick(e) {
       if (e.target && e.target.id === 'lbImg') {
-        // Toggle zoom on image click
         if (currentZoom === 1) {
           zoomIn();
         } else {
           resetZoom();
         }
-      } else if (e.target && e.target.classList && e.target.classList.contains('lightbox-body')) {
+      } else if (e.target && (e.target.id === 'lightbox' || (e.target.classList && e.target.classList.contains('lightbox-body')))) {
         closeLightbox();
       }
     }
 
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowRight') nextArtwork();
-      if (e.key === 'ArrowLeft') prevArtwork();
     });
   </script>
 </body>
@@ -897,7 +892,7 @@ function renderValidJobCardHtml(card, options = {}) {
 }
 
 /**
- * 404 HTML Template when Job Card is not found
+ * 404 HTML Template when Job Card is not found (No buttons)
  */
 function renderInvalidJobCardHtml(param) {
   return `<!DOCTYPE html>
@@ -912,8 +907,7 @@ function renderInvalidJobCardHtml(param) {
     .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; max-width: 440px; width: 100%; padding: 32px 24px; text-align: center; }
     .badge { display: inline-block; background: #ef4444; color: #fff; padding: 4px 12px; border-radius: 9999px; font-weight: 800; font-size: 12px; margin-bottom: 16px; }
     h1 { font-size: 20px; font-weight: 800; margin-bottom: 8px; color: #ffffff; }
-    p { color: #94a3b8; font-size: 13.5px; line-height: 1.5; margin-bottom: 20px; }
-    .btn { display: inline-block; background: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 13px; }
+    p { color: #94a3b8; font-size: 13.5px; line-height: 1.5; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -921,7 +915,6 @@ function renderInvalidJobCardHtml(param) {
     <div class="badge">NOT FOUND</div>
     <h1>Job Card Not Found</h1>
     <p>Could not locate any active Job Card with identifier <strong>"${param}"</strong> in Elite Digital Prints ERP database.</p>
-    <a href="https://erp.eliteedition.in" class="btn">Return to ERP Home</a>
   </div>
 </body>
 </html>`;
