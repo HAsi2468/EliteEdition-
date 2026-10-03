@@ -35,4 +35,11 @@ router.delete('/items/:id', billingController.deleteItem);
 router.get('/company-settings', billingController.getCompanySettings);
 router.put('/company-settings', billingController.updateCompanySettings);
 
+// Purchases CRUD
+router.get('/purchases', billingController.getPurchases);
+router.post('/purchases', billingController.createPurchase);
+router.post('/purchases/bulk-sync', billingController.bulkSyncPurchases);
+router.put('/purchases/:id', billingController.updatePurchase);
+router.delete('/purchases/:id', billingController.deletePurchase);
+
 module.exports = router;

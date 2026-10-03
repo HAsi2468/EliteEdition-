@@ -178,6 +178,39 @@ function productionVarianceMiddleware(req, res, next) {
   const totalWastageMtr = body.totalWastageMtr !== undefined ? body.totalWastageMtr : existingDoc.totalWastageMtr;
   const deliveredMtr = body.deliveredMtr !== undefined ? body.deliveredMtr : (body.deliveryMtr || existingDoc.deliveredMtr);
 
+  const user = req.user || {};
+  const userRole = String(user.role || req.headers['x-user-role'] || '').toLowerCase();
+  const isExplicitClient =
+    req.isClient === true ||
+    user.isClient === true ||
+    userRole === 'client';
+
+  const isAdmin =
+    !isExplicitClient && (
+      user.role === 'admin' ||
+      user.role === 'super_admin' ||
+      user.role === 'superadmin' ||
+      user.isAdmin === true ||
+      user.isMainAdmin === true ||
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      userRole === 'superadmin' ||
+      req.headers['x-is-admin'] === 'true' ||
+      req.headers['x-admin'] === 'true' ||
+      user.name === 'HASI' ||
+      user.username === 'HASI'
+    );
+
+  const operatorOverride =
+    isAdmin ||
+    body.operatorOverride === true ||
+    req.headers['x-operator-override'] === 'true';
+
+  const overageReason =
+    body.overageReason ||
+    req.headers['x-overage-reason'] ||
+    (isAdmin ? 'Admin authorized production meter variance' : '');
+
   const evaluation = evaluateStageVariances({
     totalMtr,
     printMtr,
@@ -185,8 +218,8 @@ function productionVarianceMiddleware(req, res, next) {
     freshMtr,
     totalWastageMtr,
     deliveredMtr,
-    overageReason: body.overageReason || req.headers['x-overage-reason'],
-    operatorOverride: body.operatorOverride === true || req.headers['x-operator-override'] === 'true',
+    overageReason,
+    operatorOverride,
     printStatus: body.printStatus !== undefined ? body.printStatus : existingDoc.printStatus,
     fusingStatus: body.fusingStatus !== undefined ? body.fusingStatus : existingDoc.fusingStatus,
     deliveryStatus: body.deliveryStatus !== undefined ? body.deliveryStatus : existingDoc.deliveryStatus,

@@ -39,10 +39,42 @@ const diskStorage = multer.diskStorage({
 const axios = require('axios');
 const sharp = require('sharp');
 
+const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.gif', '.csv', '.xlsx', '.zip']);
+
+function verifyFileSignature(buffer, ext) {
+  if (!buffer || buffer.length < 4) return false;
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return true;
+  // PNG: 89 50 4E 47
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return true;
+  // GIF: 47 49 46 38
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) return true;
+  // PDF: 25 50 44 46 (%PDF)
+  if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) return true;
+  // WEBP: 52 49 46 46 (RIFF) ... 57 45 42 50 (WEBP)
+  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') return true;
+  // ZIP / XLSX: 50 4B 03 04
+  if (buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07)) return true;
+  // CSV / plain text
+  if (ext === '.csv' || ext === '.txt') {
+    return !buffer.slice(0, 512).includes(0x00);
+  }
+  return false;
+}
+
+const fileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return cb(new Error(`File extension '${ext}' is not permitted. Allowed: ${Array.from(ALLOWED_EXTENSIONS).join(', ')}`), false);
+  }
+  cb(null, true);
+};
+
 // Dynamic multer middleware depending on R2 availability
 const upload = multer({
   storage: isR2Configured() ? memoryStorage : diskStorage,
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max per image/file
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max per image/file
+  fileFilter
 });
 
 /**
@@ -126,6 +158,20 @@ router.post('/', upload.single('image'), async (req, res) => {
     return res.status(400).json({
       error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
     });
+  }
+
+  // Magic bytes signature verification
+  let fileBuffer = req.file.buffer;
+  if (!fileBuffer && req.file.path && fs.existsSync(req.file.path)) {
+    try {
+      fileBuffer = fs.readFileSync(req.file.path);
+    } catch (_) {}
+  }
+  if (fileBuffer && !verifyFileSignature(fileBuffer, fileExt)) {
+    if (req.file.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    return res.status(400).json({ error: 'File content does not match genuine allowed format signature.' });
   }
 
   const folder = (req.body?.folder || req.query?.folder || 'designs').trim();

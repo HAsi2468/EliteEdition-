@@ -1589,6 +1589,9 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       if (m) {
         return `Fresh: ${m[1]}m (+${m[2]}% Shortage)`;
       }
+      if (/Lot Transfer/i.test(clean) || /\[Ref:\s*LT-/i.test(clean)) {
+        return clean.replace(/\[Ref:\s*([^\]]+)\]/i, '($1)').replace(/\s*\|\s*/g, ' • ');
+      }
       clean = clean.replace(/^Auto:\s*[^|]+\|\s*Lot\s*#?\d+\s*\|\s*/i, '');
       return clean.trim() || '—';
     };
@@ -1597,8 +1600,8 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       doc.rect(30, currY, 535, 18).fill('#059669');
       doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
       doc.text('DATE', 35, currY + 5);
-      doc.text('VENDOR NAME', 105, currY + 5);
-      doc.text('CHALLAN NO.', 235, currY + 5);
+      doc.text('VENDOR / SOURCE', 105, currY + 5);
+      doc.text('CHALLAN / REF', 235, currY + 5);
       doc.text('NOTES / REMARKS', 325, currY + 5);
       doc.text('INWARD QTY', 485, currY + 5, { width: 75, align: 'right' });
     };
@@ -1607,7 +1610,7 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       doc.rect(30, currY, 535, 18).fill('#dc2626');
       doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
       doc.text('DATE', 35, currY + 5);
-      doc.text('PARTY NAME', 105, currY + 5);
+      doc.text('PARTY / DESTINATION', 105, currY + 5);
       doc.text('CHALLAN / JOB NO.', 235, currY + 5);
       doc.text('DISPATCH DETAILS / NOTES', 325, currY + 5);
       doc.text('OUTWARD QTY', 485, currY + 5, { width: 75, align: 'right' });
@@ -1626,7 +1629,13 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       y += 18;
     } else {
       inwardTxs.forEach((tx, idx) => {
+        const isTransfer = tx.notes && (/Lot Transfer/i.test(tx.notes) || /Auto Lot.*Rebalance/i.test(tx.notes) || /\[Ref:\s*LT-/i.test(tx.notes));
+        const srcLot = tx.notes && (tx.notes.match(/(?:from Lot|Lot #(\d+)\s*->)\s*#?\s*(\d+)/i)?.[1] || tx.notes.match(/(?:from Lot|Lot #(\d+)\s*->)\s*#?\s*(\d+)/i)?.[2] || tx.notes.match(/Lot #(\d+)\s*->/i)?.[1]);
+        const refId = tx.notes && tx.notes.match(/\[Ref:\s*([^\]]+)\]/i)?.[1];
+        const chDisp = tx.challanNo || refId || (isTransfer && srcLot ? `LT-#${srcLot}` : '—');
+        const vendorDisp = isTransfer ? (srcLot ? `Lot #${srcLot}` : (tx.vendorName || tx.partyName || 'Lot Transfer')) : (tx.vendorName || tx.partyName || '—');
         const cleanNote = formatNote(tx.notes);
+
         doc.font('Helvetica').fontSize(7.5);
         const textH = doc.heightOfString(cleanNote, { width: 155 });
         const rowHeight = Math.max(18, textH + 8);
@@ -1641,8 +1650,8 @@ const downloadSingleLotStatementPdf = async (req, res) => {
         doc.rect(30, y, 535, rowHeight).fill(idx % 2 === 0 ? '#f8fafc' : '#ffffff');
         doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica');
         doc.text(fmtDate(tx.date), 35, y + 5);
-        doc.text(tx.vendorName || '—', 105, y + 5, { width: 125, lineBreak: false, ellipsis: true });
-        doc.text(tx.challanNo || '—', 235, y + 5, { width: 85, lineBreak: false, ellipsis: true });
+        doc.text(vendorDisp, 105, y + 5, { width: 125, lineBreak: false, ellipsis: true });
+        doc.text(chDisp, 235, y + 5, { width: 85, lineBreak: false, ellipsis: true });
         doc.text(cleanNote, 325, y + 5, { width: 155 });
         doc.fillColor('#047857').font('Helvetica-Bold').text(`+${Number(tx.qty || 0).toFixed(2)} m`, 485, y + 5, { width: 75, align: 'right' });
         y += rowHeight;
@@ -1668,7 +1677,11 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       y += 18;
     } else {
       outwardTxs.forEach((tx, idx) => {
-        const chDisp = tx.challanNo || (tx.notes && tx.notes.match(/(EDP-\d+|Challan\s*#?\s*\d+)/i)?.[0]) || tx.jobNo || '—';
+        const isTransfer = tx.notes && (/Lot Transfer/i.test(tx.notes) || /Auto Lot.*Rebalance/i.test(tx.notes) || /\[Ref:\s*LT-/i.test(tx.notes));
+        const targetLot = tx.notes && (tx.notes.match(/(?:to Lot|-> Lot|->\s*Lot|Transfer to Lot)\s*#?\s*(\d+)/i)?.[1] || tx.notes.match(/Lot #\d+\s*->\s*Lot #?(\d+)/i)?.[1]);
+        const refId = tx.notes && tx.notes.match(/\[Ref:\s*([^\]]+)\]/i)?.[1];
+        const chDisp = tx.challanNo || (tx.notes && tx.notes.match(/(EDP-\d+|Challan\s*#?\s*\d+)/i)?.[0]) || refId || tx.jobNo || (isTransfer && targetLot ? `LT-#${targetLot}` : '—');
+        const partyDisp = isTransfer ? (targetLot ? `Lot #${targetLot}` : (tx.partyName || 'Lot Transfer')) : (tx.partyName || '—');
         const cleanNote = formatNote(tx.notes);
 
         doc.font('Helvetica').fontSize(7.5);
@@ -1685,7 +1698,7 @@ const downloadSingleLotStatementPdf = async (req, res) => {
         doc.rect(30, y, 535, rowHeight).fill(idx % 2 === 0 ? '#f8fafc' : '#ffffff');
         doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica');
         doc.text(fmtDate(tx.date), 35, y + 5);
-        doc.text(tx.partyName || '—', 105, y + 5, { width: 125, lineBreak: false, ellipsis: true });
+        doc.text(partyDisp, 105, y + 5, { width: 125, lineBreak: false, ellipsis: true });
         doc.text(chDisp, 235, y + 5, { width: 85, lineBreak: false, ellipsis: true });
         doc.text(cleanNote, 325, y + 5, { width: 155 });
         doc.fillColor('#b91c1c').font('Helvetica-Bold').text(`-${Number(tx.qty || 0).toFixed(2)} m`, 485, y + 5, { width: 75, align: 'right' });
@@ -3863,7 +3876,7 @@ const downloadStockAdjustmentPdf = async (req, res) => {
 // ── POST /fabric/lot-transfer ──────────────────────────────────────────────
 const createLotTransfer = async (req, res) => {
   try {
-    const { date, fabricQuality, panna, sourceLotNo, destLotNo, qty, notes, department } = req.body;
+    const { date, fabricQuality, panna, sourceLotNo, destLotNo, qty, partyName, notes, department } = req.body;
 
     const sourceLot = parseInt(sourceLotNo, 10);
     const destLot = parseInt(destLotNo, 10);
@@ -3885,13 +3898,31 @@ const createLotTransfer = async (req, res) => {
     const transferDate = date ? new Date(date) : new Date();
     const transferRefId = 'LT-' + Date.now();
 
-    // Inherit panna, vendor, and department from existing source lot if available
+    // Inherit panna, vendor, and department from existing source or destination lot if available
     const existingSource = await FabricTransaction.findOne({ lotNo: sourceLot, type: 'INWARD' }).lean() ||
                            await FabricTransaction.findOne({ lotNo: sourceLot }).lean();
-    const effectivePanna = panna || existingSource?.panna || '58';
-    const effectiveVendor = existingSource?.vendorName || '';
+    const existingDest = await FabricTransaction.findOne({ lotNo: destLot, type: 'INWARD' }).lean() ||
+                         await FabricTransaction.findOne({ lotNo: destLot }).lean();
+
+    const effectivePanna = panna || existingSource?.panna || existingDest?.panna || '58';
+    const effectiveVendor = existingSource?.vendorName || existingDest?.vendorName || '';
     const effectiveDept = department || existingSource?.department || 'digital_print';
     const normFabric = normalizeFabric(fabricQuality, effectivePanna);
+
+    // Determine effective party name (for party clearance)
+    let effectiveParty = (partyName || '').trim();
+    if (!effectiveParty) {
+      const destOut = await FabricTransaction.findOne({ lotNo: destLot, type: 'OUTWARD', partyName: { $exists: true, $ne: '' } }).sort({ date: -1 }).lean();
+      const srcOut = await FabricTransaction.findOne({ lotNo: sourceLot, type: 'OUTWARD', partyName: { $exists: true, $ne: '' } }).sort({ date: -1 }).lean();
+      effectiveParty = destOut?.partyName || srcOut?.partyName || effectiveVendor || '';
+    }
+
+    // Inward vendor challans for source and destination lots
+    const destChallan = existingDest?.challanNo && !String(existingDest.challanNo).startsWith('LT-') ? String(existingDest.challanNo).trim() : '';
+    const srcChallan = existingSource?.challanNo && !String(existingSource.challanNo).startsWith('LT-') ? String(existingSource.challanNo).trim() : '';
+
+    const destLabel = `Lot #${destLot}${destChallan ? ` (${destChallan})` : ''}`;
+    const srcLabel = `Lot #${sourceLot}${srcChallan ? ` (${srcChallan})` : ''}`;
 
     // 1. OUTWARD from Source Lot
     const outwardTx = new FabricTransaction({
@@ -3900,10 +3931,12 @@ const createLotTransfer = async (req, res) => {
       fabricQuality: normFabric || fabricQuality,
       panna: effectivePanna,
       vendorName: effectiveVendor,
+      partyName: destLabel,
+      challanNo: transferRefId,
       lotNo: sourceLot,
       qty: transferQty,
       department: effectiveDept,
-      notes: `Lot Transfer to Lot #${destLot}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
+      notes: `Lot Transfer to ${destLabel}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
     });
 
     // 2. INWARD to Destination Lot
@@ -3912,11 +3945,13 @@ const createLotTransfer = async (req, res) => {
       date: transferDate,
       fabricQuality: normFabric || fabricQuality,
       panna: effectivePanna,
-      vendorName: effectiveVendor,
+      vendorName: srcLabel,
+      partyName: srcLabel,
+      challanNo: transferRefId,
       lotNo: destLot,
       qty: transferQty,
       department: effectiveDept,
-      notes: `Lot Transfer from Lot #${sourceLot}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
+      notes: `Lot Transfer from ${srcLabel}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
     });
 
     await outwardTx.save();
@@ -3927,7 +3962,7 @@ const createLotTransfer = async (req, res) => {
     res.status(201).json({
       success: true,
       message: `Successfully transferred ${transferQty}m from Lot #${sourceLot} to Lot #${destLot}`,
-      data: { outwardTx, inwardTx, transferRefId }
+      data: { outwardTx, inwardTx, transferRefId, partyName: effectiveParty }
     });
   } catch (error) {
     console.error('Error creating lot transfer:', error);
@@ -3999,6 +4034,8 @@ const getLotTransfers = async (req, res) => {
           date: t.date,
           fabricQuality: t.fabricQuality,
           panna: t.panna,
+          partyName: t.partyName || t.vendorName || '',
+          vendorName: t.vendorName || '',
           qty: t.qty,
           sourceLotNo: null,
           destLotNo: null,
@@ -4009,6 +4046,8 @@ const getLotTransfers = async (req, res) => {
       }
 
       const item = transferMap.get(refKey);
+      if (t.partyName && !item.partyName) item.partyName = t.partyName;
+      if (t.vendorName && !item.vendorName) item.vendorName = t.vendorName;
       if (t.type === 'OUTWARD') {
         item.sourceLotNo = t.lotNo;
         item.sourceTxId = t._id;
@@ -4094,7 +4133,20 @@ const autoLotTransfer = async (req, res) => {
 
           const pairRefId = `LT-AUTO-${batchTimestamp}-${executedTransfers.length + 1}`;
           const matchLabel = level === 3 ? 'Fabric + Panna + Party' : level === 2 ? 'Fabric + Panna' : 'Fabric Quality';
-          const noteMsg = `Auto Lot Transfer Rebalance (${matchLabel}): Lot #${candidate.lotNo} -> Lot #${negLot.lotNo} [Ref: ${pairRefId}]`;
+
+          const effectiveVendor = candidate.vendorName || negLot.vendorName || '';
+          const effectiveParty = candidate.partyName || negLot.partyName || effectiveVendor || '';
+
+          const candInward = await FabricTransaction.findOne({ lotNo: candidate.lotNo, type: 'INWARD' }).lean();
+          const negInward = await FabricTransaction.findOne({ lotNo: negLot.lotNo, type: 'INWARD' }).lean();
+
+          const candCh = candInward?.challanNo && !String(candInward.challanNo).startsWith('LT-') ? String(candInward.challanNo).trim() : '';
+          const negCh = negInward?.challanNo && !String(negInward.challanNo).startsWith('LT-') ? String(negInward.challanNo).trim() : '';
+
+          const candLabel = `Lot #${candidate.lotNo}${candCh ? ` (${candCh})` : ''}`;
+          const negLabel = `Lot #${negLot.lotNo}${negCh ? ` (${negCh})` : ''}`;
+
+          const noteMsg = `Auto Lot Rebalance (Fabric + Panna + Party): ${candLabel} -> ${negLabel} [Ref: ${pairRefId}]`;
 
           // Create OUTWARD from candidate
           const outwardTx = new FabricTransaction({
@@ -4102,6 +4154,9 @@ const autoLotTransfer = async (req, res) => {
             date: now,
             fabricQuality: candidate.fabricQuality,
             panna: candidate.panna || '',
+            vendorName: effectiveVendor,
+            partyName: negLabel,
+            challanNo: pairRefId,
             lotNo: candidate.lotNo,
             qty: transferQty,
             notes: noteMsg
@@ -4113,6 +4168,9 @@ const autoLotTransfer = async (req, res) => {
             date: now,
             fabricQuality: negLot.fabricQuality || candidate.fabricQuality,
             panna: negLot.panna || candidate.panna || '',
+            vendorName: candLabel,
+            partyName: candLabel,
+            challanNo: pairRefId,
             lotNo: negLot.lotNo,
             qty: transferQty,
             notes: noteMsg

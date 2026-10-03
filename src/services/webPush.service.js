@@ -142,6 +142,93 @@ class WebPushService {
   }
 
   /**
+   * Dispatches task assignment push notification to assigned user IDs
+   * @param {Array<string>} recipientUserIds 
+   * @param {object} taskData 
+   */
+  async dispatchTaskNotification(recipientUserIds, taskData) {
+    if (!Array.isArray(recipientUserIds) || recipientUserIds.length === 0) return;
+
+    // Filter out falsy IDs and deduplicate
+    const cleanUserIds = Array.from(new Set(recipientUserIds.map(String).filter(Boolean)));
+    if (cleanUserIds.length === 0) return;
+
+    const {
+      taskId = '',
+      title = 'New Task Assigned',
+      priority = 'medium',
+      department = 'General',
+      dueDate = null,
+      createdByName = 'Admin',
+      projectRef = '',
+    } = taskData;
+
+    try {
+      // Fetch all active push subscriptions for these recipients
+      const subscriptions = await PushSubscription.find({
+        user: { $in: cleanUserIds },
+      });
+
+      if (!subscriptions || subscriptions.length === 0) {
+        logger.info(`[WebPush] No active push subscriptions found for assignees: ${cleanUserIds.join(', ')}`);
+        return;
+      }
+
+      const dueStr = dueDate ? ` • Due: ${new Date(dueDate).toLocaleDateString()}` : '';
+      const projStr = projectRef ? ` [${projectRef}]` : '';
+      const bodyText = `Assigned by ${createdByName} • Priority: ${priority.toUpperCase()} • Dept: ${department}${projStr}${dueStr}`;
+
+      const notificationPayload = JSON.stringify({
+        title: `📋 Task Assigned: ${title}`,
+        body: bodyText,
+        icon: '/Logo.png',
+        badge: '/Logo.png',
+        tag: `task-${taskId || Date.now()}`,
+        renotify: true,
+        timestamp: Date.now(),
+        data: {
+          taskId,
+          url: '/workspace',
+          priority,
+        },
+        actions: [
+          { action: 'open', title: 'Open Workspace' },
+          { action: 'dismiss', title: 'Dismiss' },
+        ],
+      });
+
+      const pushPromises = subscriptions.map(async (sub) => {
+        const pushConfig = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.keys.p256dh,
+            auth: sub.keys.auth,
+          },
+        };
+
+        try {
+          await webpush.sendNotification(pushConfig, notificationPayload, {
+            TTL: 86400, // 24 hours
+            urgency: priority === 'urgent' || priority === 'high' ? 'high' : 'normal',
+          });
+        } catch (err) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            logger.info(`Cleaning expired push subscription for endpoint: ${sub.endpoint.slice(0, 30)}...`);
+            await PushSubscription.deleteOne({ _id: sub._id });
+          } else {
+            logger.warn(`Task push notification send error: ${err.message}`);
+          }
+        }
+      });
+
+      await Promise.allSettled(pushPromises);
+      logger.info(`[WebPush] Dispatched task assignment push notification to ${subscriptions.length} devices for task: "${title}"`);
+    } catch (pushErr) {
+      logger.error(`[WebPush] Failed to dispatch task push notification: ${pushErr.message}`);
+    }
+  }
+
+  /**
    * Broadcasts executive intelligence alert to all active admin/manager devices
    * @param {object} alertData
    */

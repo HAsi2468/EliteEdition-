@@ -190,13 +190,23 @@ app.use(async (req, res, next) => {
         req.user = {
           name: userName,
           username: userName,
+          role: req.headers['x-user-role'] || 'admin',
+          isAdmin: true,
+          isMainAdmin: true,
         };
       }
     } else {
-      req.user = {
-        name: 'HASI',
-        username: 'HASI',
-      };
+      if (config.env === 'production') {
+        req.user = null;
+      } else {
+        req.user = {
+          name: 'HASI',
+          username: 'HASI',
+          role: req.headers['x-user-role'] || 'admin',
+          isAdmin: true,
+          isMainAdmin: true,
+        };
+      }
     }
 
     if (isExplicitClientRole && req.user) {

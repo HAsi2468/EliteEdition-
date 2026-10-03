@@ -1,5 +1,6 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
+const { updateWithOCC } = require('../services/concurrencyService');
 
 const recalculateCard = (body) => {
   const sr = body.size_ratios || {};
@@ -162,12 +163,30 @@ const create = async (req, res) => {
 const update = async (req, res) => {
   try {
     const payload = recalculateCard({ ...req.body });
-    const card = await db.GarmentJobCard.findByIdAndUpdate(req.params.id, payload, { new: true });
+    const clientVersion = req.body.version ?? req.body.clientVersion ?? req.headers['if-match-version'] ?? req.headers['if-match'];
+    let card;
+    if (clientVersion !== undefined && clientVersion !== null && clientVersion !== '') {
+      card = await updateWithOCC(db.GarmentJobCard, req.params.id, clientVersion, payload);
+    } else {
+      const updatePayload = { ...payload, $inc: { version: 1 } };
+      delete updatePayload.version;
+      card = await db.GarmentJobCard.findByIdAndUpdate(req.params.id, updatePayload, { new: true });
+    }
     if (!card) return res.status(404).json({ success: false, error: 'Garment job card not found' });
     res.json({ success: true, data: card });
   } catch (err) {
+    if (err.statusCode === 409 || err.code === 'STALE_RECORD_CONFLICT') {
+      return res.status(409).json({
+        success: false,
+        code: 'STALE_RECORD_CONFLICT',
+        error: err.message,
+        currentVersion: err.currentVersion,
+        updatedByName: err.updatedByName,
+        updatedAt: err.updatedAt
+      });
+    }
     logger.error('garmentJobCard.update error: %o', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 };
 

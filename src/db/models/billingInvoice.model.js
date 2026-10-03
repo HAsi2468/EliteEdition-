@@ -121,14 +121,17 @@ const billingInvoiceSchema = new mongoose.Schema(
     },
 
     // Audit Trail
-    createdBy: { type: String, default: 'Admin', trim: true }
+    createdBy: { type: String, default: 'Admin', trim: true },
+    version: { type: Number, default: 1 }
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
   }
 );
 
-// ── Indexes for query optimization ──
+// ── Indexes for query optimization & idempotency ──
+// Business key idempotency: prevent duplicate invoices per company
+billingInvoiceSchema.index({ companyEntity: 1, invoiceNo: 1 }, { unique: true });
 // Date-sorted invoice listing
 billingInvoiceSchema.index({ invoiceDate: -1 });
 // Filter by PAID/UNPAID

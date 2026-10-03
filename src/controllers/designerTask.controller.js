@@ -212,6 +212,13 @@ const createDesignerTask = async (req, res) => {
       body.colourMatches = body.colourMatching.split(',').map(s => s.trim()).filter(Boolean);
     }
 
+    if (Array.isArray(body.parties)) {
+      body.parties = body.parties.map(p => String(p).trim()).filter(Boolean);
+      body.party = body.parties[0] || '';
+    } else if (body.party) {
+      body.parties = [body.party.trim()];
+    }
+
     // Default date to today (YYYY-MM-DD)
     if (!body.date) {
       body.date = new Date().toISOString().split('T')[0];
@@ -482,6 +489,13 @@ const updateDesignerTask = async (req, res) => {
       body.colourMatching = body.colourMatches.filter(Boolean).join(', ');
     } else if (body.colourMatching !== undefined) {
       body.colourMatches = body.colourMatching ? body.colourMatching.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
+
+    if (Array.isArray(body.parties)) {
+      body.parties = body.parties.map(p => String(p).trim()).filter(Boolean);
+      body.party = body.parties[0] || '';
+    } else if (body.party !== undefined) {
+      body.parties = body.party ? [body.party.trim()] : [];
     }
 
     // If status changed, record in stageHistory

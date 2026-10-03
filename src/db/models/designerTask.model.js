@@ -141,6 +141,37 @@ const designerTaskSchema = new mongoose.Schema(
       default: 'Medium',
       index: true,
     },
+    category: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    colors: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    parties: {
+      type: [String],
+      default: [],
+    },
+    party: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    isCatalogUploaded: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    catalogDesignId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     sampleImage: {
       type: String,
       default: '',

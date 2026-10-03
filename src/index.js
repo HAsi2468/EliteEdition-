@@ -101,20 +101,25 @@ server.listen(port, '0.0.0.0', async () => {
   }
 });
 
-// const exitHandler = () => {
-// 	if (server) {
-// 		server.close(() => {
-// 			logger.info('Server closed');
-// 			process.exit(1);
-// 		});
-// 	} else {
-// 		process.exit(1);
-// 	}
-// };
+const exitHandler = (code = 1) => {
+  if (server) {
+    server.close(() => {
+      logger.info('Server closed gracefully');
+      process.exit(code);
+    });
+    setTimeout(() => {
+      process.exit(code);
+    }, 5000).unref();
+  } else {
+    process.exit(code);
+  }
+};
 
 const unexpectedErrorHandler = (error) => {
-  logger.error(error);
-  // exitHandler();
+  logger.error('CRITICAL UNHANDLED ERROR:', error);
+  if (config.env === 'production') {
+    exitHandler(1);
+  }
 };
 
 process.on('uncaughtException', unexpectedErrorHandler);
@@ -122,7 +127,10 @@ process.on('unhandledRejection', unexpectedErrorHandler);
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received');
-  if (server) {
-    server.close();
-  }
+  exitHandler(0);
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received');
+  exitHandler(0);
 });

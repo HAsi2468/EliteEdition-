@@ -70,7 +70,8 @@ const garmentJobCardSchema = new mongoose.Schema(
     total_stitching_cost: { type: Number, default: 0 },
     overhead_cost: { type: Number, default: 0 },
     grand_total_cost: { type: Number, default: 0 },
-    final_cost_per_pc: { type: Number, default: 0 }
+    final_cost_per_pc: { type: Number, default: 0 },
+    version: { type: Number, default: 1 }
   },
   {
     timestamps: {

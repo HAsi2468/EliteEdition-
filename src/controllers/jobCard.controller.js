@@ -7,6 +7,7 @@ const fs = require('fs');
 const axios = require('axios');
 const { publishActivity } = require('../utils/activityEvent');
 const { emitSocketEvent } = require('../utils/socketEmitHelper');
+const { updateWithOCC } = require('../services/concurrencyService');
 
 // ─── Google Drive URL converter ───────────────────────────────────────────────
 function convertDriveUrl(link) {
@@ -947,7 +948,15 @@ const updateJobCard = async (req, res) => {
     const updatedAuditTrail = Array.isArray(existingCard.auditTrail) ? [...existingCard.auditTrail, auditEntry] : [auditEntry];
     body.auditTrail = updatedAuditTrail;
 
-    const card = await db.JobCard.findByIdAndUpdate(targetId, body, { new:true, runValidators:true }).lean();
+    const clientVersion = req.body.version ?? req.body.clientVersion ?? req.headers['if-match-version'] ?? req.headers['if-match'];
+    let card;
+    if (clientVersion !== undefined && clientVersion !== null && clientVersion !== '') {
+      card = await updateWithOCC(db.JobCard, targetId, clientVersion, body);
+    } else {
+      const updatePayload = { ...body, $inc: { version: 1 } };
+      delete updatePayload.version;
+      card = await db.JobCard.findByIdAndUpdate(targetId, updatePayload, { new: true, runValidators: true }).lean();
+    }
 
     // Auto-sync updated job card attributes to any linked Delivery Challan
     try {
@@ -1008,8 +1017,18 @@ const updateJobCard = async (req, res) => {
 
     res.json(card);
   } catch (err) {
+    if (err.statusCode === 409 || err.code === 'STALE_RECORD_CONFLICT') {
+      return res.status(409).json({
+        success: false,
+        code: 'STALE_RECORD_CONFLICT',
+        error: err.message,
+        currentVersion: err.currentVersion,
+        updatedByName: err.updatedByName,
+        updatedAt: err.updatedAt
+      });
+    }
     logger.error('updateJobCard error: %o', err);
-    res.status(500).json({ error: err.message || 'Internal Server Error' });
+    res.status(err.statusCode || 500).json({ error: err.message || 'Internal Server Error' });
   }
 };
 

@@ -54,6 +54,7 @@ const db = {
   StitchingConfig: require('./stitchingConfig.model'),
   RawMaterialTransaction: require('./rawMaterialTransaction.model'),
   BillingInvoice: require('./billingInvoice.model'),
+  BillingPurchase: require('./billingPurchase.model'),
   BillingCustomer: require('./billingCustomer.model'),
   BillingItem: require('./billingItem.model'),
   FabricChallan: require('./fabricChallan.model'),

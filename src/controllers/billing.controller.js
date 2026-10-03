@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const BillingInvoice = require('../db/models/billingInvoice.model');
+const BillingPurchase = require('../db/models/billingPurchase.model');
 const BillingCustomer = require('../db/models/billingCustomer.model');
 const BillingItem = require('../db/models/billingItem.model');
 const FabricChallan = require('../db/models/fabricChallan.model');
@@ -7,6 +8,7 @@ const StitchingChallan = require('../db/models/stitchingChallan.model');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const { updateWithOCC } = require('../services/concurrencyService');
 
 // Helper to convert number to Indian Currency Words
 function numToWords(amount) {
@@ -60,6 +62,36 @@ function buildCompanyFilter(companyEntity) {
       ]
     };
   }
+}
+
+function buildPurchaseCompanyFilter(companyEntity) {
+  if (!companyEntity) return {};
+  const ce = String(companyEntity).trim();
+  if (ce === 'Elite Edition') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Edition' },
+        { purchaseNo: { $regex: '^EE', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Elite Fabtex') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Fabtex' },
+        { purchaseNo: { $regex: '^EF', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'edp' || ce === 'Elite Digital Prints' || ce === 'Elite Digital Print') {
+    return {
+      $or: [
+        { companyEntity: { $in: ['Elite Digital Prints', 'Elite Digital Print', 'Elite Online', 'edp'] } },
+        { companyEntity: { $exists: false } },
+        { companyEntity: null },
+        { companyEntity: '' }
+      ]
+    };
+  }
+  return { companyEntity: ce };
 }
 
 // ── 1. DASHBOARD STATS ────────────────────────────────────────────────────────
@@ -729,7 +761,15 @@ const updateInvoice = async (req, res) => {
       return res.status(409).json({ success: false, error: guardErr.message });
     }
 
-    const invoice = await BillingInvoice.findByIdAndUpdate(req.params.id, invoiceData, { new: true });
+    const clientVersion = req.body.version ?? req.body.clientVersion ?? req.headers['if-match-version'] ?? req.headers['if-match'];
+    let invoice;
+    if (clientVersion !== undefined && clientVersion !== null && clientVersion !== '') {
+      invoice = await updateWithOCC(BillingInvoice, req.params.id, clientVersion, invoiceData);
+    } else {
+      const updatePayload = { ...invoiceData, $inc: { version: 1 } };
+      delete updatePayload.version;
+      invoice = await BillingInvoice.findByIdAndUpdate(req.params.id, updatePayload, { new: true });
+    }
     if (!invoice) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
@@ -740,7 +780,17 @@ const updateInvoice = async (req, res) => {
 
     res.json({ success: true, data: invoice });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    if (error.statusCode === 409 || error.code === 'STALE_RECORD_CONFLICT') {
+      return res.status(409).json({
+        success: false,
+        code: 'STALE_RECORD_CONFLICT',
+        error: error.message,
+        currentVersion: error.currentVersion,
+        updatedByName: error.updatedByName,
+        updatedAt: error.updatedAt
+      });
+    }
+    res.status(error.statusCode || 500).json({ success: false, error: error.message });
   }
 };
 
@@ -2667,6 +2717,133 @@ const updateCompanySettings = async (req, res) => {
   }
 };
 
+// ── 13. PURCHASES CRUD ────────────────────────────────────────────────────────
+const getPurchases = async (req, res) => {
+  try {
+    const { companyEntity, search } = req.query;
+    let query = {};
+    if (companyEntity && companyEntity !== 'ALL') {
+      query = buildPurchaseCompanyFilter(companyEntity);
+    }
+    if (search && search.trim()) {
+      const s = search.trim();
+      const searchConditions = [
+        { purchaseNo: { $regex: s, $options: 'i' } },
+        { vendorName: { $regex: s, $options: 'i' } },
+        { itemName: { $regex: s, $options: 'i' } },
+        { 'items.itemName': { $regex: s, $options: 'i' } }
+      ];
+      if (query.$or) {
+        query = {
+          $and: [
+            { $or: query.$or },
+            { $or: searchConditions }
+          ]
+        };
+      } else {
+        query.$or = searchConditions;
+      }
+    }
+    const purchases = await BillingPurchase.find(query).sort({ date: -1, createdAt: -1 }).lean();
+    res.json({ success: true, data: purchases });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const createPurchase = async (req, res) => {
+  try {
+    const purchaseData = { ...req.body };
+    if (purchaseData.date) {
+      purchaseData.date = new Date(purchaseData.date);
+    }
+    if (purchaseData._id && !mongoose.Types.ObjectId.isValid(purchaseData._id)) {
+      delete purchaseData._id;
+    }
+    const purchase = await BillingPurchase.create(purchaseData);
+    res.status(201).json({ success: true, data: purchase });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const updatePurchase = async (req, res) => {
+  try {
+    const purchaseData = { ...req.body };
+    if (purchaseData.date) {
+      purchaseData.date = new Date(purchaseData.date);
+    }
+    delete purchaseData._id;
+    const purchase = await BillingPurchase.findByIdAndUpdate(req.params.id, purchaseData, { new: true });
+    if (!purchase) {
+      return res.status(404).json({ success: false, error: 'Purchase record not found' });
+    }
+    res.json({ success: true, data: purchase });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const deletePurchase = async (req, res) => {
+  try {
+    await BillingPurchase.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Purchase record deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const bulkSyncPurchases = async (req, res) => {
+  try {
+    const { purchases } = req.body;
+    if (!Array.isArray(purchases) || purchases.length === 0) {
+      return res.json({ success: true, count: 0, message: 'No purchases provided' });
+    }
+
+    let syncedCount = 0;
+    const syncedRecords = [];
+    for (const p of purchases) {
+      if (!p.purchaseNo && !p.vendorName) continue;
+      const purchaseNo = (p.purchaseNo || '').trim();
+      const vendorName = (p.vendorName || '').trim();
+      const companyEntity = p.companyEntity || 'Elite Digital Prints';
+
+      const existing = await BillingPurchase.findOne({
+        purchaseNo,
+        vendorName
+      });
+
+      if (!existing) {
+        const created = await BillingPurchase.create({
+          companyEntity,
+          purchaseNo: purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
+          date: p.date ? new Date(p.date) : new Date(),
+          vendorName,
+          items: Array.isArray(p.items) ? p.items : [],
+          itemName: p.itemName || '',
+          quantity: Number(p.quantity) || 0,
+          unit: p.unit || 'Mtr',
+          rate: p.rate || 0,
+          subtotalAmount: Number(p.subtotalAmount) || 0,
+          taxableAmount: Number(p.taxableAmount) || 0,
+          gstRate: Number(p.gstRate) || 0,
+          gstType: p.gstType || 'CGST_SGST',
+          gstAmount: Number(p.gstAmount) || 0,
+          totalAmount: Number(p.totalAmount) || 0,
+          notes: p.notes || ''
+        });
+        syncedRecords.push(created);
+        syncedCount++;
+      } else {
+        syncedRecords.push(existing);
+      }
+    }
+    res.json({ success: true, syncedCount, data: syncedRecords });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   getBillingDashboardStats,
   getInvoices,
@@ -2688,5 +2865,10 @@ module.exports = {
   updateItem,
   deleteItem,
   getCompanySettings,
-  updateCompanySettings
+  updateCompanySettings,
+  getPurchases,
+  createPurchase,
+  updatePurchase,
+  deletePurchase,
+  bulkSyncPurchases
 };
