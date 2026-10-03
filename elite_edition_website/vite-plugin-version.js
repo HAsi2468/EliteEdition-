@@ -7,6 +7,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default function versionPlugin() {
+  const getPkgVersion = () => {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+      return pkg.version || '2.8.0';
+    } catch {
+      return '2.8.0';
+    }
+  };
+
   return {
     name: 'vite-plugin-version',
     buildStart() {
@@ -19,6 +28,8 @@ export default function versionPlugin() {
 
       const versionData = {
         version: Date.now(),
+        releaseVersion: `v${getPkgVersion()}`,
+        releaseName: `v${getPkgVersion()} — Job Card Print Sheet & Production Suite`,
         gitCommit: commitHash,
         buildTime: new Date().toISOString(),
       };
@@ -39,6 +50,8 @@ export default function versionPlugin() {
 
       const versionData = {
         version: Date.now(),
+        releaseVersion: `v${getPkgVersion()}`,
+        releaseName: `v${getPkgVersion()} — Job Card Print Sheet & Production Suite`,
         gitCommit: commitHash,
         buildTime: new Date().toISOString(),
       };

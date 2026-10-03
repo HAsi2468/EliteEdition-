@@ -1,5 +1,7 @@
 {
-  "version": 1791018415798,
-  "gitCommit": "4cdba68",
-  "buildTime": "2026-10-03T09:06:55.798Z"
+  "version": 1791022781512,
+  "releaseVersion": "v2.8.0",
+  "releaseName": "v2.8.0 — Job Card Print Sheet & Production Suite",
+  "gitCommit": "39e52e8",
+  "buildTime": "2026-10-03T10:19:41.513Z"
 }
