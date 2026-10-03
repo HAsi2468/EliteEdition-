@@ -1188,20 +1188,32 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   if (activeLogo) {
     try {
       doc.image(activeLogo, ML + 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
-      doc.image(activeLogo, ML + CW - logoW - 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
     } catch (e) {}
   }
 
-  doc.moveTo(ML + logoW + 10, curY).lineTo(ML + logoW + 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
-  doc.moveTo(ML + CW - logoW - 10, curY).lineTo(ML + CW - logoW - 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+  // QR Code on right side
+  const qrBoxW = 44;
+  try {
+    const qrcode = require('qrcode');
+    const qrUrl = `https://erp.eliteedition.in/verify/jobcard/${encodeURIComponent(jobCard.jobNo || jobCard._id)}`;
+    const qrBuf = await qrcode.toBuffer(qrUrl, { width: 140, margin: 1, errorCorrectionLevel: 'M' });
+    if (qrBuf) {
+      doc.image(qrBuf, ML + CW - qrBoxW + 6, curY + 2, { fit: [32, 32] });
+    }
+  } catch (e) {}
 
+  doc.moveTo(ML + logoW + 10, curY).lineTo(ML + logoW + 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+  doc.moveTo(ML + CW - qrBoxW, curY).lineTo(ML + CW - qrBoxW, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+
+  const centerAreaX = ML + logoW + 10;
+  const centerAreaW = CW - (logoW + 10) - qrBoxW;
   doc.fillColor('#000000').fontSize(13.5).font('Helvetica-Bold')
-    .text('ELITE DIGITAL', ML + logoW + 10, curY + 3, { width: CW - 2 * (logoW + 10), align: 'center' });
+    .text('ELITE DIGITAL', centerAreaX, curY + 3, { width: centerAreaW, align: 'center' });
 
   const mName = (jobCard.machineName || '').trim().toUpperCase();
   const mBg = mName === 'GRANDO' ? '#0b5394' : mName === 'PRINTDOT' ? '#cc0000' : '#cc0000';
   const mColor = '#ffffff';
-  const badgeW = 110, badgeH = 12, badgeX = ML + (CW - badgeW) / 2;
+  const badgeW = 110, badgeH = 12, badgeX = centerAreaX + (centerAreaW - badgeW) / 2;
   doc.rect(badgeX, curY + 21, badgeW, badgeH).fillAndStroke(mBg, '#000000');
   doc.fillColor(mColor).fontSize(8).font('Helvetica-Bold')
     .text(mName || 'PRINTDOT', badgeX, curY + 23, { width: badgeW, align: 'center' });

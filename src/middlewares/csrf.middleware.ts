@@ -46,7 +46,8 @@ export const createCsrfMiddleware = (options: CsrfMiddlewareOptions = {}) => {
       path.endsWith('/csrf-token') ||
       path.includes('/auth/csrf-token') ||
       path.includes('/challanVerification') ||
-      path.startsWith('/verify/challan')
+      path.startsWith('/verify/challan') ||
+      path.startsWith('/verify/jobcard')
     ) {
       return next();
     }

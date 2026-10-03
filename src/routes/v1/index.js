@@ -73,6 +73,7 @@ router.use('/search', require('./search.route'));
 router.use('/job-cards', require('./jobCardCompletion.route'));
 router.use('/notifications', require('./notification.route'));
 router.use('/verify/challan', require('./challanVerification.route'));
+router.use('/verify/jobcard', require('./jobCardVerification.route'));
 router.use('/telemetry', require('./telemetry.route'));
 router.use('/jobs', require('./jobs.route').router);
 
