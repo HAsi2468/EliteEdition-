@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import '../styles/taskManager.css';
 import {
+  Check,
   CheckSquare,
   Clock,
   Plus,
