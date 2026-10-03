@@ -1129,8 +1129,8 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
 
   if (ff > 0) wItems.push(`FF:${ff}`);
   if (pf > 0) wItems.push(`PF:${pf}`);
-  if (fs > 0) wItems.push(`FS:${fs}`);
-  if (gf > 0) wItems.push(`GF:${gf}`);
+  if (fs > 0) wItems.push(`FU:${fs}`);
+  if (gf > 0) wItems.push(`JF:${gf}`);
   if (cw > 0) wItems.push(`CW:${Number(cw.toFixed(2))}`);
 
   const totalW = parseFloat(card.totalWastageMtr) || (
@@ -1185,9 +1185,20 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
     rows.push(row);
   }
 
-  const challanNosStr = chList.map(c => `EDP-${c.challanNo}`).join(', ');
+  const challanDetailsList = chList.map(c => {
+    const cNo = c.challanNo ? `EDP-${c.challanNo}` : 'Challan';
+    let mtr = parseFloat(c.totalMtr) || 0;
+    if (!mtr && Array.isArray(c.tpDetails)) {
+      mtr = c.tpDetails.reduce((acc, t) => acc + (parseFloat(t.tpMeter) || 0), 0);
+    }
+    const mtrStr = mtr > 0 ? `${Number(mtr.toFixed(2))} Mtr` : '';
+    const invStr = c.invoiceNo ? `Inv: ${c.invoiceNo}` : 'Inv: --';
+    const parts = [mtrStr, invStr].filter(Boolean).join(', ');
+    return parts ? `${cNo} (${parts})` : cNo;
+  });
+  const challanNosStr = challanDetailsList.join(', ');
 
-  return { rows, totalMtr: finalTotalMtr, challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
+  return { rows, totalMtr: finalTotalMtr, challanNosStr, challanSummaryStr: challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
 }
 
 // ─── Render Job Card PDF A5 Page (Image 2 Exact Spec Layout) ──────────────────
@@ -1546,7 +1557,7 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   const westageSubLabelW = 14;
   const westageSubValW = westageW - westageSubLabelW;
 
-  const { rows: gridData, totalMtr: finalTotalMtr } = buildTpAndWasteGrid(jobCard.challans || [], jobCard);
+  const { rows: gridData, totalMtr: finalTotalMtr, challanNosStr } = buildTpAndWasteGrid(jobCard.challans || [], jobCard);
 
   const tpGridRowH = 12;
   gridData.forEach((row, rIdx) => {
@@ -1589,7 +1600,12 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
     curY += tpGridRowH;
   });
 
-  doc.fillColor('#64748b').fontSize(4.8).font('Helvetica').text('Wastage: FF: Fabric Fault | PF: Print Fault | FS: Fusing Fault | GF: Genuine Fault | CW: Challan Waste   •   CH: Delivery Challan No.', ML, curY + 1.5, { width: CW, align: 'center' });
+  let legendY = curY + 1.5;
+  if (challanNosStr) {
+    doc.fillColor('#1e293b').fontSize(5.2).font('Helvetica-Bold').text(`Challan: ${challanNosStr}`, ML, legendY, { width: CW, align: 'center' });
+    legendY += 6.5;
+  }
+  doc.fillColor('#64748b').fontSize(4.6).font('Helvetica').text('*Wastage: FF: Fabric Fault | PF: Print Fault | FU: Fusing Fault | JF: Joint/Genuine Fault | CW: Challan Waste | TOT: Total Wastage', ML, legendY, { width: CW, align: 'center' });
 }
 
 const downloadJobCardPdf = async (req, res) => {

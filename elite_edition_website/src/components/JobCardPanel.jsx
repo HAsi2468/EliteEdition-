@@ -341,7 +341,7 @@ export async function triggerJobCardPrint(cardOrCards) {
 
   const pagesHtml = preparedCards.map((item, idx) => {
     const { card, design1, design2, showTwoImages, img1, img2, candidates1, candidates2, qrDataUrl, challans } = item;
-    const { rows: tpRows, totalMtr: finalTpTotal } = buildTpAndWasteGrid(challans, card);
+    const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr } = buildTpAndWasteGrid(challans, card);
 
     const c1Json = JSON.stringify(candidates1).replace(/"/g, '&quot;');
     const c2Json = JSON.stringify(candidates2).replace(/"/g, '&quot;');
@@ -561,9 +561,9 @@ export async function triggerJobCardPrint(cardOrCards) {
           <td class="tp-val tp-waste-val" style="font-weight: 900;">${(tpRows[4][5] || tpRows[4][3])?.wVal || ''}</td>
         </tr>
       </table>
-      <div style="padding: 2px 4px; border: 1.2px solid #000; border-top: none; font-size: 6pt; color: #334155; background: #ffffff; display: flex; justify-content: space-between; flex-wrap: wrap;">
-        <span><strong>Wastage Types:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FS:</strong> Fusing Fault | <strong>GF:</strong> Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</span>
-        <span>${item.challans?.length ? `<strong>Challan:</strong> EDP-${item.challans.map(c => c.challanNo).join(', EDP-')}` : ''}</span>
+      <div style="padding: 2px 4px; border: 1.2px solid #000; border-top: none; font-size: 6pt; color: #334155; background: #ffffff; display: flex; flex-direction: column; gap: 1px; line-height: 1.25;">
+        ${challanNosStr ? `<div><strong>Challan:</strong> ${challanNosStr}</div>` : ''}
+        <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FU:</strong> Fusing Fault | <strong>JF:</strong> Joint/Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
       </div>
     </div>
   </div>`;
@@ -1600,9 +1600,9 @@ function JobCardPrintView({ card, onClose, onShare }) {
                     </tr>
                   </tbody>
                 </table>
-                <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', lineHeight: 1.25 }}>
-                  <span><strong>Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FS:</strong> Fusing Fault | <strong>GF:</strong> Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</span>
-                  {challanNosStr && <span><strong>Challan:</strong> {challanNosStr}</span>}
+                <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: 1.25 }}>
+                  {challanNosStr && <div><strong>Challan:</strong> {challanNosStr}</div>}
+                  <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FU:</strong> Fusing Fault | <strong>JF:</strong> Joint/Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
                 </div>
               </div>
             </div>

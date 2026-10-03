@@ -629,9 +629,9 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                   </tr>
                 </tbody>
               </table>
-              <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', lineHeight: 1.25 }}>
-                <span><strong>Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FS:</strong> Fusing Fault | <strong>GF:</strong> Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</span>
-                {challanNosStr && <span><strong>Challan:</strong> {challanNosStr}</span>}
+              <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: 1.25 }}>
+                {challanNosStr && <div><strong>Challan:</strong> {challanNosStr}</div>}
+                <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FU:</strong> Fusing Fault | <strong>JF:</strong> Joint/Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
               </div>
             </div>
           )}

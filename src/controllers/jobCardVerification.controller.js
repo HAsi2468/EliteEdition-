@@ -297,8 +297,8 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
 
   if (ff > 0) wItems.push(`FF:${ff}`);
   if (pf > 0) wItems.push(`PF:${pf}`);
-  if (fs > 0) wItems.push(`FS:${fs}`);
-  if (gf > 0) wItems.push(`GF:${gf}`);
+  if (fs > 0) wItems.push(`FU:${fs}`);
+  if (gf > 0) wItems.push(`JF:${gf}`);
   if (cw > 0) wItems.push(`CW:${Number(cw.toFixed(2))}`);
 
   const totalW = parseFloat(card.totalWastageMtr) || (
@@ -353,9 +353,20 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
     rows.push(row);
   }
 
-  const challanNosStr = chList.map(c => `EDP-${c.challanNo}`).join(', ');
+  const challanDetailsList = chList.map(c => {
+    const cNo = c.challanNo ? `EDP-${c.challanNo}` : 'Challan';
+    let mtr = parseFloat(c.totalMtr) || 0;
+    if (!mtr && Array.isArray(c.tpDetails)) {
+      mtr = c.tpDetails.reduce((acc, t) => acc + (parseFloat(t.tpMeter) || 0), 0);
+    }
+    const mtrStr = mtr > 0 ? `${Number(mtr.toFixed(2))} Mtr` : '';
+    const invStr = c.invoiceNo ? `Inv: ${c.invoiceNo}` : 'Inv: --';
+    const parts = [mtrStr, invStr].filter(Boolean).join(', ');
+    return parts ? `${cNo} (${parts})` : cNo;
+  });
+  const challanNosStr = challanDetailsList.join(', ');
 
-  return { rows, totalMtr: finalTotalMtr, challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
+  return { rows, totalMtr: finalTotalMtr, challanNosStr, challanSummaryStr: challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
 }
 
 /**
@@ -778,9 +789,9 @@ function renderValidJobCardHtml(card, options = {}) {
     </table>
 
     <!-- LEGEND / DETAILS FOR SHORT FORMS -->
-    <div style="padding: 3px 6px; border: 1.2px solid #000; border-top: none; font-size: 6.5pt; color: #334155; background: #ffffff; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; line-height: 1.25;">
-      <span><strong>Wastage:</strong> <strong>FF</strong>: Fabric Fault | <strong>PF</strong>: Print Fault | <strong>FS</strong>: Fusing Fault | <strong>GF</strong>: Genuine Fault | <strong>CW</strong>: Challan Waste | <strong>TOT</strong>: Total Wastage</span>
-      <span>${challanNosStr ? `<strong>Linked Challan:</strong> ${challanNosStr}` : ''}</span>
+    <div style="padding: 3px 6px; border: 1.2px solid #000; border-top: none; font-size: 6.5pt; color: #334155; background: #ffffff; display: flex; flex-direction: column; gap: 2px; line-height: 1.3;">
+      ${challanNosStr ? `<div><strong>Challan:</strong> ${challanNosStr}</div>` : ''}
+      <div><strong>*Wastage:</strong> <strong>FF</strong>: Fabric Fault | <strong>PF</strong>: Print Fault | <strong>FU</strong>: Fusing Fault | <strong>JF</strong>: Joint/Genuine Fault | <strong>CW</strong>: Challan Waste | <strong>TOT</strong>: Total Wastage</div>
     </div>
   </div>
 
