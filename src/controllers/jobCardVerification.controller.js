@@ -488,14 +488,14 @@ function renderValidJobCardHtml(card, options = {}) {
   <title>Job Card #${jobNo} — Elite Digital Prints</title>
   <link rel="icon" type="image/png" href="/DigitalLogo.png">
   <style>
-    @page { size: A4 portrait; margin: 10mm; }
+    @page { size: A5 portrait; margin: 6mm; }
     @media print {
       body { background-color: #ffffff; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .card-container { max-width: 100%; border: 1.5px solid #000000; box-shadow: none; margin: 0 auto; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
     body { background-color: #f1f5f9; color: #000000; padding: 10px; display: flex; justify-content: center; }
-    .card-container { max-width: 680px; width: 100%; background: #ffffff; border: 1.5px solid #000000; box-shadow: 0 10px 25px rgba(0,0,0,0.08); overflow: hidden; margin: 0 auto; }
+    .card-container { max-width: 580px; width: 100%; background: #ffffff; border: 1.5px solid #000000; box-shadow: 0 10px 25px rgba(0,0,0,0.08); overflow: hidden; margin: 0 auto; }
     
     /* Header */
     .header-bar { display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1.5px solid #000; background: #ffffff; }

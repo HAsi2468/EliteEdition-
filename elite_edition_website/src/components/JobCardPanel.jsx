@@ -591,14 +591,14 @@ export async function triggerJobCardPrint(cardOrCards) {
   win.document.write(`<!DOCTYPE html><html><head>
     <title>${titleText}</title>
     <style>
-      @page { size: A4 portrait; margin: 10mm; }
+      @page { size: A5 portrait; margin: 6mm; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .page-break { page-break-after: always; break-after: page; }
       }
       * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-      body { background: #fff; color: #000; font-size: 9pt; line-height: 1.2; margin: 0; padding: 0; }
-      .card-page { width: 100%; max-width: 190mm; margin: 0 auto; position: relative; }
+      body { background: #fff; color: #000; font-size: 8.5pt; line-height: 1.15; margin: 0; padding: 0; }
+      .card-page { width: 100%; max-width: 136mm; margin: 0 auto; position: relative; }
       .wrap { width: 100%; display: flex; flex-direction: column; gap: 1px; }
       
       /* Header styles */

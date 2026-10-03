@@ -1203,9 +1203,9 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
 
 // ─── Render Job Card PDF A5 Page (Image 2 Exact Spec Layout) ──────────────────
 async function renderJobCardA5Page(doc, jobCard, activeLogo) {
-  const PW = 595.28, PH = 841.89; // Standard A4 (210mm x 297mm)
-  const ML = 28.35, MR = 28.35;   // Exact 10mm equal left and right margins
-  const CW = PW - ML - MR;        // 538.58 pt width
+  const PW = 419.53, PH = 595.28; // Standard A5 (148mm x 210mm)
+  const ML = 16, MR = 16;         // Exact equal 16pt (~5.6mm) margins on every side
+  const CW = PW - ML - MR;        // 387.53 pt width
 
   const formatDateStr = (d) => {
     if (!d) return '';
@@ -1433,7 +1433,7 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   curY += rowH + 2;
 
   // 4. DESIGN IMAGE CONTAINER
-  const imgAreaH = 155;
+  const imgAreaH = 125;
   doc.rect(ML, curY, CW, imgAreaH).strokeColor('#000000').lineWidth(1.2).stroke();
 
   try {
@@ -1674,7 +1674,7 @@ const downloadJobCardPdf = async (req, res) => {
     const logoFallback = path.join(__dirname, 'Logo.png');
     const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
 
-    const doc = new PDFDocument({ margin: 28.35, size: 'A4', autoFirstPage: true });
+    const doc = new PDFDocument({ margin: 16, size: 'A5', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="JobCard_${jobCard.jobNo || 'preview'}.pdf"`);
     doc.pipe(res);
@@ -1727,14 +1727,14 @@ const downloadBulkJobCardsPdf = async (req, res) => {
     const logoFallback = path.join(__dirname, 'Logo.png');
     const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
 
-    const doc = new PDFDocument({ margin: 28.35, size: 'A4', autoFirstPage: true });
+    const doc = new PDFDocument({ margin: 16, size: 'A5', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Combined_Job_Cards_${jobCards.length}_Cards.pdf"`);
     doc.pipe(res);
 
     for (let jIdx = 0; jIdx < jobCards.length; jIdx++) {
       if (jIdx > 0) {
-        doc.addPage({ size: 'A4', margin: 28.35 });
+        doc.addPage({ size: 'A5', margin: 16 });
       }
       await renderJobCardA5Page(doc, jobCards[jIdx], activeLogo);
     }
