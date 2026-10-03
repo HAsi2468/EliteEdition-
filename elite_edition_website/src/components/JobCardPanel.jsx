@@ -870,6 +870,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
     imageUrl2: card.imageUrl2 || '',
   });
   const [zoomImage, setZoomImage] = useState(null);
+  const [viewTab, setViewTab] = useState('all'); // 'all' | 'sheet' | 'tracking'
 
   useEffect(() => {
     const resolveImages = async () => {
@@ -930,6 +931,44 @@ function JobCardPrintView({ card, onClose, onShare }) {
 
   const primaryDesignName = cleanDesignNameString(card.designName || card.designNo || '');
   const colorHex = card.colors ? getColorHex(card.colors) : null;
+  const machineBg = card.machineName === 'GRANDO' ? '#0b5394' : card.machineName === 'PRINTDOT' ? '#cc0000' : '#1e293b';
+
+  const tdPrintLabel = {
+    border: '1px solid #000',
+    padding: '2px 4px',
+    fontWeight: 800,
+    fontSize: '7.5pt',
+    background: '#f8fafc',
+    whiteSpace: 'nowrap',
+    color: '#000'
+  };
+
+  const tdPrintVal = {
+    border: '1px solid #000',
+    padding: '2px 4px',
+    fontSize: '7.5pt',
+    color: '#000'
+  };
+
+  const tdTpLabel = {
+    border: '1px solid #000',
+    padding: '2px 3px',
+    fontWeight: 800,
+    fontSize: '7pt',
+    textAlign: 'center',
+    background: '#f8fafc',
+    width: '26px',
+    color: '#000'
+  };
+
+  const tdTpVal = {
+    border: '1px solid #000',
+    padding: '2px 3px',
+    fontSize: '7pt',
+    width: '36px',
+    minWidth: '32px',
+    color: '#000'
+  };
 
   return (
     <div
@@ -937,21 +976,21 @@ function JobCardPrintView({ card, onClose, onShare }) {
       onClick={onClose}
       style={{
         zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '1rem', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)'
+        padding: '1rem', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)'
       }}
     >
       <div
         className="modal-content"
         style={{
-          maxWidth: 940,
-          width: '95vw',
-          maxHeight: '92vh',
+          maxWidth: 980,
+          width: '96vw',
+          maxHeight: '94vh',
           display: 'flex',
           flexDirection: 'column',
           padding: 0,
           overflow: 'hidden',
           borderRadius: 'var(--radius-lg, 12px)',
-          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
           background: 'var(--bg-card, #131722)',
           border: '1px solid var(--border-light, #2e384d)'
         }}
@@ -960,11 +999,11 @@ function JobCardPrintView({ card, onClose, onShare }) {
         {/* ─── MODAL HEADER ─── */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '1rem 1.4rem', borderBottom: '1px solid var(--border-light)',
-          background: 'rgba(255,255,255,0.02)'
+          padding: '0.85rem 1.4rem', borderBottom: '1px solid var(--border-light)',
+          background: 'rgba(255,255,255,0.02)', gap: '1rem', flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <span style={{
                 fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)',
                 fontFamily: 'monospace', letterSpacing: '0.04em'
@@ -985,14 +1024,57 @@ function JobCardPrintView({ card, onClose, onShare }) {
               <WorkflowStageBadge card={card} />
               <StatusPill status={card.status || 'Pending'} />
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
               <span>Dept: <strong style={{ color: 'var(--text-primary)' }}>{card.department || 'digital_print'}</strong></span>
               {card.category && <span>Category: <strong style={{ color: 'var(--text-primary)' }}>{card.category}</strong></span>}
               <span>Created Date: <strong style={{ color: 'var(--text-primary)' }}>{card.date || '—'}</strong></span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* 🌟 VIEW MODE SELECTOR (Sheet vs Tracking vs All) 🌟 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              display: 'flex', background: 'rgba(255,255,255,0.06)', padding: '3px',
+              borderRadius: '8px', border: '1px solid var(--border-light)'
+            }}>
+              <button
+                type="button"
+                onClick={() => setViewTab('all')}
+                style={{
+                  padding: '4px 10px', fontSize: '0.76rem', fontWeight: 700, borderRadius: '6px',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s ease',
+                  background: viewTab === 'all' ? 'var(--primary)' : 'transparent',
+                  color: viewTab === 'all' ? '#ffffff' : 'var(--text-muted)'
+                }}
+              >
+                📑 All Information
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewTab('sheet')}
+                style={{
+                  padding: '4px 10px', fontSize: '0.76rem', fontWeight: 700, borderRadius: '6px',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s ease',
+                  background: viewTab === 'sheet' ? 'var(--primary)' : 'transparent',
+                  color: viewTab === 'sheet' ? '#ffffff' : 'var(--text-muted)'
+                }}
+              >
+                📄 Authentic Print Card
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewTab('tracking')}
+                style={{
+                  padding: '4px 10px', fontSize: '0.76rem', fontWeight: 700, borderRadius: '6px',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s ease',
+                  background: viewTab === 'tracking' ? 'var(--primary)' : 'transparent',
+                  color: viewTab === 'tracking' ? '#ffffff' : 'var(--text-muted)'
+                }}
+              >
+                📊 Department Tracking
+              </button>
+            </div>
+
             <button onClick={onClose} className="btn-icon" style={{ borderRadius: '50%', padding: '0.45rem' }}>
               <X size={18} />
             </button>
@@ -1002,268 +1084,773 @@ function JobCardPrintView({ card, onClose, onShare }) {
         {/* ─── MODAL SCROLLABLE BODY ─── */}
         <div style={{
           flex: 1, overflowY: 'auto', padding: '1.2rem 1.4rem',
-          display: 'flex', flexDirection: 'column', gap: '1.1rem'
+          display: 'flex', flexDirection: 'column', gap: '1.2rem'
         }}>
-          {/* 🌟 Top Visual Overview Banner (Artwork Images & Essential Identifiers) 🌟 */}
-          <div style={{
-            display: 'flex', gap: '1.2rem', flexWrap: 'wrap',
-            background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)',
-            borderRadius: 'var(--radius-md)', padding: '1rem', alignItems: 'stretch'
-          }}>
-            {/* Artwork Previews */}
-            <div style={{ display: 'flex', gap: '0.75rem', flex: '1 1 320px', minWidth: 260 }}>
-              <SmartJobCardPreviewImage
-                rawUrl={resolvedImages.imageUrl1 || card.imageUrl1}
-                designName={primaryDesignName}
-                label="Artwork 1 (Primary)"
-                onZoom={setZoomImage}
-              />
-              {(resolvedImages.imageUrl2 || card.imageUrl2) && (
-                <SmartJobCardPreviewImage
-                  rawUrl={resolvedImages.imageUrl2 || card.imageUrl2}
-                  designName={primaryDesignName}
-                  label="Artwork 2 / Back"
-                  onZoom={setZoomImage}
-                />
-              )}
-            </div>
-
-            {/* Quick Hero Highlights */}
-            <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.6rem' }}>
-              <div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
-                  PARTY NAME
-                </div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>
-                  {card.party || '—'}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
-                  DESIGN NAME / NUMBER
-                </div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary)', marginTop: 2 }}>
-                  {primaryDesignName || '—'}
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '0.5rem', marginTop: 4 }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>TOTAL METERS</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#10b981' }}>{card.totalMtr || '0'} m</div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>FABRIC</div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.fabric || '—'}</div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>COLORS</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {colorHex && (
-                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: colorHex, border: '1px solid rgba(255,255,255,0.3)', display: 'inline-block' }} />
-                    )}
-                    <span>{card.colors || '—'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 🚨 Emergency Notes Alert Banner (if present) 🚨 */}
-          {card.emergencyNotes && (
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {/* 📄 VIEW MODE 1: AUTHENTIC PHYSICAL JOB CARD (EXACT PRINT REPLICA)    */}
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {(viewTab === 'all' || viewTab === 'sheet') && (
             <div style={{
-              background: 'rgba(239, 68, 68, 0.12)', border: '1.5px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem'
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              width: '100%', background: 'rgba(0,0,0,0.2)', padding: '1rem',
+              borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)'
             }}>
-              <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  URGENT / EMERGENCY INSTRUCTION
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                width: '100%', maxWidth: '580px', marginBottom: '8px'
+              }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  📄 Authentic Physical Job Card Sheet (Print Layout)
                 </div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fca5a5', marginTop: 2 }}>
-                  {card.emergencyNotes}
+                <button
+                  onClick={doPrint}
+                  style={{
+                    background: '#2563eb', color: '#fff', border: 'none',
+                    padding: '3px 10px', borderRadius: '4px', fontSize: '0.72rem',
+                    fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                  }}
+                >
+                  <Printer size={12} /> Print Physical Sheet
+                </button>
+              </div>
+
+              {/* Exact Physical Paper Replica Card */}
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: '580px',
+                  background: '#ffffff',
+                  color: '#000000',
+                  padding: '12px 14px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
+                  boxSizing: 'border-box',
+                  borderRadius: '3px',
+                  border: '1.2px solid #000'
+                }}
+              >
+                {/* Top Banner: Elite Digital Prints Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    border: '1.2px solid #000',
+                    padding: '4px 8px',
+                    marginBottom: '2px',
+                    background: '#f8fafc',
+                  }}
+                >
+                  <img
+                    src="/DigitalLogo.png"
+                    alt="Elite Digital Prints"
+                    style={{ height: '32px', objectFit: 'contain' }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11pt', fontWeight: 900, letterSpacing: '1px', color: '#000' }}>
+                      ELITE DIGITAL PRINTS
+                    </div>
+                    <div
+                      style={{
+                        background: machineBg,
+                        color: '#ffffff',
+                        display: 'inline-block',
+                        padding: '1px 14px',
+                        fontSize: '9pt',
+                        fontWeight: 800,
+                        marginTop: '2px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      {card?.machineName || 'MACHINE'}
+                    </div>
+                  </div>
+                  <img
+                    src="/DigitalLogo.png"
+                    alt="Elite Digital Prints"
+                    style={{ height: '32px', objectFit: 'contain' }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
                 </div>
+
+                {/* Main 18-Specification Grid Table */}
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '8pt',
+                    marginTop: '1px',
+                    border: '1.2px solid #000',
+                  }}
+                >
+                  <tbody>
+                    <tr>
+                      <td style={tdPrintLabel}>JOB NO. :</td>
+                      <td style={{ ...tdPrintVal, fontWeight: 900, fontSize: '9.5pt', color: '#0b5394' }}>{card?.jobNo || ''}</td>
+                      <td style={tdPrintLabel}>COLORS :</td>
+                      <td style={tdPrintVal}>{card?.colors || card?.colourMatching || ''}</td>
+                      <td style={tdPrintLabel}>DATE :</td>
+                      <td style={tdPrintVal}>{card?.date || ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>D. NO. :</td>
+                      <td style={{ ...tdPrintVal, fontWeight: 800 }}>{primaryDesignName || card?.designNo || ''}</td>
+                      <td style={tdPrintLabel}>PANNA :</td>
+                      <td style={tdPrintVal}>{card?.panna || ''}</td>
+                      <td style={tdPrintLabel}>PASS :</td>
+                      <td style={tdPrintVal}>{card?.pass || ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>FABRIC :</td>
+                      <td style={{ ...tdPrintVal, fontWeight: 700 }}>{card?.fabric || ''}</td>
+                      <td style={tdPrintLabel}>CON. :</td>
+                      <td style={tdPrintVal}>{card?.consumption || ''}</td>
+                      <td style={tdPrintLabel}>ALL OVER :</td>
+                      <td style={tdPrintVal}>{card?.allover || ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>PCS :</td>
+                      <td style={tdPrintVal}>{card?.pcs || ''}</td>
+                      <td style={tdPrintLabel}>BOTTOM :</td>
+                      <td style={tdPrintVal}>{card?.bottom || ''}</td>
+                      <td style={tdPrintLabel}>PN/KM :</td>
+                      <td style={tdPrintVal}>{card?.pnKm || ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>TOP :</td>
+                      <td style={tdPrintVal}>{card?.top || ''}</td>
+                      <td style={tdPrintLabel}>DUPATTA :</td>
+                      <td style={tdPrintVal}>{card?.dupatta || ''}</td>
+                      <td style={tdPrintLabel}>SET-COPY :</td>
+                      <td style={tdPrintVal}>{card?.setCopy || ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>SLEEVE :</td>
+                      <td style={tdPrintVal}>{card?.sleeve || ''}</td>
+                      <td style={tdPrintLabel}>CUT :</td>
+                      <td style={tdPrintVal}>{card?.cut || ''}</td>
+                      <td colSpan={2} style={{ ...tdPrintVal, textAlign: 'center', background: '#f1f5f9', fontWeight: 800, fontSize: '8pt' }}>
+                        TOTAL MTR
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>PARTY:</td>
+                      <td colSpan={3} style={{ ...tdPrintVal, fontWeight: 800, fontSize: '9pt' }}>
+                        {card?.party || ''}
+                      </td>
+                      <td colSpan={2} style={{ ...tdPrintVal, fontWeight: 900, fontSize: '11pt', paddingLeft: '8px', color: '#166534' }}>
+                        : {card?.totalMtr || '0'} Mtr
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Design Image Area */}
+                <div
+                  style={{
+                    width: '100%',
+                    border: '1.2px solid #000',
+                    marginTop: '2px',
+                    minHeight: '130px',
+                    maxHeight: '190px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    background: '#f8fafc',
+                  }}
+                >
+                  {resolvedImages.imageUrl1 || resolvedImages.imageUrl2 ? (
+                    <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                      {resolvedImages.imageUrl1 && (
+                        <div
+                          style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', minHeight: '130px', cursor: 'zoom-in' }}
+                          onClick={() => setZoomImage(resolvedImages.imageUrl1)}
+                          title="Click to Zoom Artwork 1"
+                        >
+                          <img
+                            src={resolvedImages.imageUrl1}
+                            alt="Design Artwork 1"
+                            referrerPolicy="no-referrer"
+                            style={{ maxWidth: '100%', maxHeight: '180px', objectFit: 'contain' }}
+                            onError={(e) => {
+                              const cands = getImageCandidates(resolvedImages.imageUrl1, primaryDesignName);
+                              if (cands.length > 1 && e.currentTarget.src !== cands[1]) {
+                                e.currentTarget.src = cands[1];
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                      {resolvedImages.imageUrl2 && (
+                        <div
+                          style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderLeft: '1.2px solid #000', minHeight: '130px', cursor: 'zoom-in' }}
+                          onClick={() => setZoomImage(resolvedImages.imageUrl2)}
+                          title="Click to Zoom Artwork 2"
+                        >
+                          <img
+                            src={resolvedImages.imageUrl2}
+                            alt="Design Artwork 2"
+                            referrerPolicy="no-referrer"
+                            style={{ maxWidth: '100%', maxHeight: '180px', objectFit: 'contain' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '8pt', padding: '1rem' }}>
+                      <ImageIcon size={22} style={{ margin: '0 auto 4px', opacity: 0.5 }} />
+                      <div>{primaryDesignName || 'NO DESIGN IMAGE ATTACHED'}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes Container */}
+                <div
+                  style={{
+                    border: '1.2px solid #000',
+                    marginTop: '2px',
+                    fontSize: '7.5pt',
+                    fontWeight: 700,
+                    lineHeight: '1.25',
+                  }}
+                >
+                  <div style={{ padding: '2px 6px', borderBottom: '1px solid #e2e8f0', color: '#000' }}>
+                    NOTE 1 : {card?.note1 || '—'}
+                  </div>
+                  {card?.emergencyNotes && (
+                    <div style={{ padding: '2px 6px', background: '#fef2f2', color: '#b91c1c', borderBottom: '1px solid #fecaca', fontWeight: 800 }}>
+                      EMRG. NOTE : {card.emergencyNotes}
+                    </div>
+                  )}
+                  <div style={{ padding: '2px 6px', color: '#000' }}>
+                    NOTE 2 : {card?.note2 || '—'}
+                  </div>
+                </div>
+
+                {/* Printing Specs Table 1 */}
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '7.5pt',
+                    marginTop: '2px',
+                    border: '1.2px solid #000',
+                  }}
+                >
+                  <tbody>
+                    <tr>
+                      <td style={{ ...tdPrintLabel, width: '18%' }}>DESIGNER :</td>
+                      <td style={{ ...tdPrintVal, width: '32%' }}>{card?.designer || '—'}</td>
+                      <td style={{ ...tdPrintLabel, width: '18%' }}>C. M. :</td>
+                      <td style={{ ...tdPrintVal, width: '32%' }}>{card?.colourMatching || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>EXP. TIME :</td>
+                      <td style={{ ...tdPrintVal, fontWeight: 700, color: '#0b5394' }}>{card?.expTime || '—'}</td>
+                      <td style={tdPrintLabel}>PAPER TYPE :</td>
+                      <td style={tdPrintVal}>{card?.paperType || '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Printing & Operator Table 2 */}
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '7.5pt',
+                    marginTop: '2px',
+                    border: '1.2px solid #000',
+                  }}
+                >
+                  <tbody>
+                    <tr>
+                      <td style={{ ...tdPrintLabel, width: '18%' }}>OPERATOR :</td>
+                      <td style={{ ...tdPrintVal, width: '32%' }}>{card?.operatorName || '—'}</td>
+                      <td style={{ ...tdPrintLabel, width: '18%' }}>PRINT DATE :</td>
+                      <td style={{ ...tdPrintVal, width: '32%' }}>{card?.printDate || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style={tdPrintLabel}>ROLL NO. :</td>
+                      <td style={tdPrintVal}>{card?.rollNo || '—'}</td>
+                      <td style={tdPrintLabel}>PRINT METER :</td>
+                      <td style={{ ...tdPrintVal, fontWeight: 800, color: '#2563eb' }}>{card?.printMtr ? `${card.printMtr} Mtr` : '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Fusing & Heat Press Table 3 */}
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '7.5pt',
+                    marginTop: '2px',
+                    border: '1.2px solid #000',
+                  }}
+                >
+                  <tbody>
+                    <tr>
+                      <td style={{ ...tdPrintLabel, width: '18%', textAlign: 'center', fontWeight: 900 }}>FUSING</td>
+                      <td style={{ ...tdPrintLabel, width: '14%' }}>TEMP. :</td>
+                      <td style={{ ...tdPrintVal, width: '18%', textAlign: 'center', fontWeight: 800 }}>{card?.temperature || card?.fusingTemp || '—'}</td>
+                      <td style={{ ...tdPrintLabel, width: '14%' }}>SPEED :</td>
+                      <td style={{ ...tdPrintVal, width: '36%', textAlign: 'center', fontWeight: 800 }}>{card?.speed || card?.fusingSpeed || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ ...tdPrintLabel, textAlign: 'center', fontWeight: 800 }}>NAME:</td>
+                      <td style={tdPrintVal} colSpan={2}>{card?.fusingOperator || ''}</td>
+                      <td style={tdPrintLabel}>DATE :</td>
+                      <td style={tdPrintVal}>{card?.fusingDate || ''}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* 🌟 FULL T.P. METER & T.P. WASTAGE METER TABLE (24 Slots) 🌟 */}
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '7pt',
+                    marginTop: '2px',
+                    border: '1.2px solid #000',
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th colSpan={10} style={{ border: '1px solid #000', textAlign: 'center', fontWeight: 900, background: '#f1f5f9', padding: '2px' }}>
+                        T.P. METER
+                      </th>
+                      <th colSpan={2} style={{ border: '1px solid #000', fontSize: '6.5pt', fontWeight: 900, lineHeight: 1.1, padding: '2px', background: '#fef2f2', textAlign: 'center' }}>
+                        T.P. WASTAGE METER
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={tdTpLabel}>1)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>6)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>11)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>16)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>20)</td><td style={tdTpVal}></td>
+                      <td style={{ ...tdTpLabel, background: '#fff1f2' }}>1)</td><td style={{ ...tdTpVal, background: '#fff1f2' }}></td>
+                    </tr>
+                    <tr>
+                      <td style={tdTpLabel}>2)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>7)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>12)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>17)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>21)</td><td style={tdTpVal}></td>
+                      <td style={{ ...tdTpLabel, background: '#fff1f2' }}>2)</td><td style={{ ...tdTpVal, background: '#fff1f2' }}></td>
+                    </tr>
+                    <tr>
+                      <td style={tdTpLabel}>3)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>8)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>13)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>18)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>22)</td><td style={tdTpVal}></td>
+                      <td style={{ ...tdTpLabel, background: '#fff1f2' }}>3)</td><td style={{ ...tdTpVal, background: '#fff1f2' }}></td>
+                    </tr>
+                    <tr>
+                      <td style={tdTpLabel}>4)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>9)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>14)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>19)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>23)</td><td style={tdTpVal}></td>
+                      <td style={{ ...tdTpLabel, background: '#f8fafc' }}></td><td style={tdTpVal}></td>
+                    </tr>
+                    <tr>
+                      <td style={tdTpLabel}>5)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>10)</td><td style={tdTpVal}></td>
+                      <td style={tdTpLabel}>15)</td><td style={tdTpVal}></td>
+                      <td colSpan={3} style={{ border: '1px solid #000', fontWeight: 900, fontSize: '7.2pt', textAlign: 'right', paddingRight: '6px', background: '#f8fafc' }}>
+                        TOTAL :-
+                      </td>
+                      <td style={{ ...tdTpVal, fontWeight: 900 }}>{card?.printMtr || ''}</td>
+                      <td style={{ ...tdTpLabel, background: '#f8fafc' }}></td><td style={tdTpVal}></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* ─── SECTION: 📋 GENERAL & PARTY DETAILS ─── */}
-          <DetailCard title="General & Party Information" icon={Building2}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
-              <DetailCell label="Party Name" value={card.party} highlight />
-              <DetailCell label="Bill To" value={card.billTo} />
-              <DetailCell label="Ship To" value={card.shipTo} />
-              <DetailCell label="Bill / Challan No" value={card.billNo} />
-              <DetailCell label="Designer" value={card.designer} />
-              <DetailCell label="Colour Matching (C.M.)" value={card.colourMatching} />
-              <DetailCell
-                label="Color"
-                value={card.colors}
-                extra={colorHex ? <span style={{ width: 12, height: 12, borderRadius: '50%', background: colorHex, border: '1px solid rgba(255,255,255,0.3)' }} /> : null}
-              />
-              <DetailCell label="Category" value={card.category} />
-              <DetailCell label="Department" value={card.department || 'digital_print'} />
-              <DetailCell label="Order / Job Date" value={card.date} />
-            </div>
-          </DetailCard>
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {/* 📊 VIEW MODE 2: ALL SYSTEM & DEPARTMENT TRACKING DETAILS            */}
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {(viewTab === 'all' || viewTab === 'tracking') && (
+            <>
+              {/* Section Divider if showing both */}
+              {viewTab === 'all' && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.75rem',
+                  margin: '0.4rem 0', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800,
+                  textTransform: 'uppercase', letterSpacing: '0.05em'
+                }}>
+                  <div style={{ flex: 1, height: '1px', background: 'var(--border-light)' }} />
+                  <span>📊 System Database & Department Operations Tracking</span>
+                  <div style={{ flex: 1, height: '1px', background: 'var(--border-light)' }} />
+                </div>
+              )}
 
-          {/* ─── SECTION: ✂️ FABRIC & CUTTING / GARMENT SPECS ─── */}
-          <DetailCard title="Fabric, Cutting & Garment Breakdown" icon={Scissors}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
-              <DetailCell label="Fabric" value={card.fabric} highlight />
-              <DetailCell label="Panna (Width)" value={card.panna} />
-              <DetailCell label="Total Meters" value={card.totalMtr ? `${card.totalMtr} m` : '—'} highlight color="#10b981" />
-              <DetailCell label="Pieces (Pcs)" value={card.pcs} />
-              <DetailCell label="Cut" value={card.cut} />
-              <DetailCell label="Allover" value={card.allover} />
-              <DetailCell label="Consumption (Con.)" value={card.consumption} />
-              <DetailCell label="Top" value={card.top} />
-              <DetailCell label="Sleeve" value={card.sleeve} />
-              <DetailCell label="Bottom" value={card.bottom} />
-              <DetailCell label="Dupatta" value={card.dupatta} />
-              <DetailCell label="Set Copy" value={card.setCopy} />
-              <DetailCell label="PN / KM" value={card.pnKm} />
-            </div>
-          </DetailCard>
+              {/* Top Visual Overview Banner (Artwork Images & Essential Identifiers) */}
+              <div style={{
+                display: 'flex', gap: '1.2rem', flexWrap: 'wrap',
+                background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)',
+                borderRadius: 'var(--radius-md)', padding: '1rem', alignItems: 'stretch'
+              }}>
+                {/* Artwork Previews */}
+                <div style={{ display: 'flex', gap: '0.75rem', flex: '1 1 320px', minWidth: 260 }}>
+                  <SmartJobCardPreviewImage
+                    rawUrl={resolvedImages.imageUrl1 || card.imageUrl1}
+                    designName={primaryDesignName}
+                    label="Artwork 1 (Primary)"
+                    onZoom={setZoomImage}
+                  />
+                  {(resolvedImages.imageUrl2 || card.imageUrl2) && (
+                    <SmartJobCardPreviewImage
+                      rawUrl={resolvedImages.imageUrl2 || card.imageUrl2}
+                      designName={primaryDesignName}
+                      label="Artwork 2 / Back"
+                      onZoom={setZoomImage}
+                    />
+                  )}
+                </div>
 
-          {/* ─── 2-COLUMN ROW: PRINTING DEPT & FUSING DEPT ─── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.1rem' }}>
-            {/* 🖨️ Printing Department */}
-            <DetailCard
-              title="Printing Department"
-              icon={Printer}
-              badge={<StatusPill status={card.printStatus || 'Printing Pending'} />}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
-                <DetailCell label="Print Machine" value={card.machineName} highlight />
-                <DetailCell label="Operator" value={card.operatorName} />
-                <DetailCell label="Pass" value={card.pass} />
-                <DetailCell label="Speed" value={card.speed} />
-                <DetailCell label="EXP. Time" value={card.expTime} highlight />
-                <DetailCell label="Profile" value={card.profile} />
-                <DetailCell label="Paper Type" value={card.paperType} />
-                <DetailCell label="Print Date" value={card.printDate} />
-                <DetailCell label="Print Meter" value={card.printMtr ? `${card.printMtr} m` : '—'} highlight color="#3b82f6" />
-              </div>
-            </DetailCard>
-
-            {/* 🔥 Fusing & Heat Press */}
-            <DetailCard
-              title="Fusing & Heat Press"
-              icon={Flame}
-              badge={<StatusPill status={card.fusingStatus || 'Fusing Pending'} />}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
-                <DetailCell label="Fusing Machine" value={card.fusingMachine} />
-                <DetailCell label="Fusing Operator" value={card.fusingOperator} />
-                <DetailCell label="Temperature" value={card.temperature || card.fusingTemp} highlight />
-                <DetailCell label="Fusing Speed" value={card.fusingSpeed} />
-                <DetailCell label="Butter Paper Wt" value={card.butterPaperWeightKg ? `${card.butterPaperWeightKg} Kg` : '—'} />
-                <DetailCell label="Shift" value={card.shift} />
-                <DetailCell label="Fusing Date" value={card.fusingDate} />
-                <DetailCell label="Fusing Meter" value={card.fusingMtr ? `${card.fusingMtr} m` : '—'} highlight color="#f59e0b" />
-              </div>
-            </DetailCard>
-          </div>
-
-          {/* ─── 2-COLUMN ROW: QUALITY ASSURANCE & DELIVERY/BILLING ─── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.1rem' }}>
-            {/* 🛡️ Quality Assurance (QA) & Wastage */}
-            <DetailCard
-              title="Quality Assurance & Wastage"
-              icon={ShieldCheck}
-              badge={<StatusPill status={card.qaStatus || 'QA Pending'} />}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
-                <DetailCell label="QA Inspector" value={card.qaInspector} />
-                <DetailCell label="QA Date" value={card.qaDate} />
-                <DetailCell label="Fresh Mtr (Passed)" value={card.freshMtr ? `${card.freshMtr} m` : '—'} highlight color="#10b981" />
-                <DetailCell label="Total Wastage" value={card.totalWastageMtr ? `${card.totalWastageMtr} m` : '0 m'} color="#ef4444" />
-                <DetailCell label="Fabric Fault" value={card.fabricFaultMtr ? `${card.fabricFaultMtr} m` : '0 m'} />
-                <DetailCell label="Print Fault" value={card.printFaultMtr ? `${card.printFaultMtr} m` : '0 m'} />
-                <DetailCell label="Fusing Fault" value={card.fusingFaultMtr ? `${card.fusingFaultMtr} m` : '0 m'} />
-                <DetailCell label="Genuine Fault" value={card.genuineFaultMtr ? `${card.genuineFaultMtr} m` : '0 m'} />
-                <DetailCell label="Total Fabric Used" value={card.totalFabricUsedMtr ? `${card.totalFabricUsedMtr} m` : '—'} />
-                {card.qaNotes && (
-                  <DetailCell label="QA Notes / Remarks" value={card.qaNotes} fullWidth />
-                )}
-              </div>
-            </DetailCard>
-
-            {/* 🚚 Delivery & Billing */}
-            <DetailCard
-              title="Delivery, Dispatch & Billing"
-              icon={Truck}
-              badge={<StatusPill status={card.deliveryStatus || 'Delivery Pending'} />}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
-                <DetailCell label="Delivery Status" value={card.deliveryStatus || 'Delivery Pending'} />
-                <DetailCell label="Delivery Date" value={card.deliveryDate} />
-                <DetailCell label="Delivered Mtr" value={card.deliveredMtr || card.deliveryMtr ? `${card.deliveredMtr || card.deliveryMtr} m` : '0 m'} highlight color="#065f46" />
-                <DetailCell label="Remaining Mtr" value={card.totalMtr ? `${Math.max(0, parseFloat(card.totalMtr || 0) - parseFloat(card.deliveredMtr || 0)).toFixed(2)} m` : '—'} />
-              </div>
-
-              {/* Linked Invoices */}
-              {card.invoices && card.invoices.length > 0 && (
-                <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.6rem' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-                    Linked Invoices ({card.invoices.length})
+                {/* Quick Hero Highlights */}
+                <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.6rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
+                      PARTY NAME
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>
+                      {card.party || '—'}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    {card.invoices.map((inv, idx) => (
-                      <div key={idx} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        background: 'rgba(255,255,255,0.02)', padding: '0.35rem 0.6rem',
-                        borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)',
-                        fontSize: '0.78rem'
-                      }}>
-                        <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{inv.invoiceNo || `Invoice #${idx+1}`}</span>
-                        <span>{inv.meters || 0} m</span>
-                        <span style={{ fontWeight: 700 }}>₹{inv.amount || 0}</span>
+
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
+                      DESIGN NAME / NUMBER
+                    </div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary)', marginTop: 2 }}>
+                      {primaryDesignName || '—'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '0.5rem', marginTop: 4 }}>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>TOTAL METERS</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#10b981' }}>{card.totalMtr || '0'} m</div>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>FABRIC</div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.fabric || '—'}</div>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>COLORS</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {colorHex && (
+                          <span style={{ width: 12, height: 12, borderRadius: '50%', background: colorHex, border: '1px solid rgba(255,255,255,0.3)', display: 'inline-block' }} />
+                        )}
+                        <span>{card.colors || '—'}</span>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🚨 Emergency Notes Alert Banner (if present) 🚨 */}
+              {card.emergencyNotes && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.12)', border: '1.5px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem'
+                }}>
+                  <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      URGENT / EMERGENCY INSTRUCTION
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fca5a5', marginTop: 2 }}>
+                      {card.emergencyNotes}
+                    </div>
                   </div>
                 </div>
               )}
-            </DetailCard>
-          </div>
 
-          {/* ─── SECTION: 📝 NOTES & INSTRUCTIONS ─── */}
-          {(card.note1 || card.note2) && (
-            <DetailCard title="Special Notes & Remarks" icon={FileText}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.6rem' }}>
-                {card.note1 && <DetailCell label="Note 1" value={card.note1} />}
-                {card.note2 && <DetailCell label="Note 2" value={card.note2} />}
+              {/* ─── SECTION: 🎯 PRODUCTION STAGE & PROOFING ─── */}
+              {(card.productionStage || card.proofing?.approvalStatus || card.proofing?.artworkUrl) && (
+                <DetailCard title="Production Stage & Proofing" icon={Activity}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+                    <DetailCell label="Production Stage" value={card.productionStage || 'Order Received'} highlight />
+                    <DetailCell label="Proofing Approval" value={card.proofing?.approvalStatus || 'Pending'} />
+                    {card.proofing?.approvedAt && (
+                      <DetailCell label="Proofing Approved On" value={new Date(card.proofing.approvedAt).toLocaleDateString()} />
+                    )}
+                    {card.proofing?.artworkFileName && (
+                      <DetailCell label="Proofing Artwork File" value={card.proofing.artworkFileName} />
+                    )}
+                    {card.proofing?.clientFeedback && (
+                      <DetailCell label="Client Feedback" value={card.proofing.clientFeedback} fullWidth />
+                    )}
+                  </div>
+                </DetailCard>
+              )}
+
+              {/* ─── SECTION: 📐 PRINT SPECIFICATIONS & COSTING (MODULE 1) ─── */}
+              {card.printSpecifications && (card.printSpecifications.width > 0 || card.printSpecifications.totalSqFt > 0) && (
+                <DetailCard title="Print Dimensions & Costing Specs" icon={SlidersHorizontal}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                    <DetailCell
+                      label="Dimensions"
+                      value={`${card.printSpecifications.width || 0} × ${card.printSpecifications.height || 0} ${card.printSpecifications.dimensionsUnit || 'inch'}`}
+                      highlight
+                    />
+                    <DetailCell label="Total Sq. Ft." value={card.printSpecifications.totalSqFt ? `${card.printSpecifications.totalSqFt} sq ft` : '—'} />
+                    <DetailCell label="Total Sq. Mtr." value={card.printSpecifications.totalSqMtr ? `${card.printSpecifications.totalSqMtr} sq m` : '—'} />
+                    <DetailCell label="Material Type" value={card.printSpecifications.materialType || 'Sublimation'} />
+                    <DetailCell label="Resolution Pass" value={card.printSpecifications.resolutionPass || '4 Pass'} />
+                    <DetailCell label="Wastage Factor" value={`${card.printSpecifications.wastageFactorPct || 5}%`} />
+                    {card.printSpecifications.totalCalculatedCost > 0 && (
+                      <DetailCell label="Calculated Cost" value={`₹${card.printSpecifications.totalCalculatedCost}`} highlight color="#10b981" />
+                    )}
+                  </div>
+                </DetailCard>
+              )}
+
+              {/* ─── SECTION: 📋 GENERAL & PARTY DETAILS ─── */}
+              <DetailCard title="General & Party Information" icon={Building2}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+                  <DetailCell label="Party Name" value={card.party} highlight />
+                  <DetailCell label="Bill To" value={card.billTo} />
+                  <DetailCell label="Ship To" value={card.shipTo} />
+                  <DetailCell label="Bill / Challan No" value={card.billNo || card.partyChallan || card.ourChallanNo} />
+                  <DetailCell label="Designer" value={card.designer} />
+                  <DetailCell label="Colour Matching (C.M.)" value={card.colourMatching} />
+                  <DetailCell
+                    label="Color"
+                    value={card.colors}
+                    extra={colorHex ? <span style={{ width: 12, height: 12, borderRadius: '50%', background: colorHex, border: '1px solid rgba(255,255,255,0.3)' }} /> : null}
+                  />
+                  <DetailCell label="Category" value={card.category} />
+                  <DetailCell label="Department" value={card.department || 'digital_print'} />
+                  <DetailCell label="Order / Job Date" value={card.date} />
+                  <DetailCell label="Job No" value={card.jobNo} highlight />
+                </div>
+              </DetailCard>
+
+              {/* ─── SECTION: ✂️ FABRIC & CUTTING / GARMENT SPECS ─── */}
+              <DetailCard title="Fabric, Cutting & Garment Breakdown" icon={Scissors}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
+                  <DetailCell label="Fabric" value={card.fabric} highlight />
+                  <DetailCell label="Panna (Width)" value={card.panna} />
+                  <DetailCell label="Total Meters" value={card.totalMtr ? `${card.totalMtr} m` : '—'} highlight color="#10b981" />
+                  <DetailCell label="Pieces (Pcs)" value={card.pcs} />
+                  <DetailCell label="Cut" value={card.cut} />
+                  <DetailCell label="Allover" value={card.allover} />
+                  <DetailCell label="Consumption (Con.)" value={card.consumption} />
+                  <DetailCell label="Top" value={card.top} />
+                  <DetailCell label="Sleeve" value={card.sleeve} />
+                  <DetailCell label="Bottom" value={card.bottom} />
+                  <DetailCell label="Dupatta" value={card.dupatta} />
+                  <DetailCell label="Set Copy" value={card.setCopy} />
+                  <DetailCell label="PN / KM" value={card.pnKm} />
+                </div>
+
+                {/* Garment Size Ratios (if present) */}
+                {card.size_ratios && (
+                  <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.6rem' }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                      Garment Size Ratio Breakdown (Total: {card.total_pieces || card.pcs || 0} Pcs)
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(65px, 1fr))', gap: '0.4rem' }}>
+                      {Object.entries(card.size_ratios).map(([sizeKey, count]) => (
+                        <div key={sizeKey} style={{
+                          background: 'rgba(255,255,255,0.02)', padding: '0.3rem 0.5rem',
+                          borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                            {sizeKey.replace('_', ' ').toUpperCase()}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            {count || 0}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </DetailCard>
+
+              {/* ─── 2-COLUMN ROW: PRINTING DEPT & FUSING DEPT ─── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.1rem' }}>
+                {/* 🖨️ Printing Department */}
+                <DetailCard
+                  title="Printing Department"
+                  icon={Printer}
+                  badge={<StatusPill status={card.printStatus || 'Printing Pending'} />}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                    <DetailCell label="Print Machine" value={card.machineName} highlight />
+                    <DetailCell label="Operator" value={card.operatorName} />
+                    <DetailCell label="Pass" value={card.pass} />
+                    <DetailCell label="Speed" value={card.speed} />
+                    <DetailCell label="EXP. Time" value={card.expTime} highlight />
+                    <DetailCell label="Profile" value={card.profile} />
+                    <DetailCell label="Paper Type" value={card.paperType} />
+                    <DetailCell label="Print Date" value={card.printDate} />
+                    <DetailCell label="Roll No" value={card.rollNo} />
+                    <DetailCell label="Print Meter" value={card.printMtr ? `${card.printMtr} m` : '—'} highlight color="#3b82f6" />
+                  </div>
+                </DetailCard>
+
+                {/* 🔥 Fusing & Heat Press */}
+                <DetailCard
+                  title="Fusing & Heat Press"
+                  icon={Flame}
+                  badge={<StatusPill status={card.fusingStatus || 'Fusing Pending'} />}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                    <DetailCell label="Fusing Machine" value={card.fusingMachine} />
+                    <DetailCell label="Fusing Operator" value={card.fusingOperator} />
+                    <DetailCell label="Temperature" value={card.temperature || card.fusingTemp} highlight />
+                    <DetailCell label="Fusing Speed" value={card.fusingSpeed || card.speed} />
+                    <DetailCell label="Butter Paper Wt" value={card.butterPaperWeightKg ? `${card.butterPaperWeightKg} Kg` : '—'} />
+                    <DetailCell label="Shift" value={card.shift} />
+                    <DetailCell label="Fusing Date" value={card.fusingDate} />
+                    <DetailCell label="Fusing Meter" value={card.fusingMtr ? `${card.fusingMtr} m` : '—'} highlight color="#f59e0b" />
+                  </div>
+                </DetailCard>
               </div>
-            </DetailCard>
+
+              {/* ─── 2-COLUMN ROW: QUALITY ASSURANCE & DELIVERY/BILLING ─── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.1rem' }}>
+                {/* 🛡️ Quality Assurance (QA) & Wastage */}
+                <DetailCard
+                  title="Quality Assurance & Wastage"
+                  icon={ShieldCheck}
+                  badge={<StatusPill status={card.qaStatus || 'QA Pending'} />}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
+                    <DetailCell label="QA Inspector" value={card.qaInspector} />
+                    <DetailCell label="QA Date" value={card.qaDate} />
+                    <DetailCell label="Fresh Mtr (Passed)" value={card.freshMtr ? `${card.freshMtr} m` : '—'} highlight color="#10b981" />
+                    <DetailCell label="Total Wastage" value={card.totalWastageMtr ? `${card.totalWastageMtr} m` : '0 m'} color="#ef4444" />
+                    <DetailCell label="Fabric Fault" value={card.fabricFaultMtr ? `${card.fabricFaultMtr} m` : '0 m'} />
+                    <DetailCell label="Print Fault" value={card.printFaultMtr ? `${card.printFaultMtr} m` : '0 m'} />
+                    <DetailCell label="Fusing Fault" value={card.fusingFaultMtr ? `${card.fusingFaultMtr} m` : '0 m'} />
+                    <DetailCell label="Genuine Fault" value={card.genuineFaultMtr ? `${card.genuineFaultMtr} m` : '0 m'} />
+                    <DetailCell label="Total Fabric Used" value={card.totalFabricUsedMtr ? `${card.totalFabricUsedMtr} m` : '—'} />
+                    {card.qaNotes && (
+                      <DetailCell label="QA Notes / Remarks" value={card.qaNotes} fullWidth />
+                    )}
+                  </div>
+                </DetailCard>
+
+                {/* 🚚 Delivery & Billing */}
+                <DetailCard
+                  title="Delivery, Dispatch & Billing"
+                  icon={Truck}
+                  badge={<StatusPill status={card.deliveryStatus || 'Delivery Pending'} />}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                    <DetailCell label="Delivery Status" value={card.deliveryStatus || 'Delivery Pending'} />
+                    <DetailCell label="Delivery Date" value={card.deliveryDate || card.dispatchDate} />
+                    <DetailCell label="Delivered Mtr" value={card.deliveredMtr || card.deliveryMtr ? `${card.deliveredMtr || card.deliveryMtr} m` : '0 m'} highlight color="#065f46" />
+                    <DetailCell label="Remaining Mtr" value={card.totalMtr ? `${Math.max(0, parseFloat(card.totalMtr || 0) - parseFloat(card.deliveredMtr || 0)).toFixed(2)} m` : '—'} />
+                  </div>
+
+                  {/* Linked Invoices */}
+                  {card.invoices && card.invoices.length > 0 && (
+                    <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.6rem' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                        Linked Invoices ({card.invoices.length})
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        {card.invoices.map((inv, idx) => (
+                          <div key={idx} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            background: 'rgba(255,255,255,0.02)', padding: '0.35rem 0.6rem',
+                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)',
+                            fontSize: '0.78rem'
+                          }}>
+                            <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{inv.invoiceNo || `Invoice #${idx+1}`}</span>
+                            <span>{inv.meters || 0} m</span>
+                            <span style={{ fontWeight: 700 }}>₹{inv.amount || 0}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </DetailCard>
+              </div>
+
+              {/* ─── SECTION: 📝 NOTES & INSTRUCTIONS ─── */}
+              {(card.note1 || card.note2 || card.emergencyNotes) && (
+                <DetailCard title="Special Notes & Remarks" icon={FileText}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.6rem' }}>
+                    {card.note1 && <DetailCell label="Note 1" value={card.note1} />}
+                    {card.emergencyNotes && <DetailCell label="Emergency Note" value={card.emergencyNotes} highlight color="#ef4444" />}
+                    {card.note2 && <DetailCell label="Note 2" value={card.note2} />}
+                  </div>
+                </DetailCard>
+              )}
+
+              {/* ─── SECTION: 👤 AUDIT TRAIL & SYSTEM METADATA ─── */}
+              <DetailCard title="Audit History & System Metadata" icon={Clock}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                  <DetailCell label="Created By" value={card.createdByName || card.createdBy || 'Admin'} />
+                  <DetailCell label="Created Date / Time" value={card.created_date_time ? new Date(card.created_date_time).toLocaleString() : '—'} />
+                  <DetailCell label="Last Updated By" value={card.updatedByName || card.updatedBy || 'System'} />
+                  <DetailCell label="Modified Date / Time" value={card.modified_date_time ? new Date(card.modified_date_time).toLocaleString() : '—'} />
+                  <DetailCell label="Version" value={`v${card.version || 1}`} />
+                  {card.orderChatRoomId && (
+                    <DetailCell label="Connected Chat Channel" value="Active Channel Linked" color="#60a5fa" />
+                  )}
+                </div>
+
+                {/* Audit Trail Log History */}
+                {card.auditTrail && card.auditTrail.length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.6rem' }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                      Change Log / History ({card.auditTrail.length} Events)
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: '140px', overflowY: 'auto' }}>
+                      {card.auditTrail.map((ev, i) => (
+                        <div key={i} style={{
+                          fontSize: '0.74rem', background: 'rgba(255,255,255,0.015)',
+                          padding: '0.35rem 0.55rem', borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-light)', display: 'flex',
+                          justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap'
+                        }}>
+                          <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                            {ev.action || 'UPDATE'} • {ev.performedByName || ev.performedBy || 'Staff'}
+                          </span>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            {ev.timestamp ? new Date(ev.timestamp).toLocaleString() : ''}
+                          </span>
+                          {ev.details && (
+                            <div style={{ width: '100%', color: 'var(--text-secondary)', marginTop: '2px', fontSize: '0.7rem' }}>
+                              {ev.details}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </DetailCard>
+            </>
           )}
-
-          {/* ─── SECTION: 👤 AUDIT & SYSTEM METADATA ─── */}
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
-            gap: '0.8rem', padding: '0.6rem 0.85rem', background: 'rgba(255,255,255,0.015)',
-            border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
-            fontSize: '0.72rem', color: 'var(--text-muted)'
-          }}>
-            <div>
-              Created By: <strong style={{ color: 'var(--text-primary)' }}>{card.createdByName || card.createdBy || 'Admin'}</strong>
-              {card.created_date_time && ` on ${new Date(card.created_date_time).toLocaleDateString()}`}
-            </div>
-            {(card.updatedByName || card.updatedBy || card.modified_date_time) && (
-              <div>
-                Last Updated: <strong style={{ color: 'var(--text-primary)' }}>{card.updatedByName || card.updatedBy || 'System'}</strong>
-                {card.modified_date_time && ` (${new Date(card.modified_date_time).toLocaleDateString()})`}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* ─── MODAL FOOTER ACTIONS ─── */}
         <div style={{
-          display: 'flex', gap: '0.75rem', padding: '0.9rem 1.4rem',
+          display: 'flex', gap: '0.75rem', padding: '0.85rem 1.4rem',
           borderTop: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)',
-          justifyContent: 'flex-end', flexWrap: 'wrap'
+          justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center'
         }}>
           <button
             className="btn-primary"

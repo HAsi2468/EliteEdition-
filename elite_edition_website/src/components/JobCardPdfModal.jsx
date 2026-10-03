@@ -480,17 +480,124 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                     <td style={tdLabel}>PAPER TYPE :</td>
                     <td style={tdVal}>{card?.paperType || ''}</td>
                   </tr>
+                </tbody>
+              </table>
+
+              {/* Printing & Operator Table */}
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '7.5pt',
+                  marginTop: '2px',
+                  border: '1.2px solid #000',
+                }}
+              >
+                <tbody>
                   <tr>
-                    <td style={tdLabel}>PRINT DATE :</td>
-                    <td style={tdVal}>{card?.printDate || ''}</td>
-                    <td style={tdLabel}>PRINT METER :</td>
-                    <td style={{ ...tdVal, fontWeight: 700 }}>{card?.printMtr || ''}</td>
+                    <td style={{ ...tdLabel, width: '18%' }}>OPERATOR :</td>
+                    <td style={{ ...tdVal, width: '32%' }}>{card?.operatorName || ''}</td>
+                    <td style={{ ...tdLabel, width: '18%' }}>PRINT DATE :</td>
+                    <td style={{ ...tdVal, width: '32%' }}>{card?.printDate || ''}</td>
                   </tr>
                   <tr>
-                    <td style={tdLabel}>FUSING TEMP :</td>
-                    <td style={tdVal}>{card?.temperature || card?.fusingTemp || ''}</td>
-                    <td style={tdLabel}>SPEED :</td>
-                    <td style={tdVal}>{card?.speed || ''}</td>
+                    <td style={tdLabel}>ROLL NO. :</td>
+                    <td style={tdVal}>{card?.rollNo || ''}</td>
+                    <td style={tdLabel}>PRINT METER :</td>
+                    <td style={{ ...tdVal, fontWeight: 800, color: '#2563eb' }}>{card?.printMtr ? `${card.printMtr} Mtr` : ''}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Fusing & Heat Press Table */}
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '7.5pt',
+                  marginTop: '2px',
+                  border: '1.2px solid #000',
+                }}
+              >
+                <tbody>
+                  <tr>
+                    <td style={{ ...tdLabel, width: '18%', textAlign: 'center', fontWeight: 900 }}>FUSING</td>
+                    <td style={{ ...tdLabel, width: '14%' }}>TEMP. :</td>
+                    <td style={{ ...tdVal, width: '18%', textAlign: 'center', fontWeight: 800 }}>{card?.temperature || card?.fusingTemp || ''}</td>
+                    <td style={{ ...tdLabel, width: '14%' }}>SPEED :</td>
+                    <td style={{ ...tdVal, width: '36%', textAlign: 'center', fontWeight: 800 }}>{card?.speed || card?.fusingSpeed || ''}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ ...tdLabel, textAlign: 'center', fontWeight: 800 }}>NAME:</td>
+                    <td style={tdVal} colSpan={2}>{card?.fusingOperator || ''}</td>
+                    <td style={tdLabel}>DATE :</td>
+                    <td style={tdVal}>{card?.fusingDate || ''}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* T.P. METER & T.P. WASTAGE METER TABLE */}
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '7pt',
+                  marginTop: '2px',
+                  border: '1.2px solid #000',
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th colSpan={10} style={{ border: '1px solid #000', textAlign: 'center', fontWeight: 900, background: '#f1f5f9', padding: '2px' }}>
+                      T.P. METER
+                    </th>
+                    <th colSpan={2} style={{ border: '1px solid #000', fontSize: '6.5pt', fontWeight: 900, lineHeight: 1.1, padding: '2px', background: '#fef2f2', textAlign: 'center' }}>
+                      T.P. WASTAGE METER
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={tdTpLabel}>1)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>6)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>11)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>16)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>20)</td><td style={tdTpVal}></td>
+                    <td style={{ ...tdTpLabel, background: '#fff1f2' }}>1)</td><td style={{ ...tdTpVal, background: '#fff1f2' }}></td>
+                  </tr>
+                  <tr>
+                    <td style={tdTpLabel}>2)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>7)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>12)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>17)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>21)</td><td style={tdTpVal}></td>
+                    <td style={{ ...tdTpLabel, background: '#fff1f2' }}>2)</td><td style={{ ...tdTpVal, background: '#fff1f2' }}></td>
+                  </tr>
+                  <tr>
+                    <td style={tdTpLabel}>3)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>8)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>13)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>18)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>22)</td><td style={tdTpVal}></td>
+                    <td style={{ ...tdTpLabel, background: '#fff1f2' }}>3)</td><td style={{ ...tdTpVal, background: '#fff1f2' }}></td>
+                  </tr>
+                  <tr>
+                    <td style={tdTpLabel}>4)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>9)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>14)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>19)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>23)</td><td style={tdTpVal}></td>
+                    <td style={{ ...tdTpLabel, background: '#f8fafc' }}></td><td style={tdTpVal}></td>
+                  </tr>
+                  <tr>
+                    <td style={tdTpLabel}>5)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>10)</td><td style={tdTpVal}></td>
+                    <td style={tdTpLabel}>15)</td><td style={tdTpVal}></td>
+                    <td colSpan={3} style={{ border: '1px solid #000', fontWeight: 900, fontSize: '7.2pt', textAlign: 'right', paddingRight: '6px', background: '#f8fafc' }}>
+                      TOTAL :-
+                    </td>
+                    <td style={{ ...tdTpVal, fontWeight: 900 }}>{card?.printMtr || ''}</td>
+                    <td style={{ ...tdTpLabel, background: '#f8fafc' }}></td><td style={tdTpVal}></td>
                   </tr>
                 </tbody>
               </table>
@@ -588,4 +695,24 @@ const tdVal = {
   border: '1px solid #000',
   padding: '2px 4px',
   fontSize: '7.5pt',
+};
+
+const tdTpLabel = {
+  border: '1px solid #000',
+  padding: '2px 3px',
+  fontWeight: 800,
+  fontSize: '7pt',
+  textAlign: 'center',
+  background: '#f8fafc',
+  width: '26px',
+  color: '#000'
+};
+
+const tdTpVal = {
+  border: '1px solid #000',
+  padding: '2px 3px',
+  fontSize: '7pt',
+  width: '36px',
+  minWidth: '32px',
+  color: '#000'
 };
