@@ -620,9 +620,10 @@ app.use(['/v1', '/api/v1'], redisIdempotencyMiddleware({ required: false }));
 app.use('/v1', routes);
 app.use('/api/v1', routes);
 
-// Public verification route for physical challan and job card QR scanning (without /v1 prefix)
+// Public verification route for physical challan, job card, and tax invoice QR scanning (without /v1 prefix)
 app.use('/verify/challan', require('./routes/v1/challanVerification.route'));
 app.use('/verify/jobcard', require('./routes/v1/jobCardVerification.route'));
+app.use('/verify/invoice', require('./routes/v1/invoiceVerification.route'));
 
 // send back a 404 error for any unknown api request
 app.use(['/v1', '/api/v1'], (req, res, next) => {
@@ -637,7 +638,8 @@ app.get('*', (req, res, next) => {
     req.path.startsWith('/uploads') ||
     req.path.startsWith('/designs') ||
     req.path.startsWith('/verify/challan') ||
-    req.path.startsWith('/verify/jobcard')
+    req.path.startsWith('/verify/jobcard') ||
+    req.path.startsWith('/verify/invoice')
   ) {
 		return next();
 	}

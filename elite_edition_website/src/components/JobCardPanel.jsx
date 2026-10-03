@@ -341,7 +341,7 @@ export async function triggerJobCardPrint(cardOrCards) {
 
   const pagesHtml = preparedCards.map((item, idx) => {
     const { card, design1, design2, showTwoImages, img1, img2, candidates1, candidates2, qrDataUrl, challans } = item;
-    const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr } = buildTpAndWasteGrid(challans, card);
+    const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList } = buildTpAndWasteGrid(challans, card);
 
     const c1Json = JSON.stringify(candidates1).replace(/"/g, '&quot;');
     const c2Json = JSON.stringify(candidates2).replace(/"/g, '&quot;');
@@ -497,9 +497,9 @@ export async function triggerJobCardPrint(cardOrCards) {
         <tr>
           <td class="label" style="width: 15%; text-align: center; font-weight: 800;">FUSING</td>
           <td class="label" style="width: 15%;">TEMP. :</td>
-          <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.temperature || card.fusingTemp || ''}</td>
+          <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.fusingTemp || card.temperature || ''}</td>
           <td class="label" style="width: 15%;">SPEED :</td>
-          <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${card.speed || ''}</td>
+          <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${card.fusingSpeed || card.speed || ''}</td>
         </tr>
         <tr>
           <td class="label" style="text-align: center; font-weight: 800;">NAME:</td>
@@ -562,8 +562,16 @@ export async function triggerJobCardPrint(cardOrCards) {
         </tr>
       </table>
       <div style="padding: 2px 4px; border: 1.2px solid #000; border-top: none; font-size: 6pt; color: #334155; background: #ffffff; display: flex; flex-direction: column; gap: 1px; line-height: 1.25;">
-        ${challanNosStr ? `<div><strong>Challan:</strong> ${challanNosStr}</div>` : ''}
-        <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FU:</strong> Fusing Fault | <strong>JF:</strong> Joint/Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
+        ${challanDetailsList && challanDetailsList.length > 0 ? `<div><strong>Challan:</strong> ${challanDetailsList.map(c => {
+          const cLink = c.rawNo ? `<a href="/verify/challan/${c.rawNo}" target="_blank" style="color: #0b5394; text-decoration: underline; font-weight: bold;">${c.cNo}</a>` : c.cNo;
+          let invPart = 'Inv: --';
+          if (c.invoiceNo) {
+            invPart = `Inv: <a href="/verify/invoice/${encodeURIComponent(c.invoiceNo)}" target="_blank" style="color: #0b5394; text-decoration: underline; font-weight: bold;">${c.invoiceNo}</a>`;
+          }
+          const parts = [c.mtrStr, invPart].filter(Boolean).join(', ');
+          return parts ? `${cLink} (${parts})` : cLink;
+        }).join(', ')}</div>` : (challanNosStr ? `<div><strong>Challan:</strong> ${challanNosStr}</div>` : '')}
+        <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FS:</strong> Fusing Fault | <strong>GF:</strong> Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
       </div>
     </div>
   </div>`;
@@ -996,7 +1004,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
     return () => { isMounted = false; };
   }, [card]);
 
-  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr } = buildTpAndWasteGrid(challans, card);
+  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList } = buildTpAndWasteGrid(challans, card);
 
   useEffect(() => {
     const resolveImages = async () => {
@@ -1516,9 +1524,9 @@ function JobCardPrintView({ card, onClose, onShare }) {
                     <tr>
                       <td style={{ ...tdPrintLabel, width: '18%', textAlign: 'center', fontWeight: 900 }}>FUSING</td>
                       <td style={{ ...tdPrintLabel, width: '14%' }}>TEMP. :</td>
-                      <td style={{ ...tdPrintVal, width: '18%', textAlign: 'center', fontWeight: 800 }}>{card?.temperature || card?.fusingTemp || '—'}</td>
+                      <td style={{ ...tdPrintVal, width: '18%', textAlign: 'center', fontWeight: 800 }}>{card?.fusingTemp || card?.temperature || '—'}</td>
                       <td style={{ ...tdPrintLabel, width: '14%' }}>SPEED :</td>
-                      <td style={{ ...tdPrintVal, width: '36%', textAlign: 'center', fontWeight: 800 }}>{card?.speed || card?.fusingSpeed || '—'}</td>
+                      <td style={{ ...tdPrintVal, width: '36%', textAlign: 'center', fontWeight: 800 }}>{card?.fusingSpeed || card?.speed || '—'}</td>
                     </tr>
                     <tr>
                       <td style={{ ...tdPrintLabel, textAlign: 'center', fontWeight: 800 }}>NAME:</td>
@@ -1601,8 +1609,49 @@ function JobCardPrintView({ card, onClose, onShare }) {
                   </tbody>
                 </table>
                 <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: 1.25 }}>
-                  {challanNosStr && <div><strong>Challan:</strong> {challanNosStr}</div>}
-                  <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FU:</strong> Fusing Fault | <strong>JF:</strong> Joint/Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
+                  {challanDetailsList && challanDetailsList.length > 0 ? (
+                    <div>
+                      <strong>Challan:</strong>{' '}
+                      {challanDetailsList.map((c, i) => (
+                        <span key={i}>
+                          {i > 0 && ', '}
+                          {c.rawNo ? (
+                            <a
+                              href={`/verify/challan/${c.rawNo}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#0b5394', textDecoration: 'underline', fontWeight: 'bold' }}
+                            >
+                              {c.cNo}
+                            </a>
+                          ) : (
+                            c.cNo
+                          )}
+                          {' ('}
+                          {c.mtrStr ? `${c.mtrStr}, ` : ''}
+                          {c.invoiceNo ? (
+                            <>
+                              Inv:{' '}
+                              <a
+                                href={`/verify/invoice/${encodeURIComponent(c.invoiceNo)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#0b5394', textDecoration: 'underline', fontWeight: 'bold' }}
+                              >
+                                {c.invoiceNo}
+                              </a>
+                            </>
+                          ) : (
+                            'Inv: --'
+                          )}
+                          {')'}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    challanNosStr && <div><strong>Challan:</strong> {challanNosStr}</div>
+                  )}
+                  <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FS:</strong> Fusing Fault | <strong>GF:</strong> Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
                 </div>
               </div>
             </div>

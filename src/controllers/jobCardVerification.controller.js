@@ -297,8 +297,8 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
 
   if (ff > 0) wItems.push(`FF:${ff}`);
   if (pf > 0) wItems.push(`PF:${pf}`);
-  if (fs > 0) wItems.push(`FU:${fs}`);
-  if (gf > 0) wItems.push(`JF:${gf}`);
+  if (fs > 0) wItems.push(`FS:${fs}`);
+  if (gf > 0) wItems.push(`GF:${gf}`);
   if (cw > 0) wItems.push(`CW:${Number(cw.toFixed(2))}`);
 
   const totalW = parseFloat(card.totalWastageMtr) || (
@@ -355,18 +355,51 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
 
   const challanDetailsList = chList.map(c => {
     const cNo = c.challanNo ? `EDP-${c.challanNo}` : 'Challan';
+    const cleanNo = c.challanNo ? String(c.challanNo).replace(/^EDP-?/i, '') : '';
+    const challanLink = cleanNo
+      ? `<a href="/verify/challan/${cleanNo}" target="_blank" style="color: #0b5394; text-decoration: underline; font-weight: 700;">${cNo}</a>`
+      : cNo;
     let mtr = parseFloat(c.totalMtr) || 0;
     if (!mtr && Array.isArray(c.tpDetails)) {
       mtr = c.tpDetails.reduce((acc, t) => acc + (parseFloat(t.tpMeter) || 0), 0);
     }
     const mtrStr = mtr > 0 ? `${Number(mtr.toFixed(2))} Mtr` : '';
-    const invStr = c.invoiceNo ? `Inv: ${c.invoiceNo}` : 'Inv: --';
+    let invStr = '';
+    if (c.invoiceNo) {
+      const encInv = encodeURIComponent(c.invoiceNo);
+      invStr = `Inv: <a href="/verify/invoice/${encInv}" target="_blank" style="color: #0b5394; text-decoration: underline; font-weight: 700;">${c.invoiceNo}</a>`;
+    } else {
+      invStr = 'Inv: --';
+    }
     const parts = [mtrStr, invStr].filter(Boolean).join(', ');
-    return parts ? `${cNo} (${parts})` : cNo;
+    return parts ? `${challanLink} (${parts})` : challanLink;
   });
   const challanNosStr = challanDetailsList.join(', ');
 
   return { rows, totalMtr: finalTotalMtr, challanNosStr, challanSummaryStr: challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
+}
+
+function getFabricFusingPreset(fabricName) {
+  const f = String(fabricName || '').toLowerCase();
+  if (f.includes('crepe') || f.includes('french')) {
+    return { temp: '210°C', speed: '80' };
+  }
+  if (f.includes('organza')) {
+    return { temp: '195°C', speed: '80' };
+  }
+  if (f.includes('satin')) {
+    return { temp: '205°C', speed: '80' };
+  }
+  if (f.includes('georgette') || f.includes('chiffon')) {
+    return { temp: '200°C', speed: '80' };
+  }
+  if (f.includes('modal') || f.includes('rayon')) {
+    return { temp: '190°C', speed: '80' };
+  }
+  if (f.includes('velvet') || f.includes('heavy')) {
+    return { temp: '205°C', speed: '80' };
+  }
+  return { temp: '205°C', speed: '80' };
 }
 
 /**
@@ -379,6 +412,10 @@ function renderValidJobCardHtml(card, options = {}) {
   const designNo = card.designNo || card.designName || '—';
   const machine = (card.machineName || 'PRINTDOT').toUpperCase();
   const machineBg = machine === 'GRANDO' ? '#0b5394' : '#cc0000';
+
+  const preset = getFabricFusingPreset(card.fabric);
+  const fusingTemp = card.fusingTemp || card.temperature || preset.temp || '—';
+  const fusingSpeed = card.fusingSpeed || card.speed || preset.speed || '—';
 
   const dateStr = card.date
     ? (card.date.includes('-') ? card.date.split('-').reverse().join('/') : card.date)
@@ -398,22 +435,22 @@ function renderValidJobCardHtml(card, options = {}) {
   let artworkHtml = '';
   if (hasImg1 && hasImg2) {
     artworkHtml = `
-      <div class="artwork-item" onclick="openLightbox(0)" title="Click to view full image">
+      <div class="artwork-item" data-img-idx="0" onclick="openLightbox(0)" title="Click to view full image">
         <img class="artwork-img" id="designImg0" src="${primaryImg1}" data-candidates="${c1Json}" data-idx="0" alt="${designNo} - 1" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
-      <div class="artwork-item" onclick="openLightbox(1)" title="Click to view full image">
+      <div class="artwork-item" data-img-idx="1" onclick="openLightbox(1)" title="Click to view full image">
         <img class="artwork-img" id="designImg1" src="${primaryImg2}" data-candidates="${c2Json}" data-idx="0" alt="${designNo} - 2" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
     `;
   } else if (hasImg1) {
     artworkHtml = `
-      <div class="artwork-item" onclick="openLightbox(0)" title="Click to view full image">
+      <div class="artwork-item" data-img-idx="0" onclick="openLightbox(0)" title="Click to view full image">
         <img class="artwork-img" id="designImg0" src="${primaryImg1}" data-candidates="${c1Json}" data-idx="0" alt="${designNo}" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
     `;
   } else if (hasImg2) {
     artworkHtml = `
-      <div class="artwork-item" onclick="openLightbox(0)" title="Click to view full image">
+      <div class="artwork-item" data-img-idx="0" onclick="openLightbox(0)" title="Click to view full image">
         <img class="artwork-img" id="designImg0" src="${primaryImg2}" data-candidates="${c2Json}" data-idx="0" alt="${designNo}" referrerpolicy="no-referrer" onerror="handleImgError(this)" />
       </div>
     `;
@@ -718,9 +755,9 @@ function renderValidJobCardHtml(card, options = {}) {
       <tr>
         <td class="label" style="width: 15%; text-align: center; font-weight: 800;">FUSING</td>
         <td class="label" style="width: 15%;">TEMP. :</td>
-        <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.temperature || card.fusingTemp || '235'}</td>
+        <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${fusingTemp}</td>
         <td class="label" style="width: 15%;">SPEED :</td>
-        <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${card.speed || '40'}</td>
+        <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${fusingSpeed}</td>
       </tr>
       <tr>
         <td class="label" style="text-align: center; font-weight: 800;">NAME:</td>
@@ -791,7 +828,7 @@ function renderValidJobCardHtml(card, options = {}) {
     <!-- LEGEND / DETAILS FOR SHORT FORMS -->
     <div style="padding: 3px 6px; border: 1.2px solid #000; border-top: none; font-size: 6.5pt; color: #334155; background: #ffffff; display: flex; flex-direction: column; gap: 2px; line-height: 1.3;">
       ${challanNosStr ? `<div><strong>Challan:</strong> ${challanNosStr}</div>` : ''}
-      <div><strong>*Wastage:</strong> <strong>FF</strong>: Fabric Fault | <strong>PF</strong>: Print Fault | <strong>FU</strong>: Fusing Fault | <strong>JF</strong>: Joint/Genuine Fault | <strong>CW</strong>: Challan Waste | <strong>TOT</strong>: Total Wastage</div>
+      <div><strong>*Wastage:</strong> <strong>FF</strong>: Fabric Fault | <strong>PF</strong>: Print Fault | <strong>FS</strong>: Fusing Fault | <strong>GF</strong>: Genuine Fault | <strong>CW</strong>: Challan Waste | <strong>TOT</strong>: Total Wastage</div>
     </div>
   </div>
 
@@ -893,6 +930,18 @@ function renderValidJobCardHtml(card, options = {}) {
         closeLightbox();
       }
     }
+
+    document.querySelectorAll('.artwork-img').forEach(function(img) {
+      img.addEventListener('error', function() {
+        handleImgError(img);
+      });
+    });
+    document.querySelectorAll('.artwork-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        var idx = parseInt(this.getAttribute('data-img-idx') || '0', 10);
+        openLightbox(idx);
+      });
+    });
 
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') closeLightbox();

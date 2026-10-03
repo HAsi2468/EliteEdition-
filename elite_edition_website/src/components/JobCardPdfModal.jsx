@@ -65,7 +65,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
     return () => { isMounted = false; };
   }, [card]);
 
-  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr } = buildTpAndWasteGrid(challans, card);
+  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList } = buildTpAndWasteGrid(challans, card);
 
   if (!card && !loading) return null;
 
@@ -545,9 +545,9 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                   <tr>
                     <td style={{ ...tdLabel, width: '18%', textAlign: 'center', fontWeight: 900 }}>FUSING</td>
                     <td style={{ ...tdLabel, width: '14%' }}>TEMP. :</td>
-                    <td style={{ ...tdVal, width: '18%', textAlign: 'center', fontWeight: 800 }}>{card?.temperature || card?.fusingTemp || ''}</td>
+                    <td style={{ ...tdVal, width: '18%', textAlign: 'center', fontWeight: 800 }}>{card?.fusingTemp || card?.temperature || ''}</td>
                     <td style={{ ...tdLabel, width: '14%' }}>SPEED :</td>
-                    <td style={{ ...tdVal, width: '36%', textAlign: 'center', fontWeight: 800 }}>{card?.speed || card?.fusingSpeed || ''}</td>
+                    <td style={{ ...tdVal, width: '36%', textAlign: 'center', fontWeight: 800 }}>{card?.fusingSpeed || card?.speed || ''}</td>
                   </tr>
                   <tr>
                     <td style={{ ...tdLabel, textAlign: 'center', fontWeight: 800 }}>NAME:</td>
@@ -630,8 +630,49 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                 </tbody>
               </table>
               <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: 1.25 }}>
-                {challanNosStr && <div><strong>Challan:</strong> {challanNosStr}</div>}
-                <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FU:</strong> Fusing Fault | <strong>JF:</strong> Joint/Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
+                {challanDetailsList && challanDetailsList.length > 0 ? (
+                  <div>
+                    <strong>Challan:</strong>{' '}
+                    {challanDetailsList.map((c, i) => (
+                      <span key={i}>
+                        {i > 0 && ', '}
+                        {c.rawNo ? (
+                          <a
+                            href={`/verify/challan/${c.rawNo}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#0b5394', textDecoration: 'underline', fontWeight: 'bold' }}
+                          >
+                            {c.cNo}
+                          </a>
+                        ) : (
+                          c.cNo
+                        )}
+                        {' ('}
+                        {c.mtrStr ? `${c.mtrStr}, ` : ''}
+                        {c.invoiceNo ? (
+                          <>
+                            Inv:{' '}
+                            <a
+                              href={`/verify/invoice/${encodeURIComponent(c.invoiceNo)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#0b5394', textDecoration: 'underline', fontWeight: 'bold' }}
+                            >
+                              {c.invoiceNo}
+                            </a>
+                          </>
+                        ) : (
+                          'Inv: --'
+                        )}
+                        {')'}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  challanNosStr && <div><strong>Challan:</strong> {challanNosStr}</div>
+                )}
+                <div><strong>*Wastage:</strong> <strong>FF:</strong> Fabric Fault | <strong>PF:</strong> Print Fault | <strong>FS:</strong> Fusing Fault | <strong>GF:</strong> Genuine Fault | <strong>CW:</strong> Challan Waste | <strong>TOT:</strong> Total Wastage</div>
               </div>
             </div>
           )}

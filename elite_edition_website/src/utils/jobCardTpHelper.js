@@ -60,8 +60,8 @@ export function buildTpAndWasteGrid(challans = [], card = {}) {
 
   if (ff > 0) wItems.push(`FF:${ff}`);
   if (pf > 0) wItems.push(`PF:${pf}`);
-  if (fs > 0) wItems.push(`FU:${fs}`);
-  if (gf > 0) wItems.push(`JF:${gf}`);
+  if (fs > 0) wItems.push(`FS:${fs}`);
+  if (gf > 0) wItems.push(`GF:${gf}`);
   if (cw > 0) wItems.push(`CW:${Number(cw.toFixed(2))}`);
 
   const totalW = parseFloat(card.totalWastageMtr) || (
@@ -125,7 +125,8 @@ export function buildTpAndWasteGrid(challans = [], card = {}) {
   }
 
   const challanDetailsList = chList.map(c => {
-    const cNo = c.challanNo ? `EDP-${c.challanNo}` : 'Challan';
+    const rawNo = c.challanNo ? String(c.challanNo).replace(/^EDP-?/i, '') : '';
+    const cNo = rawNo ? `EDP-${rawNo}` : 'Challan';
     let mtr = parseFloat(c.totalMtr) || 0;
     if (!mtr && Array.isArray(c.tpDetails)) {
       mtr = c.tpDetails.reduce((acc, t) => acc + (parseFloat(t.tpMeter) || 0), 0);
@@ -133,14 +134,21 @@ export function buildTpAndWasteGrid(challans = [], card = {}) {
     const mtrStr = mtr > 0 ? `${Number(mtr.toFixed(2))} Mtr` : '';
     const invStr = c.invoiceNo ? `Inv: ${c.invoiceNo}` : 'Inv: --';
     const parts = [mtrStr, invStr].filter(Boolean).join(', ');
-    return parts ? `${cNo} (${parts})` : cNo;
+    return {
+      rawNo,
+      cNo,
+      mtrStr,
+      invoiceNo: c.invoiceNo || '',
+      label: parts ? `${cNo} (${parts})` : cNo
+    };
   });
-  const challanNosStr = challanDetailsList.join(', ');
+  const challanNosStr = challanDetailsList.map(d => d.label).join(', ');
 
   return {
     rows,
     totalMtr: finalTotalMtr,
     challanNosStr,
+    challanDetailsList,
     challanSummaryStr: challanNosStr,
     totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0
   };

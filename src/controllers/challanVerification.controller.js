@@ -43,10 +43,17 @@ const verifyChallan = async (req, res) => {
     const cleanUuid = String(uuid).trim();
     const mongoose = require('mongoose');
 
-    // Lookup by verificationUuid or fallback to ObjectId
+    // Lookup by verificationUuid or fallback to ObjectId or challanNo
     const query = { $or: [{ verificationUuid: cleanUuid }] };
     if (mongoose.Types.ObjectId.isValid(cleanUuid)) {
       query.$or.push({ _id: cleanUuid });
+    }
+    const digitsMatch = cleanUuid.match(/\d+/);
+    if (digitsMatch) {
+      const num = parseInt(digitsMatch[0], 10);
+      query.$or.push({ challanNo: num });
+      query.$or.push({ challanNo: digitsMatch[0] });
+      query.$or.push({ challanNo: cleanUuid });
     }
 
     const challan = await FabricChallan.findOne(query);
@@ -85,6 +92,9 @@ const verifyChallan = async (req, res) => {
       totalTp: challan.totalTp || (challan.tpDetails ? challan.tpDetails.length : 0),
       pcs: challan.pcs || 0,
       status: challan.status || 'PENDING',
+      jobNo: challan.jobNo || '',
+      invoiceNo: challan.invoiceNo || '',
+      tpDetails: Array.isArray(challan.tpDetails) ? challan.tpDetails : [],
       date: challan.date,
       formattedDate,
       verificationHash: challan.verificationHash || '',
@@ -150,6 +160,14 @@ function renderValidChallanHtml(data) {
         <td class="label">Party / Recipient</td>
         <td class="value highlight">${data.partyName}</td>
       </tr>
+      ${data.jobNo ? `<tr>
+        <td class="label">Job Card</td>
+        <td class="value"><a href="/verify/jobcard/${encodeURIComponent(data.jobNo)}" target="_blank" style="color: #38bdf8; text-decoration: underline;">${data.jobNo}</a></td>
+      </tr>` : ''}
+      ${data.invoiceNo ? `<tr>
+        <td class="label">Linked Tax Invoice</td>
+        <td class="value"><a href="/verify/invoice/${encodeURIComponent(data.invoiceNo)}" target="_blank" style="color: #38bdf8; text-decoration: underline; font-weight: 800;">${data.invoiceNo}</a></td>
+      </tr>` : ''}
       <tr>
         <td class="label">Dispatched Quantity</td>
         <td class="value">${data.totalMtr} Meters</td>
@@ -175,6 +193,20 @@ function renderValidChallanHtml(data) {
         <td class="value"><span class="hash-badge">${data.verificationHash || 'VERIFIED-OFFICIAL'}</span></td>
       </tr>
     </table>
+
+    ${data.tpDetails && data.tpDetails.length > 0 ? `
+    <div style="text-align: left; margin-bottom: 20px;">
+      <div style="font-size: 12px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Roll (TP) Details:</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        ${data.tpDetails.map((tp, i) => `
+          <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 11px;">
+            <span style="color: #94a3b8;">#${tp.tpNo || i + 1}:</span> <strong style="color: #f1f5f9;">${tp.tpMeter || 0}m</strong>
+            ${tp.lotNo ? `<span style="color: #64748b; font-size: 10px;"> (Lot: ${tp.lotNo})</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
 
     <div class="footer">
       This document has been verified against the official Elite Edition ERP manufacturing registry.<br>
