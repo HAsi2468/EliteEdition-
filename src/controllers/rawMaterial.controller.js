@@ -234,18 +234,50 @@ const getStockOverview = async (req, res) => {
         normPanna = normalizePannaStr(t.panna) || '58" Panna';
       }
 
-      // Group key: Inks group by materialName + color, Papers group by materialName + normPanna
+      let groupMatName = matName;
+      let groupColor = (t.color || '').trim();
+
+      if (isInk) {
+        const isGrando = matName.toLowerCase().includes('grando');
+        const isPrintdot = matName.toLowerCase().includes('printdot');
+        const brand = isGrando ? 'Grando Ink' : (isPrintdot ? 'Printdot Ink' : matName);
+
+        const cCombined = `${groupColor} ${matName}`.toLowerCase();
+        let colorKey = 'Cyan';
+        let colorCode = 'C';
+        if (cCombined.includes('magenta') || groupColor === 'M') {
+          colorKey = 'Magenta';
+          colorCode = 'M';
+        } else if (cCombined.includes('yellow') || groupColor === 'Y') {
+          colorKey = 'Yellow';
+          colorCode = 'Y';
+        } else if (cCombined.includes('black') || groupColor === 'K') {
+          colorKey = 'Black';
+          colorCode = 'K';
+        } else if (cCombined.includes('clean') || groupColor === 'C.S.' || groupColor === 'CS') {
+          colorKey = 'Cleaning Solution';
+          colorCode = 'C.S.';
+        } else {
+          colorKey = 'Cyan';
+          colorCode = 'C';
+        }
+
+        groupMatName = `${brand} - ${colorKey} (${colorCode})`;
+        groupColor = colorKey;
+      }
+
+      // Group key: Inks group by normalized brand + color, Papers group by materialName + normPanna
       const key = isInk
-        ? `${matName}___${(t.color || '').trim()}`
-        : `${matName}___${normPanna}`;
+        ? `${groupMatName}___${groupColor}`
+        : `${groupMatName}___${normPanna}`;
 
       if (!map[key]) {
         map[key] = {
-          materialName: matName,
+          materialName: groupMatName,
           panna: normPanna,
           paperQuality: t.paperQuality || '',
-          color: t.color || '',
-          canSize: t.canSize || null,
+          color: groupColor,
+          canSize: t.canSize || (isInk ? (groupColor === 'Cleaning Solution' ? 1 : 5) : null),
           metersPerRoll: t.metersPerRoll || (isPaper ? 1000 : null),
           totalInward: 0,
           totalOutward: 0,
