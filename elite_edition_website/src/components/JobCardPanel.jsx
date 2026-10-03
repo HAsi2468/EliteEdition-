@@ -3,9 +3,11 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
-  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt, Loader, User,
-  Building2, Scissors, SlidersHorizontal, ZoomIn, Layers, ShieldCheck, Truck, Flame, Sparkles, ExternalLink
+  AlertCircle, Cpu, X, Save, Eye, Image, Image as ImageIcon, LayoutGrid, List, Send, Download, Receipt, Loader, User,
+  Building2, Scissors, SlidersHorizontal, ZoomIn, Layers, ShieldCheck, Truck, Flame, Sparkles, ExternalLink, Activity
 } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
+import ErrorBoundary from './common/ErrorBoundary';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
@@ -865,6 +867,30 @@ function DetailCell({ label, value, highlight, color, fullWidth, extra }) {
 }
 
 function JobCardPrintView({ card, onClose, onShare }) {
+  if (!card) return null;
+
+  const formatDateSafe = (dateVal) => {
+    if (!dateVal) return '—';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return String(dateVal);
+      return d.toLocaleDateString();
+    } catch {
+      return String(dateVal);
+    }
+  };
+
+  const formatDateTimeSafe = (dateVal) => {
+    if (!dateVal) return '—';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return String(dateVal);
+      return d.toLocaleString();
+    } catch {
+      return String(dateVal);
+    }
+  };
+
   const [resolvedImages, setResolvedImages] = useState({
     imageUrl1: card.imageUrl1 || '',
     imageUrl2: card.imageUrl2 || '',
@@ -1586,7 +1612,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
                     <DetailCell label="Production Stage" value={card.productionStage || 'Order Received'} highlight />
                     <DetailCell label="Proofing Approval" value={card.proofing?.approvalStatus || 'Pending'} />
                     {card.proofing?.approvedAt && (
-                      <DetailCell label="Proofing Approved On" value={new Date(card.proofing.approvedAt).toLocaleDateString()} />
+                      <DetailCell label="Proofing Approved On" value={formatDateSafe(card.proofing.approvedAt)} />
                     )}
                     {card.proofing?.artworkFileName && (
                       <DetailCell label="Proofing Artwork File" value={card.proofing.artworkFileName} />
@@ -1802,9 +1828,9 @@ function JobCardPrintView({ card, onClose, onShare }) {
               <DetailCard title="Audit History & System Metadata" icon={Clock}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem', marginBottom: '0.6rem' }}>
                   <DetailCell label="Created By" value={card.createdByName || card.createdBy || 'Admin'} />
-                  <DetailCell label="Created Date / Time" value={card.created_date_time ? new Date(card.created_date_time).toLocaleString() : '—'} />
+                  <DetailCell label="Created Date / Time" value={formatDateTimeSafe(card.created_date_time)} />
                   <DetailCell label="Last Updated By" value={card.updatedByName || card.updatedBy || 'System'} />
-                  <DetailCell label="Modified Date / Time" value={card.modified_date_time ? new Date(card.modified_date_time).toLocaleString() : '—'} />
+                  <DetailCell label="Modified Date / Time" value={formatDateTimeSafe(card.modified_date_time)} />
                   <DetailCell label="Version" value={`v${card.version || 1}`} />
                   {card.orderChatRoomId && (
                     <DetailCell label="Connected Chat Channel" value="Active Channel Linked" color="#60a5fa" />
@@ -1812,7 +1838,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
                 </div>
 
                 {/* Audit Trail Log History */}
-                {card.auditTrail && card.auditTrail.length > 0 && (
+                {Array.isArray(card.auditTrail) && card.auditTrail.length > 0 && (
                   <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.6rem' }}>
                     <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
                       Change Log / History ({card.auditTrail.length} Events)
@@ -1829,7 +1855,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
                             {ev.action || 'UPDATE'} • {ev.performedByName || ev.performedBy || 'Staff'}
                           </span>
                           <span style={{ color: 'var(--text-muted)' }}>
-                            {ev.timestamp ? new Date(ev.timestamp).toLocaleString() : ''}
+                            {formatDateTimeSafe(ev.timestamp)}
                           </span>
                           {ev.details && (
                             <div style={{ width: '100%', color: 'var(--text-secondary)', marginTop: '2px', fontSize: '0.7rem' }}>
@@ -4658,13 +4684,15 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
         <JobCardForm card={formCard} onSave={onSaved} onClose={()=>setShowForm(false)} department={department}/>
       )}
       {previewCard && (
-        <JobCardPrintView 
-          card={previewCard} 
-          onClose={()=>setPreviewCard(null)}
-          onShare={(c) => {
-            handleOpenShareModal(c);
-          }}
-        />
+        <ErrorBoundary>
+          <JobCardPrintView 
+            card={previewCard} 
+            onClose={()=>setPreviewCard(null)}
+            onShare={(c) => {
+              handleOpenShareModal(c);
+            }}
+          />
+        </ErrorBoundary>
       )}
 
       {/* 🌟 SHARE TO CHAT FLOATING MODAL 🌟 */}
