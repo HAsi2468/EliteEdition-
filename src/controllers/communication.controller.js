@@ -932,6 +932,29 @@ const clearAllData = async (req, res) => {
   }
 };
 
+/**
+ * Admin endpoint to broadcast app version update notification to all connected clients
+ */
+const broadcastVersionUpdate = async (req, res) => {
+  try {
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    const { version, releaseVersion, releaseName } = req.body || {};
+    const payload = {
+      version: version || 1791022781512,
+      releaseVersion: releaseVersion || 'v2.8.0',
+      releaseName: releaseName || 'v2.8.0 — Job Card Print Sheet & Production Suite',
+      timestamp: Date.now()
+    };
+    if (io) {
+      io.emit('app-version-updated', payload);
+    }
+    res.json({ success: true, message: 'Version update signal broadcast to all connected clients.', payload });
+  } catch (error) {
+    console.error('Error broadcasting version update:', error);
+    res.status(500).json({ success: false, message: 'Failed to broadcast version update signal', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -949,6 +972,7 @@ module.exports = {
   deleteGroup,
   forceReloadAllUsers,
   clearAllData,
+  broadcastVersionUpdate,
 };
 
 

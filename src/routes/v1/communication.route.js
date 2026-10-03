@@ -30,5 +30,6 @@ router.post('/direct', communicationController.createOrGetDirectRoom);
 // 5. Destructive Administrative Endpoints (Admin Only)
 router.post('/force-reload-all', requireAdmin, communicationController.forceReloadAllUsers);
 router.post('/clear-all', requireAdmin, communicationController.clearAllData);
+router.post('/broadcast-version-update', requireAdmin, communicationController.broadcastVersionUpdate);
 
 module.exports = router;

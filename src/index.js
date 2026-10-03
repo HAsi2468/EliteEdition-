@@ -105,6 +105,26 @@ server.listen(port, '0.0.0.0', async () => {
   if (typeof process.send === 'function') {
     process.send('ready');
   }
+
+  process.on('message', (packet) => {
+    try {
+      if (packet && (packet.type === 'broadcast-version-update' || packet.action === 'broadcast-version-update')) {
+        const payload = packet.data || {
+          version: 1791022781512,
+          releaseVersion: 'v2.8.0',
+          releaseName: 'v2.8.0 — Job Card Print Sheet & Production Suite',
+          timestamp: Date.now()
+        };
+        const activeIo = app.get('io') || app.get('socketio') || global.io;
+        if (activeIo) {
+          activeIo.emit('app-version-updated', payload);
+          logger.info('[IPC] Broadcasted app-version-updated to socket clients: %s', payload.releaseVersion || payload.version);
+        }
+      }
+    } catch (ipcErr) {
+      logger.warn('[IPC] Error handling message: %s', ipcErr.message);
+    }
+  });
 });
 
 const exitHandler = (code = 1) => {
