@@ -1203,9 +1203,9 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
 
 // ─── Render Job Card PDF A5 Page (Image 2 Exact Spec Layout) ──────────────────
 async function renderJobCardA5Page(doc, jobCard, activeLogo) {
-  const PW = 419.53, PH = 595.28;
-  const ML = 32, MR = 10;
-  const CW = PW - ML - MR; // ~377.53 pt
+  const PW = 595.28, PH = 841.89; // Standard A4 (210mm x 297mm)
+  const ML = 28.35, MR = 28.35;   // Exact 10mm equal left and right margins
+  const CW = PW - ML - MR;        // 538.58 pt width
 
   const formatDateStr = (d) => {
     if (!d) return '';
@@ -1299,19 +1299,10 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
 
   const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);
 
-  // 1. PUNCH HOLE GUIDE (Left Margin)
-  const punchX = 14;
-  const centerY = PH / 2;
-  doc.circle(punchX, 130, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
-  doc.moveTo(8, centerY).lineTo(20, centerY).strokeColor('#9ca3af').lineWidth(1.2).stroke();
-  doc.fillColor('#9ca3af').fontSize(5).font('Helvetica-Bold')
-    .text('PUNCH', 4, centerY + 4, { width: 20, align: 'center' });
-  doc.circle(punchX, 450, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
-
-  let curY = 10;
+  let curY = 28.35; // 10mm equal top margin
 
   // 2. HEADER BOX
-  const headerH = 36;
+  const headerH = 42;
   doc.rect(ML, curY, CW, headerH).strokeColor('#000000').lineWidth(1.5).stroke();
 
   const logoW = 85, logoH = 28;
@@ -1351,14 +1342,17 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   curY += headerH + 1;
 
   // 3. MAIN FIELDS GRID TABLE
-  const colW_Label = 44;
+  const colW_Label = 54;
   const colW_Val = (CW - 3 * colW_Label) / 3;
-  const rowH = 13.5;
+  const rowH = 14.5;
+
+  const pannaStr = jobCard.panna ? (jobCard.rawPanna ? `${jobCard.panna} (Raw: ${jobCard.rawPanna})` : jobCard.panna) : (jobCard.rawPanna || '');
+  const fabricStr = `${jobCard.fabric || ''}${jobCard.fabricSource ? ` [${jobCard.fabricSource}]` : ''}`;
 
   const gridRows = [
     [['JOB NO. :', jobCard.jobNo || ''], ['COLORS :', jobCard.colors || ''], ['DATE :', formatDateStr(jobCard.date)]],
-    [['D. NO. :', jobCard.designNo || jobCard.designName || ''], ['PANNA :', jobCard.panna || ''], ['PASS :', jobCard.pass || '']],
-    [['FABRIC :', jobCard.fabric || ''], ['CON. :', jobCard.consumption || ''], ['ALL OVER :', jobCard.allover || '']],
+    [['D. NO. :', jobCard.designNo || jobCard.designName || ''], ['PANNA :', pannaStr], ['PASS :', jobCard.pass || '']],
+    [['FABRIC :', fabricStr], ['CON. :', jobCard.consumption || ''], ['ALL OVER :', jobCard.allover || '']],
     [['PCS :', jobCard.pcs || ''], ['BOTTOM :', jobCard.bottom || ''], ['PN/KM :', jobCard.pnKm || '']],
     [['TOP :', jobCard.top || ''], ['DUPATTA :', jobCard.dupatta || ''], ['SET-COPY :', jobCard.setCopy || '']],
   ];
@@ -1413,10 +1407,33 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
 
   doc.rect(x7, curY, totalHeaderW, rowH + 2).strokeColor('#000000').lineWidth(0.8).stroke();
   doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold').text(`: ${jobCard.totalMtr || ''}`, x7 + 4, curY + 2.5);
-  curY += rowH + 3;
+  curY += rowH + 2;
+
+  // Row 8: CLIENT PO, LOT NO, TARGET DISPATCH
+  let x8 = ML;
+  doc.rect(x8, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('PO NO. :', x8 + 2, curY + 3.5, { lineBreak: false });
+  x8 += colW_Label;
+  doc.rect(x8, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#0b5394').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.clientPoNo || jobCard.poNo || '—'), x8 + 3, curY + 3.5, { lineBreak: false });
+  x8 += colW_Val;
+
+  doc.rect(x8, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('LOT NO. :', x8 + 2, curY + 3.5, { lineBreak: false });
+  x8 += colW_Label;
+  doc.rect(x8, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.lotNo || '—'), x8 + 3, curY + 3.5, { lineBreak: false });
+  x8 += colW_Val;
+
+  doc.rect(x8, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('TARGET :', x8 + 2, curY + 3.5, { lineBreak: false });
+  x8 += colW_Label;
+  doc.rect(x8, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#166534').fontSize(7.5).font('Helvetica-Bold').text(formatDateStr(jobCard.targetDeliveryDate), x8 + 3, curY + 3.5, { lineBreak: false });
+  curY += rowH + 2;
 
   // 4. DESIGN IMAGE CONTAINER
-  const imgAreaH = 125;
+  const imgAreaH = 155;
   doc.rect(ML, curY, CW, imgAreaH).strokeColor('#000000').lineWidth(1.2).stroke();
 
   try {
@@ -1506,7 +1523,7 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   fx += fLabel2W;
 
   doc.rect(fx, curY, fVal1W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
-  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.temperature || ''), fx, curY + 3, { width: fVal1W, align: 'center' });
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.fusingTemp || jobCard.temperature || ''), fx, curY + 3, { width: fVal1W, align: 'center' });
   fx += fVal1W;
 
   doc.rect(fx, curY, fLabel3W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
@@ -1514,7 +1531,7 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   fx += fLabel3W;
 
   doc.rect(fx, curY, fVal2W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
-  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.speed || ''), fx, curY + 3, { width: fVal2W, align: 'center' });
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.fusingSpeed || jobCard.speed || ''), fx, curY + 3, { width: fVal2W, align: 'center' });
   curY += pRowH;
 
   // Name & Date Row
@@ -1600,12 +1617,22 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
     curY += tpGridRowH;
   });
 
-  let legendY = curY + 1.5;
-  if (challanNosStr) {
-    doc.fillColor('#1e293b').fontSize(5.2).font('Helvetica-Bold').text(`Challan: ${challanNosStr}`, ML, legendY, { width: CW, align: 'center' });
-    legendY += 6.5;
+  let legendY = curY + 2;
+  const freshNum = parseFloat(jobCard.freshMtr) || parseFloat(finalTotalMtr) || parseFloat(jobCard.totalMtr) || 0;
+  const wasteNum = parseFloat(jobCard.totalWastageMtr) || 0;
+  if (freshNum > 0) {
+    const totalUsed = freshNum + wasteNum;
+    const yieldPct = ((freshNum / totalUsed) * 100).toFixed(1);
+    let recTxt = `Fresh Recovery Yield: ${yieldPct}%`;
+    if (jobCard.shrinkagePct) recTxt += ` | Avg Shrinkage: ${jobCard.shrinkagePct}%`;
+    doc.fillColor('#166534').fontSize(6).font('Helvetica-Bold').text(recTxt, ML, legendY, { width: CW, align: 'center' });
+    legendY += 7.5;
   }
-  doc.fillColor('#64748b').fontSize(4.6).font('Helvetica').text('*Wastage: FF: Fabric Fault | PF: Print Fault | FU: Fusing Fault | JF: Joint/Genuine Fault | CW: Challan Waste | TOT: Total Wastage', ML, legendY, { width: CW, align: 'center' });
+  if (challanNosStr) {
+    doc.fillColor('#1e293b').fontSize(5.5).font('Helvetica-Bold').text(`Challan: ${challanNosStr}`, ML, legendY, { width: CW, align: 'center' });
+    legendY += 7;
+  }
+  doc.fillColor('#64748b').fontSize(4.8).font('Helvetica').text('*Wastage: FF: Fabric Fault | PF: Print Fault | FS: Fusing Fault | GF: Genuine Fault | CW: Challan Waste | TOT: Total Wastage', ML, legendY, { width: CW, align: 'center' });
 }
 
 const downloadJobCardPdf = async (req, res) => {
@@ -1647,7 +1674,7 @@ const downloadJobCardPdf = async (req, res) => {
     const logoFallback = path.join(__dirname, 'Logo.png');
     const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
 
-    const doc = new PDFDocument({ margin: 0, size: 'A5', autoFirstPage: true });
+    const doc = new PDFDocument({ margin: 28.35, size: 'A4', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="JobCard_${jobCard.jobNo || 'preview'}.pdf"`);
     doc.pipe(res);
@@ -1700,14 +1727,14 @@ const downloadBulkJobCardsPdf = async (req, res) => {
     const logoFallback = path.join(__dirname, 'Logo.png');
     const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
 
-    const doc = new PDFDocument({ margin: 0, size: 'A5', autoFirstPage: true });
+    const doc = new PDFDocument({ margin: 28.35, size: 'A4', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Combined_Job_Cards_${jobCards.length}_Cards.pdf"`);
     doc.pipe(res);
 
     for (let jIdx = 0; jIdx < jobCards.length; jIdx++) {
       if (jIdx > 0) {
-        doc.addPage({ size: 'A5', margin: 0 });
+        doc.addPage({ size: 'A4', margin: 28.35 });
       }
       await renderJobCardA5Page(doc, jobCards[jIdx], activeLogo);
     }

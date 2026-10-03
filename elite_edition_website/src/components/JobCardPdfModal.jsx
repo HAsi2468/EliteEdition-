@@ -350,13 +350,13 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                     <td style={tdLabel}>D. NO. :</td>
                     <td style={{ ...tdVal, fontWeight: 800 }}>{card?.designNo || card?.designName || ''}</td>
                     <td style={tdLabel}>PANNA :</td>
-                    <td style={tdVal}>{card?.panna || ''}</td>
+                    <td style={tdVal}>{card?.panna ? `${card.panna}${card.rawPanna ? ` (Raw: ${card.rawPanna})` : ''}` : (card?.rawPanna ? `Raw: ${card.rawPanna}` : '')}</td>
                     <td style={tdLabel}>PASS :</td>
                     <td style={tdVal}>{card?.pass || ''}</td>
                   </tr>
                   <tr>
                     <td style={tdLabel}>FABRIC :</td>
-                    <td style={{ ...tdVal, fontWeight: 700 }}>{card?.fabric || ''}</td>
+                    <td style={{ ...tdVal, fontWeight: 700 }}>{card?.fabric || ''}{card?.fabricSource ? ` [${card.fabricSource}]` : ''}</td>
                     <td style={tdLabel}>CON. :</td>
                     <td style={tdVal}>{card?.consumption || ''}</td>
                     <td style={tdLabel}>ALL OVER :</td>
@@ -396,6 +396,16 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                       : {card?.totalMtr || ''}
                     </td>
                   </tr>
+                  {(card?.clientPoNo || card?.poNo || card?.lotNo || card?.targetDeliveryDate) && (
+                    <tr>
+                      <td style={tdLabel}>CLIENT PO :</td>
+                      <td style={{ ...tdVal, fontWeight: 700, color: '#0369a1' }}>{card?.clientPoNo || card?.poNo || '—'}</td>
+                      <td style={tdLabel}>LOT NO. :</td>
+                      <td style={{ ...tdVal, fontWeight: 700, color: '#4338ca' }}>{card?.lotNo || '—'}</td>
+                      <td style={tdLabel}>TARGET :</td>
+                      <td style={{ ...tdVal, fontWeight: 700, color: '#b45309' }}>{card?.targetDeliveryDate ? String(card.targetDeliveryDate).split('T')[0] : '—'}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
 
@@ -630,6 +640,21 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                 </tbody>
               </table>
               <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: 1.25 }}>
+                {(() => {
+                  const freshNum = parseFloat(card?.freshMtr) || parseFloat(finalTpTotal) || parseFloat(card?.totalMtr) || 0;
+                  const wasteNum = parseFloat(card?.totalWastageMtr) || 0;
+                  if (freshNum > 0) {
+                    const totalUsed = freshNum + wasteNum;
+                    const yieldPct = ((freshNum / totalUsed) * 100).toFixed(1);
+                    return (
+                      <div>
+                        📊 <strong>Fresh Recovery:</strong> <span style={{ color: '#166534', fontWeight: 800 }}>{yieldPct}%</span>
+                        {card?.shrinkagePct ? ` | Avg Shrinkage: ${card.shrinkagePct}%` : ''}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {challanDetailsList && challanDetailsList.length > 0 ? (
                   <div>
                     <strong>Challan:</strong>{' '}

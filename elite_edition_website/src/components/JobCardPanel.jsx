@@ -163,6 +163,8 @@ const BLANK = {
   date: new Date().toISOString().split('T')[0],
   pass:'', allover:'', pnKm:'PN', setCopy:'', totalMtr:'', party:'',
   billTo:'', shipTo:'',
+  clientPoNo:'', poNo:'', lotNo:'', targetDeliveryDate:'',
+  rawPanna:'', fabricSource:'', shrinkagePct:'', freshYieldPct:'',
   expTime:'', designer:'', colourMatching:'', paperType:'',
   temperature:'', speed:'', profile:'', machineName:'',
   note1:'', note2:'', emergencyNotes:'', imageUrl1:'', imageUrl2:'',
@@ -343,6 +345,20 @@ export async function triggerJobCardPrint(cardOrCards) {
     const { card, design1, design2, showTwoImages, img1, img2, candidates1, candidates2, qrDataUrl, challans } = item;
     const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList } = buildTpAndWasteGrid(challans, card);
 
+    const freshNum = parseFloat(card.freshMtr) || parseFloat(finalTpTotal) || parseFloat(card.totalMtr) || 0;
+    const wasteNum = parseFloat(card.totalWastageMtr) || 0;
+    let recoveryHtml = '';
+    if (freshNum > 0) {
+      const totalUsed = freshNum + wasteNum;
+      const yieldPct = ((freshNum / totalUsed) * 100).toFixed(1);
+      recoveryHtml = `<div>📊 <strong>Fresh Recovery:</strong> <span style="color: #166534; font-weight: 800;">${yieldPct}%</span>`;
+      if (card.shrinkagePct) recoveryHtml += ` | <strong>Avg Shrinkage:</strong> ${card.shrinkagePct}%`;
+      recoveryHtml += `</div>`;
+    }
+
+    const pannaDisplay = card.panna ? (card.rawPanna ? `${card.panna} (Raw: ${card.rawPanna})` : card.panna) : (card.rawPanna || '');
+    const fabricDisplay = `${card.fabric || ''}${card.fabricSource ? ` [${card.fabricSource}]` : ''}`;
+
     const c1Json = JSON.stringify(candidates1).replace(/"/g, '&quot;');
     const c2Json = JSON.stringify(candidates2).replace(/"/g, '&quot;');
     const alt1 = (design1 || 'Design 1').replace(/"/g, '&quot;');
@@ -388,18 +404,6 @@ export async function triggerJobCardPrint(cardOrCards) {
 
     return `
     <div class="card-page ${!isLast ? 'page-break' : ''}">
-      <div class="punch-guide">
-        <div class="punch-hole top"></div>
-        <div class="punch-center">
-          <svg width="10" height="8" viewBox="0 0 10 8">
-            <line x1="0" y1="4" x2="10" y2="4" stroke="#9ca3af" stroke-width="1.5"/>
-            <polyline points="7,1 10,4 7,7" fill="none" stroke="#9ca3af" stroke-width="1.5"/>
-          </svg>
-          <div class="punch-text">PUNCH</div>
-        </div>
-        <div class="punch-hole bottom"></div>
-      </div>
-      
       <div class="wrap">
       <!-- HEADER -->
       <div class="header">
@@ -426,11 +430,11 @@ export async function triggerJobCardPrint(cardOrCards) {
         </tr>
         <tr>
           <td class="label">D. NO. :</td><td class="val">${cleanDesignNameString(card.designNo || card.designName || '')}</td>
-          <td class="label">PANNA :</td><td class="val">${card.panna || ''}</td>
+          <td class="label">PANNA :</td><td class="val">${pannaDisplay}</td>
           <td class="label">PASS :</td><td class="val">${card.pass || ''}</td>
         </tr>
         <tr>
-          <td class="label">FABRIC :</td><td class="val">${card.fabric || ''}</td>
+          <td class="label">FABRIC :</td><td class="val">${fabricDisplay}</td>
           <td class="label">CON. :</td><td class="val">${card.consumption || ''}</td>
           <td class="label">ALL OVER :</td><td class="val">${card.allover || ''}</td>
         </tr>
@@ -450,8 +454,13 @@ export async function triggerJobCardPrint(cardOrCards) {
           <td colspan="2" style="text-align: center; font-weight: 800; background: #fff;">TOTAL MTR</td>
         </tr>
         <tr>
-          <td class="label">PARTY:</td><td colspan="3" class="val">${card.party || ''}</td>
+          <td class="label">PARTY:</td><td colspan="3" class="val" style="font-weight: 700;">${card.party || ''}</td>
           <td colspan="2" style="font-weight: 900; font-size: 11.5pt; padding-left: 10px;">: ${card.totalMtr || ''}</td>
+        </tr>
+        <tr>
+          <td class="label">CLIENT PO :</td><td class="val" style="font-weight: 700; color: #0b5394;">${card.clientPoNo || card.poNo || '—'}</td>
+          <td class="label">LOT NO. :</td><td class="val" style="font-weight: 700;">${card.lotNo || '—'}</td>
+          <td class="label">TARGET :</td><td class="val" style="font-weight: 700; color: #166534;">${card.targetDeliveryDate || '—'}</td>
         </tr>
       </table>
 
@@ -562,6 +571,7 @@ export async function triggerJobCardPrint(cardOrCards) {
         </tr>
       </table>
       <div style="padding: 2px 4px; border: 1.2px solid #000; border-top: none; font-size: 6pt; color: #334155; background: #ffffff; display: flex; flex-direction: column; gap: 1px; line-height: 1.25;">
+        ${recoveryHtml}
         ${challanDetailsList && challanDetailsList.length > 0 ? `<div><strong>Challan:</strong> ${challanDetailsList.map(c => {
           const cLink = c.rawNo ? `<a href="/verify/challan/${c.rawNo}" target="_blank" style="color: #0b5394; text-decoration: underline; font-weight: bold;">${c.cNo}</a>` : c.cNo;
           let invPart = 'Inv: --';
@@ -581,14 +591,14 @@ export async function triggerJobCardPrint(cardOrCards) {
   win.document.write(`<!DOCTYPE html><html><head>
     <title>${titleText}</title>
     <style>
-      @page { size: A5; margin: 8mm; }
+      @page { size: A4 portrait; margin: 10mm; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .page-break { page-break-after: always; break-after: page; }
       }
       * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-      body { background: #fff; color: #000; font-size: 9pt; line-height: 1.2; position: relative; padding-left: 12mm; }
-      .card-page { width: 100%; position: relative; }
+      body { background: #fff; color: #000; font-size: 9pt; line-height: 1.2; margin: 0; padding: 0; }
+      .card-page { width: 100%; max-width: 190mm; margin: 0 auto; position: relative; }
       .wrap { width: 100%; display: flex; flex-direction: column; gap: 1px; }
       
       /* Header styles */
@@ -678,40 +688,6 @@ export async function triggerJobCardPrint(cardOrCards) {
       .tp-ch-header { font-weight: 800; color: #1e3a8a; }
       .tp-waste-val { font-weight: 800; color: #b91c1c; font-size: 7.2pt; }
 
-      /* Punch Guide */
-      .punch-guide {
-        position: absolute;
-        left: 2mm;
-        top: 90mm;
-        width: 8mm;
-        z-index: 100;
-      }
-      .punch-hole {
-        position: absolute;
-        left: 1mm;
-        width: 6mm;
-        height: 6mm;
-        border: 1px solid #9ca3af;
-        border-radius: 50%;
-        box-sizing: border-box;
-      }
-      .punch-hole.top { top: -43mm; }
-      .punch-hole.bottom { top: 37mm; }
-      .punch-center {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 10mm;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        transform: translateY(-50%);
-      }
-      .punch-text {
-        font-size: 5pt;
-        color: #9ca3af;
-        margin-top: 2px;
-      }
     </style>
     <script>
       function handleCandidateError(img) {
@@ -1326,13 +1302,17 @@ function JobCardPrintView({ card, onClose, onShare }) {
                       <td style={tdPrintLabel}>D. NO. :</td>
                       <td style={{ ...tdPrintVal, fontWeight: 800 }}>{primaryDesignName || card?.designNo || ''}</td>
                       <td style={tdPrintLabel}>PANNA :</td>
-                      <td style={tdPrintVal}>{card?.panna || ''}</td>
+                      <td style={tdPrintVal}>
+                        {card?.panna ? `${card.panna}${card.rawPanna ? ` (Raw: ${card.rawPanna})` : ''}` : (card?.rawPanna ? `Raw: ${card.rawPanna}` : '')}
+                      </td>
                       <td style={tdPrintLabel}>PASS :</td>
                       <td style={tdPrintVal}>{card?.pass || ''}</td>
                     </tr>
                     <tr>
                       <td style={tdPrintLabel}>FABRIC :</td>
-                      <td style={{ ...tdPrintVal, fontWeight: 700 }}>{card?.fabric || ''}</td>
+                      <td style={{ ...tdPrintVal, fontWeight: 700 }}>
+                        {card?.fabric || ''}{card?.fabricSource ? ` [${card.fabricSource}]` : ''}
+                      </td>
                       <td style={tdPrintLabel}>CON. :</td>
                       <td style={tdPrintVal}>{card?.consumption || ''}</td>
                       <td style={tdPrintLabel}>ALL OVER :</td>
@@ -1372,6 +1352,22 @@ function JobCardPrintView({ card, onClose, onShare }) {
                         : {card?.totalMtr || '0'} Mtr
                       </td>
                     </tr>
+                    {(card?.clientPoNo || card?.poNo || card?.lotNo || card?.targetDeliveryDate) && (
+                      <tr>
+                        <td style={tdPrintLabel}>CLIENT PO :</td>
+                        <td style={{ ...tdPrintVal, fontWeight: 700, color: '#0369a1' }}>
+                          {card?.clientPoNo || card?.poNo || '—'}
+                        </td>
+                        <td style={tdPrintLabel}>LOT NO. :</td>
+                        <td style={{ ...tdPrintVal, fontWeight: 700, color: '#4338ca' }}>
+                          {card?.lotNo || '—'}
+                        </td>
+                        <td style={tdPrintLabel}>TARGET :</td>
+                        <td style={{ ...tdPrintVal, fontWeight: 700, color: '#b45309' }}>
+                          {card?.targetDeliveryDate ? String(card.targetDeliveryDate).split('T')[0] : '—'}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
 
@@ -1609,6 +1605,21 @@ function JobCardPrintView({ card, onClose, onShare }) {
                   </tbody>
                 </table>
                 <div style={{ padding: '2px 4px', border: '1.2px solid #000', borderTop: 'none', fontSize: '6pt', color: '#334155', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: 1.25 }}>
+                  {(() => {
+                    const freshNum = parseFloat(card?.freshMtr) || parseFloat(finalTpTotal) || parseFloat(card?.totalMtr) || 0;
+                    const wasteNum = parseFloat(card?.totalWastageMtr) || 0;
+                    if (freshNum > 0) {
+                      const totalUsed = freshNum + wasteNum;
+                      const yieldPct = ((freshNum / totalUsed) * 100).toFixed(1);
+                      return (
+                        <div>
+                          📊 <strong>Fresh Recovery:</strong> <span style={{ color: '#166534', fontWeight: 800 }}>{yieldPct}%</span>
+                          {card?.shrinkagePct ? ` | Avg Shrinkage: ${card.shrinkagePct}%` : ''}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   {challanDetailsList && challanDetailsList.length > 0 ? (
                     <div>
                       <strong>Challan:</strong>{' '}
@@ -3088,18 +3099,24 @@ function JobCardForm({ card, onSave, onClose, department }) {
           </div>
 
           {/* Section: Party Details */}
-          <div style={sectionLabel}>🏢 Party Details</div>
+          <div style={sectionLabel}>🏢 Party & Order Details</div>
           <div style={rowStyle}>
             <Field label="Party Name" name="party" form={form} onChange={onChange} options={['', ...(printConfig.parties || [])]} half/>
             <Field label="Bill To" name="billTo" form={form} onChange={onChange} options={['', ...(printConfig.billToOptions || [])]} half/>
             <Field label="Ship To" name="shipTo" form={form} onChange={onChange} options={['', ...(printConfig.shipToOptions || [])]} half/>
+            <Field label="Client PO / Ref No." name="clientPoNo" form={form} onChange={onChange} placeholder="e.g. PO-8921" half/>
+            <Field label="Lot No." name="lotNo" form={form} onChange={onChange} placeholder="e.g. LOT-45A" half/>
+            <Field label="Target Delivery Date" name="targetDeliveryDate" type="date" form={form} onChange={onChange} half/>
           </div>
 
           {/* Section: Fabric & Garment */}
-          <div style={sectionLabel}>👗 Garment Details</div>
+          <div style={sectionLabel}>👗 Garment & Fabric Details</div>
           <div style={rowStyle}>
             <Field label="Category" name="category" form={form} onChange={onChange} options={['', ...printConfig.categories]} half/>
             <Field label="Fabric" name="fabric" form={form} onChange={onChange} options={['', ...(printConfig.fabrics || [])]} half/>
+            <Field label="Fabric Source / Mill" name="fabricSource" form={form} onChange={onChange} placeholder="e.g. Surat Mill / In-House" half/>
+            <Field label="Raw Panna (Greige)" name="rawPanna" form={form} onChange={onChange} placeholder="e.g. 48 Inch" half/>
+            <Field label="Exp. Shrinkage %" name="shrinkagePct" type="number" form={form} onChange={onChange} placeholder="e.g. 2.5" half/>
             <Field label="PCS" name="pcs" form={form} onChange={onChange} half/>
             <Field label="Top" name="top" form={form} onChange={onChange} half/>
             <Field label="Sleeve" name="sleeve" form={form} onChange={onChange} half/>

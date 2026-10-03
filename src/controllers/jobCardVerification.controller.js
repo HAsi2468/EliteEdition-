@@ -417,6 +417,24 @@ function renderValidJobCardHtml(card, options = {}) {
   const fusingTemp = card.fusingTemp || card.temperature || preset.temp || '—';
   const fusingSpeed = card.fusingSpeed || card.speed || preset.speed || '—';
 
+  const freshNum = parseFloat(card.freshMtr) || parseFloat(finalTpTotal) || parseFloat(card.totalMtr) || 0;
+  const wasteNum = totalW > 0 ? totalW : (parseFloat(card.totalWastageMtr) || 0);
+  let recoveryHtml = '';
+  if (freshNum > 0) {
+    const totalUsed = freshNum + wasteNum;
+    const yieldPct = ((freshNum / totalUsed) * 100).toFixed(1);
+    recoveryHtml = `<div>📊 <strong>Fresh Recovery:</strong> <span style="color: #166534; font-weight: 800;">${yieldPct}%</span>`;
+    if (card.shrinkagePct) {
+      recoveryHtml += ` | <strong>Avg Shrinkage:</strong> ${card.shrinkagePct}%`;
+    }
+    recoveryHtml += `</div>`;
+  }
+
+  const pannaDisplay = card.panna
+    ? (card.rawPanna ? `${card.panna} (Raw: ${card.rawPanna})` : card.panna)
+    : (card.rawPanna || '—');
+  const fabricDisplay = `${card.fabric || '—'}${card.fabricSource ? ` <span style="font-size: 7.5pt; color: #475569; font-weight: 700;">[${card.fabricSource}]</span>` : ''}`;
+
   const dateStr = card.date
     ? (card.date.includes('-') ? card.date.split('-').reverse().join('/') : card.date)
     : '—';
@@ -470,9 +488,14 @@ function renderValidJobCardHtml(card, options = {}) {
   <title>Job Card #${jobNo} — Elite Digital Prints</title>
   <link rel="icon" type="image/png" href="/DigitalLogo.png">
   <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    @media print {
+      body { background-color: #ffffff; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .card-container { max-width: 100%; border: 1.5px solid #000000; box-shadow: none; margin: 0 auto; }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
     body { background-color: #f1f5f9; color: #000000; padding: 10px; display: flex; justify-content: center; }
-    .card-container { max-width: 650px; width: 100%; background: #ffffff; border: 1.5px solid #000000; box-shadow: 0 10px 25px rgba(0,0,0,0.08); overflow: hidden; }
+    .card-container { max-width: 680px; width: 100%; background: #ffffff; border: 1.5px solid #000000; box-shadow: 0 10px 25px rgba(0,0,0,0.08); overflow: hidden; margin: 0 auto; }
     
     /* Header */
     .header-bar { display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1.5px solid #000; background: #ffffff; }
@@ -680,11 +703,11 @@ function renderValidJobCardHtml(card, options = {}) {
       </tr>
       <tr>
         <td class="label">D. NO. :</td><td class="val val-highlight">${designNo}</td>
-        <td class="label">PANNA :</td><td class="val">${card.panna || '—'}</td>
+        <td class="label">PANNA :</td><td class="val">${pannaDisplay}</td>
         <td class="label">PASS :</td><td class="val">${card.pass || '—'}</td>
       </tr>
       <tr>
-        <td class="label">FABRIC :</td><td class="val">${card.fabric || '—'}</td>
+        <td class="label">FABRIC :</td><td class="val">${fabricDisplay}</td>
         <td class="label">CON. :</td><td class="val">${card.consumption || '—'}</td>
         <td class="label">ALL OVER :</td><td class="val">${card.allover || '—'}</td>
       </tr>
@@ -707,6 +730,12 @@ function renderValidJobCardHtml(card, options = {}) {
         <td class="label">PARTY:</td>
         <td colspan="3" class="val val-highlight" style="font-size: 10pt;">${card.party || '—'}</td>
         <td colspan="2" class="total-val">: ${card.totalMtr || '—'}</td>
+      </tr>
+      <!-- CLIENT ORDER & TRACKING ROW -->
+      <tr>
+        <td class="label">CLIENT PO :</td><td class="val" style="font-weight: 700; color: #0b5394;">${card.clientPoNo || card.poNo || '—'}</td>
+        <td class="label">LOT NO. :</td><td class="val" style="font-weight: 700;">${card.lotNo || '—'}</td>
+        <td class="label">TARGET :</td><td class="val" style="font-weight: 700; color: #166534;">${card.targetDeliveryDate || '—'}</td>
       </tr>
     </table>
 
@@ -827,6 +856,7 @@ function renderValidJobCardHtml(card, options = {}) {
 
     <!-- LEGEND / DETAILS FOR SHORT FORMS -->
     <div style="padding: 3px 6px; border: 1.2px solid #000; border-top: none; font-size: 6.5pt; color: #334155; background: #ffffff; display: flex; flex-direction: column; gap: 2px; line-height: 1.3;">
+      ${recoveryHtml}
       ${challanNosStr ? `<div><strong>Challan:</strong> ${challanNosStr}</div>` : ''}
       <div><strong>*Wastage:</strong> <strong>FF</strong>: Fabric Fault | <strong>PF</strong>: Print Fault | <strong>FS</strong>: Fusing Fault | <strong>GF</strong>: Genuine Fault | <strong>CW</strong>: Challan Waste | <strong>TOT</strong>: Total Wastage</div>
     </div>
