@@ -141,6 +141,7 @@ const request = async (path, options = {}) => {
       ...(uId ? { 'X-User-Id': uId } : {}),
       ...(uName ? { 'X-User-Name': uName } : {}),
       ...(uRole ? { 'X-User-Role': uRole } : {}),
+      ...(uRole === 'admin' || currUser?.isAdmin || currUser?.isMainAdmin ? { 'X-Operator-Override': 'true', 'X-Is-Admin': 'true' } : {}),
       ...(activeCompanyId ? { 'X-Company-Id': activeCompanyId } : {}),
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
@@ -280,6 +281,9 @@ export const api = {
     localStorage.removeItem('elite_user');
     localStorage.removeItem('elite_is_client');
     localStorage.removeItem('elite_client_data');
+    try {
+      import('../utils/crossTabSync').then(m => m.broadcastCrossTab('AUTH_LOGOUT'));
+    } catch (_) {}
   },
 
   getCurrentUser() {
@@ -1918,6 +1922,39 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  },
+
+  // Purchases CRUD
+  async getBillingPurchases(companyEntity = '', search = '') {
+    const query = new URLSearchParams();
+    if (companyEntity) query.append('companyEntity', companyEntity);
+    if (search) query.append('search', search);
+    return request(`/billing/purchases?${query.toString()}`);
+  },
+
+  async createBillingPurchase(data) {
+    return request('/billing/purchases', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async bulkSyncBillingPurchases(purchases) {
+    return request('/billing/purchases/bulk-sync', {
+      method: 'POST',
+      body: JSON.stringify({ purchases }),
+    });
+  },
+
+  async updateBillingPurchase(id, data) {
+    return request(`/billing/purchases/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBillingPurchase(id) {
+    return request(`/billing/purchases/${id}`, { method: 'DELETE' });
   },
 
   // Data Backup

@@ -193,9 +193,9 @@
 /* Search Box */
 .task-search-input-wrap {
   position: relative !important;
-  flex: 1 1 200px !important;
+  flex: 1 1 240px !important;
   min-width: 180px !important;
-  max-width: 320px !important;
+  max-width: 480px !important;
 }
 
 .task-search-icon {

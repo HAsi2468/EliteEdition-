@@ -267,6 +267,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     panna: '58',
     sourceLotNo: '',
     destLotNo: '',
+    partyName: '',
     qty: '',
     notes: '',
   });
@@ -282,12 +283,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const openQuickTransfer = (targetLot) => {
     const rawDeficit = Math.abs(targetLot.currentStock || 0);
+    const targetParty = targetLot.outwardTxs?.find(o => o.partyName)?.partyName || targetLot.vendorName || '';
     setTransferForm({
       date: new Date().toISOString().split('T')[0],
       fabricQuality: targetLot.fabricQuality || '',
       panna: targetLot.panna || '58',
       sourceLotNo: '',
       destLotNo: String(targetLot.lotNo),
+      partyName: targetParty,
       qty: rawDeficit > 0 ? String(rawDeficit.toFixed(2)) : '',
       notes: `Deficit Clearance for Lot #${targetLot.lotNo}`
     });
@@ -982,10 +985,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     const effFabric = transferForm.fabricQuality || (srcLot && (normalizeFabricName(srcLot.fabricQuality, srcLot.panna) || srcLot.fabricQuality)) || '';
     const effPanna = transferForm.panna || (srcLot && srcLot.panna) || '58';
     const cleanFabric = normalizeFabricName(effFabric, effPanna);
+    const resolvedParty = (transferForm.partyName || srcLot?.outwardTxs?.find(o => o.partyName)?.partyName || srcLot?.vendorName || '').trim();
     const payload = {
       ...transferForm,
       fabricQuality: cleanFabric || effFabric,
       panna: effPanna,
+      partyName: resolvedParty,
       department: department || 'digital_print'
     };
     try {
@@ -1000,6 +1005,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           panna: '58',
           sourceLotNo: '',
           destLotNo: '',
+          partyName: '',
           qty: '',
           notes: '',
         });
@@ -3211,16 +3217,71 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {lot.inwardTxs.map((inTx, iIdx) => (
-                                      <tr key={inTx._id || iIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                        <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(inTx.date)}</td>
-                                        <td style={{ padding: '0.35rem' }}>{inTx.vendorName || '—'}</td>
-                                        <td style={{ padding: '0.35rem' }}>{inTx.challanNo || '—'}</td>
-                                        <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
-                                          +{Number(inTx.qty || 0).toFixed(2)}
-                                        </td>
-                                      </tr>
-                                    ))}
+                                    {lot.inwardTxs.map((inTx, iIdx) => {
+                                      const isLotTransferIn = Boolean(
+                                        inTx.notes && (
+                                          /Lot Transfer/i.test(inTx.notes) ||
+                                          /Auto Lot.*Rebalance/i.test(inTx.notes) ||
+                                          /\[Ref:\s*LT-/i.test(inTx.notes)
+                                        )
+                                      );
+                                      const srcLotMatch = inTx.notes && (
+                                        inTx.notes.match(/(?:from Lot|Lot #(\d+)\s*->)\s*#?\s*(\d+)/i) ||
+                                        inTx.notes.match(/Lot #(\d+)\s*->/i)
+                                      );
+                                      const srcLotNum = srcLotMatch ? (srcLotMatch[1] || srcLotMatch[2]) : (inTx.partyName?.match(/Lot #(\d+)/i)?.[1] || inTx.vendorName?.match(/Lot #(\d+)/i)?.[1] || null);
+                                      const inRefIdMatch = inTx.notes && inTx.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                                      const inRefId = inRefIdMatch ? inRefIdMatch[1] : null;
+
+                                      let inTransferReason = '';
+                                      if (isLotTransferIn && inTx.notes) {
+                                        const noteParts = inTx.notes.split('|');
+                                        if (noteParts.length > 1) {
+                                          inTransferReason = noteParts.slice(1).join(' • ').replace(/\[Ref:\s*[^\]]+\]/i, '').trim();
+                                        }
+                                      }
+
+                                      const displayInChallan = inTx.challanNo || inRefId || (isLotTransferIn && srcLotNum ? `LT-#${srcLotNum}` : '—');
+                                      const matchedSrcLot = srcLotNum ? lotRecords.find(l => String(l.lotNo) === String(srcLotNum)) : null;
+                                      const srcChallan = matchedSrcLot?.vendorChallanNo || matchedSrcLot?.inwardTxs?.find(i => i.challanNo && !String(i.challanNo).startsWith('LT-'))?.challanNo || '';
+                                      const srcChallanStr = srcChallan ? ` (${srcChallan})` : '';
+
+                                      const displayVendor = isLotTransferIn
+                                        ? (inTx.partyName && inTx.partyName.includes('(')
+                                            ? inTx.partyName
+                                            : (inTx.vendorName && inTx.vendorName.includes('(')
+                                                ? inTx.vendorName
+                                                : (srcLotNum ? `Lot #${srcLotNum}${srcChallanStr}` : 'Lot Transfer')))
+                                        : (inTx.vendorName || inTx.partyName || matchedSrcLot?.vendorName || lot.vendorName || '—');
+
+                                      return (
+                                        <tr key={inTx._id || iIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                          <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(inTx.date)}</td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 700, color: isLotTransferIn ? '#10b981' : 'var(--text-primary)' }}>{displayVendor}</div>
+                                            {isLotTransferIn && (
+                                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontSize: '0.68rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                                <ArrowRightLeft size={10} /> Transfer In
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 600, color: isLotTransferIn ? '#a78bfa' : 'inherit' }}>{displayInChallan}</div>
+                                            {isLotTransferIn && inTransferReason && (
+                                              <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', marginTop: '1px', lineHeight: 1.2 }}>
+                                                {inTransferReason}
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
+                                            +{Number(inTx.qty || 0).toFixed(2)}
+                                            {isLotTransferIn && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 5px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}>Transfer</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
                                   </tbody>
                                 </table>
                               </div>
@@ -3253,17 +3314,81 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   </thead>
                                   <tbody>
                                     {lot.outwardTxs.map((outTx, oIdx) => {
+                                      const isLotTransfer = Boolean(
+                                        outTx.notes && (
+                                          /Lot Transfer/i.test(outTx.notes) ||
+                                          /Auto Lot.*Rebalance/i.test(outTx.notes) ||
+                                          /\[Ref:\s*LT-/i.test(outTx.notes)
+                                        )
+                                      );
+                                      const destLotMatch = outTx.notes && (
+                                        outTx.notes.match(/(?:to Lot|-> Lot|->\s*Lot|Transfer to Lot)\s*#?\s*(\d+)/i) ||
+                                        outTx.notes.match(/Lot #\d+\s*->\s*Lot #?(\d+)/i)
+                                      );
+                                      const destLotNum = destLotMatch ? (destLotMatch[1] || destLotMatch[2]) : (outTx.partyName?.match(/Lot #(\d+)/i)?.[1] || null);
+                                      const refIdMatch = outTx.notes && outTx.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                                      const refId = refIdMatch ? refIdMatch[1] : null;
+
+                                      let transferReason = '';
+                                      if (isLotTransfer && outTx.notes) {
+                                        const noteParts = outTx.notes.split('|');
+                                        if (noteParts.length > 1) {
+                                          transferReason = noteParts.slice(1).join(' • ').replace(/\[Ref:\s*[^\]]+\]/i, '').trim();
+                                        }
+                                      }
+
                                       const displayChallan = outTx.challanNo
                                         || (outTx.notes && outTx.notes.match(/(EDP-\d+|Challan\s*#?\s*\d+)/i)?.[0])
+                                        || refId
                                         || outTx.jobNo
-                                        || '—';
+                                        || (isLotTransfer && destLotNum ? `LT-#${destLotNum}` : '—');
+
+                                      const matchedDestLot = destLotNum ? lotRecords.find(l => String(l.lotNo) === String(destLotNum)) : null;
+                                      const destChallan = matchedDestLot?.vendorChallanNo || matchedDestLot?.inwardTxs?.find(i => i.challanNo && !String(i.challanNo).startsWith('LT-'))?.challanNo || '';
+                                      const destChallanStr = destChallan ? ` (${destChallan})` : '';
+
+                                      const fallbackParty = outTx.partyName
+                                        || matchedDestLot?.outwardTxs?.find(o => o.partyName)?.partyName
+                                        || (matchedDestLot?.vendorName && matchedDestLot.vendorName !== lot.vendorName ? matchedDestLot.vendorName : '')
+                                        || lot.outwardTxs?.find(o => o.partyName && !o.notes?.includes('Lot Transfer'))?.partyName
+                                        || outTx.vendorName
+                                        || lot.vendorName
+                                        || '';
+
+                                      const displayParty = isLotTransfer
+                                        ? (outTx.partyName && outTx.partyName.includes('(')
+                                            ? outTx.partyName
+                                            : (destLotNum ? `Lot #${destLotNum}${destChallanStr}` : (outTx.partyName || 'Lot Transfer')))
+                                        : (outTx.partyName || fallbackParty || '—');
+
                                       return (
                                         <tr key={outTx._id || oIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                           <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(outTx.date)}</td>
-                                          <td style={{ padding: '0.35rem' }}>{outTx.partyName || '—'}</td>
-                                          <td style={{ padding: '0.35rem', fontWeight: 600 }}>{displayChallan}</td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 700, color: isLotTransfer ? '#38bdf8' : 'var(--text-primary)' }}>
+                                              {displayParty}
+                                            </div>
+                                            {isLotTransfer && (
+                                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontSize: '0.68rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                                <ArrowRightLeft size={10} /> Transfer Out
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '0.35rem' }}>
+                                            <div style={{ fontWeight: 600, color: isLotTransfer ? '#a78bfa' : 'inherit' }}>
+                                              {displayChallan}
+                                            </div>
+                                            {isLotTransfer && transferReason && (
+                                              <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', marginTop: '1px', lineHeight: 1.2 }}>
+                                                {transferReason}
+                                              </div>
+                                            )}
+                                          </td>
                                           <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
                                             -{Number(outTx.qty || 0).toFixed(2)}
+                                            {isLotTransfer && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '1px 5px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(167, 139, 250, 0.3)', fontWeight: 600 }}>Transfer</span>
+                                            )}
                                             {(outTx.notes || '').includes('+2% French Crepe Applied') && (
                                               <span style={{ fontSize: '0.65rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(124, 58, 237, 0.3)' }}>+2%</span>
                                             )}
@@ -3402,6 +3527,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Date</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Fabric Quality</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Party / Client</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>From Lot (Source)</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>To Lot (Destination)</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>Transferred Qty</th>
@@ -3416,42 +3542,53 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     if (!transferSearch) return true;
                     const s = transferSearch.toLowerCase();
                     return (t.fabricQuality || '').toLowerCase().includes(s) ||
+                      (t.partyName || '').toLowerCase().includes(s) ||
+                      (t.vendorName || '').toLowerCase().includes(s) ||
                       String(t.sourceLotNo || '').includes(s) ||
                       String(t.destLotNo || '').includes(s) ||
                       (t.notes || '').toLowerCase().includes(s);
-                  }).map((t, idx) => (
-                    <tr key={t.transferRefId || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '0.75rem 1rem' }}>{formatDateDDMMYYYY(t.date)}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{t.fabricQuality}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                          Lot #{t.sourceLotNo || '—'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                          Lot #{t.destLotNo || '—'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#a78bfa' }}>
-                        {Number(t.qty || 0).toFixed(2)} mtr
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{t.notes || '—'}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleDeleteTransfer(t)}
-                          className="btn-icon"
-                          title="Undo / Delete Lot Transfer"
-                          style={{ color: '#ef4444', padding: '0.3rem' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  }).map((t, idx) => {
+                    const matchedDest = lotRecords.find(l => String(l.lotNo) === String(t.destLotNo));
+                    const matchedSrc = lotRecords.find(l => String(l.lotNo) === String(t.sourceLotNo));
+                    const displayTransferParty = t.partyName || matchedDest?.outwardTxs?.find(o => o.partyName)?.partyName || matchedSrc?.outwardTxs?.find(o => o.partyName)?.partyName || t.vendorName || matchedSrc?.vendorName || '—';
+
+                    return (
+                      <tr key={t.transferRefId || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '0.75rem 1rem' }}>{formatDateDDMMYYYY(t.date)}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{t.fabricQuality}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{displayTransferParty}</span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                            Lot #{t.sourceLotNo || '—'}{matchedSrc?.vendorChallanNo ? ` (${matchedSrc.vendorChallanNo})` : ''}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                            Lot #{t.destLotNo || '—'}{matchedDest?.vendorChallanNo ? ` (${matchedDest.vendorChallanNo})` : ''}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#a78bfa' }}>
+                          {Number(t.qty || 0).toFixed(2)} mtr
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{t.notes || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleDeleteTransfer(t)}
+                            className="btn-icon"
+                            title="Undo / Delete Lot Transfer"
+                            style={{ color: '#ef4444', padding: '0.3rem' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {lotTransfers.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                         No lot transfers performed yet. Click "New Lot Transfer" to move stock between lots.
                       </td>
                     </tr>
@@ -3605,16 +3742,43 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </tr>
                 </thead>
                 <tbody>
-                  {inwardTx.map(t => (
+                  {inwardTx.map(t => {
+                    const isTransfer = t.notes && (/Lot Transfer/i.test(t.notes) || /Auto Lot.*Rebalance/i.test(t.notes) || /\[Ref:\s*LT-/i.test(t.notes));
+                    const refIdMatch = t.notes && t.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                    const srcLotMatch = t.notes && (
+                      t.notes.match(/(?:from Lot|Lot #(\d+)\s*->)\s*#?\s*(\d+)/i) ||
+                      t.notes.match(/Lot #(\d+)\s*->/i)
+                    );
+                    const srcLotNum = srcLotMatch ? (srcLotMatch[1] || srcLotMatch[2]) : (t.partyName?.match(/Lot #(\d+)/i)?.[1] || t.vendorName?.match(/Lot #(\d+)/i)?.[1] || null);
+                    const displayChallan = t.challanNo || refIdMatch?.[1] || (isTransfer && srcLotNum ? `LT-#${srcLotNum}` : '-');
+                    const displayVendor = isTransfer
+                      ? (srcLotNum ? `Lot #${srcLotNum}` : (t.vendorName?.startsWith('Lot #') ? t.vendorName : (t.partyName?.startsWith('Lot #') ? t.partyName : 'Lot Transfer')))
+                      : (t.vendorName || t.partyName || '-');
+
+                    return (
                     <tr key={t._id}>
                       <td>{formatDateDDMMYYYY(t.date)}</td>
                       <td><span style={{ fontWeight: 600 }}>#{t.lotNo}</span></td>
-                      <td>{t.challanNo}</td>
-                      <td>{t.vendorName}</td>
+                      <td>
+                        <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
+                      </td>
+                      <td>
+                        <div>{displayVendor}</div>
+                        {isTransfer && (
+                          <span style={{ fontSize: '0.68rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '1px 5px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.25)', display: 'inline-block', marginTop: '2px' }}>
+                            🔄 Transfer {srcLotNum ? `← #${srcLotNum}` : ''}
+                          </span>
+                        )}
+                      </td>
                       <td>{t.fabricQuality}</td>
                       <td>{t.panna || '-'}</td>
                       <td style={{ color: 'var(--success)', fontWeight: 600 }}>
-                        <div>+{Number(t.qty || 0).toFixed(2)}</div>
+                        <div>
+                          +{Number(t.qty || 0).toFixed(2)}
+                          {isTransfer && (
+                            <span style={{ fontSize: '0.68rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 5px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-block' }}>Transfer</span>
+                          )}
+                        </div>
                         {Array.isArray(t.tpDetails) && t.tpDetails.length > 0 && (
                           <div
                             onClick={() => openInwardTpModal(t)}
@@ -3684,7 +3848,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {inwardTx.length === 0 && (
                     <tr><td colSpan="9" style={{ textAlign: 'center' }}>No inward transactions found.</td></tr>
                   )}
@@ -3837,17 +4002,41 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </tr>
                 </thead>
                 <tbody>
-                  {outwardTx.map(t => (
+                  {outwardTx.map(t => {
+                    const isTransfer = t.notes && (/Lot Transfer/i.test(t.notes) || /Auto Lot.*Rebalance/i.test(t.notes) || /\[Ref:\s*LT-/i.test(t.notes));
+                    const refIdMatch = t.notes && t.notes.match(/\[Ref:\s*([^\]]+)\]/i);
+                    const destLotMatch = t.notes && (
+                      t.notes.match(/(?:to Lot|-> Lot|->\s*Lot|Transfer to Lot)\s*#?\s*(\d+)/i) ||
+                      t.notes.match(/Lot #\d+\s*->\s*Lot #?(\d+)/i)
+                    );
+                    const destLotNum = destLotMatch ? (destLotMatch[1] || destLotMatch[2]) : (t.partyName?.match(/Lot #(\d+)/i)?.[1] || null);
+                    const displayChallan = t.challanNo || refIdMatch?.[1] || (isTransfer && destLotNum ? `LT-#${destLotNum}` : '-');
+                    const displayParty = isTransfer
+                      ? (destLotNum ? `Lot #${destLotNum}` : (t.partyName?.startsWith('Lot #') ? t.partyName : 'Lot Transfer'))
+                      : (t.partyName || '-');
+
+                    return (
                     <tr key={t._id}>
                       <td>{formatDateDDMMYYYY(t.date)}</td>
-                      <td>{renderJobNoBadge(t.jobNo)}</td>
-                      <td>{t.challanNo || '-'}</td>
-                      <td>{t.partyName}</td>
+                      <td>
+                        {isTransfer ? (
+                          <span style={{ fontSize: '0.72rem', color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(59, 130, 246, 0.25)', display: 'inline-block' }}>
+                            🔄 Transfer {destLotNum ? `→ #${destLotNum}` : ''}
+                          </span>
+                        ) : renderJobNoBadge(t.jobNo)}
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: isTransfer ? 700 : 'normal', color: isTransfer ? '#a78bfa' : 'inherit' }}>{displayChallan}</span>
+                      </td>
+                      <td>{displayParty}</td>
                       <td>{t.fabricQuality}</td>
                       <td>{t.lotNo ? `#${t.lotNo}` : '-'}</td>
                       <td>{t.panna || '-'}</td>
                       <td style={{ color: 'var(--danger)', fontWeight: 600 }}>
                         -{Number(t.qty || 0).toFixed(2)}
+                        {isTransfer && (
+                          <span style={{ fontSize: '0.68rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(167, 139, 250, 0.3)', display: 'inline-block' }}>Transfer</span>
+                        )}
                         {(t.notes || '').includes('+2% French Crepe Applied') && (
                           <span style={{ fontSize: '0.68rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(124, 58, 237, 0.3)', display: 'inline-block' }}>+2%</span>
                         )}
@@ -3925,7 +4114,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {outwardTx.length === 0 && (
                     <tr><td colSpan="10" style={{ textAlign: 'center' }}>No outward transactions found.</td></tr>
                   )}
@@ -7001,16 +7191,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     onChange={e => {
                       const sLotNo = e.target.value;
                       const matched = lotRecords.find(l => String(l.lotNo) === String(sLotNo));
+                      const candidateParty = matched?.outwardTxs?.find(o => o.partyName)?.partyName || matched?.vendorName || '';
                       if (matched) {
                         const mNorm = normalizeFabricName(matched.fabricQuality, matched.panna);
                         setTransferForm(prev => ({
                           ...prev,
                           sourceLotNo: sLotNo,
+                          partyName: prev.partyName || candidateParty,
                           fabricQuality: prev.fabricQuality || mNorm || matched.fabricQuality || '',
                           panna: matched.panna || prev.panna || '58'
                         }));
                       } else {
-                        setTransferForm(prev => ({ ...prev, sourceLotNo: sLotNo }));
+                        setTransferForm(prev => ({ ...prev, sourceLotNo: sLotNo, partyName: prev.partyName || candidateParty }));
                       }
                     }}
                     style={{
@@ -7047,6 +7239,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     onChange={e => {
                       const dLotNo = e.target.value;
                       const matched = lotRecords.find(l => String(l.lotNo) === String(dLotNo));
+                      const candidateParty = matched?.outwardTxs?.find(o => o.partyName)?.partyName || matched?.vendorName || '';
                       let autoQty = transferForm.qty;
                       if (matched && matched.currentStock < 0) {
                         autoQty = String(Math.abs(matched.currentStock).toFixed(2));
@@ -7056,12 +7249,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         setTransferForm(prev => ({
                           ...prev,
                           destLotNo: dLotNo,
+                          partyName: prev.partyName || candidateParty,
                           qty: autoQty || prev.qty,
                           fabricQuality: prev.fabricQuality || mNorm || matched.fabricQuality || '',
                           panna: matched.panna || prev.panna || '58'
                         }));
                       } else {
-                        setTransferForm(prev => ({ ...prev, destLotNo: dLotNo, qty: autoQty }));
+                        setTransferForm(prev => ({ ...prev, destLotNo: dLotNo, partyName: prev.partyName || candidateParty, qty: autoQty }));
                       }
                     }}
                     style={{
@@ -7083,6 +7277,32 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     )}
                   </select>
                 </div>
+              </div>
+
+              {/* Party / Client Name for Clearness */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                  Party Name (For Reconciliation & Statement Clearness)
+                </label>
+                <input
+                  type="text"
+                  list="transfer-parties"
+                  placeholder="Select or enter Party Name (e.g. VG, Client)..."
+                  value={transferForm.partyName}
+                  onChange={e => setTransferForm({ ...transferForm, partyName: e.target.value })}
+                  style={{
+                    width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                    fontSize: '0.88rem', outline: 'none', fontWeight: 500
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
+                />
+                <datalist id="transfer-parties">
+                  {Array.from(new Set([...partiesList, ...vendorsList.map(v => v.vendorName || v)])).filter(Boolean).sort().map((p, idx) => (
+                    <option key={idx} value={p} />
+                  ))}
+                </datalist>
               </div>
 
               {/* Quantity */}

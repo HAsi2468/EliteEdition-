@@ -42,9 +42,11 @@ import {
   MessageSquare,
   Clipboard,
   Send,
-  Building2
+  Building2,
+  UploadCloud,
+  FolderPlus
 } from 'lucide-react';
-import { triggerPushNotification } from './NotificationToast';
+import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { triggerEliteConfirm } from './EliteModalDialog';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignImage from './DesignImage';
@@ -566,12 +568,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const initialTaskForm = {
     date: new Date().toISOString().split('T')[0],
     designName: '',
+    category: '',
+    colors: '',
     fabrics: [],
     fabricName: '',
     designers: [],
     designerName: '',
     colourMatches: [],
     colourMatching: '',
+    parties: [],
+    party: '',
     priority: 'Medium',
     sampleImage: '',
     sampleLink: '',
@@ -583,13 +589,28 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [savingTask, setSavingTask] = useState(false);
   const [uploadingSampleImage, setUploadingSampleImage] = useState(false);
 
+  // Upload to Design Catalog Modal State
+  const [catalogUploadModalTask, setCatalogUploadModalTask] = useState(null);
+  const [catalogUploadForm, setCatalogUploadForm] = useState({
+    designName: '',
+    category: '',
+    fabricName: '',
+    colourMatching: '',
+    colors: '',
+    parties: [],
+    imageUrl: '',
+    imageUrl2: '',
+    notes: '',
+  });
+  const [uploadingToCatalog, setUploadingToCatalog] = useState(false);
+
   // Real-time unique design name check for tasks
   const isDuplicateTaskName = useMemo(() => {
     const trimmed = String(taskFormData.designName || '').trim().toLowerCase();
     if (!trimmed) return false;
     return tasks.some(t => 
       String(t.designName || '').trim().toLowerCase() === trimmed &&
-      (!editingId || t._id !== editingId)
+      (!editingId || String(t._id || t.id) !== String(editingId))
     );
   }, [taskFormData.designName, tasks, editingId]);
 
@@ -966,12 +987,20 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       ...initialTaskForm,
       date: new Date().toISOString().split('T')[0],
       designName: getNextSampleDesignNumber(tasks),
+      category: '',
+      colors: '',
+      parties: [],
+      party: '',
       fabrics: [],
       fabricName: '',
       designers: isUserRestricted && userAssignedName ? [userAssignedName] : [],
       designerName: isUserRestricted && userAssignedName ? userAssignedName : '',
       colourMatches: [],
       colourMatching: '',
+      priority: 'Medium',
+      sampleImage: '',
+      sampleLink: '',
+      notes: '',
     });
     setShowCreateModal(true);
   };
@@ -982,7 +1011,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   }));
 
   const handleOpenEdit = (task) => {
-    setEditingId(task._id);
+    setEditingId(task._id || task.id);
     const taskFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
       ? task.fabrics
       : (task.fabricName ? task.fabricName.split(',').map(s => s.trim()).filter(Boolean) : []);
@@ -995,9 +1024,17 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       ? task.colourMatches
       : (task.colourMatching ? task.colourMatching.split(',').map(s => s.trim()).filter(Boolean) : []);
 
+    const taskParties = Array.isArray(task.parties) && task.parties.length > 0
+      ? task.parties
+      : (task.party ? [task.party] : []);
+
     setTaskFormData({
       date: task.date || new Date().toISOString().split('T')[0],
       designName: task.designName || '',
+      category: task.category || '',
+      colors: task.colors || '',
+      parties: taskParties,
+      party: taskParties.join(', '),
       fabrics: taskFabrics,
       fabricName: taskFabrics.join(', '),
       designers: taskDesigners,
@@ -1010,6 +1047,102 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       notes: task.notes || '',
     });
     setShowCreateModal(true);
+  };
+
+  const handleOpenUploadToCatalog = async (task) => {
+    // Determine best artwork preview from sample
+    const bestImage = task.outputImage ||
+      (Array.isArray(task.outputImages) && task.outputImages[0]) ||
+      (Array.isArray(task.finalDesignImages) && task.finalDesignImages[0]) ||
+      task.sampleImage ||
+      task.sampleLink ||
+      '';
+
+    const secondImage = (Array.isArray(task.outputImages) && task.outputImages.length > 1)
+      ? task.outputImages[1]
+      : (task.sampleImage && task.sampleImage !== bestImage ? task.sampleImage : '');
+
+    // Recommendation for sequential ED-xxx catalogue number
+    let recommendedName = '';
+    try {
+      const nextNumRes = await api.getNextDesignNumber({ department: 'digital_print' });
+      if (nextNumRes && (nextNumRes.nextNumber || nextNumRes.nextDesignNumber)) {
+        recommendedName = nextNumRes.nextNumber || nextNumRes.nextDesignNumber;
+      }
+    } catch (e) {
+      console.warn('Could not fetch next design number:', e);
+    }
+
+    const taskFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
+      ? task.fabrics.join(', ')
+      : (task.fabricName || '');
+
+    const taskColourMatches = Array.isArray(task.colourMatches) && task.colourMatches.length > 0
+      ? task.colourMatches.join(', ')
+      : (task.colourMatching || '');
+
+    const taskParties = Array.isArray(task.parties) && task.parties.length > 0
+      ? task.parties
+      : (task.party ? [task.party] : []);
+
+    setCatalogUploadForm({
+      designName: recommendedName || task.designName || '',
+      category: task.category || (task.fabrics && task.fabrics[0] ? task.fabrics[0] : 'ALLOWER'),
+      fabricName: taskFabrics,
+      colourMatching: taskColourMatches,
+      colors: task.colors || task.priority || 'Medium',
+      parties: taskParties,
+      imageUrl: bestImage,
+      imageUrl2: secondImage,
+      notes: task.notes ? `From sample ${task.designName}: ${task.notes}` : `Created from sample ${task.designName}`,
+    });
+    setCatalogUploadModalTask(task);
+  };
+
+  const handleConfirmCatalogUpload = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!catalogUploadModalTask) return;
+    if (!catalogUploadForm.designName || !catalogUploadForm.designName.trim()) {
+      alert('Design Name is required for Design Catalog.');
+      return;
+    }
+
+    setUploadingToCatalog(true);
+    try {
+      const payload = {
+        designName: catalogUploadForm.designName.trim(),
+        category: catalogUploadForm.category || 'ALLOWER',
+        fabricName: catalogUploadForm.fabricName || '',
+        colourMatching: catalogUploadForm.colourMatching || '',
+        colors: catalogUploadForm.colors || '',
+        parties: Array.isArray(catalogUploadForm.parties) ? catalogUploadForm.parties.filter(Boolean) : (catalogUploadForm.parties ? [catalogUploadForm.parties] : []),
+        imageUrl: catalogUploadForm.imageUrl || '',
+        imageUrl2: catalogUploadForm.imageUrl2 || '',
+        notes: catalogUploadForm.notes || '',
+        status: 'Active',
+        department: 'digital_print',
+      };
+
+      const createdDesign = await api.createDesign(payload);
+
+      // Update the sample task: mark approved and record catalog link
+      await api.updateDesignerTask(catalogUploadModalTask._id, {
+        isCatalogUploaded: true,
+        catalogDesignId: createdDesign?._id || '',
+        status: 'Approved',
+        finalDesignStatus: 'Approved',
+      });
+
+      triggerPushNotification('🎉 Published to Design Catalog', `Design "${payload.designName}" is now active in Design Catalog!`, 'success');
+      triggerGlobalDataRefresh('catalog');
+      setCatalogUploadModalTask(null);
+      loadData(true);
+    } catch (err) {
+      console.error('Failed to upload design to catalog:', err);
+      alert('Failed to upload to Design Catalog: ' + (err.message || 'Unknown error'));
+    } finally {
+      setUploadingToCatalog(false);
+    }
   };
 
   const handleDeleteTask = async (task) => {
@@ -1077,7 +1210,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
     const isDuplicate = tasks.some(t => 
       String(t.designName || '').trim().toLowerCase() === finalDesignName.toLowerCase() &&
-      (!editingId || t._id !== editingId)
+      (!editingId || String(t._id || t.id) !== String(editingId))
     );
     if (isDuplicate) {
       alert(`A design task with name "${finalDesignName}" already exists! Design name must be unique.`);
@@ -1087,16 +1220,21 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     const fabricsList = taskFormData.fabrics || [];
     const designersList = taskFormData.designers || [];
     const colourMatchesList = taskFormData.colourMatches || [];
+    const partiesList = taskFormData.parties || [];
 
     const submissionPayload = {
       ...taskFormData,
       designName: finalDesignName,
+      category: taskFormData.category || '',
+      colors: taskFormData.colors || '',
       fabrics: fabricsList,
       fabricName: fabricsList.join(', '),
       designers: designersList,
       designerName: designersList.join(', '),
       colourMatches: colourMatchesList,
-      colourMatching: colourMatchesList.join(', ')
+      colourMatching: colourMatchesList.join(', '),
+      parties: partiesList,
+      party: partiesList[0] || taskFormData.party || ''
     };
 
     setSavingTask(true);
@@ -1894,7 +2032,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   };
 
   return (
-    <div style={{ padding: embedded ? '0' : '1rem', maxWidth: '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
+    <div style={{ padding: embedded ? '0' : '1rem', maxWidth: embedded ? 'none' : '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
       {/* ─── Top Header Bar (Only visible in standalone mode) ─────────── */}
       {!embedded && (
         <div className="ent-screen-header" style={{ marginBottom: '1rem' }}>
@@ -2336,100 +2474,494 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       ) : (
         /* ─── HIGH-DENSITY TABLE VIEW (ONLY VIEW) ───────────────────────── */
         <div>
-          {/* Total Designs Count & Sort Toolbar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Designs:</span>
-              <span style={{
-                fontSize: '0.82rem',
-                fontWeight: 800,
-                color: '#ffffff',
-                background: '#2563eb',
-                padding: '2px 10px',
-                borderRadius: '20px',
-                minWidth: '28px',
-                textAlign: 'center',
-              }}>
-                {filteredTasks.length}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Quick Sort:</span>
-              <button
-                type="button"
-                onClick={() => setSortBy('designName')}
-                style={{
-                  padding: '0.3rem 0.65rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: sortBy === 'designName' ? '#2563eb' : '#cbd5e1',
-                  background: sortBy === 'designName' ? '#eff6ff' : '#f8fafc',
-                  color: sortBy === 'designName' ? '#1d4ed8' : '#64748b',
-                }}
-              >
-                Name
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortBy('createdAt')}
-                style={{
-                  padding: '0.3rem 0.65rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: sortBy === 'createdAt' ? '#2563eb' : '#cbd5e1',
-                  background: sortBy === 'createdAt' ? '#eff6ff' : '#f8fafc',
-                  color: sortBy === 'createdAt' ? '#1d4ed8' : '#64748b',
-                }}
-              >
-                Date
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortBy('priority')}
-                style={{
-                  padding: '0.3rem 0.65rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: sortBy === 'priority' ? '#2563eb' : '#cbd5e1',
-                  background: sortBy === 'priority' ? '#eff6ff' : '#f8fafc',
-                  color: sortBy === 'priority' ? '#1d4ed8' : '#64748b',
-                }}
-              >
-                Priority
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-                title={sortOrder === 'asc' ? 'Currently Ascending - click for Descending' : 'Currently Descending - click for Ascending'}
-                style={{
-                  padding: '0.3rem 0.65rem',
+          {/* Total Designs Count & Sort Toolbar (Only for standalone Designer Screen) */}
+          {!embedded && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Designs:</span>
+                <span style={{
                   fontSize: '0.82rem',
                   fontWeight: 800,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  border: '1px solid #2563eb',
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.2rem',
-                }}
-              >
-                <span>{sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}</span>
-              </button>
+                  color: '#ffffff',
+                  background: '#2563eb',
+                  padding: '2px 10px',
+                  borderRadius: '20px',
+                  minWidth: '28px',
+                  textAlign: 'center',
+                }}>
+                  {filteredTasks.length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Quick Sort:</span>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('designName')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: sortBy === 'designName' ? '#2563eb' : '#cbd5e1',
+                    background: sortBy === 'designName' ? '#eff6ff' : '#f8fafc',
+                    color: sortBy === 'designName' ? '#1d4ed8' : '#64748b',
+                  }}
+                >
+                  Name
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('createdAt')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: sortBy === 'createdAt' ? '#2563eb' : '#cbd5e1',
+                    background: sortBy === 'createdAt' ? '#eff6ff' : '#f8fafc',
+                    color: sortBy === 'createdAt' ? '#1d4ed8' : '#64748b',
+                  }}
+                >
+                  Date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('priority')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: sortBy === 'priority' ? '#2563eb' : '#cbd5e1',
+                    background: sortBy === 'priority' ? '#eff6ff' : '#f8fafc',
+                    color: sortBy === 'priority' ? '#1d4ed8' : '#64748b',
+                  }}
+                >
+                  Priority
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                  title={sortOrder === 'asc' ? 'Currently Ascending - click for Descending' : 'Currently Descending - click for Ascending'}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: '1px solid #2563eb',
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.2rem',
+                  }}
+                >
+                  <span>{sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+          {embedded ? (
+            /* ─── SAMPLE DESIGN CARD GRID VIEW (MATCHING DESIGN CATALOG LAYOUT & SIZE) ─── */
+            filteredTasks.length === 0 ? (
+              <div className="glass-panel" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                <Palette size={48} color="#94a3b8" style={{ opacity: 0.4, margin: '0 auto 1rem auto' }} />
+                <h4 style={{ margin: '0 0 0.35rem', color: '#0f172a', fontSize: '1.1rem', fontWeight: 800 }}>No Sample Designs Found</h4>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>No design tasks match the selected stage and search filters.</p>
+                {canInputNewDesign && (
+                  <button className="btn-primary" onClick={handleOpenCreate} style={{ marginTop: '1.25rem', padding: '0.55rem 1.3rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Plus size={14} /> Add First Sample Design
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem', paddingBottom: '20px' }}>
+                {filteredTasks.map((task) => {
+                  const allFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
+                    ? task.fabrics
+                    : task.fabricName ? task.fabricName.split(',').map((s) => s.trim()).filter(Boolean) : [];
+                  const allDesigners = Array.isArray(task.designers) && task.designers.length > 0
+                    ? task.designers
+                    : task.designerName ? task.designerName.split(',').map((s) => s.trim()).filter(Boolean) : [];
+                  const allColourMatches = Array.isArray(task.colourMatches) && task.colourMatches.length > 0
+                    ? task.colourMatches
+                    : task.colourMatching ? task.colourMatching.split(',').map((s) => s.trim()).filter(Boolean) : [];
+
+                  const taskImages = Array.from(
+                    new Set([
+                      ...(Array.isArray(task.outputImages) ? task.outputImages : []),
+                      ...(task.outputImage ? [task.outputImage] : []),
+                      ...(Array.isArray(task.finalDesignImages) ? task.finalDesignImages : []),
+                      ...(Array.isArray(task.drowDesignImages) ? task.drowDesignImages : []),
+                      ...(Array.isArray(task.colourMatchingImages) ? task.colourMatchingImages : []),
+                      ...(Array.isArray(task.stage3Images) ? task.stage3Images : []),
+                    ])
+                  ).filter(Boolean);
+
+                  const currentBadge = getTaskCurrentStatusBadge(task);
+                  const statusOpts = getStatusDropdownOptions(task);
+                  const isStatusOpen = openStatusDropdownId === task._id;
+
+                  return (
+                    <div
+                      key={task._id}
+                      className="glass-panel"
+                      style={{
+                        padding: '1.1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem',
+                        borderRadius: '16px',
+                        background: 'var(--bg-card, #ffffff)',
+                        border: '1px solid var(--border-color, #e2e8f0)',
+                        boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(15,23,42,0.08)';
+                        e.currentTarget.style.borderColor = '#bfdbfe';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = '';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.04)';
+                        e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
+                      }}
+                    >
+                      {/* Top Header: Category & Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        <span style={{
+                          background: 'rgba(139,92,246,0.12)', color: '#7c3aed',
+                          fontSize: '0.67rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px',
+                          border: '1px solid rgba(139,92,246,0.25)',
+                          textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap'
+                        }}>
+                          {task.category || (allFabrics[0] ? allFabrics[0] : 'ALLOWER')}
+                        </span>
+
+                        <div style={{ position: 'relative' }}>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenStatusDropdownId(isStatusOpen ? null : task._id);
+                            }}
+                            style={{
+                              background: currentBadge.bg || '#ecfdf5',
+                              color: currentBadge.color || '#059669',
+                              fontSize: '0.67rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px',
+                              border: currentBadge.border ? `1px solid ${currentBadge.border}` : '1px solid #a7f3d0',
+                              whiteSpace: 'nowrap',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}
+                            title="Click to change status"
+                          >
+                            <span>{currentBadge.label}</span>
+                            <span style={{ fontSize: '0.6rem' }}>▾</span>
+                          </span>
+
+                          {/* Floating Dropdown Menu */}
+                          {isStatusOpen && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 'calc(100% + 4px)',
+                                right: 0,
+                                zIndex: 9999,
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '8px',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                                minWidth: '190px',
+                                padding: '0.35rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.2rem'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '0.2rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
+                                Select Stage Status
+                              </div>
+                              {statusOpts.map((opt) => {
+                                const OptIcon = opt.icon;
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenStatusDropdownId(null);
+                                      handleDirectStatusChange(task, opt);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.45rem',
+                                      width: '100%',
+                                      padding: '0.38rem 0.5rem',
+                                      borderRadius: '5px',
+                                      border: opt.isActive ? `1px solid ${opt.border}` : '1px solid transparent',
+                                      background: opt.isActive ? opt.bg : 'transparent',
+                                      color: opt.color,
+                                      fontSize: '0.72rem',
+                                      fontWeight: opt.isActive ? 800 : 600,
+                                      cursor: 'pointer',
+                                      textAlign: 'left'
+                                    }}
+                                  >
+                                    {OptIcon && <OptIcon size={11} />}
+                                    <span style={{ flex: 1 }}>{opt.label}</span>
+                                    {opt.isActive && <span>✓</span>}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Main Image View */}
+                      <div
+                        style={{
+                          height: '180px',
+                          background: '#f8fafc',
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          border: '1px solid var(--border-light, #e2e8f0)',
+                          cursor: (task.sampleImage || task.sampleLink) ? 'pointer' : 'default'
+                        }}
+                        onClick={() => {
+                          const imgToZoom = task.sampleImage || task.sampleLink;
+                          if (imgToZoom) {
+                            handleOpenLightbox([imgToZoom], 0, `Sample: ${task.designName}`);
+                          }
+                        }}
+                      >
+                        {task.sampleImage || task.sampleLink ? (
+                          <DesignImage
+                            rawUrl={task.sampleImage || task.sampleLink}
+                            designName={task.designName}
+                            thumbnail={true}
+                            width={360}
+                            onZoom={(src) => handleOpenLightbox([src || task.sampleImage || task.sampleLink], 0, `Sample: ${task.designName}`)}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', color: '#94a3b8' }}>
+                            <ImageIcon size={38} color="#cbd5e1" />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>No Sample Image</span>
+                          </div>
+                        )}
+
+                        {/* Small Sub image thumbnail inside card if available */}
+                        {taskImages.length > 0 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenLightbox(taskImages, 0, `Proof Images: ${task.designName}`);
+                            }}
+                            style={{
+                              position: 'absolute', bottom: 6, right: 6, width: '38px', height: '38px',
+                              border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden',
+                              background: '#ffffff', cursor: 'pointer', zIndex: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                            }}
+                            title="Click to view proof images"
+                          >
+                            <DesignImage
+                              rawUrl={taskImages[0]}
+                              designName={`${task.designName}-proof`}
+                              showPlaceholderBadge={false}
+                              thumbnail={true}
+                              width={120}
+                              style={{ width: '100%', height: '100%' }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Design Info */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                            {task.designName}
+                          </span>
+                        </div>
+
+                        {/* Assigned Parties / Team */}
+                        {(() => {
+                          const effectiveParties = (Array.isArray(task.parties) && task.parties.length > 0)
+                            ? task.parties
+                            : (task.party ? [task.party] : [...(allDesigners.length > 0 ? allDesigners : []), ...(allColourMatches.length > 0 ? allColourMatches : [])]);
+                          return (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                              {effectiveParties.slice(0, 2).map((pName, pIdx) => (
+                                <span
+                                  key={pIdx}
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    color: '#10b981',
+                                    fontWeight: 700,
+                                    background: 'rgba(16, 185, 129, 0.12)',
+                                    padding: '2px 7px',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                  title={`Party: ${pName}`}
+                                >
+                                  <span style={{ fontSize: '0.72rem' }}>🏢</span> {pName}
+                                </span>
+                              ))}
+                              {effectiveParties.length === 0 && (
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    color: '#10b981',
+                                    fontWeight: 700,
+                                    background: 'rgba(16, 185, 129, 0.12)',
+                                    padding: '2px 7px',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                >
+                                  <span style={{ fontSize: '0.72rem' }}>🏢</span> ELITE EON
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Parameters grid: only show clean design-specific details (EXACT same as Design Catalog) */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem 0.5rem', fontSize: '0.78rem', borderTop: '1px dashed var(--border-light)', paddingTop: '0.5rem' }}>
+                          {[
+                            ['Colour Match', allColourMatches.join(', ') || '—'],
+                            ['Fabric', allFabrics.join(', ') || '—'],
+                            ['Colors', task.colors || task.priority || 'Medium'],
+                            ['Category', task.category || (allFabrics[0] ? allFabrics[0] : 'ALLOWER')]
+                          ].map(([k, v]) => (
+                            <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{k}</span>
+                              {k === 'Colors' && v ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  {getColorHex(v) && (
+                                    <span style={{
+                                      display: 'inline-block',
+                                      width: '10px',
+                                      height: '10px',
+                                      borderRadius: '2px',
+                                      backgroundColor: getColorHex(v),
+                                      border: '1px solid rgba(255,255,255,0.2)',
+                                      flexShrink: 0
+                                    }} />
+                                  )}
+                                  <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {v}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {v || '—'}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {task.notes && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '0.35rem 0.5rem', borderRadius: 4, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            Notes: {task.notes}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions - EXACT same measurement & layout as Design Catalog with To Catalog Action */}
+                      <div style={{ display: 'flex', gap: '0.4rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.7rem', marginTop: 'auto', alignItems: 'center' }}>
+                        <button onClick={() => handleOpenEdit(task)} className="btn-secondary" style={{ flex: 1, padding: '0.4rem 0.5rem', fontSize: '0.78rem', justifyContent: 'center', whiteSpace: 'nowrap' }}>
+                          <Edit2 size={13} /> Edit Design
+                        </button>
+                        {task.isCatalogUploaded ? (
+                          <span
+                            style={{
+                              padding: '0.4rem 0.55rem',
+                              fontSize: '0.73rem',
+                              borderRadius: 'var(--radius-sm)',
+                              background: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              color: '#059669',
+                              fontWeight: 800,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="Already uploaded to Design Catalog"
+                          >
+                            <CheckCircle2 size={12} /> In Catalog
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenUploadToCatalog(task)}
+                            style={{
+                              padding: '0.4rem 0.6rem',
+                              fontSize: '0.75rem',
+                              borderRadius: 'var(--radius-sm)',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              color: '#ffffff',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.15s ease'
+                            }}
+                            title="Approve & Upload to Design Catalog"
+                          >
+                            <UploadCloud size={13} /> To Catalog
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteTask(task)}
+                          style={{
+                            padding: '0.4rem 0.6rem', fontSize: '0.78rem', borderRadius: 'var(--radius-sm)',
+                            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                            color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem',
+                            fontFamily: 'var(--font-sans)', transition: 'all 0.15s'
+                          }}
+                          title="Delete Design"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            /* ─── STANDALONE DESIGNER SCREEN TABLE VIEW (SAME AS CURRENT) ─── */
+            <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
           <div style={{ overflowX: 'auto', minHeight: '360px', paddingBottom: openStatusDropdownId ? '160px' : '20px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
               <thead>
@@ -3348,8 +3880,50 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                             <History size={13} />
                             <span>{task.stageHistory?.length || 0}</span>
                           </button>
-                          {isUserAdmin && !embedded && (
+                          {(isUserAdmin || canInputNewDesign) && (
                             <>
+                              {task.isCatalogUploaded ? (
+                                <span
+                                  style={{
+                                    padding: '0.3rem 0.55rem',
+                                    fontSize: '0.7rem',
+                                    background: '#ecfdf5',
+                                    border: '1px solid #a7f3d0',
+                                    color: '#059669',
+                                    borderRadius: '6px',
+                                    fontWeight: 800,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  title="Uploaded to Design Catalog"
+                                >
+                                  <CheckCircle2 size={11} /> In Catalog
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenUploadToCatalog(task)}
+                                  title="Approve & Upload to Design Catalog"
+                                  style={{
+                                    padding: '0.32rem 0.55rem',
+                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    color: '#ffffff',
+                                    cursor: 'pointer',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 2px 5px rgba(16, 185, 129, 0.25)'
+                                  }}
+                                >
+                                  <UploadCloud size={12} /> To Catalog
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleOpenEdit(task)}
                                 title="Edit Task"
@@ -3366,22 +3940,24 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                               >
                                 <Edit2 size={13} />
                               </button>
-                              <button
-                                onClick={() => handleDeleteTask(task)}
-                                title="Delete Task"
-                                style={{
-                                  padding: '0.35rem 0.5rem',
-                                  background: '#fef2f2',
-                                  border: '1px solid #fecaca',
-                                  borderRadius: '6px',
-                                  color: '#dc2626',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                }}
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                              {isUserAdmin && (
+                                <button
+                                  onClick={() => handleDeleteTask(task)}
+                                  title="Delete Task"
+                                  style={{
+                                    padding: '0.35rem 0.5rem',
+                                    background: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '6px',
+                                    color: '#dc2626',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -3393,11 +3969,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             </table>
           </div>
         </div>
+          )}
         </div>
       )}
 
       {/* ─── MODAL: UPDATE STATUS & MULTI-IMAGE UPLOAD TO CLOUDFLARE R2 ─── */}
-      {!embedded && activeModalData && (
+      {activeModalData && (
         <div
           style={{
             position: 'fixed',
@@ -5129,6 +5706,91 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 )}
               </div>
 
+              {/* Category & Colors */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    list="sample-modal-categories"
+                    placeholder="e.g. ALLOWER, KURTI-SET, DUPATTA..."
+                    value={taskFormData.category}
+                    onChange={(e) => setTaskFormData((prev) => ({ ...prev, category: e.target.value.toUpperCase() }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.52rem 0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      color: '#0f172a',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                  <datalist id="sample-modal-categories">
+                    {(Array.isArray(printConfig.categories) && printConfig.categories.length > 0
+                      ? printConfig.categories
+                      : ['ALLOWER', 'KURTI-SET', 'DUPATTA', 'SUIT', 'TOP', 'BOTTOM', 'SAREE']
+                    ).map((c, idx) => (
+                      <option key={idx} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                    Colors / Shade
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {getColorHex(taskFormData.colors) && (
+                      <span
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '4px',
+                          backgroundColor: getColorHex(taskFormData.colors),
+                          border: '1px solid #cbd5e1',
+                          flexShrink: 0
+                        }}
+                      />
+                    )}
+                    <input
+                      type="text"
+                      list="sample-modal-colors"
+                      placeholder="e.g. Yellow, Sky Blue, Navy..."
+                      value={taskFormData.colors}
+                      onChange={(e) => setTaskFormData((prev) => ({ ...prev, colors: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.52rem 0.75rem',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.85rem',
+                        color: '#0f172a',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <datalist id="sample-modal-colors">
+                    {COLOR_NAMES.map((col, idx) => (
+                      <option key={idx} value={col} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Multi-Select: Party / Client */}
+              <MultiSelectBox
+                label="Party / Client"
+                icon={Building2}
+                options={printConfig.parties || []}
+                selected={taskFormData.parties || []}
+                onChange={(selected) => setTaskFormData((prev) => ({ ...prev, parties: selected, party: selected[0] || '' }))}
+                tagTheme={{ bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' }}
+              />
+
               {/* Multi-Select: Designers */}
               <MultiSelectBox
                 label="Assigned Designers"
@@ -5315,6 +5977,342 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   }}
                 >
                   {savingTask ? 'Saving Design Task...' : (editingId ? 'Update Design Task' : 'Create Design Task')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── UPLOAD SAMPLE DESIGN TO DESIGN CATALOG MODAL ─── */}
+      {catalogUploadModalTask && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '1rem',
+          }}
+          onClick={() => setCatalogUploadModalTask(null)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '620px',
+              width: '100%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #cbd5e1',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1px solid #e2e8f0',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                borderTopLeftRadius: '16px',
+                borderTopRightRadius: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  }}
+                >
+                  <UploadCloud size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                    Upload to Design Catalog
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                    Approve sample <strong>{catalogUploadModalTask.designName}</strong> and publish directly into live Design Catalog
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCatalogUploadModalTask(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '0.35rem',
+                  borderRadius: '6px',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleConfirmCatalogUpload} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Artwork & Target Name Header */}
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: '#f8fafc', padding: '0.85rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', background: '#e2e8f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {catalogUploadForm.imageUrl ? (
+                    <img src={catalogUploadForm.imageUrl} alt="Catalog Design Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <ImageIcon size={28} color="#94a3b8" />
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.25rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#059669', background: '#ecfdf5', padding: '2px 7px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                      SOURCE: {catalogUploadModalTask.designName}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>➔ Design Catalog</span>
+                  </div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>
+                    Catalog Design Name / Number <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={catalogUploadForm.designName}
+                    onChange={(e) => setCatalogUploadForm(prev => ({ ...prev, designName: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. ED-720..."
+                    style={{
+                      width: '100%',
+                      padding: '0.45rem 0.65rem',
+                      borderRadius: '6px',
+                      border: '1.5px solid #2563eb',
+                      fontSize: '0.92rem',
+                      fontWeight: 800,
+                      color: '#1d4ed8',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Grid 2-col parameters */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    list="catalog-upload-categories"
+                    value={catalogUploadForm.category}
+                    onChange={(e) => setCatalogUploadForm(prev => ({ ...prev, category: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. ALLOWER, KURTI-SET, DUPATTA..."
+                    style={{
+                      width: '100%',
+                      padding: '0.48rem 0.65rem',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <datalist id="catalog-upload-categories">
+                    {(Array.isArray(printConfig.categories) && printConfig.categories.length > 0
+                      ? printConfig.categories
+                      : ['ALLOWER', 'KURTI-SET', 'DUPATTA', 'SUIT', 'TOP', 'BOTTOM', 'SAREE']
+                    ).map((c, idx) => (
+                      <option key={idx} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                    Fabric
+                  </label>
+                  <input
+                    type="text"
+                    value={catalogUploadForm.fabricName}
+                    onChange={(e) => setCatalogUploadForm(prev => ({ ...prev, fabricName: e.target.value }))}
+                    placeholder="e.g. ARMANI 44, CAMBRIC 58..."
+                    style={{
+                      width: '100%',
+                      padding: '0.48rem 0.65rem',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                    Colour Match
+                  </label>
+                  <input
+                    type="text"
+                    value={catalogUploadForm.colourMatching}
+                    onChange={(e) => setCatalogUploadForm(prev => ({ ...prev, colourMatching: e.target.value }))}
+                    placeholder="e.g. JAY, DJR..."
+                    style={{
+                      width: '100%',
+                      padding: '0.48rem 0.65rem',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                    Colors / Shade
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {getColorHex(catalogUploadForm.colors) && (
+                      <span
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '4px',
+                          backgroundColor: getColorHex(catalogUploadForm.colors),
+                          border: '1px solid #cbd5e1',
+                          flexShrink: 0
+                        }}
+                      />
+                    )}
+                    <input
+                      type="text"
+                      list="catalog-upload-colors"
+                      value={catalogUploadForm.colors}
+                      onChange={(e) => setCatalogUploadForm(prev => ({ ...prev, colors: e.target.value }))}
+                      placeholder="e.g. Yellow, Sky Blue, Pink..."
+                      style={{
+                        width: '100%',
+                        padding: '0.48rem 0.65rem',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.82rem',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <datalist id="catalog-upload-colors">
+                    {COLOR_NAMES.map((col, idx) => (
+                      <option key={idx} value={col} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* MultiSelect: Parties */}
+              <MultiSelectBox
+                label="Assigned Parties (Clients)"
+                icon={Building2}
+                options={printConfig.parties || []}
+                selected={catalogUploadForm.parties || []}
+                onChange={(selected) => setCatalogUploadForm(prev => ({ ...prev, parties: selected }))}
+                tagTheme={{ bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' }}
+              />
+
+              {/* Image URL preview / edit */}
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                  Catalog Primary Image URL
+                </label>
+                <input
+                  type="text"
+                  value={catalogUploadForm.imageUrl}
+                  onChange={(e) => setCatalogUploadForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                  placeholder="https://... artwork image link"
+                  style={{
+                    width: '100%',
+                    padding: '0.48rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                  Catalog Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={catalogUploadForm.notes}
+                  onChange={(e) => setCatalogUploadForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Notes for Design Catalog..."
+                  style={{
+                    width: '100%',
+                    padding: '0.48rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                <button
+                  type="button"
+                  onClick={() => setCatalogUploadModalTask(null)}
+                  style={{
+                    padding: '0.55rem 1.1rem',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploadingToCatalog}
+                  style={{
+                    padding: '0.55rem 1.35rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    cursor: uploadingToCatalog ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <UploadCloud size={16} />
+                  {uploadingToCatalog ? 'Publishing to Design Catalog...' : 'Confirm & Publish to Design Catalog'}
                 </button>
               </div>
             </form>

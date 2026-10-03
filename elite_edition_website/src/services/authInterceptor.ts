@@ -210,6 +210,10 @@ export class SilentAuthInterceptor {
     }
 
     if (typeof window !== 'undefined') {
+      try {
+        import('../utils/crossTabSync').then(m => m.broadcastCrossTab('AUTH_LOGOUT'));
+      } catch (_) {}
+
       window.dispatchEvent(
         new CustomEvent('elite-session-expired', {
           detail: { reason: 'REFRESH_TOKEN_EXPIRED', timestamp: Date.now() },

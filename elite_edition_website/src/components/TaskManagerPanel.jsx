@@ -160,6 +160,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [showMobileScopeMenu, setShowMobileScopeMenu] = useState(false);
   const [showMobileFilterMenu, setShowMobileFilterMenu] = useState(false);
 
+  // Desktop Dropdown States & Refs
+  const [showViewDropdown, setShowViewDropdown] = useState(false);
+  const [showScopeDropdown, setShowScopeDropdown] = useState(false);
+  const viewDropdownRef = useRef(null);
+  const scopeDropdownRef = useRef(null);
+
   // Task Creation Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -173,6 +179,21 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [newEstHours, setNewEstHours] = useState('');
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState([]);
   const [staffSearch, setStaffSearch] = useState('');
+
+  // Task Edit Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [editingUpdating, setEditingUpdating] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editPriority, setEditPriority] = useState('medium');
+  const [editDepartment, setEditDepartment] = useState('General');
+  const [editProjectRef, setEditProjectRef] = useState('');
+  const [editClientName, setEditClientName] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editEstHours, setEditEstHours] = useState('');
+  const [editAssigneeIds, setEditAssigneeIds] = useState([]);
+  const [editStaffSearch, setEditStaffSearch] = useState('');
   
   // Feature 4: Task Template Library state
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -375,6 +396,20 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Close View and Scope dropdowns on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (viewDropdownRef.current && !viewDropdownRef.current.contains(e.target)) {
+        setShowViewDropdown(false);
+      }
+      if (scopeDropdownRef.current && !scopeDropdownRef.current.contains(e.target)) {
+        setShowScopeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
@@ -416,6 +451,78 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   const handleDeselectAllStaff = () => {
     setSelectedAssigneeIds([]);
+  };
+
+  const handleOpenEditModal = (task, e) => {
+    if (e) e.stopPropagation();
+    if (!task) return;
+    setEditingTask(task);
+    setEditTitle(task.title || '');
+    setEditDesc(task.description || '');
+    setEditPriority(task.priority || 'medium');
+    setEditDepartment(task.department || 'General');
+    setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+    setEditEstHours(task.estimatedHours != null ? String(task.estimatedHours) : '');
+    setEditProjectRef(task.projectRef || '');
+    setEditClientName(task.clientName || '');
+    setEditAssigneeIds((task.assignees || []).map((a) => String(typeof a === 'object' ? (a._id || a.id) : a)));
+    setEditStaffSearch('');
+    setShowEditModal(true);
+  };
+
+  const toggleEditAssigneeSelection = (userId) => {
+    setEditAssigneeIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleEditSelectAllStaff = () => {
+    setEditAssigneeIds(allUsers.map((u) => String(u._id)));
+  };
+
+  const handleEditDeselectAllStaff = () => {
+    setEditAssigneeIds([]);
+  };
+
+  const handleEditTaskSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingTask) return;
+    if (!editTitle.trim()) {
+      alert('Please enter a task title.');
+      return;
+    }
+
+    setEditingUpdating(true);
+    try {
+      const updates = {
+        title: editTitle.trim(),
+        description: editDesc.trim(),
+        priority: editPriority,
+        department: editDepartment,
+        projectRef: editProjectRef.trim(),
+        clientName: editClientName.trim(),
+        dueDate: editDueDate || null,
+        estimatedHours: parseFloat(editEstHours) || 0,
+        assignees: editAssigneeIds,
+        userId: myId,
+        userName: myName
+      };
+
+      const res = await api.updateTask(editingTask._id, updates);
+      if (res.success && res.data) {
+        const updated = res.data;
+        setTasks((prev) => prev.map((t) => (String(t._id) === String(updated._id) ? updated : t)));
+        if (selectedTask && String(selectedTask._id) === String(updated._id)) {
+          setSelectedTask(updated);
+        }
+        setShowEditModal(false);
+        setEditingTask(null);
+      }
+    } catch (err) {
+      alert('Failed to update task: ' + err.message);
+    } finally {
+      setEditingUpdating(false);
+    }
   };
 
   // Cloudflare R2 Attachment Handlers
@@ -1029,24 +1136,223 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           </div>
 
           <div className="task-actions-group">
-            {/* View Switcher Pills */}
-            <div className="task-view-switcher">
-              {viewsList.map((v) => {
-                const IconComp = v.icon;
-                const isActive = activeView === v.id;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setActiveView(v.id)}
-                    className={`task-view-tab ${isActive ? 'active' : ''}`}
-                    title={v.label}
-                  >
-                    <IconComp size={13} />
-                    <span>{v.shortLabel}</span>
-                  </button>
-                );
-              })}
+            {/* ── BUTTON 1: VIEW SELECTOR DROPDOWN (Replaces view tabs bar) ── */}
+            <div ref={viewDropdownRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowViewDropdown((prev) => !prev);
+                  setShowScopeDropdown(false);
+                }}
+                className="task-btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0 10px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: showViewDropdown ? '#eff6ff' : '#ffffff',
+                  border: showViewDropdown ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                  color: showViewDropdown ? '#1d4ed8' : '#1e293b',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Change Task View"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, background: '#eff6ff', color: '#2563eb' }}>
+                  <CurrentViewIcon size={13} />
+                </div>
+                <span style={{ fontWeight: 800 }}>{currentViewObj.shortLabel}</span>
+                <ChevronDown size={13} color="#64748b" style={{ transform: showViewDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {showViewDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 5px)',
+                    right: 0,
+                    minWidth: '200px',
+                    background: '#ffffff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                    zIndex: 1100,
+                    padding: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    animation: 'fadeIn 0.15s ease'
+                  }}
+                >
+                  <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '4px 8px', letterSpacing: '0.04em' }}>
+                    Select View
+                  </div>
+                  {viewsList.map((v) => {
+                    const IconComp = v.icon;
+                    const isActive = activeView === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveView(v.id);
+                          setShowViewDropdown(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          background: isActive ? '#eff6ff' : 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: isActive ? '#1d4ed8' : '#334155',
+                          fontSize: '0.76rem',
+                          fontWeight: isActive ? 800 : 600,
+                          textAlign: 'left',
+                          transition: 'background 0.12s'
+                        }}
+                        onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                          <IconComp size={13} color={isActive ? '#2563eb' : '#64748b'} />
+                          <span>{v.label}</span>
+                        </div>
+                        {isActive && <Check size={13} color="#2563eb" style={{ flexShrink: 0 }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── BUTTON 2: CATEGORY / SCOPE FILTER DROPDOWN (Replaces scope pills bar) ── */}
+            <div ref={scopeDropdownRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowScopeDropdown((prev) => !prev);
+                  setShowViewDropdown(false);
+                }}
+                className="task-btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0 10px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: showScopeDropdown ? '#eff6ff' : (currentScopeObj.isAlert ? '#fef2f2' : '#ffffff'),
+                  border: showScopeDropdown ? '1.5px solid #2563eb' : (currentScopeObj.isAlert ? '1.5px solid #fecaca' : '1px solid #cbd5e1'),
+                  color: currentScopeObj.isAlert ? '#dc2626' : (showScopeDropdown ? '#1d4ed8' : '#1e293b'),
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Filter by Task Scope / Category"
+              >
+                <span>{currentScopeObj.icon}</span>
+                <span style={{ fontWeight: 800 }}>{currentScopeObj.shortLabel}</span>
+                <span
+                  style={{
+                    background: currentScopeObj.isAlert ? '#dc2626' : '#2563eb',
+                    color: '#ffffff',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    fontSize: '0.64rem',
+                    fontWeight: 800
+                  }}
+                >
+                  {currentScopeObj.count}
+                </span>
+                <ChevronDown size={13} color="#64748b" style={{ transform: showScopeDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {showScopeDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 5px)',
+                    right: 0,
+                    minWidth: '230px',
+                    background: '#ffffff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                    zIndex: 1100,
+                    padding: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    animation: 'fadeIn 0.15s ease'
+                  }}
+                >
+                  <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '4px 8px', letterSpacing: '0.04em' }}>
+                    Filter by Scope
+                  </div>
+                  {scopeTabs.map((tab) => {
+                    const isActive = taskScope === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setTaskScope(tab.id);
+                          setShowScopeDropdown(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          background: isActive ? '#eff6ff' : (tab.isAlert ? '#fef2f2' : 'transparent'),
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: tab.isAlert ? '#dc2626' : (isActive ? '#1d4ed8' : '#334155'),
+                          fontSize: '0.76rem',
+                          fontWeight: isActive ? 800 : 600,
+                          textAlign: 'left',
+                          transition: 'background 0.12s'
+                        }}
+                        onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = tab.isAlert ? '#fee2e2' : '#f8fafc'; }}
+                        onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = tab.isAlert ? '#fef2f2' : 'transparent'; }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                          <span>{tab.icon}</span>
+                          <span>{tab.label}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span
+                            style={{
+                              background: tab.isAlert ? '#dc2626' : (isActive ? '#2563eb' : '#e2e8f0'),
+                              color: (tab.isAlert || isActive) ? '#ffffff' : '#475569',
+                              padding: '1px 6px',
+                              borderRadius: '8px',
+                              fontSize: '0.64rem',
+                              fontWeight: 800
+                            }}
+                          >
+                            {tab.count}
+                          </span>
+                          {isActive && <Check size={13} color="#2563eb" style={{ flexShrink: 0 }} />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Export CSV Button */}
@@ -1072,7 +1378,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           </div>
         </div>
 
-        {/* Row 2: Search + Scopes + Filters */}
+        {/* Row 2: Search + Filters */}
         <div className="task-header-row-bottom">
           {/* Integrated Search Input */}
           <div className="task-search-input-wrap">
@@ -1093,24 +1399,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 <X size={12} />
               </button>
             )}
-          </div>
-
-          {/* Scope Navigation Tabs */}
-          <div className="task-scopes-scroll-wrap">
-            {scopeTabs.map((tab) => {
-              const isActive = taskScope === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setTaskScope(tab.id)}
-                  className={`task-scope-pill ${isActive ? 'active' : ''} ${tab.isAlert ? 'alert' : ''}`}
-                >
-                  <span>{tab.icon} {tab.shortLabel}</span>
-                  <span className="task-scope-count">{tab.count}</span>
-                </button>
-              );
-            })}
           </div>
 
           {/* Filters: Assignee & Priority */}
@@ -1828,28 +2116,76 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                   </span>
                                 )}
 
-                                {/* Status Quick Shift Select */}
-                                <select
-                                  value={t.status}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) => handleStatusChange(t, e.target.value)}
-                                  style={{
-                                    fontSize: '0.68rem',
-                                    padding: '2px 6px',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-light)',
-                                    background: '#ffffff',
-                                    cursor: 'pointer',
-                                    fontWeight: 700,
-                                    height: '26px',
-                                    maxWidth: '120px',
-                                    flexShrink: 0
-                                  }}
-                                >
-                                  {KANBAN_COLUMNS.map((c) => (
-                                    <option key={c.id} value={c.id}>{c.label}</option>
-                                  ))}
-                                </select>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  {/* Status Quick Shift Select */}
+                                  <select
+                                    value={t.status}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => handleStatusChange(t, e.target.value)}
+                                    style={{
+                                      fontSize: '0.68rem',
+                                      padding: '2px 5px',
+                                      borderRadius: '6px',
+                                      border: '1px solid var(--border-light)',
+                                      background: '#ffffff',
+                                      cursor: 'pointer',
+                                      fontWeight: 700,
+                                      height: '26px',
+                                      maxWidth: '95px',
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    {KANBAN_COLUMNS.map((c) => (
+                                      <option key={c.id} value={c.id}>{c.label}</option>
+                                    ))}
+                                  </select>
+
+                                  {/* Edit Task Button */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleOpenEditModal(t, e)}
+                                    style={{
+                                      background: '#eff6ff',
+                                      border: '1px solid #bfdbfe',
+                                      color: '#2563eb',
+                                      padding: 0,
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      height: '26px',
+                                      width: '26px',
+                                      flexShrink: 0
+                                    }}
+                                    title="Edit Task"
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+
+                                  {/* Delete Task Button */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleDeleteTask(t._id, e)}
+                                    style={{
+                                      background: '#fee2e2',
+                                      border: '1px solid #fca5a5',
+                                      color: '#dc2626',
+                                      padding: 0,
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      height: '26px',
+                                      width: '26px',
+                                      flexShrink: 0
+                                    }}
+                                    title="Delete Task"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
                               </div>
 
                             </div>
@@ -1984,14 +2320,23 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                         <td style={{ fontWeight: 600 }}>
                           {calculateTotalLoggedHours(t.timeLogs)}h {t.estimatedHours ? `/ ${t.estimatedHours}h` : ''}
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button
-                            onClick={(e) => handleDeleteTask(t._id, e)}
-                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                            title="Delete Task"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              onClick={(e) => handleOpenEditModal(t, e)}
+                              style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', cursor: 'pointer', padding: '3px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                              title="Edit Task"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteTask(t._id, e)}
+                              style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#ef4444', cursor: 'pointer', padding: '3px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                              title="Delete Task"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -3055,6 +3400,328 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         </div>
       )}
 
+      {/* ── EDIT TASK MODAL ── */}
+      {showEditModal && editingTask && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', background: '#ffffff', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+            
+            {/* Modal Header */}
+            <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Edit2 size={18} color="#ffffff" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
+                  Edit Task Details
+                </h3>
+              </div>
+              <button onClick={() => setShowEditModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleEditTaskSubmit} style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              
+              {/* Task Title */}
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  Task Title *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Task title..."
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  required
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  Description &amp; Work Instructions
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Enter detailed task instructions..."
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* Priority, Department & Due Date */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Priority
+                  </label>
+                  <select
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Department
+                  </label>
+                  <select
+                    value={editDepartment}
+                    onChange={(e) => setEditDepartment(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
+                  >
+                    <option value="General">General</option>
+                    <option value="Fabric">Fabric</option>
+                    <option value="Digital Print">Digital Print</option>
+                    <option value="Stitching">Stitching</option>
+                    <option value="Garments">Garments</option>
+                    <option value="Accounts">Accounts</option>
+                    <option value="Dispatch">Dispatch</option>
+                    <option value="Sampling">Sampling</option>
+                    <option value="Maintenance">Maintenance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={13} color="#2563eb" />
+                      <span>Due Date</span>
+                    </label>
+                    {editDueDate && (
+                      <button
+                        type="button"
+                        onClick={() => setEditDueDate('')}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.55rem',
+                      fontSize: '0.8rem',
+                      borderRadius: '6px',
+                      border: editDueDate ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                      background: editDueDate ? '#eff6ff' : '#ffffff',
+                      color: '#0f172a',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        setEditDueDate(today);
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.66rem',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        setEditDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.66rem',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}
+                    >
+                      Tmrw
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 7);
+                        setEditDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.66rem',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}
+                    >
+                      +1 Wk
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Assigned To Staff Selection */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Assigned To Staff Members
+                    </label>
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '1px 7px',
+                        borderRadius: '10px',
+                        background: editAssigneeIds.length > 0 ? '#eff6ff' : '#fef2f2',
+                        color: editAssigneeIds.length > 0 ? '#2563eb' : '#dc2626',
+                        border: `1px solid ${editAssigneeIds.length > 0 ? '#bfdbfe' : '#fecaca'}`
+                      }}
+                    >
+                      {editAssigneeIds.length} staff selected
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button type="button" onClick={handleEditSelectAllStaff} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+                      Select All
+                    </button>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>|</span>
+                    <button type="button" onClick={handleEditDeselectAllStaff} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ position: 'relative', marginBottom: '0.4rem' }}>
+                  <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search staff members..."
+                    value={editStaffSearch}
+                    onChange={(e) => setEditStaffSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '26px', fontSize: '0.74rem', height: '28px', background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '3px', background: '#ffffff' }}>
+                  {allUsers
+                    .filter((u) => {
+                      const term = editStaffSearch.toLowerCase().trim();
+                      if (!term) return true;
+                      return (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
+                    })
+                    .map((u) => {
+                      const isChecked = editAssigneeIds.includes(String(u._id));
+                      return (
+                        <div
+                          key={u._id}
+                          onClick={() => toggleEditAssigneeSelection(String(u._id))}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.35rem 0.55rem',
+                            borderRadius: '6px',
+                            background: isChecked ? '#eff6ff' : 'transparent',
+                            border: isChecked ? '1px solid #bfdbfe' : '1px solid transparent',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name || u.username}</span>
+                          </div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Project Ref & Est Hours */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Project / Job Card Ref (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. @JC-1004"
+                    value={editProjectRef}
+                    onChange={(e) => setEditProjectRef(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Est. Hours (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder="e.g. 2.0"
+                    value={editEstHours}
+                    onChange={(e) => setEditEstHours(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              {/* Submit / Cancel Buttons */}
+              <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  style={{ flex: 1, padding: '0.6rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px', border: '1px solid var(--border-light)', background: '#f8fafc', color: 'var(--text-primary)', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editingUpdating}
+                  className="btn-primary"
+                  style={{ flex: 2, padding: '0.6rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: '8px' }}
+                >
+                  {editingUpdating ? 'Saving Changes...' : 'Save Task Changes'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── TASK DETAIL DRAWER / MODAL ── */}
       {selectedTask && (
         <div 
@@ -3068,18 +3735,62 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           >
             
             {/* Header */}
-            <div style={{ padding: '1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#2563eb', color: '#fff' }}>
+            <div style={{ padding: '0.9rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', flexWrap: 'wrap', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: 200 }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#2563eb', color: '#fff', whiteSpace: 'nowrap' }}>
                   {selectedTask.status}
                 </span>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                   {selectedTask.title}
                 </h3>
               </div>
-              <button onClick={() => setSelectedTask(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedTask)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    color: '#2563eb',
+                    cursor: 'pointer'
+                  }}
+                  title="Edit Task"
+                >
+                  <Edit2 size={13} />
+                  <span>Edit Task</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleDeleteTask(selectedTask._id, e)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    background: '#fee2e2',
+                    border: '1px solid #fca5a5',
+                    color: '#dc2626',
+                    cursor: 'pointer'
+                  }}
+                  title="Delete Task"
+                >
+                  <Trash2 size={13} />
+                  <span>Delete</span>
+                </button>
+                <button onClick={() => setSelectedTask(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Two-Column Body Layout */}

@@ -41,6 +41,7 @@ import { triggerEliteAlert, triggerEliteConfirm } from './services/dialogService
 import PdfPreviewModal from './components/PdfPreviewModal';
 import PrintOptionsModal from './components/PrintOptionsModal';
 import AutoUpdateNotification from './components/AutoUpdateNotification';
+import { webPushClient } from './services/webPushClient';
 import { matchSkuOrBrandCode } from './utils/skuHelper';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
 import { 
@@ -622,18 +623,30 @@ export default function App() {
     }
   };
 
-  // Auto-request Push Notification permission on site open
+  // Auto-request Push Notification permission on site open & register browser Web Push
   useEffect(() => {
     if (isAuthenticated) {
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') {
-            triggerPushNotification('Push Notifications Active 🔔', 'You will receive real-time popups for Chat, Tasks, and Operations.', 'success');
+      const subscribePush = async () => {
+        try {
+          const userId = currentUser?._id || currentUser?.id;
+          if ('Notification' in window) {
+            if (Notification.permission === 'default') {
+              const perm = await Notification.requestPermission();
+              if (perm === 'granted') {
+                await webPushClient.subscribeToPush(userId);
+                triggerPushNotification('Push Notifications Active 🔔', 'You will receive real-time popups for Chat, Tasks, and Operations.', 'success');
+              }
+            } else if (Notification.permission === 'granted') {
+              await webPushClient.subscribeToPush(userId);
+            }
           }
-        }).catch(() => {});
-      }
+        } catch (e) {
+          console.warn('[App] Push notification subscription error:', e);
+        }
+      };
+      subscribePush();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUser]);
 
   // Tab permission validation — ONLY reset activeTab if the tab is truly forbidden
   useEffect(() => {

@@ -9,11 +9,13 @@ import { installGlobalDialogInterceptors } from './services/dialogService.js'
 import { setupGlobalCrashListeners } from './utils/globalCrashListeners'
 import { initERPTelemetry } from './telemetry/deviceTelemetry'
 import './services/telemetryService.ts'
+import { initCrossTabSync } from './utils/crossTabSync'
 
-// Initialize device & hardware telemetry, enterprise dialog & global error and rejection listeners
+// Initialize device & hardware telemetry, enterprise dialog, global error and cross-tab sync listeners
 initERPTelemetry()
 installGlobalDialogInterceptors()
 setupGlobalCrashListeners()
+initCrossTabSync()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -81,6 +83,17 @@ if ('serviceWorker' in navigator && isAllowedPwaHost) {
     }
   });
 }
+
+// Auto-heal Vite dynamic chunk loading errors on new deployments
+window.addEventListener('vite:preloadError', (event) => {
+  const storageKey = 'last_chunk_reload_time';
+  const now = Date.now();
+  const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+  if (now - lastReload > 8000) {
+    sessionStorage.setItem(storageKey, String(now));
+    window.location.reload();
+  }
+});
 
 // Auto-heal dynamic import chunk errors after new deployments
 window.addEventListener('unhandledrejection', (event) => {

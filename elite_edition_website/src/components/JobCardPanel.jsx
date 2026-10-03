@@ -4,7 +4,7 @@ import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
   AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt, Loader, User,
-  Building2, Scissors, SlidersHorizontal
+  Building2, Scissors, SlidersHorizontal, ZoomIn, Layers, ShieldCheck, Truck, Flame, Sparkles, ExternalLink
 } from 'lucide-react';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignCatalogue from './DesignCatalogue';
@@ -702,12 +702,174 @@ export async function triggerJobCardPrint(cardOrCards) {
   win.document.close();
 }
 
+// ─── Image preview component with candidate fallback and zoom ───────────────
+function SmartJobCardPreviewImage({ rawUrl, designName, label, onZoom }) {
+  const candidates = useMemo(() => {
+    return getImageCandidates(rawUrl, designName, { thumbnail: false, width: 800 });
+  }, [rawUrl, designName]);
+
+  const [candIndex, setCandIndex] = useState(0);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setCandIndex(0);
+    setHasError(false);
+  }, [rawUrl, designName]);
+
+  const currentSrc = candidates[candIndex] || (rawUrl ? convertDriveUrl(rawUrl) : '');
+
+  if (hasError || !currentSrc) {
+    return (
+      <div style={{
+        flex: 1, minWidth: 160, minHeight: 140,
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px dashed var(--border-light)',
+        borderRadius: 'var(--radius-sm)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '0.75rem', gap: '0.4rem', color: 'var(--text-muted)'
+      }}>
+        <Image size={24} style={{ opacity: 0.4 }} />
+        <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{label || 'Design Artwork'}</span>
+        <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>No preview image</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        flex: 1, minWidth: 160,
+        background: 'rgba(0,0,0,0.3)',
+        border: '1px solid var(--border-light)',
+        borderRadius: 'var(--radius-sm)',
+        overflow: 'hidden',
+        position: 'relative',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: 'var(--shadow-sm)'
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 6, left: 6, zIndex: 2,
+        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+        color: '#fff', fontSize: '0.65rem', fontWeight: 700,
+        padding: '2px 6px', borderRadius: 4, letterSpacing: '0.03em'
+      }}>
+        {label}
+      </div>
+      <div
+        style={{
+          height: 150, width: '100%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', position: 'relative', overflow: 'hidden'
+        }}
+        onClick={() => onZoom && onZoom(currentSrc)}
+        title="Click to view high resolution image"
+      >
+        <img
+          src={currentSrc}
+          alt={label || 'Artwork'}
+          referrerPolicy="no-referrer"
+          onError={() => {
+            if (candIndex + 1 < candidates.length) {
+              setCandIndex(i => i + 1);
+            } else {
+              setHasError(true);
+            }
+          }}
+          style={{
+            maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
+            transition: 'transform 0.2s ease'
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+        />
+        <div style={{
+          position: 'absolute', bottom: 6, right: 6,
+          background: 'rgba(0,0,0,0.7)', color: '#fff',
+          borderRadius: 4, padding: '2px 6px', fontSize: '0.65rem',
+          display: 'flex', alignItems: 'center', gap: 4
+        }}>
+          <ZoomIn size={11} /> Zoom
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal section card helper ───────────────────────────────────────────────
+function DetailCard({ title, icon: Icon, children, badge, style }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.02)',
+      border: '1px solid var(--border-light)',
+      borderRadius: 'var(--radius-md)',
+      padding: '0.85rem 1rem',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.65rem',
+      ...style
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        borderBottom: '1px solid var(--border-light)', paddingBottom: '0.45rem'
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.45rem',
+          fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)',
+          textTransform: 'uppercase', letterSpacing: '0.04em'
+        }}>
+          {Icon && <Icon size={14} />}
+          <span>{title}</span>
+        </div>
+        {badge}
+      </div>
+      <div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal field cell helper ─────────────────────────────────────────────────
+function DetailCell({ label, value, highlight, color, fullWidth, extra }) {
+  const displayVal = value !== undefined && value !== null && String(value).trim() !== '' ? String(value) : '—';
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: '2px',
+      background: 'rgba(255,255,255,0.015)',
+      border: '1px solid var(--border-light)',
+      borderRadius: 'var(--radius-sm)',
+      padding: '0.45rem 0.65rem',
+      minWidth: 0,
+      gridColumn: fullWidth ? '1 / -1' : undefined
+    }}>
+      <div style={{
+        fontSize: '0.62rem', color: 'var(--text-muted)',
+        textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.03em',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+      }}>
+        {label}
+      </div>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.4rem',
+        fontSize: '0.85rem',
+        fontWeight: highlight ? 700 : 600,
+        color: color || (highlight ? 'var(--primary)' : 'var(--text-primary)'),
+        wordBreak: 'break-word'
+      }}>
+        <span>{displayVal}</span>
+        {extra}
+      </div>
+    </div>
+  );
+}
+
 function JobCardPrintView({ card, onClose, onShare }) {
-  const printRef = useRef();
   const [resolvedImages, setResolvedImages] = useState({
     imageUrl1: card.imageUrl1 || '',
     imageUrl2: card.imageUrl2 || '',
   });
+  const [zoomImage, setZoomImage] = useState(null);
 
   useEffect(() => {
     const resolveImages = async () => {
@@ -720,7 +882,6 @@ function JobCardPrintView({ card, onClose, onShare }) {
       let img2 = card.imageUrl2 || '';
 
       try {
-        // Look up in catalog if no image attached
         if (!img1 && names[0]) {
           const res1 = await api.getDesigns({ search: names[0], limit: 5 });
           if (res1 && res1.data && res1.data.length > 0) {
@@ -736,7 +897,6 @@ function JobCardPrintView({ card, onClose, onShare }) {
           }
         }
 
-        // If 2 design names were entered and img2 isn't set, resolve design 2 image
         if (!img2 && names.length > 1 && names[1]) {
           const res2 = await api.getDesigns({ search: names[1], limit: 5 });
           if (res2 && res2.data && res2.data.length > 0) {
@@ -750,7 +910,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
 
         setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
       } catch (err) {
-        console.error('Failed to resolve design images for print:', err);
+        console.error('Failed to resolve design images for preview:', err);
         setResolvedImages({
           imageUrl1: card.imageUrl1 || '',
           imageUrl2: (names.length >= 2) ? (card.imageUrl2 || '') : '',
@@ -768,59 +928,416 @@ function JobCardPrintView({ card, onClose, onShare }) {
     });
   };
 
+  const primaryDesignName = cleanDesignNameString(card.designName || card.designNo || '');
+  const colorHex = card.colors ? getColorHex(card.colors) : null;
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth:520, padding:'1.5rem' }} onClick={e=>e.stopPropagation()}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.2rem' }}>
-          <div>
-            <h3 style={{ fontSize:'1.1rem', fontWeight:700, color:'var(--text-primary)' }}>Job Card Preview</h3>
-            <p style={{ fontSize:'0.8rem', color:'var(--text-muted)', marginTop:2 }}>Job No.: {card.jobNo} • Machine: {card.machineName || '—'}</p>
-          </div>
-          <button onClick={onClose} className="btn-icon"><X size={16}/></button>
-        </div>
-
-        {/* Quick summary */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.6rem', marginBottom:'1.2rem' }}>
-          {[
-            ['Party', card.party],
-            ['Design Name', card.designName || card.designNo],
-            ['Fabric', card.fabric],
-            ['Designer', card.designer],
-            ['C. Matching', card.colourMatching],
-            ['Panna', card.panna],
-            ['Pass', card.pass],
-            ['Total Mtr', card.totalMtr],
-            ['EXP. Time', card.expTime],
-            ['Fusing Temp', card.temperature],
-            ['Speed', card.speed],
-            ['Date', card.date],
-          ].map(([k,v])=>(
-            <div key={k} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border-light)',
-              borderRadius:'var(--radius-sm)', padding:'0.5rem 0.75rem' }}>
-              <div style={{ fontSize:'0.65rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:700 }}>{k}</div>
-              <div style={{ fontSize:'0.9rem', color: k==='EXP. Time'||k==='Design Name' ? 'var(--primary)' : 'var(--text-primary)', fontWeight:600 }}>{v || '—'}</div>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      style={{
+        zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1rem', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)'
+      }}
+    >
+      <div
+        className="modal-content"
+        style={{
+          maxWidth: 940,
+          width: '95vw',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 0,
+          overflow: 'hidden',
+          borderRadius: 'var(--radius-lg, 12px)',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)',
+          background: 'var(--bg-card, #131722)',
+          border: '1px solid var(--border-light, #2e384d)'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ─── MODAL HEADER ─── */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '1rem 1.4rem', borderBottom: '1px solid var(--border-light)',
+          background: 'rgba(255,255,255,0.02)'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)',
+                fontFamily: 'monospace', letterSpacing: '0.04em'
+              }}>
+                JOB NO.- {card.jobNo}
+              </span>
+              {card.machineName && (
+                <span style={{
+                  padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800,
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                  background: card.machineName === 'GRANDO' ? 'rgba(37,99,235,0.18)' : card.machineName === 'PRINTDOT' ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.08)',
+                  color: card.machineName === 'GRANDO' ? '#60a5fa' : card.machineName === 'PRINTDOT' ? '#f87171' : 'var(--text-primary)',
+                  border: `1px solid ${card.machineName === 'GRANDO' ? 'rgba(96,165,250,0.3)' : card.machineName === 'PRINTDOT' ? 'rgba(248,113,113,0.3)' : 'var(--border-light)'}`
+                }}>
+                  {card.machineName}
+                </span>
+              )}
+              <WorkflowStageBadge card={card} />
+              <StatusPill status={card.status || 'Pending'} />
             </div>
-          ))}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+              <span>Dept: <strong style={{ color: 'var(--text-primary)' }}>{card.department || 'digital_print'}</strong></span>
+              {card.category && <span>Category: <strong style={{ color: 'var(--text-primary)' }}>{card.category}</strong></span>}
+              <span>Created Date: <strong style={{ color: 'var(--text-primary)' }}>{card.date || '—'}</strong></span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button onClick={onClose} className="btn-icon" style={{ borderRadius: '50%', padding: '0.45rem' }}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        <div style={{ display:'flex', gap:'0.75rem' }}>
+        {/* ─── MODAL SCROLLABLE BODY ─── */}
+        <div style={{
+          flex: 1, overflowY: 'auto', padding: '1.2rem 1.4rem',
+          display: 'flex', flexDirection: 'column', gap: '1.1rem'
+        }}>
+          {/* 🌟 Top Visual Overview Banner (Artwork Images & Essential Identifiers) 🌟 */}
+          <div style={{
+            display: 'flex', gap: '1.2rem', flexWrap: 'wrap',
+            background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)',
+            borderRadius: 'var(--radius-md)', padding: '1rem', alignItems: 'stretch'
+          }}>
+            {/* Artwork Previews */}
+            <div style={{ display: 'flex', gap: '0.75rem', flex: '1 1 320px', minWidth: 260 }}>
+              <SmartJobCardPreviewImage
+                rawUrl={resolvedImages.imageUrl1 || card.imageUrl1}
+                designName={primaryDesignName}
+                label="Artwork 1 (Primary)"
+                onZoom={setZoomImage}
+              />
+              {(resolvedImages.imageUrl2 || card.imageUrl2) && (
+                <SmartJobCardPreviewImage
+                  rawUrl={resolvedImages.imageUrl2 || card.imageUrl2}
+                  designName={primaryDesignName}
+                  label="Artwork 2 / Back"
+                  onZoom={setZoomImage}
+                />
+              )}
+            </div>
+
+            {/* Quick Hero Highlights */}
+            <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.6rem' }}>
+              <div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
+                  PARTY NAME
+                </div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>
+                  {card.party || '—'}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
+                  DESIGN NAME / NUMBER
+                </div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary)', marginTop: 2 }}>
+                  {primaryDesignName || '—'}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '0.5rem', marginTop: 4 }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>TOTAL METERS</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#10b981' }}>{card.totalMtr || '0'} m</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>FABRIC</div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.fabric || '—'}</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>COLORS</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {colorHex && (
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: colorHex, border: '1px solid rgba(255,255,255,0.3)', display: 'inline-block' }} />
+                    )}
+                    <span>{card.colors || '—'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 🚨 Emergency Notes Alert Banner (if present) 🚨 */}
+          {card.emergencyNotes && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.12)', border: '1.5px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem'
+            }}>
+              <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  URGENT / EMERGENCY INSTRUCTION
+                </div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fca5a5', marginTop: 2 }}>
+                  {card.emergencyNotes}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── SECTION: 📋 GENERAL & PARTY DETAILS ─── */}
+          <DetailCard title="General & Party Information" icon={Building2}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+              <DetailCell label="Party Name" value={card.party} highlight />
+              <DetailCell label="Bill To" value={card.billTo} />
+              <DetailCell label="Ship To" value={card.shipTo} />
+              <DetailCell label="Bill / Challan No" value={card.billNo} />
+              <DetailCell label="Designer" value={card.designer} />
+              <DetailCell label="Colour Matching (C.M.)" value={card.colourMatching} />
+              <DetailCell
+                label="Color"
+                value={card.colors}
+                extra={colorHex ? <span style={{ width: 12, height: 12, borderRadius: '50%', background: colorHex, border: '1px solid rgba(255,255,255,0.3)' }} /> : null}
+              />
+              <DetailCell label="Category" value={card.category} />
+              <DetailCell label="Department" value={card.department || 'digital_print'} />
+              <DetailCell label="Order / Job Date" value={card.date} />
+            </div>
+          </DetailCard>
+
+          {/* ─── SECTION: ✂️ FABRIC & CUTTING / GARMENT SPECS ─── */}
+          <DetailCard title="Fabric, Cutting & Garment Breakdown" icon={Scissors}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
+              <DetailCell label="Fabric" value={card.fabric} highlight />
+              <DetailCell label="Panna (Width)" value={card.panna} />
+              <DetailCell label="Total Meters" value={card.totalMtr ? `${card.totalMtr} m` : '—'} highlight color="#10b981" />
+              <DetailCell label="Pieces (Pcs)" value={card.pcs} />
+              <DetailCell label="Cut" value={card.cut} />
+              <DetailCell label="Allover" value={card.allover} />
+              <DetailCell label="Consumption (Con.)" value={card.consumption} />
+              <DetailCell label="Top" value={card.top} />
+              <DetailCell label="Sleeve" value={card.sleeve} />
+              <DetailCell label="Bottom" value={card.bottom} />
+              <DetailCell label="Dupatta" value={card.dupatta} />
+              <DetailCell label="Set Copy" value={card.setCopy} />
+              <DetailCell label="PN / KM" value={card.pnKm} />
+            </div>
+          </DetailCard>
+
+          {/* ─── 2-COLUMN ROW: PRINTING DEPT & FUSING DEPT ─── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.1rem' }}>
+            {/* 🖨️ Printing Department */}
+            <DetailCard
+              title="Printing Department"
+              icon={Printer}
+              badge={<StatusPill status={card.printStatus || 'Printing Pending'} />}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                <DetailCell label="Print Machine" value={card.machineName} highlight />
+                <DetailCell label="Operator" value={card.operatorName} />
+                <DetailCell label="Pass" value={card.pass} />
+                <DetailCell label="Speed" value={card.speed} />
+                <DetailCell label="EXP. Time" value={card.expTime} highlight />
+                <DetailCell label="Profile" value={card.profile} />
+                <DetailCell label="Paper Type" value={card.paperType} />
+                <DetailCell label="Print Date" value={card.printDate} />
+                <DetailCell label="Print Meter" value={card.printMtr ? `${card.printMtr} m` : '—'} highlight color="#3b82f6" />
+              </div>
+            </DetailCard>
+
+            {/* 🔥 Fusing & Heat Press */}
+            <DetailCard
+              title="Fusing & Heat Press"
+              icon={Flame}
+              badge={<StatusPill status={card.fusingStatus || 'Fusing Pending'} />}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                <DetailCell label="Fusing Machine" value={card.fusingMachine} />
+                <DetailCell label="Fusing Operator" value={card.fusingOperator} />
+                <DetailCell label="Temperature" value={card.temperature || card.fusingTemp} highlight />
+                <DetailCell label="Fusing Speed" value={card.fusingSpeed} />
+                <DetailCell label="Butter Paper Wt" value={card.butterPaperWeightKg ? `${card.butterPaperWeightKg} Kg` : '—'} />
+                <DetailCell label="Shift" value={card.shift} />
+                <DetailCell label="Fusing Date" value={card.fusingDate} />
+                <DetailCell label="Fusing Meter" value={card.fusingMtr ? `${card.fusingMtr} m` : '—'} highlight color="#f59e0b" />
+              </div>
+            </DetailCard>
+          </div>
+
+          {/* ─── 2-COLUMN ROW: QUALITY ASSURANCE & DELIVERY/BILLING ─── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.1rem' }}>
+            {/* 🛡️ Quality Assurance (QA) & Wastage */}
+            <DetailCard
+              title="Quality Assurance & Wastage"
+              icon={ShieldCheck}
+              badge={<StatusPill status={card.qaStatus || 'QA Pending'} />}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem' }}>
+                <DetailCell label="QA Inspector" value={card.qaInspector} />
+                <DetailCell label="QA Date" value={card.qaDate} />
+                <DetailCell label="Fresh Mtr (Passed)" value={card.freshMtr ? `${card.freshMtr} m` : '—'} highlight color="#10b981" />
+                <DetailCell label="Total Wastage" value={card.totalWastageMtr ? `${card.totalWastageMtr} m` : '0 m'} color="#ef4444" />
+                <DetailCell label="Fabric Fault" value={card.fabricFaultMtr ? `${card.fabricFaultMtr} m` : '0 m'} />
+                <DetailCell label="Print Fault" value={card.printFaultMtr ? `${card.printFaultMtr} m` : '0 m'} />
+                <DetailCell label="Fusing Fault" value={card.fusingFaultMtr ? `${card.fusingFaultMtr} m` : '0 m'} />
+                <DetailCell label="Genuine Fault" value={card.genuineFaultMtr ? `${card.genuineFaultMtr} m` : '0 m'} />
+                <DetailCell label="Total Fabric Used" value={card.totalFabricUsedMtr ? `${card.totalFabricUsedMtr} m` : '—'} />
+                {card.qaNotes && (
+                  <DetailCell label="QA Notes / Remarks" value={card.qaNotes} fullWidth />
+                )}
+              </div>
+            </DetailCard>
+
+            {/* 🚚 Delivery & Billing */}
+            <DetailCard
+              title="Delivery, Dispatch & Billing"
+              icon={Truck}
+              badge={<StatusPill status={card.deliveryStatus || 'Delivery Pending'} />}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                <DetailCell label="Delivery Status" value={card.deliveryStatus || 'Delivery Pending'} />
+                <DetailCell label="Delivery Date" value={card.deliveryDate} />
+                <DetailCell label="Delivered Mtr" value={card.deliveredMtr || card.deliveryMtr ? `${card.deliveredMtr || card.deliveryMtr} m` : '0 m'} highlight color="#065f46" />
+                <DetailCell label="Remaining Mtr" value={card.totalMtr ? `${Math.max(0, parseFloat(card.totalMtr || 0) - parseFloat(card.deliveredMtr || 0)).toFixed(2)} m` : '—'} />
+              </div>
+
+              {/* Linked Invoices */}
+              {card.invoices && card.invoices.length > 0 && (
+                <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.6rem' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                    Linked Invoices ({card.invoices.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    {card.invoices.map((inv, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        background: 'rgba(255,255,255,0.02)', padding: '0.35rem 0.6rem',
+                        borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)',
+                        fontSize: '0.78rem'
+                      }}>
+                        <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{inv.invoiceNo || `Invoice #${idx+1}`}</span>
+                        <span>{inv.meters || 0} m</span>
+                        <span style={{ fontWeight: 700 }}>₹{inv.amount || 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </DetailCard>
+          </div>
+
+          {/* ─── SECTION: 📝 NOTES & INSTRUCTIONS ─── */}
+          {(card.note1 || card.note2) && (
+            <DetailCard title="Special Notes & Remarks" icon={FileText}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.6rem' }}>
+                {card.note1 && <DetailCell label="Note 1" value={card.note1} />}
+                {card.note2 && <DetailCell label="Note 2" value={card.note2} />}
+              </div>
+            </DetailCard>
+          )}
+
+          {/* ─── SECTION: 👤 AUDIT & SYSTEM METADATA ─── */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
+            gap: '0.8rem', padding: '0.6rem 0.85rem', background: 'rgba(255,255,255,0.015)',
+            border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
+            fontSize: '0.72rem', color: 'var(--text-muted)'
+          }}>
+            <div>
+              Created By: <strong style={{ color: 'var(--text-primary)' }}>{card.createdByName || card.createdBy || 'Admin'}</strong>
+              {card.created_date_time && ` on ${new Date(card.created_date_time).toLocaleDateString()}`}
+            </div>
+            {(card.updatedByName || card.updatedBy || card.modified_date_time) && (
+              <div>
+                Last Updated: <strong style={{ color: 'var(--text-primary)' }}>{card.updatedByName || card.updatedBy || 'System'}</strong>
+                {card.modified_date_time && ` (${new Date(card.modified_date_time).toLocaleDateString()})`}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ─── MODAL FOOTER ACTIONS ─── */}
+        <div style={{
+          display: 'flex', gap: '0.75rem', padding: '0.9rem 1.4rem',
+          borderTop: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)',
+          justifyContent: 'flex-end', flexWrap: 'wrap'
+        }}>
           <button
             className="btn-primary"
-            style={{ flex:1, justifyContent:'center' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.55rem 1.2rem', fontWeight: 700 }}
             onClick={doPrint}
           >
             <Printer size={15}/> Print / Save as PDF
           </button>
           {onShare && (
-            <button className="btn-secondary" style={{ flex:1, justifyContent:'center', color: '#60a5fa', borderColor: 'rgba(96,165,250,0.3)' }} onClick={() => onShare(card)}>
+            <button
+              className="btn-secondary"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.55rem 1.1rem',
+                color: '#60a5fa', borderColor: 'rgba(96,165,250,0.3)', fontWeight: 600
+              }}
+              onClick={() => onShare(card)}
+            >
               <Send size={15}/> Share to Chat
             </button>
           )}
-          <button className="btn-secondary" style={{ flex:1, justifyContent:'center' }} onClick={onClose}>
+          <button
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.55rem 1.1rem' }}
+            onClick={onClose}
+          >
             Close
           </button>
         </div>
       </div>
+
+      {/* ─── IMAGE FULL-SCREEN ZOOM OVERLAY MODAL ─── */}
+      {zoomImage && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1250,
+            background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '1.5rem'
+          }}
+          onClick={() => setZoomImage(null)}
+        >
+          <div style={{
+            position: 'absolute', top: 16, right: 16, display: 'flex', gap: '0.5rem', zIndex: 10
+          }}>
+            <a
+              href={zoomImage}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary"
+              style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', color: '#fff' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink size={14} style={{ marginRight: 4 }} /> Open in New Tab
+            </a>
+            <button
+              onClick={() => setZoomImage(null)}
+              className="btn-icon"
+              style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '50%', padding: '0.45rem' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <img
+            src={zoomImage}
+            alt="Zoomed Design"
+            referrerPolicy="no-referrer"
+            style={{
+              maxWidth: '92vw', maxHeight: '86vh', objectFit: 'contain',
+              borderRadius: 'var(--radius-md)', boxShadow: '0 25px 50px rgba(0,0,0,0.8)'
+            }}
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

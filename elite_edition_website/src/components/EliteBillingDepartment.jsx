@@ -97,7 +97,10 @@ import {
   BookOpen,
   FileSpreadsheet,
   ShoppingBag,
-  FileCode
+  FileCode,
+  Filter,
+  RotateCcw,
+  Percent
 } from 'lucide-react';
 
 // Helper for Indian Currency formatting
@@ -338,13 +341,26 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [purchases, setPurchases] = useState(() => {
     try {
       const saved = localStorage.getItem(`elite_purchases_${companyEntity || 'edp'}`);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) return JSON.parse(saved);
+      for (const k of ['elite_purchases_edp', 'elite_purchases_Elite Digital Prints', 'elite_purchases_Elite Edition', 'elite_purchases_Elite Fabtex']) {
+        const anySaved = localStorage.getItem(k);
+        if (anySaved) {
+          const parsed = JSON.parse(anySaved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+      return [];
     } catch (e) {
       return [];
     }
   });
 
   const [purchaseSearch, setPurchaseSearch] = useState('');
+  const [purchaseDatePreset, setPurchaseDatePreset] = useState('all');
+  const [purchaseDateStart, setPurchaseDateStart] = useState('');
+  const [purchaseDateEnd, setPurchaseDateEnd] = useState('');
+  const [purchaseVendorFilter, setPurchaseVendorFilter] = useState('ALL');
+  const [purchaseGstFilter, setPurchaseGstFilter] = useState('ALL');
   const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
 
@@ -442,11 +458,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   };
 
   const handleEditPurchase = (p) => {
-    setEditingPurchaseId(p.id);
+    setEditingPurchaseId(p._id || p.id);
     const pGstRate = p.gstRate != null ? p.gstRate : 0;
     const pItems = Array.isArray(p.items) && p.items.length > 0
       ? p.items.map(it => ({
-          id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          id: it.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           itemName: it.itemName || '',
           quantity: it.quantity || '',
           unit: it.unit || 'Mtr',
@@ -464,7 +480,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
     setPurchaseForm({
       purchaseNo: p.purchaseNo || '',
-      date: p.date || new Date().toISOString().split('T')[0],
+      date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : p.date) : new Date().toISOString().split('T')[0],
       vendorName: p.vendorName || '',
       items: pItems,
       gstRate: pGstRate,
@@ -477,28 +493,82 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     setShowPurchaseModal(true);
   };
 
-  useEffect(() => {
+  const fetchPurchases = async () => {
     try {
-      localStorage.setItem(`elite_purchases_${companyEntity || 'edp'}`, JSON.stringify(purchases));
-    } catch (e) {}
-  }, [purchases, companyEntity]);
+      const res = await api.getBillingPurchases(companyEntity);
+      let dbPurchases = (res && res.data) ? res.data : [];
+
+      // Collect all local storage purchases to ensure no previous entry is lost
+      const allLocalPurchases = [];
+      const keysToCheck = [
+        `elite_purchases_${companyEntity || 'edp'}`,
+        'elite_purchases_edp',
+        'elite_purchases_Elite Digital Prints',
+        'elite_purchases_Elite Edition',
+        'elite_purchases_Elite Fabtex'
+      ];
+      keysToCheck.forEach(k => {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) {
+              arr.forEach(item => {
+                if (item && (item.purchaseNo || item.vendorName)) {
+                  allLocalPurchases.push({ ...item, companyEntity: item.companyEntity || companyEntity || 'Elite Digital Prints' });
+                }
+              });
+            }
+          }
+        } catch (err) {}
+      });
+
+      // Filter unsynced items
+      const unsynced = allLocalPurchases.filter(localP => {
+        const localNo = String(localP.purchaseNo || '').trim().toLowerCase();
+        const localVendor = String(localP.vendorName || '').trim().toLowerCase();
+        return !dbPurchases.some(dbP => 
+          String(dbP.purchaseNo || '').trim().toLowerCase() === localNo &&
+          String(dbP.vendorName || '').trim().toLowerCase() === localVendor
+        );
+      });
+
+      if (unsynced.length > 0) {
+        try {
+          await api.bulkSyncBillingPurchases(unsynced);
+          const freshRes = await api.getBillingPurchases(companyEntity);
+          if (freshRes && freshRes.data) {
+            dbPurchases = freshRes.data;
+          }
+        } catch (syncErr) {
+          console.warn('Failed bulkSyncBillingPurchases:', syncErr);
+        }
+      }
+
+      setPurchases(dbPurchases);
+      try {
+        localStorage.setItem(`elite_purchases_${companyEntity || 'edp'}`, JSON.stringify(dbPurchases));
+      } catch (e) {}
+    } catch (err) {
+      console.warn('Failed to load purchases from API:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPurchases();
+  }, [companyEntity]);
 
   useEffect(() => {
     const handleRefresh = (e) => {
       if (!e || !e.detail || e.detail === 'billing' || e.detail?.source === 'billing') {
-        try {
-          const saved = localStorage.getItem(`elite_purchases_${companyEntity || 'edp'}`);
-          if (saved) {
-            setPurchases(JSON.parse(saved));
-          }
-        } catch (err) {}
+        fetchPurchases();
       }
     };
     window.addEventListener('elite-data-refresh', handleRefresh);
     return () => window.removeEventListener('elite-data-refresh', handleRefresh);
   }, [companyEntity]);
 
-  const handleCreatePurchase = (e) => {
+  const handleCreatePurchase = async (e) => {
     e.preventDefault();
     if (!purchaseForm.vendorName) {
       alert('Please select Vendor Name.');
@@ -522,11 +592,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     const calculatedGstAmt = (calculatedSubtotal * rateNum) / 100;
     const finalTotal = parseFloat(purchaseForm.totalAmount) || (calculatedSubtotal + calculatedGstAmt);
 
-    const newPur = {
-      id: editingPurchaseId || `pur_${Date.now()}`,
+    const payload = {
       purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
       vendorName: purchaseForm.vendorName,
+      companyEntity: companyEntity || 'Elite Digital Prints',
       items: validItems.map(item => {
         const q = parseFloat(item.quantity) || 0;
         const r = parseFloat(item.rate) || 0;
@@ -552,11 +622,39 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       notes: purchaseForm.notes || ''
     };
 
-    if (editingPurchaseId) {
-      setPurchases(prev => prev.map(p => p.id === editingPurchaseId ? newPur : p));
-      setEditingPurchaseId(null);
-    } else {
-      setPurchases(prev => [newPur, ...prev]);
+    try {
+      if (editingPurchaseId) {
+        const isMongoId = /^[0-9a-fA-F]{24}$/.test(editingPurchaseId);
+        if (isMongoId) {
+          const res = await api.updateBillingPurchase(editingPurchaseId, payload);
+          if (res && res.data) {
+            setPurchases(prev => prev.map(p => ((p._id === editingPurchaseId || p.id === editingPurchaseId) ? res.data : p)));
+          } else {
+            setPurchases(prev => prev.map(p => ((p._id === editingPurchaseId || p.id === editingPurchaseId) ? { ...payload, _id: editingPurchaseId, id: editingPurchaseId } : p)));
+          }
+        } else {
+          const res = await api.createBillingPurchase(payload);
+          const saved = (res && res.data) ? res.data : { ...payload, id: editingPurchaseId };
+          setPurchases(prev => prev.map(p => (p.id === editingPurchaseId ? saved : p)));
+        }
+        setEditingPurchaseId(null);
+      } else {
+        const res = await api.createBillingPurchase(payload);
+        const saved = (res && res.data) ? res.data : { ...payload, id: `pur_${Date.now()}` };
+        setPurchases(prev => [saved, ...prev]);
+      }
+    } catch (err) {
+      console.error('Error saving purchase to DB:', err);
+      const fallbackPur = {
+        ...payload,
+        id: editingPurchaseId || `pur_${Date.now()}`
+      };
+      if (editingPurchaseId) {
+        setPurchases(prev => prev.map(p => (p.id === editingPurchaseId || p._id === editingPurchaseId ? fallbackPur : p)));
+        setEditingPurchaseId(null);
+      } else {
+        setPurchases(prev => [fallbackPur, ...prev]);
+      }
     }
 
     setShowPurchaseModal(false);
@@ -573,9 +671,17 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     });
   };
 
-  const handleDeletePurchase = (id) => {
-    if (window.confirm('Are you sure you want to delete this purchase record?')) {
-      setPurchases(prev => prev.filter(p => p.id !== id));
+  const handleDeletePurchase = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this purchase record?')) return;
+    try {
+      const isMongoId = /^[0-9a-fA-F]{24}$/.test(id);
+      if (isMongoId) {
+        await api.deleteBillingPurchase(id);
+      }
+      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
+    } catch (err) {
+      console.error('Error deleting purchase:', err);
+      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
     }
   };
 
@@ -601,14 +707,70 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     return Array.from(list).filter(Boolean);
   }, [fabricVendors]);
 
-  const filteredPurchases = purchases.filter(p => {
-    const q = purchaseSearch.toLowerCase();
-    return !q || (p.purchaseNo && p.purchaseNo.toLowerCase().includes(q)) || (p.vendorName && p.vendorName.toLowerCase().includes(q)) || (p.itemName && p.itemName.toLowerCase().includes(q));
-  });
+  // Dynamic list of unique vendors for purchases filter
+  const purchaseVendorsList = useMemo(() => {
+    const list = new Set();
+    (purchases || []).forEach(p => {
+      if (p.vendorName && p.vendorName.trim()) list.add(p.vendorName.trim());
+    });
+    (fabricVendors || []).forEach(v => {
+      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
+      if (vName && String(vName).trim()) list.add(String(vName).trim());
+    });
+    return Array.from(list).sort();
+  }, [purchases, fabricVendors]);
 
-  const totalPurchaseValue = purchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
-  const totalInwardQty = purchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
-  const uniqueVendorsCount = new Set(purchases.map(p => p.vendorName).filter(Boolean)).size;
+  // Date range object based on preset or custom range
+  const purchaseDateRange = useMemo(() => {
+    return getDatePresetRange(purchaseDatePreset, purchaseDateStart, purchaseDateEnd);
+  }, [purchaseDatePreset, purchaseDateStart, purchaseDateEnd]);
+
+  const hasActivePurchaseFilters = Boolean(
+    (purchaseSearch && purchaseSearch.trim()) ||
+    purchaseDatePreset !== 'all' ||
+    purchaseVendorFilter !== 'ALL' ||
+    purchaseGstFilter !== 'ALL'
+  );
+
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter(p => {
+      // 1. Text Search
+      if (purchaseSearch && purchaseSearch.trim()) {
+        const q = purchaseSearch.toLowerCase().trim();
+        const matchNo = p.purchaseNo && p.purchaseNo.toLowerCase().includes(q);
+        const matchVendor = p.vendorName && p.vendorName.toLowerCase().includes(q);
+        const matchItem = p.itemName && p.itemName.toLowerCase().includes(q);
+        const matchChildItems = Array.isArray(p.items) && p.items.some(it => it.itemName && it.itemName.toLowerCase().includes(q));
+        if (!matchNo && !matchVendor && !matchItem && !matchChildItems) return false;
+      }
+
+      // 2. Vendor Filter
+      if (purchaseVendorFilter && purchaseVendorFilter !== 'ALL') {
+        if ((p.vendorName || '').trim().toLowerCase() !== purchaseVendorFilter.trim().toLowerCase()) return false;
+      }
+
+      // 3. GST Rate Filter
+      if (purchaseGstFilter && purchaseGstFilter !== 'ALL') {
+        if (Number(p.gstRate || 0) !== Number(purchaseGstFilter)) return false;
+      }
+
+      // 4. Date Range Filter
+      if (purchaseDateRange.start || purchaseDateRange.end) {
+        if (!p.date) return false;
+        const pDate = new Date(p.date);
+        if (!isNaN(pDate.getTime())) {
+          if (purchaseDateRange.start && pDate < purchaseDateRange.start) return false;
+          if (purchaseDateRange.end && pDate > purchaseDateRange.end) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseDateRange]);
+
+  const totalPurchaseValue = filteredPurchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
+  const totalInwardQty = filteredPurchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
+  const uniqueVendorsCount = new Set(filteredPurchases.map(p => p.vendorName).filter(Boolean)).size;
 
   // Helper for Ledger dates
   const getLedgerDateRange = () => {
@@ -3842,17 +4004,120 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
           {/* Filter Bar & Action Header */}
           <div style={{ background: 'var(--bg-card, #ffffff)', padding: '0.9rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', minWidth: 280 }}>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+              {/* Search Bar */}
+              <div style={{ position: 'relative', minWidth: 220, flex: '1 1 220px', maxWidth: 300 }}>
                 <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input
                   type="text"
                   placeholder="Search Bill No, Vendor, Item..."
                   value={purchaseSearch}
                   onChange={e => setPurchaseSearch(e.target.value)}
-                  style={{ width: '100%', paddingLeft: 32, paddingRight: 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                  style={{ width: '100%', paddingLeft: 32, paddingRight: 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
                 />
               </div>
+
+              {/* Date Filter Dropdown */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <Calendar size={13} style={{ color: '#4f46e5' }} />
+                <select
+                  value={purchaseDatePreset}
+                  onChange={e => setPurchaseDatePreset(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="all">📅 All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="this_week">This Week</option>
+                  <option value="last_7_days">Last 7 Days</option>
+                  <option value="this_month">This Month</option>
+                  <option value="previous_month">Previous Month</option>
+                  <option value="last_30_days">Last 30 Days</option>
+                  <option value="current_fiscal_year">Current FY</option>
+                  <option value="custom">Custom Range...</option>
+                </select>
+              </div>
+
+              {/* Custom Date Pickers */}
+              {purchaseDatePreset === 'custom' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '4px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  <input
+                    type="date"
+                    value={purchaseDateStart}
+                    onChange={e => setPurchaseDateStart(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', color: '#1e293b', outline: 'none' }}
+                    title="From Date"
+                  />
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>to</span>
+                  <input
+                    type="date"
+                    value={purchaseDateEnd}
+                    onChange={e => setPurchaseDateEnd(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', color: '#1e293b', outline: 'none' }}
+                    title="To Date"
+                  />
+                </div>
+              )}
+
+              {/* Vendor Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <Building size={13} style={{ color: '#0284c7' }} />
+                <select
+                  value={purchaseVendorFilter}
+                  onChange={e => setPurchaseVendorFilter(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none', maxWidth: 160 }}
+                >
+                  <option value="ALL">🏢 All Vendors</option>
+                  {purchaseVendorsList.map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* GST Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <Percent size={12} style={{ color: '#8b5cf6' }} />
+                <select
+                  value={purchaseGstFilter}
+                  onChange={e => setPurchaseGstFilter(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="ALL">All GST Rates</option>
+                  <option value="0">0% GST</option>
+                  <option value="5">5% GST</option>
+                  <option value="12">12% GST</option>
+                  <option value="18">18% GST</option>
+                  <option value="28">28% GST</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button & Badge */}
+              {hasActivePurchaseFilters && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPurchaseSearch('');
+                      setPurchaseDatePreset('all');
+                      setPurchaseDateStart('');
+                      setPurchaseDateEnd('');
+                      setPurchaseVendorFilter('ALL');
+                      setPurchaseGstFilter('ALL');
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 9px',
+                      fontSize: '0.76rem', fontWeight: 700, color: '#ef4444', background: '#fef2f2',
+                      border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer'
+                    }}
+                    title="Reset all filters"
+                  >
+                    <RotateCcw size={12} /> Clear
+                  </button>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                    ({filteredPurchases.length} of {purchases.length})
+                  </span>
+                </div>
+              )}
             </div>
 
             <button
@@ -3874,7 +4139,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               style={{
                 padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
                 border: 'none', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)'
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)',
+                whiteSpace: 'nowrap'
               }}
             >
               <Plus size={16} /> + New Purchase Inward Entry
@@ -3900,14 +4166,38 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 {filteredPurchases.length === 0 ? (
                   <tr>
                     <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-                      🛒 No purchase invoices found. Click "+ New Purchase Inward Entry" to log vendor bills.
+                      {hasActivePurchaseFilters ? (
+                        <div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#64748b' }}>
+                            🔍 No matching purchase bills found for the applied filters.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPurchaseSearch('');
+                              setPurchaseDatePreset('all');
+                              setPurchaseDateStart('');
+                              setPurchaseDateEnd('');
+                              setPurchaseVendorFilter('ALL');
+                              setPurchaseGstFilter('ALL');
+                            }}
+                            style={{ padding: '5px 12px', fontSize: '0.78rem', fontWeight: 700, color: '#4f46e5', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer', marginTop: '0.6rem' }}
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
+                      ) : (
+                        '🛒 No purchase invoices found. Click "+ New Purchase Inward Entry" to log vendor bills.'
+                      )}
                     </td>
                   </tr>
                 ) : (
                   filteredPurchases.map((p) => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
+                    <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
                       <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: '#4f46e5', verticalAlign: 'top' }}>{p.purchaseNo}</td>
-                      <td style={{ padding: '0.85rem 1rem', color: '#64748b', verticalAlign: 'top' }}>{p.date}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: '#64748b', verticalAlign: 'top' }}>
+                        {p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : ''}
+                      </td>
                       <td style={{ padding: '0.85rem 1rem', fontWeight: 700, verticalAlign: 'top' }}>{p.vendorName}</td>
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'top' }}>
                         {Array.isArray(p.items) && p.items.length > 0 ? (
@@ -3995,7 +4285,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                             <Edit2 size={13} /> Edit
                           </button>
                           <button
-                            onClick={() => handleDeletePurchase(p.id)}
+                            onClick={() => handleDeletePurchase(p._id || p.id)}
                             style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
                             title="Delete Purchase Entry"
                           >
@@ -4362,7 +4652,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </div>
                 <div>
                   <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Inward Date</div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155', marginTop: 2 }}>{viewPurchaseModal.date}</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155', marginTop: 2 }}>
+                    {viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}
+                  </div>
                 </div>
                 <div>
                   <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vendor / Supplier</div>

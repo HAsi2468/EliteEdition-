@@ -420,6 +420,30 @@ export default function JobCardTracking({ onPreview }) {
         return next;
       });
     } catch (err) {
+      if (err.message && (err.message.includes('PRINT_METER_ANOMALY') || err.message.includes('OVER_DISPATCH') || err.message.includes('FUSING_EXCEEDS_PRINT'))) {
+        const confirmOverride = window.confirm(
+          `${err.message}\n\nDo you want to authorize and save this high-meter overrun with Admin/Manager Override?`
+        );
+        if (confirmOverride) {
+          try {
+            const overrideRes = await api.updateJobCard(cardId, {
+              ...updated,
+              operatorOverride: true,
+              overageReason: 'Admin authorized high meter override'
+            });
+            setCards(prev => prev.map(c => c._id === cardId ? { ...c, ...overrideRes, ...updated } : c));
+            setModifiedCards(prev => {
+              const next = { ...prev };
+              delete next[cardId];
+              return next;
+            });
+            return;
+          } catch (retryErr) {
+            alert(retryErr.message || 'Failed to save with override.');
+            return;
+          }
+        }
+      }
       alert(err.message || 'Failed to save tracking changes.');
     } finally {
       setSavingIds(prev => {

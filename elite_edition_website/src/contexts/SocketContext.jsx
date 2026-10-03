@@ -104,13 +104,38 @@ export const SocketProvider = ({ children }) => {
       }
     };
 
+    // General Task Assignment Push Notification
+    const handleTaskAssigned = (data) => {
+      try {
+        const {
+          title = 'New Task',
+          priority = 'medium',
+          department = 'General',
+          dueDate = null,
+          createdByName = 'Admin',
+          taskId = '',
+        } = data || {};
+
+        const notifTitle = `📋 New Task Assigned: ${title}`;
+        const dueStr = dueDate ? ` | Due: ${new Date(dueDate).toLocaleDateString()}` : '';
+        const notifBody = `Assigned by ${createdByName} • Priority: ${priority.toUpperCase()} • Dept: ${department}${dueStr}`;
+
+        fireBrowserNotification(notifTitle, notifBody, `elite-task-${taskId || Date.now()}`);
+        fireInAppToast(notifTitle, notifBody, 'info');
+      } catch (e) {
+        console.warn('[SocketContext] task-assigned error:', e.message);
+      }
+    };
+
     if (newSocket && typeof newSocket.on === 'function') {
       newSocket.on('designer-task-assigned', handleDesignerTask);
+      newSocket.on('task-assigned', handleTaskAssigned);
     }
 
     return () => {
       if (newSocket && typeof newSocket.off === 'function') {
         newSocket.off('designer-task-assigned', handleDesignerTask);
+        newSocket.off('task-assigned', handleTaskAssigned);
       }
       unsubStatus();
     };
