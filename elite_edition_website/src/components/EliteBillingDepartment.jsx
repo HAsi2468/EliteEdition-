@@ -672,13 +672,21 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   };
 
   const handleDeletePurchase = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this purchase record?')) return;
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Purchase Record',
+      message: 'Are you sure you want to delete this purchase record? This action cannot be undone.',
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
     try {
       const isMongoId = /^[0-9a-fA-F]{24}$/.test(id);
       if (isMongoId) {
         await api.deleteBillingPurchase(id);
       }
       setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
+      triggerPushNotification('🗑️ Purchase Deleted', 'Purchase record deleted successfully.', 'success');
     } catch (err) {
       console.error('Error deleting purchase:', err);
       setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
@@ -2009,7 +2017,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   // Delete Customer
   const handleDeleteCustomer = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete customer "${name}"?`)) return;
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Customer',
+      message: `Are you sure you want to delete customer "${name}"?`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
     try {
       await api.deleteBillingCustomer(id);
       setCustomers(prev => prev.filter(c => c._id !== id));
@@ -2021,7 +2036,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   // Delete Item
   const handleDeleteItem = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete product "${name}"?`)) return;
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Product',
+      message: `Are you sure you want to delete product "${name}"?`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
     try {
       await api.deleteBillingItem(id);
       setItemsList(prev => prev.filter(i => i._id !== id));
@@ -2596,10 +2618,18 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   // Delete Invoice
   const handleDeleteInvoice = async (id, invNo) => {
-    if (!window.confirm(`Delete Invoice "${invNo}"?`)) return;
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Tax Invoice',
+      message: `Are you sure you want to delete Invoice "${invNo}"? This action cannot be undone.`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
     try {
       await api.deleteBillingInvoice(id);
       await loadData();
+      triggerPushNotification('🗑️ Invoice Deleted', `Invoice "${invNo}" deleted successfully.`, 'info');
     } catch (err) {
       alert(err.message || 'Failed to delete invoice');
     }

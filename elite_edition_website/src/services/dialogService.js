@@ -131,11 +131,13 @@ export const installGlobalDialogInterceptors = () => {
     triggerPushNotification('System Alert', String(message || ''), 'warning');
   };
 
-  // Intercept window.confirm fallback warning
+  // Preserve native window.confirm so synchronous confirmation boxes work properly
+  const nativeConfirm = window.__nativeConfirm || (typeof window.confirm === 'function' ? window.confirm.bind(window) : null);
+  window.__nativeConfirm = nativeConfirm;
   window.confirm = function (message) {
-    console.warn('[Global Interceptor] Native synchronous window.confirm() was called. Please migrate to triggerEliteConfirm()! Message:', message);
-    triggerPushNotification('Confirm Action', String(message || ''), 'warning');
-    // Default safe fallback to false to avoid unintended deletions/actions
+    if (typeof nativeConfirm === 'function') {
+      return nativeConfirm(message);
+    }
     return false;
   };
 
