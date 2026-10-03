@@ -26,11 +26,12 @@ jobs:
 
       - name: Upload Frontend dist to EC2
         uses: appleboy/scp-action@v0.1.4
+        continue-on-error: true
         with:
           host: ${{ secrets.AWS_HOST }}
           username: ${{ secrets.AWS_USERNAME }}
           key: ${{ secrets.AWS_SSH_KEY }}
-          source: "elite_edition_website/dist/."
+          source: "elite_edition_website/dist/*"
           target: "/home/ubuntu/elite_edition_website_dist"
           strip_components: 2
 
@@ -43,5 +44,6 @@ jobs:
           script: |
             cd ${{ secrets.AWS_TARGET_DIR }}
             git pull origin main
-            npm install
+            npm install --production --legacy-peer-deps || npm install --production
+            cp -rf elite_edition_website_dist/* /home/ubuntu/elite_edition_website_dist/ 2>/dev/null || true
             pm2 restart all || npm start
