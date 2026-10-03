@@ -125,13 +125,16 @@ const verifyJobCard = async (req, res) => {
       card.totalMtr = (consNum * pcsNum).toFixed(2);
     }
 
-    const raw1 = card.imageUrl1 || card.imageUrl;
-    const raw2 = card.imageUrl2;
-    card.imageUrl1 = normalizeImageUrl(raw1, card.designName || card.designNo);
-    card.imageUrl2 = normalizeImageUrl(raw2, card.designName ? `${card.designName}-2` : '');
+    const raw1 = card.imageUrl1 || card.imageUrl || '';
+    const raw2 = card.imageUrl2 || '';
+    const designNo = card.designNo || card.designName || '';
+    const hasMultipleDesigns = designNo.includes(',') || (card.designName && card.designName.includes(','));
+    const showTwoImages = Boolean(raw2 && raw2.trim()) || (hasMultipleDesigns && Boolean(card.designName));
 
-    const candidates1 = getDesignCandidates(raw1 || card.imageUrl1, card.designName || card.designNo);
-    const candidates2 = getDesignCandidates(raw2 || card.imageUrl2, card.designName ? `${card.designName}-2` : '');
+    const candidates1 = getDesignCandidates(raw1, designNo);
+    const candidates2 = showTwoImages
+      ? getDesignCandidates(raw2, hasMultipleDesigns ? designNo.split(',')[1].trim() : '')
+      : [];
 
     const nonce = res.locals.cspNonce || '';
 
