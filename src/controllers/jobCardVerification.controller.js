@@ -407,7 +407,7 @@ function getFabricFusingPreset(fabricName) {
  */
 function renderValidJobCardHtml(card, options = {}) {
   const { candidates1 = [], candidates2 = [], challans = [], nonce = '' } = options;
-  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr } = buildTpAndWasteGrid(challans, card);
+  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, totalW = 0 } = buildTpAndWasteGrid(challans, card);
   const jobNo = card.jobNo || '—';
   const designNo = card.designNo || card.designName || '—';
   const machine = (card.machineName || 'PRINTDOT').toUpperCase();
