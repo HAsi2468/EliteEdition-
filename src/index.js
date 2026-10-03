@@ -75,6 +75,9 @@ server.listen(port, '0.0.0.0', async () => {
   if (Number(port) !== 3000) {
     try {
       const server3000 = http.Server(app);
+      server3000.on('error', (err) => {
+        console.warn('Could not bind fallback port 3000 (handled):', err.message);
+      });
       const io3000 = new Server(server3000, { cors: { origin: '*' } });
       setupSockets(io3000);
       server3000.listen(3000, '0.0.0.0', () => console.log('Fallback server listening on port 3000'));
@@ -85,6 +88,9 @@ server.listen(port, '0.0.0.0', async () => {
 
   try {
     const server80 = http.Server(app);
+    server80.on('error', (err) => {
+      console.warn('Could not bind port 80 (handled):', err.message);
+    });
     const io80 = new Server(server80, { cors: { origin: '*' } });
     setupSockets(io80);
     server80.listen(80, '0.0.0.0', () => console.log('HTTP server listening on port 80'));
