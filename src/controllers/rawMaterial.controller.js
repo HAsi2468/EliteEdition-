@@ -236,6 +236,7 @@ const getStockOverview = async (req, res) => {
 
       let groupMatName = matName;
       let groupColor = (t.color || '').trim();
+      let paperGrade = (t.paperQuality || '').trim();
 
       if (isInk) {
         const isGrando = matName.toLowerCase().includes('grando');
@@ -264,9 +265,23 @@ const getStockOverview = async (req, res) => {
 
         groupMatName = `${brand} - ${colorKey} (${colorCode})`;
         groupColor = colorKey;
+      } else if (isPaper) {
+        const isButter = matName.toLowerCase().includes('butter');
+        if (isButter) {
+          groupMatName = 'Butter Paper';
+          paperGrade = '';
+        } else {
+          const combined = `${matName} ${t.paperQuality || ''}`.toLowerCase();
+          if (combined.includes('a++')) paperGrade = 'A++';
+          else if (combined.includes('a+')) paperGrade = 'A+';
+          else if (/\ba\b/.test(combined) || combined.includes('(a)')) paperGrade = 'A';
+          else paperGrade = paperGrade || 'A++';
+
+          groupMatName = `Sublimation Paper (${paperGrade})`;
+        }
       }
 
-      // Group key: Inks group by normalized brand + color, Papers group by materialName + normPanna
+      // Group key: Inks group by normalized brand + color, Papers group by normalized materialName + normPanna
       const key = isInk
         ? `${groupMatName}___${groupColor}`
         : `${groupMatName}___${normPanna}`;
@@ -275,7 +290,7 @@ const getStockOverview = async (req, res) => {
         map[key] = {
           materialName: groupMatName,
           panna: normPanna,
-          paperQuality: t.paperQuality || '',
+          paperQuality: paperGrade,
           color: groupColor,
           canSize: t.canSize || (isInk ? (groupColor === 'Cleaning Solution' ? 1 : 5) : null),
           metersPerRoll: t.metersPerRoll || (isPaper ? 1000 : null),
