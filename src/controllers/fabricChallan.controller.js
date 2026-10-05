@@ -633,6 +633,9 @@ const createChallan = async (req, res) => {
             const currentDelivered = parseFloat(jCard.deliveredMtr || 0);
             const newDelivered = Math.round((currentDelivered + totalMtr) * 100) / 100;
             jCard.deliveredMtr = newDelivered;
+            if (!jCard.lotNo && finalLotNoStr) {
+              jCard.lotNo = finalLotNoStr;
+            }
             const targetMtr = parseFloat(jCard.totalMtr || jCard.totalQty || 0);
             if (targetMtr > 0 && newDelivered >= targetMtr) {
               jCard.deliveryStatus = 'Delivery Done';

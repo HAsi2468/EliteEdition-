@@ -1070,6 +1070,53 @@ const getNextJobCardNumber = async (req, res) => {
   }
 };
 
+function resolveJobCardLotNo(card = {}, challans = []) {
+  if (card?.lotNo && String(card.lotNo).trim() && String(card.lotNo).trim() !== '—') {
+    return String(card.lotNo).trim();
+  }
+  const chList = Array.isArray(challans) ? challans : (Array.isArray(card?.challans) ? card.challans : []);
+  const lotSet = new Set();
+
+  for (const ch of chList) {
+    if (ch?.lotNo) {
+      String(ch.lotNo)
+        .split(/[,/&]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .forEach(l => {
+          if (l && l !== '—' && l !== 'N/A' && l !== 'null' && l !== 'undefined') lotSet.add(l);
+        });
+    }
+    if (Array.isArray(ch?.tpDetails)) {
+      for (const tp of ch.tpDetails) {
+        if (tp?.lotNo) {
+          String(tp.lotNo)
+            .split(/[,/&]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
+            .forEach(l => {
+              if (l && l !== '—' && l !== 'N/A' && l !== 'null' && l !== 'undefined') lotSet.add(l);
+            });
+        }
+      }
+    }
+  }
+
+  const combinedNotes = `${card?.note1 || ''} ${card?.note2 || ''}`;
+  const noteMatch = combinedNotes.match(/Lot\s*#?\s*([A-Za-z0-9\-_,\s]+)/i);
+  if (noteMatch && noteMatch[1] && noteMatch[1].trim() !== 'N/A') {
+    String(noteMatch[1])
+      .split(/[,/&]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .forEach(l => {
+        if (l && l !== '—' && l !== 'N/A') lotSet.add(l);
+      });
+  }
+
+  return Array.from(lotSet).join(', ');
+}
+
 /**
  * Builds the 5-column TP Meter & Wastage Meter grid from linked Fabric Challans and Job Card faults.
  * Slots:
@@ -1081,6 +1128,7 @@ const getNextJobCardNumber = async (req, res) => {
  */
 function buildTpAndWasteGrid(challans = [], card = {}) {
   const chList = Array.isArray(challans) ? challans : [];
+  const effectiveLotNo = resolveJobCardLotNo(card, chList);
   const allTpMtrs = [];
   const allWestMtrs = [];
 
@@ -1198,7 +1246,7 @@ function buildTpAndWasteGrid(challans = [], card = {}) {
   });
   const challanNosStr = challanDetailsList.join(', ');
 
-  return { rows, totalMtr: finalTotalMtr, challanNosStr, challanSummaryStr: challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0 };
+  return { rows, totalMtr: finalTotalMtr, challanNosStr, challanSummaryStr: challanNosStr, totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0, effectiveLotNo };
 }
 
 // ─── Render Job Card PDF A5 Page (Image 2 Exact Spec Layout) ──────────────────
@@ -1418,11 +1466,12 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   doc.fillColor('#0b5394').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.clientPoNo || jobCard.poNo || '—'), x8 + 3, curY + 3.5, { lineBreak: false });
   x8 += colW_Val;
 
+  const effectiveLotNo = resolveJobCardLotNo(jobCard, jobCard.challans) || '—';
   doc.rect(x8, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
   doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('LOT NO. :', x8 + 2, curY + 3.5, { lineBreak: false });
   x8 += colW_Label;
   doc.rect(x8, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
-  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.lotNo || '—'), x8 + 3, curY + 3.5, { lineBreak: false });
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.lotNo || effectiveLotNo), x8 + 3, curY + 3.5, { lineBreak: false });
   x8 += colW_Val;
 
   doc.rect(x8, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();

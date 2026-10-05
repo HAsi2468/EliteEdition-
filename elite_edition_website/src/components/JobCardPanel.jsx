@@ -343,7 +343,7 @@ export async function triggerJobCardPrint(cardOrCards) {
 
   const pagesHtml = preparedCards.map((item, idx) => {
     const { card, design1, design2, showTwoImages, img1, img2, candidates1, candidates2, qrDataUrl, challans } = item;
-    const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList } = buildTpAndWasteGrid(challans, card);
+    const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList, effectiveLotNo } = buildTpAndWasteGrid(challans, card);
 
     const freshNum = parseFloat(card.freshMtr) || parseFloat(finalTpTotal) || parseFloat(card.totalMtr) || 0;
     const wasteNum = parseFloat(card.totalWastageMtr) || 0;
@@ -459,7 +459,7 @@ export async function triggerJobCardPrint(cardOrCards) {
         </tr>
         <tr>
           <td class="label">CLIENT PO :</td><td class="val" style="font-weight: 700; color: #0b5394;">${card.clientPoNo || card.poNo || '—'}</td>
-          <td class="label">LOT NO. :</td><td class="val" style="font-weight: 700;">${card.lotNo || '—'}</td>
+          <td class="label">LOT NO. :</td><td class="val" style="font-weight: 700;">${card.lotNo || effectiveLotNo || '—'}</td>
           <td class="label">TARGET :</td><td class="val" style="font-weight: 700; color: #166534;">${card.targetDeliveryDate || '—'}</td>
         </tr>
       </table>
@@ -980,7 +980,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
     return () => { isMounted = false; };
   }, [card]);
 
-  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList } = buildTpAndWasteGrid(challans, card);
+  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList, effectiveLotNo } = buildTpAndWasteGrid(challans, card);
 
   useEffect(() => {
     const resolveImages = async () => {
@@ -1034,6 +1034,8 @@ function JobCardPrintView({ card, onClose, onShare }) {
   const doPrint = () => {
     triggerJobCardPrint({
       ...card,
+      lotNo: card.lotNo || effectiveLotNo || '',
+      challans,
       imageUrl1: resolvedImages.imageUrl1 || card.imageUrl1,
       imageUrl2: resolvedImages.imageUrl2 || card.imageUrl2
     });
@@ -1352,7 +1354,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
                         : {card?.totalMtr || '0'} Mtr
                       </td>
                     </tr>
-                    {(card?.clientPoNo || card?.poNo || card?.lotNo || card?.targetDeliveryDate) && (
+                    {(card?.clientPoNo || card?.poNo || card?.lotNo || effectiveLotNo || card?.targetDeliveryDate) && (
                       <tr>
                         <td style={tdPrintLabel}>CLIENT PO :</td>
                         <td style={{ ...tdPrintVal, fontWeight: 700, color: '#0369a1' }}>
@@ -1360,7 +1362,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
                         </td>
                         <td style={tdPrintLabel}>LOT NO. :</td>
                         <td style={{ ...tdPrintVal, fontWeight: 700, color: '#4338ca' }}>
-                          {card?.lotNo || '—'}
+                          {card?.lotNo || effectiveLotNo || '—'}
                         </td>
                         <td style={tdPrintLabel}>TARGET :</td>
                         <td style={{ ...tdPrintVal, fontWeight: 700, color: '#b45309' }}>

@@ -10,8 +10,64 @@
  *    - TOT: shows total wastage
  */
 
+/**
+ * Resolves the lot number for a Job Card:
+ * 1. Returns card.lotNo if explicitly filled and valid.
+ * 2. Otherwise, scans linked Fabric Challans (ch.lotNo and ch.tpDetails[].lotNo).
+ * 3. Also checks card.note1 / card.note2 for any "[Fabric Sync] Issued ... from Lot #...".
+ * 4. Merges unique lot numbers into a clean comma-separated string.
+ */
+export function resolveJobCardLotNo(card = {}, challans = []) {
+  if (card?.lotNo && String(card.lotNo).trim() && String(card.lotNo).trim() !== '—') {
+    return String(card.lotNo).trim();
+  }
+  const chList = Array.isArray(challans) ? challans : (Array.isArray(card?.challans) ? card.challans : []);
+  const lotSet = new Set();
+
+  for (const ch of chList) {
+    if (ch?.lotNo) {
+      String(ch.lotNo)
+        .split(/[,/&]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .forEach(l => {
+          if (l && l !== '—' && l !== 'N/A' && l !== 'null' && l !== 'undefined') lotSet.add(l);
+        });
+    }
+    if (Array.isArray(ch?.tpDetails)) {
+      for (const tp of ch.tpDetails) {
+        if (tp?.lotNo) {
+          String(tp.lotNo)
+            .split(/[,/&]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
+            .forEach(l => {
+              if (l && l !== '—' && l !== 'N/A' && l !== 'null' && l !== 'undefined') lotSet.add(l);
+            });
+        }
+      }
+    }
+  }
+
+  // Also check if card notes contain lot allocation info
+  const combinedNotes = `${card?.note1 || ''} ${card?.note2 || ''}`;
+  const noteMatch = combinedNotes.match(/Lot\s*#?\s*([A-Za-z0-9\-_,\s]+)/i);
+  if (noteMatch && noteMatch[1] && noteMatch[1].trim() !== 'N/A') {
+    String(noteMatch[1])
+      .split(/[,/&]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .forEach(l => {
+        if (l && l !== '—' && l !== 'N/A') lotSet.add(l);
+      });
+  }
+
+  return Array.from(lotSet).join(', ');
+}
+
 export function buildTpAndWasteGrid(challans = [], card = {}) {
   const chList = Array.isArray(challans) ? challans : [];
+  const effectiveLotNo = resolveJobCardLotNo(card, chList);
   const allTpMtrs = [];
   const allWestMtrs = [];
 
@@ -150,6 +206,7 @@ export function buildTpAndWasteGrid(challans = [], card = {}) {
     challanNosStr,
     challanDetailsList,
     challanSummaryStr: challanNosStr,
-    totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0
+    totalW: totalW > 0 ? Number(totalW.toFixed(2)) : 0,
+    effectiveLotNo
   };
 }

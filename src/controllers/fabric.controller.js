@@ -183,6 +183,10 @@ const createOutward = async (req, res) => {
             jobCard.status = 'In Progress';
             updated = true;
           }
+          if (!jobCard.lotNo && lotNo) {
+            jobCard.lotNo = String(lotNo).trim();
+            updated = true;
+          }
           // Log lot allocation details in job notes
           const syncNote = `[Fabric Sync] Issued ${qty} mtr from Lot #${lotNo || 'N/A'}`;
           if (!jobCard.note1) {

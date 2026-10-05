@@ -65,7 +65,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
     return () => { isMounted = false; };
   }, [card]);
 
-  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList } = buildTpAndWasteGrid(challans, card);
+  const { rows: tpRows, totalMtr: finalTpTotal, challanNosStr, challanDetailsList, effectiveLotNo } = buildTpAndWasteGrid(challans, card);
 
   if (!card && !loading) return null;
 
@@ -73,6 +73,8 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
     if (!card) return;
     triggerJobCardPrint({
       ...card,
+      lotNo: card.lotNo || effectiveLotNo || '',
+      challans,
       imageUrl1: resolvedImages.imageUrl1 || card.imageUrl1,
       imageUrl2: resolvedImages.imageUrl2 || card.imageUrl2,
     });
@@ -396,12 +398,12 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                       : {card?.totalMtr || ''}
                     </td>
                   </tr>
-                  {(card?.clientPoNo || card?.poNo || card?.lotNo || card?.targetDeliveryDate) && (
+                  {(card?.clientPoNo || card?.poNo || card?.lotNo || effectiveLotNo || card?.targetDeliveryDate) && (
                     <tr>
                       <td style={tdLabel}>CLIENT PO :</td>
                       <td style={{ ...tdVal, fontWeight: 700, color: '#0369a1' }}>{card?.clientPoNo || card?.poNo || '—'}</td>
                       <td style={tdLabel}>LOT NO. :</td>
-                      <td style={{ ...tdVal, fontWeight: 700, color: '#4338ca' }}>{card?.lotNo || '—'}</td>
+                      <td style={{ ...tdVal, fontWeight: 700, color: '#4338ca' }}>{card?.lotNo || effectiveLotNo || '—'}</td>
                       <td style={tdLabel}>TARGET :</td>
                       <td style={{ ...tdVal, fontWeight: 700, color: '#b45309' }}>{card?.targetDeliveryDate ? String(card.targetDeliveryDate).split('T')[0] : '—'}</td>
                     </tr>
