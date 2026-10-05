@@ -87,7 +87,8 @@ import {
   Phone,
   PhoneOff,
   Search,
-  MoreHorizontal
+  MoreHorizontal,
+  CheckSquare
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -519,19 +520,29 @@ export default function App() {
   const isCompanyAllowed = (companyName) => {
     if (!currentUser) return false;
     if (currentUser.role === 'admin' || currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') return true;
-    if (Array.isArray(currentUser.allowedCompanies) && currentUser.allowedCompanies.length > 0) {
+    if (Array.isArray(currentUser.allowedCompanies)) {
+      if (currentUser.allowedCompanies.length === 0) return false;
       if (companyName === 'EON' || companyName === 'Elite Online') {
         return currentUser.allowedCompanies.includes('EON') || currentUser.allowedCompanies.includes('Elite Online');
       }
       return currentUser.allowedCompanies.includes(companyName);
     }
-    return true;
+    return false;
   };
 
-  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('EON') || (currentUser.permissions && currentUser.permissions.some(p => ELITE_ONLINE_PERMISSIONS.includes(p)));
-  const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Digital Print') || (currentUser.permissions && currentUser.permissions.some(p => (EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')) && !p.startsWith('stitching_')));
-  const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Stitching') || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p) || p.startsWith('stitching_')));
-  const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
+  const hasEliteEditionAccess = currentUser?.role === 'admin' || (isCompanyAllowed('EON') && Boolean(currentUser?.permissions?.some(p => ELITE_ONLINE_PERMISSIONS.includes(p))));
+  const hasDigitalPrintAccess = currentUser?.role === 'admin' || (isCompanyAllowed('Elite Digital Print') && Boolean(currentUser?.permissions?.some(p => (EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')) && !p.startsWith('stitching_'))));
+  const hasStitchingAccess = currentUser?.role === 'admin' || (isCompanyAllowed('Elite Stitching') && Boolean(currentUser?.permissions?.some(p => STITCHING_PERMISSIONS.includes(p) || p.startsWith('stitching_'))));
+
+  const hasCommunicationAccess = !currentUser || currentUser?.role === 'admin' || 
+    Boolean(currentUser?.canBroadcastChat) || 
+    Boolean(currentUser?.permissions?.some(p => ['workspace', 'communication', 'interdept-communication', 'chat'].includes(p)));
+
+  const hasTaskAccess = !currentUser || currentUser?.role === 'admin' || 
+    Boolean(currentUser?.canManageTasks) || 
+    Boolean(currentUser?.permissions?.some(p => ['task_management', 'task-manager', 'tasks', 'task'].includes(p)));
+
+  const hasWorkspaceAccess = hasCommunicationAccess || hasTaskAccess;
 
   const getFirstJobCardsTab = () => {
     if (!currentUser || currentUser.role === 'admin') return 'jobcards';
@@ -594,15 +605,21 @@ export default function App() {
     if (isCompanyAllowed('Elite Edition')) allowedDepts.push('elite_edition');
     if (isCompanyAllowed('Elite Fabtex')) allowedDepts.push('elite_fabtex');
 
-    if (allowedDepts.length > 0 && !allowedDepts.includes(activeDepartment)) {
-      const targetDept = allowedDepts[0];
-      setActiveDepartment(targetDept);
-      if (activeTab !== 'workspace') {
-        if (targetDept === 'stitching') setActiveTab(getFirstStitchingTab());
-        else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
-        else if (targetDept === 'elite_edition') setActiveTab('ee_dashboard');
-        else if (targetDept === 'elite_fabtex') setActiveTab('ef_dashboard');
-        else if (targetDept === 'elite_online') setActiveTab(getFirstEETab());
+    if (allowedDepts.length > 0) {
+      if (!allowedDepts.includes(activeDepartment)) {
+        const targetDept = allowedDepts[0];
+        setActiveDepartment(targetDept);
+        if (!['communication', 'workspace', 'task_management'].includes(activeTab)) {
+          if (targetDept === 'stitching') setActiveTab(getFirstStitchingTab());
+          else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
+          else if (targetDept === 'elite_edition') setActiveTab('ee_dashboard');
+          else if (targetDept === 'elite_fabtex') setActiveTab('ef_dashboard');
+          else if (targetDept === 'elite_online') setActiveTab(getFirstEETab());
+        }
+      }
+    } else if (hasWorkspaceAccess) {
+      if (!['communication', 'workspace', 'task_management'].includes(activeTab)) {
+        setActiveTab(hasCommunicationAccess ? 'communication' : 'task_management');
       }
     }
   }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment]);
@@ -685,9 +702,15 @@ export default function App() {
         setActiveTab('dashboard');
       }
     } else if (currentUser.permissions && currentUser.permissions.length > 0) {
+      // If user is accessing communication or task management and has workspace access, allow
+      if (['communication', 'workspace'].includes(activeTab) && hasCommunicationAccess) return;
+      if (activeTab === 'task_management' && hasTaskAccess) return;
+
       // For non-admin users, check if activeTab or any parent category is allowed
       const isAllowed = currentUser.permissions.some(p => {
         if (p === activeTab) return true;
+        if (['communication', 'workspace'].includes(activeTab) && (p === 'workspace' || p === 'interdept-communication' || p === 'communication')) return true;
+        if (activeTab === 'task_management' && (p === 'task_management' || p === 'task-manager' || p === 'tasks')) return true;
         if (activeTab.startsWith('ee_') || activeTab.startsWith('ef_') || activeTab.startsWith('es_') || activeTab.startsWith('eo_')) return true;
         if (activeTab === 'catalog' && p === 'inventory') return true;
         if (activeTab === 'jobcards_list' && (p === 'stitching_jobcards' || p === 'jobcards_list' || p === 'jobcards')) return true;
@@ -702,15 +725,19 @@ export default function App() {
         return false;
       });
 
-      if (!isAllowed && !['workspace', 'dashboard'].includes(activeTab)) {
+      if (!isAllowed && !['workspace', 'communication', 'task_management', 'dashboard'].includes(activeTab)) {
         if (hasStitchingAccess && activeDepartment === 'stitching') {
           setActiveTab(getFirstStitchingTab());
         } else if (hasDigitalPrintAccess && activeDepartment === 'digital_print') {
           setActiveTab(getFirstJobCardsTab());
         } else if (hasEliteEditionAccess && activeDepartment === 'elite_edition') {
           setActiveTab(getFirstEETab());
+        } else if (hasCommunicationAccess) {
+          setActiveTab('communication');
+        } else if (hasTaskAccess) {
+          setActiveTab('task_management');
         } else {
-          setActiveTab(currentUser.permissions[0]);
+          setActiveTab(currentUser.permissions[0] || 'no-access');
         }
       }
     } else {
@@ -1602,29 +1629,46 @@ export default function App() {
               );
             })}
 
-            {hasWorkspaceAccess && (
+            {(hasCommunicationAccess || hasTaskAccess) && (
               <>
                 <div className="dept-switcher-divider" />
-                <button
-                  onClick={() => {
-                    setActiveTab('communication');
-                    setMobileMenuOpen(false);
-                    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-                      window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
-                    }
-                  }}
-                  className={`dept-switcher-btn comm-btn ${['communication', 'workspace', 'task_management'].includes(activeTab) ? 'active' : ''}`}
-                  title="Inter-Department Communication & Workforce Chat"
-                  type="button"
-                >
-                  <MessageSquare size={13} style={{ flexShrink: 0 }} />
-                  <span>Communication</span>
-                  {chatUnreadCount > 0 && (
-                    <span className="dept-switcher-badge">
-                      {chatUnreadCount}
-                    </span>
-                  )}
-                </button>
+                {hasCommunicationAccess && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('communication');
+                      setMobileMenuOpen(false);
+                      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                        window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
+                      }
+                    }}
+                    className={`dept-switcher-btn comm-btn ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
+                    title="Inter-Department Communication & Workforce Chat"
+                    type="button"
+                  >
+                    <MessageSquare size={13} style={{ flexShrink: 0 }} />
+                    <span>Communication</span>
+                    {chatUnreadCount > 0 && (
+                      <span className="dept-switcher-badge">
+                        {chatUnreadCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+
+                {hasTaskAccess && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('task_management');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`dept-switcher-btn comm-btn ${activeTab === 'task_management' ? 'active' : ''}`}
+                    title="Task Management & Staff Workloads"
+                    type="button"
+                  >
+                    <CheckSquare size={13} style={{ flexShrink: 0 }} />
+                    <span>Tasks</span>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -2015,7 +2059,7 @@ export default function App() {
                   );
                 })}
 
-                {hasWorkspaceAccess && (
+                {hasCommunicationAccess && (
                   <button
                     onClick={() => {
                       setActiveTab('communication');
@@ -2024,10 +2068,22 @@ export default function App() {
                         window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
                       }
                     }}
-                    className={`mobile-drawer-item ${activeTab === 'communication' ? 'active' : ''}`}
+                    className={`mobile-drawer-item ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
                   >
                     <span>Communication</span>
                     {chatUnreadCount > 0 && <span style={{ fontSize: '0.75rem' }}>({chatUnreadCount})</span>}
+                  </button>
+                )}
+
+                {hasTaskAccess && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('task_management');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`mobile-drawer-item ${activeTab === 'task_management' ? 'active' : ''}`}
+                  >
+                    <span>Tasks</span>
                   </button>
                 )}
               </div>

@@ -196,7 +196,7 @@ select,
 
 /* Touch targets for touch mode (WCAG 2.5.5 touch target accuracy) */
 html[data-pointer-mode="touch"] button:not(.sidebar-wrap button):not(.sidebar-nav-collapsed-btn):not(.ops-action-btn):not(.compact-btn),
-html[data-pointer-mode="touch"] input,
+html[data-pointer-mode="touch"] input:not([type="checkbox"]):not([type="radio"]),
 html[data-pointer-mode="touch"] select,
 html[data-pointer-mode="touch"] .btn,
 html[data-pointer-mode="touch"] .smart-icon-btn {
@@ -427,7 +427,7 @@ label {
   margin-bottom: 6px;
 }
 
-input, select, textarea {
+input:not([type="checkbox"]):not([type="radio"]), select, textarea {
   font-family: var(--font-family);
   background: var(--bg-input);
   border: 1px solid var(--border-color);
@@ -444,11 +444,28 @@ input, select, textarea {
   transition: border-color var(--transition-fast);
 }
 
+input[type="checkbox"], input[type="radio"] {
+  width: 16px !important;
+  min-width: 16px !important;
+  max-width: 16px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  accent-color: #2563eb !important;
+  box-shadow: none !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
 textarea {
   min-height: 88px;
 }
 
-input:focus, select:focus, textarea:focus {
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
   border-color: var(--primary);
 }
 

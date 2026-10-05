@@ -312,8 +312,8 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
           onClick={(e) => e.stopPropagation()}
         >
           {/* Search bar inside dropdown */}
-          <div style={{ padding: '0.5rem', borderBottom: '1px solid var(--border-light, #334155)', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-            <Search size={14} style={{ color: 'var(--text-muted)' }} />
+          <div style={{ padding: '0.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '0.4rem', alignItems: 'center', background: '#f8fafc' }}>
+            <Search size={14} style={{ color: '#64748b' }} />
             <input
               id="party-multiselect-search"
               name="partyMultiselectSearch"
@@ -324,39 +324,40 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
               placeholder="Filter party names..."
               style={{
                 width: '100%',
-                padding: '0.3rem 0.4rem',
+                padding: '0.35rem 0.5rem',
                 fontSize: '0.8rem',
-                background: 'rgba(0, 0, 0, 0.2)',
-                border: '1px solid var(--border-light, #334155)',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
                 borderRadius: '4px',
-                color: 'var(--text-primary, #fff)'
+                color: '#0f172a',
+                outline: 'none'
               }}
               autoFocus
             />
           </div>
 
           {/* Quick Actions */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0.6rem', background: 'rgba(0, 0, 0, 0.15)', borderBottom: '1px solid var(--border-light, #334155)', fontSize: '0.72rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.75rem', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem' }}>
             <button
               type="button"
               onClick={handleSelectAll}
-              style={{ background: 'none', border: 'none', color: 'var(--primary, #3b82f6)', cursor: 'pointer', fontWeight: 600 }}
+              style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 700 }}
             >
               Select All
             </button>
             <button
               type="button"
               onClick={handleClearAll}
-              style={{ background: 'none', border: 'none', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontWeight: 600 }}
             >
               Clear All
             </button>
           </div>
 
           {/* Parties List */}
-          <div style={{ overflowY: 'auto', flex: 1, padding: '0.3rem 0' }}>
+          <div style={{ overflowY: 'auto', flex: 1, padding: '0.3rem 0', maxHeight: '200px' }}>
             {filteredOptions.length === 0 ? (
-              <div style={{ padding: '0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+              <div style={{ padding: '0.8rem', textAlign: 'center', color: '#64748b', fontSize: '0.78rem' }}>
                 {searchTerm ? 'No parties matching search.' : 'No parties found in Settings → Parties (Clients).'}
               </div>
             ) : (
@@ -374,17 +375,17 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.6rem',
+                      gap: '0.65rem',
                       padding: '0.45rem 0.75rem',
                       cursor: 'pointer',
-                      background: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                      color: isSelected ? '#60a5fa' : 'var(--text-primary, #fff)',
+                      background: isSelected ? '#eff6ff' : 'transparent',
+                      color: isSelected ? '#1d4ed8' : '#1e293b',
                       fontSize: '0.82rem',
-                      fontWeight: isSelected ? 600 : 400,
+                      fontWeight: isSelected ? 700 : 500,
                       transition: 'background 0.1s ease'
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                      if (!isSelected) e.currentTarget.style.background = '#f8fafc';
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected) e.currentTarget.style.background = 'transparent';
@@ -397,10 +398,18 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => {}}
-                      style={{ cursor: 'pointer', accentColor: 'var(--primary, #3b82f6)' }}
+                      style={{ 
+                        width: '16px',
+                        height: '16px',
+                        minHeight: '16px',
+                        cursor: 'pointer', 
+                        accentColor: '#2563eb',
+                        margin: 0,
+                        flexShrink: 0
+                      }}
                     />
-                    <span style={{ flex: 1 }}>{party}</span>
-                    {isSelected && <Check size={14} style={{ color: '#60a5fa' }} />}
+                    <span style={{ flex: 1, userSelect: 'none' }}>{party}</span>
+                    {isSelected && <Check size={14} style={{ color: '#2563eb', flexShrink: 0 }} />}
                   </label>
                 );
               })
@@ -408,7 +417,7 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
           </div>
 
           {/* Quick Add Custom Party */}
-          <div style={{ padding: '0.4rem 0.6rem', borderTop: '1px solid var(--border-light, #334155)', background: 'rgba(0, 0, 0, 0.2)', display: 'flex', gap: '0.4rem' }}>
+          <div style={{ padding: '0.45rem 0.65rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
             <input
               id="catalogue-custom-party-input"
               name="catalogueCustomPartyInput"
@@ -420,23 +429,24 @@ function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options 
               placeholder="+ Add party name..."
               style={{
                 flex: 1,
-                padding: '0.25rem 0.4rem',
-                fontSize: '0.75rem',
-                background: 'rgba(0, 0, 0, 0.2)',
-                border: '1px solid var(--border-light, #334155)',
+                padding: '0.35rem 0.5rem',
+                fontSize: '0.78rem',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
                 borderRadius: '4px',
-                color: 'var(--text-primary, #fff)'
+                color: '#0f172a',
+                outline: 'none'
               }}
             />
             <button
               type="button"
               onClick={handleAddCustom}
               style={{
-                padding: '0.25rem 0.6rem',
-                fontSize: '0.72rem',
+                padding: '0.35rem 0.7rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
-                background: 'var(--primary, #3b82f6)',
-                color: '#fff',
+                background: '#2563eb',
+                color: '#ffffff',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer'
