@@ -448,36 +448,39 @@
   background: #94a3b8 !important;
 }
 
-/* Task Card */
+/* ─── Task Card Redesign (Modern Linear/Notion Aesthetics) ─── */
 .task-card {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 10px !important;
-  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  padding: 11px 13px !important;
   cursor: pointer !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02) !important;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 8px !important;
+  gap: 9px !important;
   user-select: none !important;
   position: relative !important;
 }
 
 .task-card:hover {
   transform: translateY(-2px) !important;
-  box-shadow: 0 8px 18px -2px rgba(15, 23, 42, 0.09), 0 3px 6px -1px rgba(15, 23, 42, 0.04) !important;
+  box-shadow: 0 10px 22px -3px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03) !important;
   border-color: #cbd5e1 !important;
 }
 
+/* Overdue card with sleek left accent and warm ambient gradient */
 .task-card.overdue {
   border-left: 3.5px solid #ef4444 !important;
-  border-color: #fecaca !important;
-  box-shadow: 0 1px 4px rgba(239, 68, 68, 0.08) !important;
+  border-color: #fca5a5 !important;
+  background: linear-gradient(135deg, rgba(254, 242, 242, 0.45) 0%, #ffffff 45%) !important;
+  box-shadow: 0 1px 4px rgba(239, 68, 68, 0.07) !important;
 }
 
 .task-card.overdue:hover {
-  box-shadow: 0 8px 18px -2px rgba(239, 68, 68, 0.15) !important;
+  border-color: #f87171 !important;
+  box-shadow: 0 10px 22px -3px rgba(239, 68, 68, 0.14), 0 4px 8px -2px rgba(239, 68, 68, 0.06) !important;
 }
 
 /* Card Ghost Action Buttons */
@@ -485,7 +488,7 @@
   background: transparent !important;
   border: none !important;
   color: #94a3b8 !important;
-  padding: 4px !important;
+  padding: 0 !important;
   border-radius: 6px !important;
   cursor: pointer !important;
   display: inline-flex !important;
@@ -506,30 +509,53 @@
   background: #fef2f2 !important;
 }
 
-/* Status Dropdown */
-.task-card-status-select {
-  font-size: 0.7rem !important;
-  font-weight: 600 !important;
-  padding: 0 8px !important;
-  border-radius: 6px !important;
+/* Modern Unified Status Pill Group */
+.task-card-status-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 7px !important;
+  background: #f8fafc !important;
   border: 1px solid #e2e8f0 !important;
-  background: #ffffff !important;
+  overflow: hidden !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.task-card-status-group:hover,
+.task-card-status-group:focus-within {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Status Select inside group */
+.task-card-status-select {
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  padding: 0 6px 0 8px !important;
+  border: none !important;
+  background: transparent !important;
   color: #334155 !important;
   cursor: pointer !important;
   height: 26px !important;
-  min-width: 105px !important;
+  min-width: 90px !important;
   outline: none !important;
-  transition: border-color 0.15s ease !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 6px center !important;
+  padding-right: 18px !important;
 }
 
-.task-card-status-select:focus,
 .task-card-status-select:hover {
-  border-color: #94a3b8 !important;
+  color: #0f172a !important;
 }
 
-/* Advance Arrow Button */
+/* Advance Arrow Button inside group */
 .task-card-advance-btn {
-  border-radius: 6px !important;
+  border: none !important;
+  border-left: 1px solid #e2e8f0 !important;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
   cursor: pointer !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -542,7 +568,32 @@
 }
 
 .task-card-advance-btn:hover {
-  transform: translateX(1px);
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-left-color: #2563eb !important;
+}
+
+.task-card-advance-btn.in-review {
+  color: #16a34a !important;
+  background: #f0fdf4 !important;
+  border-left-color: #bbf7d0 !important;
+}
+
+.task-card-advance-btn.in-review:hover {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-left-color: #16a34a !important;
+}
+
+.task-card-done-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 26px !important;
+  width: 26px !important;
+  border-left: 1px solid #bbf7d0 !important;
+  background: #f0fdf4 !important;
+  color: #16a34a !important;
 }
 
 /* ─── MOBILE ADAPTIVE RESPONSIVENESS (< 768px) ─── */
