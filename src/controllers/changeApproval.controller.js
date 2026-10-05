@@ -106,6 +106,8 @@ const executeApprovedAction = async (approval, adminUser) => {
         'X-User-Role': 'admin',
         'X-Is-Admin': 'true',
         'X-Operator-Override': 'true',
+        // Pass the admin's auth details so auth middleware recognizes the request
+        'X-Internal-Service': 'approval-executor',
       },
     };
 
@@ -134,17 +136,51 @@ const executeApprovedAction = async (approval, adminUser) => {
 
   // 2. Fail-safe Fallback: Direct Mongoose Model update / delete
   try {
-    const targetModel = models[approval.module];
+    let targetModel = models[approval.module];
+    if (!targetModel && (approval.module === 'Fabric' || approval.module === 'FabricTransaction')) {
+      targetModel = models.FabricTransaction || models.Fabric;
+    }
     if (targetModel && approval.targetId) {
       if (approval.httpMethod === 'DELETE') {
         const deleted = await targetModel.findByIdAndDelete(approval.targetId);
         return { success: true, method: 'DIRECT_MODEL_DELETE', data: deleted };
       } else {
+        const payload = { ...approval.requestBody };
+
+        // Special handling for tpDetails: sanitize before applying
+        if (Array.isArray(payload.tpDetails)) {
+          payload.tpDetails = payload.tpDetails
+            .filter(r => r.tpMeter != null && r.tpMeter !== '')
+            .map((r, idx) => ({
+              tpNo: Number(r.tpNo) || idx + 1,
+              tpMeter: parseFloat(r.tpMeter) || 0,
+              notes: r.notes || '',
+            }));
+          if (payload.totalTp === undefined) {
+            payload.totalTp = payload.tpDetails.filter(r => parseFloat(r.tpMeter) > 0).length;
+          }
+        }
+
         const updated = await targetModel.findByIdAndUpdate(
           approval.targetId,
-          { $set: approval.requestBody },
+          { $set: payload },
           { new: true, runValidators: false }
         );
+
+        // Broadcast real-time module-specific socket event so screens update immediately
+        try {
+          const io = global.io;
+          if (io && updated) {
+            if (approval.module === 'Fabric' || approval.module === 'FabricTransaction') {
+              io.emit('fabric-updated', { type: 'transaction-updated', data: updated });
+            } else if (approval.module === 'JobCard') {
+              io.emit('jobCardUpdated', updated);
+            }
+          }
+        } catch (sockErr) {
+          logger.warn('[ChangeApprovalController] Real-time fallback broadcast failed: %s', sockErr.message);
+        }
+
         return { success: true, method: 'DIRECT_MODEL_UPDATE', data: updated };
       }
     }

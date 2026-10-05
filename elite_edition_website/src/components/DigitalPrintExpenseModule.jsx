@@ -453,16 +453,24 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       return cName === partyNameLower;
     });
 
-    if (showAllPartyInvoices) return invs;
+    const filtered = showAllPartyInvoices 
+      ? invs 
+      : invs.filter(inv => {
+          const isSelected = !!selectedInvoicesMap[inv._id]?.selected;
+          const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
+          return isSelected || (inv.paymentStatus !== 'PAID' && due > 0);
+        });
 
-    return invs.filter(inv => {
-      const isSelected = !!selectedInvoicesMap[inv._id]?.selected;
-      const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
-      return isSelected || (inv.paymentStatus !== 'PAID' && due > 0);
+    // Show oldest invoices first (ascending by invoiceDate / createdAt / invoiceNo)
+    return [...filtered].sort((a, b) => {
+      const timeA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const timeB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      if (timeA !== timeB) return timeA - timeB;
+      return String(a.invoiceNo || '').localeCompare(String(b.invoiceNo || ''), undefined, { numeric: true });
     });
   }, [allInvoices, selectedParty, showAllPartyInvoices, selectedInvoicesMap]);
 
-  const syncFormWithSelectedInvoices = (map, partyName) => {
+  const syncFormWithSelectedInvoices = (map, partyName, explicitAmount = null) => {
     const selectedEntries = Object.values(map).filter(e => e && e.selected && Number(e.payingAmount) > 0);
     const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.payingAmount) || 0), 0);
     const invoiceNos = selectedEntries.map(e => e.invoice?.invoiceNo).filter(Boolean);
@@ -472,40 +480,125 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       ? `Bill Payment - ${partyName}${invoiceNos.length ? ` (${billNoStr})` : ''}`
       : `Bill Payment${invoiceNos.length ? ` (${billNoStr})` : ''}`;
 
-    setFormVal(prev => ({
-      ...prev,
-      type: 'IN', // Strictly Cash IN for Party Bill Payment
-      category: inCategories.find(c => c.toLowerCase().includes('client') || c.toLowerCase().includes('payment')) || inCategories[0] || 'Client Payment / Advance',
-      paidToOrReceivedFrom: partyName || prev.paidToOrReceivedFrom,
-      amount: totalAmount > 0 ? totalAmount.toFixed(2) : prev.amount,
-      billNo: billNoStr,
-      title: titleStr
-    }));
+    setFormVal(prev => {
+      const finalAmount = explicitAmount != null 
+        ? (Number(explicitAmount) > 0 ? Number(explicitAmount).toFixed(2) : '')
+        : (totalAmount > 0 ? totalAmount.toFixed(2) : prev.amount);
+
+      return {
+        ...prev,
+        type: 'IN', // Strictly Cash IN for Party Bill Payment
+        category: inCategories.find(c => c.toLowerCase().includes('client') || c.toLowerCase().includes('payment')) || inCategories[0] || 'Client Payment / Advance',
+        paidToOrReceivedFrom: partyName || prev.paidToOrReceivedFrom,
+        amount: finalAmount,
+        billNo: billNoStr,
+        title: titleStr
+      };
+    });
+  };
+
+  const autoMatchInvoicesToAmount = (targetAmt, partyName) => {
+    const pName = partyName || selectedParty;
+    if (!pName) return;
+    const numAmt = parseFloat(targetAmt);
+    if (!numAmt || numAmt <= 0) return;
+
+    const partyNameLower = pName.trim().toLowerCase();
+    // Get all unpaid invoices for this party sorted oldest first
+    const pendingInvs = (allInvoices || [])
+      .filter(inv => {
+        const cName = (inv.customer?.name || '').trim().toLowerCase();
+        const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
+        return cName === partyNameLower && inv.paymentStatus !== 'PAID' && due > 0;
+      })
+      .sort((a, b) => {
+        const timeA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const timeB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        if (timeA !== timeB) return timeA - timeB; // Oldest first
+        return String(a.invoiceNo || '').localeCompare(String(b.invoiceNo || ''), undefined, { numeric: true });
+      });
+
+    if (pendingInvs.length === 0) return;
+
+    let remaining = Math.round(numAmt * 100) / 100;
+    const newMap = {};
+    const unallocatedInvs = [...pendingInvs];
+
+    while (remaining > 0.001 && unallocatedInvs.length > 0) {
+      // 1. Check if any single remaining invoice has due exactly equal to remaining
+      const exactMatchIdx = unallocatedInvs.findIndex(inv => {
+        const due = Math.round((inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0))) * 100) / 100;
+        return Math.abs(due - remaining) < 0.01;
+      });
+
+      if (exactMatchIdx !== -1) {
+        const matchedInv = unallocatedInvs.splice(exactMatchIdx, 1)[0];
+        const due = Math.round((matchedInv.balanceDue != null ? Number(matchedInv.balanceDue) : Math.max(0, Number(matchedInv.grandTotal || 0) - Number(matchedInv.paidAmount || 0))) * 100) / 100;
+        newMap[matchedInv._id] = {
+          selected: true,
+          payingAmount: due,
+          invoice: matchedInv
+        };
+        remaining = 0;
+        break;
+      }
+
+      // 2. Otherwise take the oldest unallocated invoice
+      const oldestInv = unallocatedInvs.shift();
+      const due = Math.round((oldestInv.balanceDue != null ? Number(oldestInv.balanceDue) : Math.max(0, Number(oldestInv.grandTotal || 0) - Number(oldestInv.paidAmount || 0))) * 100) / 100;
+      if (due <= 0) continue;
+
+      if (remaining >= due) {
+        newMap[oldestInv._id] = {
+          selected: true,
+          payingAmount: due,
+          invoice: oldestInv
+        };
+        remaining = Math.round((remaining - due) * 100) / 100;
+      } else {
+        // Partial allocation for the remaining amount
+        newMap[oldestInv._id] = {
+          selected: true,
+          payingAmount: remaining,
+          invoice: oldestInv
+        };
+        remaining = 0;
+        break;
+      }
+    }
+
+    setSelectedInvoicesMap(newMap);
+    syncFormWithSelectedInvoices(newMap, pName, numAmt);
   };
 
   const handlePartyChange = (partyName) => {
     setSelectedParty(partyName);
-    setSelectedInvoicesMap({});
     if (!partyName) {
+      setSelectedInvoicesMap({});
       setFormVal(prev => ({
         ...prev,
         paidToOrReceivedFrom: '',
         title: 'Bill Payment',
-        amount: '',
         billNo: ''
       }));
       return;
     }
 
-    setFormVal(prev => ({
-      ...prev,
-      type: 'IN', // Always stored as Cash IN
-      category: inCategories.find(c => c.toLowerCase().includes('client') || c.toLowerCase().includes('payment')) || inCategories[0] || 'Client Payment / Advance',
-      paidToOrReceivedFrom: partyName,
-      title: `Bill Payment - ${partyName}`,
-      amount: '',
-      billNo: ''
-    }));
+    const currentAmount = parseFloat(formVal.amount);
+    if (currentAmount > 0) {
+      // Auto-match oldest invoices to entered amount immediately
+      autoMatchInvoicesToAmount(currentAmount, partyName);
+    } else {
+      setSelectedInvoicesMap({});
+      setFormVal(prev => ({
+        ...prev,
+        type: 'IN', // Always stored as Cash IN
+        category: inCategories.find(c => c.toLowerCase().includes('client') || c.toLowerCase().includes('payment')) || inCategories[0] || 'Client Payment / Advance',
+        paidToOrReceivedFrom: partyName,
+        title: `Bill Payment - ${partyName}`,
+        billNo: ''
+      }));
+    }
   };
 
   const handleToggleInvoice = (inv) => {
@@ -547,11 +640,18 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const handleSelectAllPending = () => {
     if (!selectedParty) return;
     const partyNameLower = selectedParty.trim().toLowerCase();
-    const pendingInvs = (allInvoices || []).filter(inv => {
-      const cName = (inv.customer?.name || '').trim().toLowerCase();
-      const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
-      return cName === partyNameLower && inv.paymentStatus !== 'PAID' && due > 0;
-    });
+    const pendingInvs = (allInvoices || [])
+      .filter(inv => {
+        const cName = (inv.customer?.name || '').trim().toLowerCase();
+        const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
+        return cName === partyNameLower && inv.paymentStatus !== 'PAID' && due > 0;
+      })
+      .sort((a, b) => {
+        const timeA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const timeB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        if (timeA !== timeB) return timeA - timeB; // Oldest first
+        return String(a.invoiceNo || '').localeCompare(String(b.invoiceNo || ''), undefined, { numeric: true });
+      });
 
     const newMap = {};
     pendingInvs.forEach(inv => {
@@ -579,19 +679,29 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       return vName === vendorNameLower;
     });
 
-    if (showAllVendorPurchases) return purs;
+    const filtered = showAllVendorPurchases
+      ? purs
+      : purs.filter(p => {
+          const purKey = p.id || p.purchaseNo;
+          const isSelected = !!selectedPurchasesMap[purKey]?.selected;
+          const totalAmt = Number(p.totalAmount) || 0;
+          const paidAmt = Number(p.paidAmount) || 0;
+          const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
+          return isSelected || (p.paymentStatus !== 'PAID' && (due > 0 || totalAmt > 0));
+        });
 
-    return purs.filter(p => {
-      const purKey = p.id || p.purchaseNo;
-      const isSelected = !!selectedPurchasesMap[purKey]?.selected;
-      const totalAmt = Number(p.totalAmount) || 0;
-      const paidAmt = Number(p.paidAmount) || 0;
-      const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
-      return isSelected || (p.paymentStatus !== 'PAID' && (due > 0 || totalAmt > 0));
+    // Show oldest purchases first
+    return [...filtered].sort((a, b) => {
+      const dateA = a.billDate || a.purchaseDate || a.date || a.createdAt;
+      const dateB = b.billDate || b.purchaseDate || b.date || b.createdAt;
+      const timeA = dateA ? new Date(dateA).getTime() : 0;
+      const timeB = dateB ? new Date(dateB).getTime() : 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return String(a.purchaseNo || a.billNo || '').localeCompare(String(b.purchaseNo || b.billNo || ''), undefined, { numeric: true });
     });
   }, [allPurchases, selectedVendor, showAllVendorPurchases, selectedPurchasesMap]);
 
-  const syncFormWithSelectedPurchases = (map, vendorName) => {
+  const syncFormWithSelectedPurchases = (map, vendorName, explicitAmount = null) => {
     const selectedEntries = Object.values(map).filter(e => e && e.selected && Number(e.payingAmount) > 0);
     const totalAmount = selectedEntries.reduce((sum, e) => sum + (Number(e.payingAmount) || 0), 0);
     const billNos = selectedEntries.map(e => e.purchase?.purchaseNo).filter(Boolean);
@@ -601,40 +711,137 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       ? `Vendor Payment - ${vendorName}${billNos.length ? ` (${billNoStr})` : ''}`
       : `Vendor Payment${billNos.length ? ` (${billNoStr})` : ''}`;
 
-    setFormVal(prev => ({
-      ...prev,
-      type: 'OUT', // Strictly Cash OUT for Vendor Purchase Payment
-      category: outCategories.find(c => c.toLowerCase().includes('ink') || c.toLowerCase().includes('maintenance') || c.toLowerCase().includes('paper') || c.toLowerCase().includes('expense')) || outCategories[0] || 'Ink & Consumables',
-      paidToOrReceivedFrom: vendorName || prev.paidToOrReceivedFrom,
-      amount: totalAmount > 0 ? totalAmount.toFixed(2) : prev.amount,
-      billNo: billNoStr,
-      title: titleStr
-    }));
+    setFormVal(prev => {
+      const finalAmount = explicitAmount != null 
+        ? (Number(explicitAmount) > 0 ? Number(explicitAmount).toFixed(2) : '')
+        : (totalAmount > 0 ? totalAmount.toFixed(2) : prev.amount);
+
+      return {
+        ...prev,
+        type: 'OUT', // Strictly Cash OUT for Vendor Purchase Payment
+        category: outCategories.find(c => c.toLowerCase().includes('ink') || c.toLowerCase().includes('maintenance') || c.toLowerCase().includes('paper') || c.toLowerCase().includes('expense')) || outCategories[0] || 'Ink & Consumables',
+        paidToOrReceivedFrom: vendorName || prev.paidToOrReceivedFrom,
+        amount: finalAmount,
+        billNo: billNoStr,
+        title: titleStr
+      };
+    });
+  };
+
+  const autoMatchPurchasesToAmount = (targetAmt, vendorName) => {
+    const vName = vendorName || selectedVendor;
+    if (!vName) return;
+    const numAmt = parseFloat(targetAmt);
+    if (!numAmt || numAmt <= 0) return;
+
+    const vendorNameLower = vName.trim().toLowerCase();
+    const pendingPurs = (allPurchases || [])
+      .filter(p => {
+        const name = (p.vendorName || '').trim().toLowerCase();
+        const totalAmt = Number(p.totalAmount) || 0;
+        const paidAmt = Number(p.paidAmount) || 0;
+        const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
+        return name === vendorNameLower && p.paymentStatus !== 'PAID' && due > 0;
+      })
+      .sort((a, b) => {
+        const dateA = a.billDate || a.purchaseDate || a.date || a.createdAt;
+        const dateB = b.billDate || b.purchaseDate || b.date || b.createdAt;
+        const timeA = dateA ? new Date(dateA).getTime() : 0;
+        const timeB = dateB ? new Date(dateB).getTime() : 0;
+        if (timeA !== timeB) return timeA - timeB; // Oldest first
+        return String(a.purchaseNo || a.billNo || '').localeCompare(String(b.purchaseNo || b.billNo || ''), undefined, { numeric: true });
+      });
+
+    if (pendingPurs.length === 0) return;
+
+    let remaining = Math.round(numAmt * 100) / 100;
+    const newMap = {};
+    const unallocatedPurs = [...pendingPurs];
+
+    while (remaining > 0.001 && unallocatedPurs.length > 0) {
+      // 1. Check if any single remaining purchase bill has due exactly equal to remaining
+      const exactMatchIdx = unallocatedPurs.findIndex(p => {
+        const totalAmt = Number(p.totalAmount) || 0;
+        const paidAmt = Number(p.paidAmount) || 0;
+        const due = Math.round((p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt)) * 100) / 100;
+        return Math.abs(due - remaining) < 0.01;
+      });
+
+      if (exactMatchIdx !== -1) {
+        const matchedPur = unallocatedPurs.splice(exactMatchIdx, 1)[0];
+        const purKey = matchedPur.id || matchedPur.purchaseNo;
+        const totalAmt = Number(matchedPur.totalAmount) || 0;
+        const paidAmt = Number(matchedPur.paidAmount) || 0;
+        const due = Math.round((matchedPur.balanceDue != null ? Number(matchedPur.balanceDue) : Math.max(0, totalAmt - paidAmt)) * 100) / 100;
+        newMap[purKey] = {
+          selected: true,
+          payingAmount: due > 0 ? due : totalAmt,
+          purchase: matchedPur
+        };
+        remaining = 0;
+        break;
+      }
+
+      // 2. Otherwise take the oldest unallocated purchase bill
+      const oldestPur = unallocatedPurs.shift();
+      const purKey = oldestPur.id || oldestPur.purchaseNo;
+      const totalAmt = Number(oldestPur.totalAmount) || 0;
+      const paidAmt = Number(oldestPur.paidAmount) || 0;
+      const due = Math.round((oldestPur.balanceDue != null ? Number(oldestPur.balanceDue) : Math.max(0, totalAmt - paidAmt)) * 100) / 100;
+      if (due <= 0 && totalAmt <= 0) continue;
+      const effectiveDue = due > 0 ? due : totalAmt;
+
+      if (remaining >= effectiveDue) {
+        newMap[purKey] = {
+          selected: true,
+          payingAmount: effectiveDue,
+          purchase: oldestPur
+        };
+        remaining = Math.round((remaining - effectiveDue) * 100) / 100;
+      } else {
+        // Partial allocation for the remaining amount
+        newMap[purKey] = {
+          selected: true,
+          payingAmount: remaining,
+          purchase: oldestPur
+        };
+        remaining = 0;
+        break;
+      }
+    }
+
+    setSelectedPurchasesMap(newMap);
+    syncFormWithSelectedPurchases(newMap, vName, numAmt);
   };
 
   const handleVendorChange = (vendorName) => {
     setSelectedVendor(vendorName);
-    setSelectedPurchasesMap({});
     if (!vendorName) {
+      setSelectedPurchasesMap({});
       setFormVal(prev => ({
         ...prev,
         paidToOrReceivedFrom: '',
         title: 'Vendor Payment',
-        amount: '',
         billNo: ''
       }));
       return;
     }
 
-    setFormVal(prev => ({
-      ...prev,
-      type: 'OUT', // Stored as Cash OUT
-      category: outCategories.find(c => c.toLowerCase().includes('ink') || c.toLowerCase().includes('maintenance') || c.toLowerCase().includes('paper') || c.toLowerCase().includes('expense')) || outCategories[0] || 'Ink & Consumables',
-      paidToOrReceivedFrom: vendorName,
-      title: `Vendor Payment - ${vendorName}`,
-      amount: '',
-      billNo: ''
-    }));
+    const currentAmount = parseFloat(formVal.amount);
+    if (currentAmount > 0) {
+      // Auto-match oldest purchases to entered amount immediately
+      autoMatchPurchasesToAmount(currentAmount, vendorName);
+    } else {
+      setSelectedPurchasesMap({});
+      setFormVal(prev => ({
+        ...prev,
+        type: 'OUT', // Stored as Cash OUT
+        category: outCategories.find(c => c.toLowerCase().includes('ink') || c.toLowerCase().includes('maintenance') || c.toLowerCase().includes('paper') || c.toLowerCase().includes('expense')) || outCategories[0] || 'Ink & Consumables',
+        paidToOrReceivedFrom: vendorName,
+        title: `Vendor Payment - ${vendorName}`,
+        billNo: ''
+      }));
+    }
   };
 
   const handleTogglePurchase = (pur) => {
@@ -684,6 +891,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       const paidAmt = Number(p.paidAmount) || 0;
       const due = p.balanceDue != null ? Number(p.balanceDue) : Math.max(0, totalAmt - paidAmt);
       return vName === vendorNameLower && p.paymentStatus !== 'PAID' && (due > 0 || totalAmt > 0);
+    }).sort((a, b) => {
+      const dateA = a.billDate || a.purchaseDate || a.date || a.createdAt;
+      const dateB = b.billDate || b.purchaseDate || b.date || b.createdAt;
+      const timeA = dateA ? new Date(dateA).getTime() : 0;
+      const timeB = dateB ? new Date(dateB).getTime() : 0;
+      if (timeA !== timeB) return timeA - timeB; // Oldest first
+      return String(a.purchaseNo || a.billNo || '').localeCompare(String(b.purchaseNo || b.billNo || ''), undefined, { numeric: true });
     });
 
     const newMap = {};
@@ -1648,14 +1862,42 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   {selectedParty && (
                     <div style={{ borderTop: '1px solid #bfdbfe', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e3a8a' }}>
-                          Select Invoices for Payment ({currentPartyInvoices.length} found):
-                        </span>
-                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e3a8a' }}>
+                            Select Invoices for Payment ({currentPartyInvoices.length} found):
+                          </span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 7px', background: '#dbeafe', color: '#1e40af', borderRadius: '12px' }}>
+                            Oldest First ⏳
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {Number(formVal.amount) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => autoMatchInvoicesToAmount(formVal.amount, selectedParty)}
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                padding: '3px 10px',
+                                borderRadius: '5px',
+                                border: '1px solid #1d4ed8',
+                                background: '#2563eb',
+                                color: '#ffffff',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 3px rgba(37,99,235,0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                              title="Auto-select oldest invoices matching the entered amount"
+                            >
+                              ⚡ Auto-Match ₹{Number(formVal.amount).toLocaleString('en-IN')}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={handleSelectAllPending}
-                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #2563eb', background: '#2563eb', color: '#ffffff', cursor: 'pointer', boxShadow: '0 1px 3px rgba(37,99,235,0.2)' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', cursor: 'pointer' }}
                           >
                             Select All Unpaid
                           </button>
@@ -1682,11 +1924,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
-                          {currentPartyInvoices.map((inv) => {
+                          {currentPartyInvoices.map((inv, idx) => {
                             const isSelected = !!selectedInvoicesMap[inv._id]?.selected;
                             const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
                             const isPaid = inv.paymentStatus === 'PAID' || due <= 0;
                             const payingAmt = selectedInvoicesMap[inv._id]?.payingAmount ?? (isSelected ? due : '');
+                            const invDate = inv.invoiceDate ? new Date(inv.invoiceDate) : (inv.createdAt ? new Date(inv.createdAt) : null);
+                            const formattedDate = invDate ? invDate.toLocaleDateString('en-IN') : 'No Date';
 
                             return (
                               <div
@@ -1712,6 +1956,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                       <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>
                                         {inv.invoiceNo}
                                       </span>
+                                      {idx === 0 && !isPaid && (
+                                        <span style={{
+                                          fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px',
+                                          background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5'
+                                        }}>
+                                          Oldest Bill
+                                        </span>
+                                      )}
                                       <span style={{
                                         fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px',
                                         background: '#eff6ff',
@@ -1722,7 +1974,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                       </span>
                                     </div>
                                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
-                                      {inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN') : ''} • Total: ₹{inv.grandTotal?.toLocaleString('en-IN')} • Due: <strong style={{ color: '#1d4ed8' }}>₹{due.toLocaleString('en-IN')}</strong>
+                                      <span style={{ fontWeight: 600, color: '#334155' }}>📅 {formattedDate}</span> • Total: ₹{inv.grandTotal?.toLocaleString('en-IN')} • Due: <strong style={{ color: '#1d4ed8' }}>₹{due.toLocaleString('en-IN')}</strong>
                                     </div>
                                   </div>
                                 </div>
@@ -1754,17 +2006,45 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                         </div>
                       )}
 
-                      {/* Selected Summary (Pure White & Blue) */}
-                      {Object.values(selectedInvoicesMap).filter(e => e?.selected).length > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.65rem', padding: '0.55rem 0.85rem', background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #93c5fd', borderRadius: '7px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>
-                            ✓ {Object.values(selectedInvoicesMap).filter(e => e?.selected).length} Invoice(s) Selected
-                          </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1d4ed8' }}>
-                            Total: ₹{Number(formVal.amount || 0).toLocaleString('en-IN')} (Stored as Cash IN)
-                          </span>
-                        </div>
-                      )}
+                      {/* Selected Summary & Match Tracker (Pure White & Blue) */}
+                      {(() => {
+                        const selectedEntries = Object.values(selectedInvoicesMap).filter(e => e?.selected);
+                        const totalAllocated = selectedEntries.reduce((sum, e) => sum + (Number(e.payingAmount) || 0), 0);
+                        const targetAmt = Number(formVal.amount || 0);
+                        const diff = Math.round((targetAmt - totalAllocated) * 100) / 100;
+                        const isMatch = targetAmt > 0 && Math.abs(diff) < 0.01;
+
+                        if (selectedEntries.length === 0 && targetAmt <= 0) return null;
+
+                        return (
+                          <div style={{
+                            marginTop: '0.65rem', padding: '0.6rem 0.85rem',
+                            background: isMatch ? '#f0fdf4' : (diff > 0.01 ? '#eff6ff' : '#fffbeb'),
+                            border: isMatch ? '1.5px solid #86efac' : (diff > 0.01 ? '1.5px solid #93c5fd' : '1.5px solid #fde047'),
+                            borderRadius: '8px',
+                            display: 'flex', flexDirection: 'column', gap: '0.25rem'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isMatch ? '#15803d' : '#1e40af' }}>
+                                ✓ {selectedEntries.length} Invoice(s) Selected • Total Paying: ₹{totalAllocated.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              {isMatch ? (
+                                <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  ✅ Exact Match to Entered Amount!
+                                </span>
+                              ) : targetAmt > 0 && diff > 0.01 ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb' }}>
+                                  Target: ₹{targetAmt.toLocaleString('en-IN')} (₹{diff.toLocaleString('en-IN')} unallocated / advance)
+                                </span>
+                              ) : targetAmt > 0 && diff < -0.01 ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309' }}>
+                                  Target: ₹{targetAmt.toLocaleString('en-IN')} (Exceeds target by ₹{Math.abs(diff).toLocaleString('en-IN')})
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1801,14 +2081,42 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   {selectedVendor && (
                     <div style={{ borderTop: '1px solid #bfdbfe', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e3a8a' }}>
-                          Select Purchase Bills for Payment ({currentVendorPurchases.length} found):
-                        </span>
-                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e3a8a' }}>
+                            Select Purchase Bills for Payment ({currentVendorPurchases.length} found):
+                          </span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 7px', background: '#dbeafe', color: '#1e40af', borderRadius: '12px' }}>
+                            Oldest First ⏳
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {Number(formVal.amount) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => autoMatchPurchasesToAmount(formVal.amount, selectedVendor)}
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                padding: '3px 10px',
+                                borderRadius: '5px',
+                                border: '1px solid #1d4ed8',
+                                background: '#2563eb',
+                                color: '#ffffff',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 3px rgba(37,99,235,0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                              title="Auto-select oldest purchase bills matching the entered amount"
+                            >
+                              ⚡ Auto-Match ₹{Number(formVal.amount).toLocaleString('en-IN')}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={handleSelectAllPendingPurchases}
-                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #2563eb', background: '#2563eb', color: '#ffffff', cursor: 'pointer', boxShadow: '0 1px 3px rgba(37,99,235,0.2)' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', cursor: 'pointer' }}
                           >
                             Select All Unpaid
                           </button>
@@ -1835,7 +2143,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
-                          {currentVendorPurchases.map((pur) => {
+                          {currentVendorPurchases.map((pur, idx) => {
                             const purKey = pur.id || pur.purchaseNo;
                             const isSelected = !!selectedPurchasesMap[purKey]?.selected;
                             const totalAmt = Number(pur.totalAmount) || 0;
@@ -1848,6 +2156,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                             const itemsSummary = Array.isArray(pur.items) && pur.items.length > 0
                               ? pur.items.map(it => `${it.itemName || 'Item'} (${it.quantity || 0} ${it.unit || 'Mtr'})`).join(', ')
                               : (pur.itemName || 'Material Inward');
+
+                            const purDate = pur.billDate || pur.purchaseDate || pur.date || pur.createdAt;
+                            const formattedDate = purDate ? new Date(purDate).toLocaleDateString('en-IN') : 'No Date';
 
                             return (
                               <div
@@ -1873,6 +2184,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                       <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>
                                         {pur.purchaseNo}
                                       </span>
+                                      {idx === 0 && !isPaid && (
+                                        <span style={{
+                                          fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px',
+                                          background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5'
+                                        }}>
+                                          Oldest Bill
+                                        </span>
+                                      )}
                                       <span style={{
                                         fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px',
                                         background: '#eff6ff',
@@ -1891,7 +2210,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                       {itemsSummary}
                                     </div>
                                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 1 }}>
-                                      {pur.date ? new Date(pur.date).toLocaleDateString('en-IN') : ''} • Bill Total: ₹{totalAmt.toLocaleString('en-IN')} • Due: <strong style={{ color: '#1d4ed8' }}>₹{due.toLocaleString('en-IN')}</strong>
+                                      <span style={{ fontWeight: 600, color: '#334155' }}>📅 {formattedDate}</span> • Bill Total: ₹{totalAmt.toLocaleString('en-IN')} • Due: <strong style={{ color: '#1d4ed8' }}>₹{due.toLocaleString('en-IN')}</strong>
                                     </div>
                                   </div>
                                 </div>
@@ -1923,17 +2242,45 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                         </div>
                       )}
 
-                      {/* Selected Purchases Summary (Pure White & Blue) */}
-                      {Object.values(selectedPurchasesMap).filter(e => e?.selected).length > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.65rem', padding: '0.55rem 0.85rem', background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #93c5fd', borderRadius: '7px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>
-                            ✓ {Object.values(selectedPurchasesMap).filter(e => e?.selected).length} Purchase Bill(s) Selected
-                          </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1d4ed8' }}>
-                            Total: ₹{Number(formVal.amount || 0).toLocaleString('en-IN')} (Stored as Cash OUT)
-                          </span>
-                        </div>
-                      )}
+                      {/* Selected Purchases Summary & Match Tracker (Pure White & Blue) */}
+                      {(() => {
+                        const selectedEntries = Object.values(selectedPurchasesMap).filter(e => e?.selected);
+                        const totalAllocated = selectedEntries.reduce((sum, e) => sum + (Number(e.payingAmount) || 0), 0);
+                        const targetAmt = Number(formVal.amount || 0);
+                        const diff = Math.round((targetAmt - totalAllocated) * 100) / 100;
+                        const isMatch = targetAmt > 0 && Math.abs(diff) < 0.01;
+
+                        if (selectedEntries.length === 0 && targetAmt <= 0) return null;
+
+                        return (
+                          <div style={{
+                            marginTop: '0.65rem', padding: '0.6rem 0.85rem',
+                            background: isMatch ? '#f0fdf4' : (diff > 0.01 ? '#eff6ff' : '#fffbeb'),
+                            border: isMatch ? '1.5px solid #86efac' : (diff > 0.01 ? '1.5px solid #93c5fd' : '1.5px solid #fde047'),
+                            borderRadius: '8px',
+                            display: 'flex', flexDirection: 'column', gap: '0.25rem'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isMatch ? '#15803d' : '#1e40af' }}>
+                                ✓ {selectedEntries.length} Purchase Bill(s) Selected • Total Paying: ₹{totalAllocated.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              {isMatch ? (
+                                <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  ✅ Exact Match to Entered Amount!
+                                </span>
+                              ) : targetAmt > 0 && diff > 0.01 ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb' }}>
+                                  Target: ₹{targetAmt.toLocaleString('en-IN')} (₹{diff.toLocaleString('en-IN')} unallocated)
+                                </span>
+                              ) : targetAmt > 0 && diff < -0.01 ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309' }}>
+                                  Target: ₹{targetAmt.toLocaleString('en-IN')} (Exceeds target by ₹{Math.abs(diff).toLocaleString('en-IN')})
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1963,8 +2310,23 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     placeholder="0.00"
                     value={formVal.amount}
                     onChange={e => setFormVal(prev => ({ ...prev, amount: e.target.value }))}
+                    onBlur={() => {
+                      const num = parseFloat(formVal.amount);
+                      if (num > 0) {
+                        if (transactionMode === 'PARTY' && selectedParty) {
+                          autoMatchInvoicesToAmount(num, selectedParty);
+                        } else if (transactionMode === 'VENDOR' && selectedVendor) {
+                          autoMatchPurchasesToAmount(num, selectedVendor);
+                        }
+                      }
+                    }}
                     style={{ width: '100%', marginTop: 4, fontWeight: 900, fontSize: '1rem', color: formVal.type === 'IN' ? '#34d399' : '#f87171' }}
                   />
+                  {((transactionMode === 'PARTY' && selectedParty) || (transactionMode === 'VENDOR' && selectedVendor)) && Number(formVal.amount) > 0 && (
+                    <div style={{ marginTop: '4px', fontSize: '0.68rem', color: '#2563eb', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>⚡ Auto-allocates across oldest bills (FIFO)</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -43,6 +43,8 @@ export const createCsrfMiddleware = (options: CsrfMiddlewareOptions = {}) => {
     // 2. Check for handshake endpoints or exempt routes
     const path = req.path || req.originalUrl || '';
     if (
+      req.headers['x-approval-execution'] === 'true' ||
+      req.headers['x-internal-service'] === 'approval-executor' ||
       path.endsWith('/csrf-token') ||
       path.includes('/auth/csrf-token') ||
       path.includes('/challanVerification') ||

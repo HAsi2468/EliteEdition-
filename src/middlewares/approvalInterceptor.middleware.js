@@ -51,8 +51,14 @@ const getModuleAndModel = (urlPath) => {
   if (lower.includes('/fabric-challan')) {
     return { name: 'FabricChallan', model: models.FabricChallan };
   }
+  if (lower.includes('/fabric-vendors')) {
+    return { name: 'FabricVendor', model: models.FabricVendor };
+  }
+  if (lower.includes('/fabric-stock-adjustment') || lower.includes('/fabric-adjustment')) {
+    return { name: 'FabricStockAdjustment', model: models.FabricStockAdjustment };
+  }
   if (lower.includes('/fabric')) {
-    return { name: 'Fabric', model: models.FabricVendor };
+    return { name: 'Fabric', model: models.FabricTransaction || models.Fabric };
   }
   if (lower.includes('/inventory')) {
     return { name: 'Inventory', model: models.Inventory };
@@ -142,6 +148,52 @@ const isRoutineJobCardDataEntry = (moduleName, body) => {
 
   // Purely operational department data entry (fusing, printing, QA, delivery dispatch)
   return true;
+};
+
+/**
+ * Checks whether this update is a "first-time fill" — i.e., setting data that
+ * was previously null, empty, or absent in the existing document.
+ * These are treated as initial data entry (not edits) and bypass approval.
+ *
+ * Rules:
+ * - If EVERY field in the incoming payload was previously null/undefined/empty
+ *   in the stored document, it's first-time entry → bypass.
+ * - Specifically handles tpDetails: if existing doc has no tpDetails (null / []) and
+ *   incoming body only sets tpDetails + optional derived fields (totalTp, qty), bypass.
+ */
+const isFirstTimeDataEntry = (beforeData, requestBody) => {
+  if (!beforeData || !requestBody || typeof requestBody !== 'object') {
+    return false;
+  }
+
+  const bodyKeys = Object.keys(requestBody).filter(k =>
+    !['_id', 'id', '__v', 'csrfToken', 'idempotencyKey'].includes(k)
+  );
+
+  if (bodyKeys.length === 0) return false;
+
+  // Special case: tpDetails-only update on a record that has no tpDetails yet
+  const isTpOnlyUpdate = bodyKeys.every(k => ['tpDetails', 'totalTp', 'qty'].includes(k));
+  if (isTpOnlyUpdate) {
+    const existingTps = beforeData.tpDetails;
+    const hasNoExistingTps =
+      existingTps == null ||
+      (Array.isArray(existingTps) && existingTps.filter(r => r.tpMeter != null && parseFloat(r.tpMeter) > 0).length === 0);
+    if (hasNoExistingTps) {
+      return true; // First-time TP entry → no approval needed
+    }
+  }
+
+  // General rule: all updated fields were previously empty/null/undefined in the stored doc
+  const allWereEmpty = bodyKeys.every(k => {
+    const existing = beforeData[k];
+    if (existing === null || existing === undefined) return true;
+    if (Array.isArray(existing) && existing.length === 0) return true;
+    if (typeof existing === 'string' && existing.trim() === '') return true;
+    return false;
+  });
+
+  return allWereEmpty;
 };
 
 // Calculate field-by-field diff between old and new state
@@ -237,6 +289,10 @@ const approvalInterceptor = async (req, res, next) => {
       return next();
     }
 
+    // 5.2 Bypass approval for first-time data entry on fields that were previously empty/null
+    // (e.g. adding tpDetails to a fabric inward that was recorded without TP breakdown)
+    // This is NOT an "edit" — it is initial data fill and should not require approval.
+
     // Snapshot existing document for "Before" data
     let beforeData = null;
     let targetIdentifier = '';
@@ -247,6 +303,7 @@ const approvalInterceptor = async (req, res, next) => {
         if (existingDoc) {
           beforeData = existingDoc;
           targetIdentifier =
+            (existingDoc.lotNo ? `Lot #${existingDoc.lotNo}` : '') ||
             existingDoc.jobNo ||
             existingDoc.invoiceNo ||
             existingDoc.challanNo ||
@@ -265,6 +322,16 @@ const approvalInterceptor = async (req, res, next) => {
 
     if (!targetIdentifier) {
       targetIdentifier = targetId ? `#${targetId.slice(-6)}` : `${moduleName} Record`;
+    }
+
+    // First-time data entry check (after we have beforeData)
+    if (isEdit && isFirstTimeDataEntry(beforeData, req.body)) {
+      logger.info(
+        '[ApprovalInterceptor] Allowing first-time data fill without approval for %s (%s) — fields were previously empty',
+        moduleName,
+        targetId
+      );
+      return next();
     }
 
     // Calculate diff between existing document and proposed changes
