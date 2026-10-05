@@ -6,7 +6,11 @@ const config = require('../config/config.js');
 const db = require('../db/models');
 
 async function getUserByEmail(email) {
-	const user = await db.user.findOne({ email }).lean();
+	if (!email) return null;
+	const cleanEmail = String(email).trim().toLowerCase();
+	const user = await db.user.findOne({
+		email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+	}).lean();
 	if (user) {
 		user.id = user._id.toString();
 	}

@@ -5,7 +5,7 @@ const { decryptData } = require('../utils/auth');
 
 async function loginUserWithEmailAndPassword(req) {
 	const { email, password } = req.body;
-	const user = await userService.getUserByEmail(email);
+	const user = await userService.getUserByEmail(email ? String(email).trim() : '');
     if (!user) {
         // Early exit if the user does not exist
         throw new ApiError(
