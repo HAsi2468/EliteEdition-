@@ -2336,7 +2336,8 @@ export default function App() {
       {/* Main Layout */}
       <main style={styles.mainLayout} className={`main-layout-container ${['communication', 'workspace', 'task_management'].includes(activeTab) ? 'is-comm-active' : ''}`}>
         
-        {/* Left Navigation Sidebar */}
+        {/* Left Navigation Sidebar - Hidden on Chat and Task Management */}
+        {!['communication', 'workspace', 'task_management'].includes(activeTab) && (
         <aside
           style={{
             width: isSidebarCollapsed ? '68px' : '230px',
@@ -2738,6 +2739,7 @@ export default function App() {
 
           </div>
         </aside>
+        )}
 
         {/* Right Content Panel */}
         <section
