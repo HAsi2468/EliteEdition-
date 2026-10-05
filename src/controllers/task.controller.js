@@ -61,22 +61,29 @@ const getTasks = async (req, res) => {
     // Role-based Access Control:
     // Master admin can see all tasks.
     // Regular users can ONLY see tasks assigned to them or created/assigned by them.
-    const userRole = (req.user?.role || '').toLowerCase();
+    const userRole = (req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
     const isMasterAdmin = userRole === 'admin' ||
+      userRole === 'super_admin' ||
       Boolean(req.user?.isMainAdmin) ||
-      (req.user?.username || '').toLowerCase() === 'admin' ||
+      Boolean(req.user?.isAdmin) ||
+      req.headers['x-is-admin'] === 'true' ||
+      (req.user?.username || req.headers['x-user-name'] || '').toLowerCase() === 'admin' ||
       (req.user?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com';
 
     const currentUserId = req.user?._id || req.headers['x-user-id'] || req.query.userId;
 
-    if (!isMasterAdmin && currentUserId && mongoose.Types.ObjectId.isValid(currentUserId)) {
-      const userObjId = new mongoose.Types.ObjectId(currentUserId);
-      andConditions.push({
-        $or: [
-          { assignees: userObjId },
-          { createdBy: userObjId }
-        ]
-      });
+    if (!isMasterAdmin) {
+      if (currentUserId && mongoose.Types.ObjectId.isValid(currentUserId)) {
+        const userObjId = new mongoose.Types.ObjectId(currentUserId);
+        andConditions.push({
+          $or: [
+            { assignees: userObjId },
+            { createdBy: userObjId }
+          ]
+        });
+      } else {
+        andConditions.push({ _id: null });
+      }
     }
 
     if (andConditions.length === 1) {

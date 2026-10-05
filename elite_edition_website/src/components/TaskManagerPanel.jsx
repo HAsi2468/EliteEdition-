@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
@@ -139,6 +139,19 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState('kanban'); // 'kanban' | 'list' | 'calendar' | 'timeline' | 'leaderboard' | 'timesheets'
 
+  const myId = String(currentUser?._id || currentUser?.id || '');
+  const myName = currentUser?.name || currentUser?.username || 'Staff';
+
+  const isMasterAdmin = Boolean(
+    (currentUser?.role || '').toLowerCase() === 'admin' ||
+    (currentUser?.role || '').toLowerCase() === 'super_admin' ||
+    currentUser?.isAdmin ||
+    currentUser?.isMainAdmin ||
+    (currentUser?.username || '').toLowerCase() === 'admin' ||
+    (currentUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com'
+  );
+  const isAdmin = isMasterAdmin;
+
   // TaskOPad Scope Tabs State
   const [taskScope, setTaskScope] = useState('all'); // 'all' | 'my_tasks' | 'delegated' | 'today' | 'overdue' | 'completed'
   const [mobileKanbanCol, setMobileKanbanCol] = useState('all');
@@ -153,9 +166,24 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [manualLogBillable, setManualLogBillable] = useState(true);
   const [loggingTime, setLoggingTime] = useState(false);
 
-  // Filters
+  // Filters (Locked to 'me' for non-admin staff)
+  const defaultAssigneeFilter = isMasterAdmin ? 'all' : 'me';
   const [searchQuery, setSearchQuery] = useState('');
-  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilterRaw] = useState(() => (isMasterAdmin ? 'all' : 'me'));
+  const setAssigneeFilter = useCallback((val) => {
+    if (!isMasterAdmin) {
+      setAssigneeFilterRaw('me');
+      return;
+    }
+    setAssigneeFilterRaw(val);
+  }, [isMasterAdmin]);
+
+  useEffect(() => {
+    if (!isMasterAdmin && assigneeFilter !== 'me') {
+      setAssigneeFilterRaw('me');
+    }
+  }, [isMasterAdmin, assigneeFilter]);
+
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -317,17 +345,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     { id: 'In Review', label: 'In Review', color: '#7c3aed', bg: '#f3e8ff' },
     { id: 'Done', label: 'Done', color: '#16a34a', bg: '#f0fdf4' },
   ];
-
-  const myId = String(currentUser?._id || currentUser?.id || '');
-  const myName = currentUser?.name || currentUser?.username || 'Staff';
-
-  const isMasterAdmin = Boolean(
-    (currentUser?.role || '').toLowerCase() === 'admin' ||
-    currentUser?.isMainAdmin ||
-    (currentUser?.username || '').toLowerCase() === 'admin' ||
-    (currentUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com'
-  );
-  const isAdmin = isMasterAdmin;
 
   const isTaskAssignedToMe = (t) => {
     const myName = (currentUser?.name || '').toLowerCase().trim();
@@ -942,7 +959,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     if (assigneeFilter === 'me') {
-      if (!isTaskAssignedToMe(t)) return false;
+      if (!isTaskAssignedToMe(t) && !isTaskCreatedByMe(t)) return false;
     } else if (assigneeFilter !== 'all') {
       const hasAssignee = (t.assignees || []).some((a) => {
         const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
@@ -1544,7 +1561,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   ];
 
   const scopeTabs = [
-    { id: 'all', label: 'All Tasks', shortLabel: 'All Tasks', icon: '🎯', count: allCount, color: '#2563eb' },
+    { id: 'all', label: isMasterAdmin ? 'All Tasks' : 'All My Tasks', shortLabel: isMasterAdmin ? 'All Tasks' : 'My Tasks', icon: '🎯', count: allCount, color: '#2563eb' },
     { id: 'my_tasks', label: 'My Tasks', shortLabel: 'My Tasks', icon: '👤', count: myTasksCount, color: '#0284c7' },
     { id: 'delegated', label: 'Assigned by Me (Delegated)', shortLabel: 'Delegated', icon: '🤝', count: delegatedCount, color: '#7c3aed' },
     { id: 'today', label: 'Due Today', shortLabel: 'Due Today', icon: '⏰', count: todayCount, color: '#d97706' },
@@ -2042,27 +2059,48 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
           {/* Filters: Assignee & Priority */}
           <div className="task-filter-dropdowns">
-            <select
-              value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              className="task-select"
-            >
-              <option value="all">👥 All Staff</option>
-              <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
-                👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
-              </option>
-              <optgroup label="Team Members">
-                {allUsers.map((u) => {
-                  const uId = String(u._id || u.id);
-                  const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
-                  return (
-                    <option key={uId} value={uId}>
-                      {u.name || u.username} {isMe ? '(Me)' : ''}
-                    </option>
-                  );
-                })}
-              </optgroup>
-            </select>
+            {isMasterAdmin ? (
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="task-select"
+              >
+                <option value="all">👥 All Staff</option>
+                <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
+                  👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
+                </option>
+                <optgroup label="Team Members">
+                  {allUsers.map((u) => {
+                    const uId = String(u._id || u.id);
+                    const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
+                    return (
+                      <option key={uId} value={uId}>
+                        {u.name || u.username} {isMe ? '(Me)' : ''}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              </select>
+            ) : (
+              <select
+                value="me"
+                disabled
+                className="task-select"
+                title="Locked: You can only view your own tasks"
+                style={{
+                  cursor: 'not-allowed',
+                  backgroundColor: '#f8fafc',
+                  borderColor: '#cbd5e1',
+                  color: '#1e3a8a',
+                  fontWeight: 700,
+                  opacity: 0.95
+                }}
+              >
+                <option value="me">
+                  👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
+                </option>
+              </select>
+            )}
 
             <select
               value={priorityFilter}
@@ -2195,10 +2233,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             style={{
               padding: '0.42rem 0.55rem',
               borderRadius: '8px',
-              background: (showMobileFilterMenu || searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') ? '#eff6ff' : '#f8fafc',
-              border: (showMobileFilterMenu || searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+              background: (showMobileFilterMenu || searchQuery || assigneeFilter !== defaultAssigneeFilter || priorityFilter !== 'all') ? '#eff6ff' : '#f8fafc',
+              border: (showMobileFilterMenu || searchQuery || assigneeFilter !== defaultAssigneeFilter || priorityFilter !== 'all') ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
               cursor: 'pointer',
-              color: (showMobileFilterMenu || searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') ? '#2563eb' : '#64748b',
+              color: (showMobileFilterMenu || searchQuery || assigneeFilter !== defaultAssigneeFilter || priorityFilter !== 'all') ? '#2563eb' : '#64748b',
               display: 'flex',
               alignItems: 'center',
               gap: '3px',
@@ -2207,7 +2245,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             title="Search & Filters"
           >
             <Filter size={13} />
-            {(searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') && (
+            {(searchQuery || assigneeFilter !== defaultAssigneeFilter || priorityFilter !== 'all') && (
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563eb' }} />
             )}
           </button>
@@ -2424,27 +2462,40 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-              <select
-                value={assigneeFilter}
-                onChange={(e) => setAssigneeFilter(e.target.value)}
-                style={{ fontSize: '0.72rem', height: '30px', padding: '0 0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600, width: '100%' }}
-              >
-                <option value="all">👥 All Staff</option>
-                <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
-                  👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
-                </option>
-                <optgroup label="Team Members">
-                  {allUsers.map((u) => {
-                    const uId = String(u._id || u.id);
-                    const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
-                    return (
-                      <option key={uId} value={uId}>
-                        {u.name || u.username} {isMe ? '(Me)' : ''}
-                      </option>
-                    );
-                  })}
-                </optgroup>
-              </select>
+              {isMasterAdmin ? (
+                <select
+                  value={assigneeFilter}
+                  onChange={(e) => setAssigneeFilter(e.target.value)}
+                  style={{ fontSize: '0.72rem', height: '30px', padding: '0 0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600, width: '100%' }}
+                >
+                  <option value="all">👥 All Staff</option>
+                  <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
+                    👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
+                  </option>
+                  <optgroup label="Team Members">
+                    {allUsers.map((u) => {
+                      const uId = String(u._id || u.id);
+                      const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
+                      return (
+                        <option key={uId} value={uId}>
+                          {u.name || u.username} {isMe ? '(Me)' : ''}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                </select>
+              ) : (
+                <select
+                  value="me"
+                  disabled
+                  title="Locked: You can only view your own tasks"
+                  style={{ fontSize: '0.72rem', height: '30px', padding: '0 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#1e3a8a', fontWeight: 700, width: '100%', cursor: 'not-allowed', opacity: 0.95 }}
+                >
+                  <option value="me">
+                    👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
+                  </option>
+                </select>
+              )}
 
               <select
                 value={priorityFilter}
@@ -2459,11 +2510,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               </select>
             </div>
 
-            {(searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') && (
+            {(searchQuery || assigneeFilter !== defaultAssigneeFilter || priorityFilter !== 'all') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
-                  setAssigneeFilter('all');
+                  setAssigneeFilter(defaultAssigneeFilter);
                   setPriorityFilter('all');
                 }}
                 style={{
