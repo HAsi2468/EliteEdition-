@@ -95,6 +95,55 @@ const getModuleAndModel = (urlPath) => {
   return { name: cleanName, model: null };
 };
 
+// Core Job Card fields that DO require approval if modified (order specs, customer, fabric, billing quantities, rates)
+const CORE_JOBCARD_SPEC_FIELDS = new Set([
+  'partyname',
+  'party',
+  'clientname',
+  'client',
+  'clientcode',
+  'designno',
+  'designname',
+  'catalogno',
+  'fabricname',
+  'fabrictype',
+  'fabric',
+  'totalmtr',
+  'orderedmtr',
+  'ordermtr',
+  'rate',
+  'amount',
+  'totalamount',
+  'unitprice',
+  'jobno',
+  'orderdate',
+  'expecteddeliverydate',
+]);
+
+/**
+ * Checks whether an incoming JobCard update is routine operational department data entry
+ * (such as fusing entry, printing progress, machine parameters, fault logs, QA check, delivery status).
+ * These are daily operational workflows and do NOT require admin approval.
+ */
+const isRoutineJobCardDataEntry = (moduleName, body) => {
+  if (moduleName !== 'JobCard' && moduleName !== 'GarmentJobCard') {
+    return false;
+  }
+  if (!body || typeof body !== 'object') {
+    return false;
+  }
+
+  const keys = Object.keys(body).map(k => k.toLowerCase().replace(/[-_]/g, ''));
+  // If ANY core customer/order specification is being modified, require approval
+  const touchesCoreSpec = keys.some(k => CORE_JOBCARD_SPEC_FIELDS.has(k));
+  if (touchesCoreSpec) {
+    return false;
+  }
+
+  // Purely operational department data entry (fusing, printing, QA, delivery dispatch)
+  return true;
+};
+
 // Calculate field-by-field diff between old and new state
 const computeDiff = (beforeObj, afterObj) => {
   const diffs = [];
@@ -180,6 +229,13 @@ const approvalInterceptor = async (req, res, next) => {
 
     // Resolve module name and Mongoose model
     const { name: moduleName, model: TargetModel } = getModuleAndModel(originalUrl);
+
+    // 5.1 Bypass approval for routine factory process data entry (Fusing, Printing, QA, Delivery tracking)
+    // Operators filling in routine production metrics on job cards is normal data entry, not an edit!
+    if (isEdit && isRoutineJobCardDataEntry(moduleName, req.body)) {
+      logger.info('[ApprovalInterceptor] Allowing routine factory data entry without approval for %s (%s)', moduleName, targetId);
+      return next();
+    }
 
     // Snapshot existing document for "Before" data
     let beforeData = null;
