@@ -2602,10 +2602,20 @@ function JobCardForm({ card, onSave, onClose, department }) {
 
     // Auto-calculate standard values if pcs is already entered
     const pcsVal = parseFloat(form.pcs) || 0;
-    const topVal = d.top100 ? (((d.top100 / 100) * pcsVal).toFixed(2)) : '';
-    const sleeveVal = d.sleeve100 ? (((d.sleeve100 / 100) * pcsVal).toFixed(2)) : '';
-    const bottomVal = d.bottom100 ? (((d.bottom100 / 100) * pcsVal).toFixed(2)) : '';
-    const dupattaVal = d.dupatta100 ? (((d.dupatta100 / 100) * pcsVal).toFixed(2)) : '';
+    const calcScaledPart = (stdVal, pcs) => {
+      if (!stdVal) return '';
+      const num = parseFloat(stdVal);
+      if (isNaN(num) || num <= 0) return '';
+      // If the standard was entered as 1 (user intended 1 pc per garment rather than 1/100th), scale as 1 per garment
+      const perPc = num === 1 ? 1 : (num / 100);
+      const total = perPc * pcs;
+      return total % 1 === 0 ? total.toString() : parseFloat(total.toFixed(2)).toString();
+    };
+
+    const topVal = calcScaledPart(d.top100, pcsVal);
+    const sleeveVal = calcScaledPart(d.sleeve100, pcsVal);
+    const bottomVal = calcScaledPart(d.bottom100, pcsVal);
+    const dupattaVal = calcScaledPart(d.dupatta100, pcsVal);
     const cutVal = d.cut100 ? d.cut100.toString() : ''; // Cut does not multiply by pcs
     const consumptionVal = d.totalMtr100 ? ((d.totalMtr100 / 100).toFixed(2)) : '';
     const totalMtrVal = d.totalMtr100 ? (((d.totalMtr100 / 100) * pcsVal).toFixed(2)) : '';
@@ -2706,11 +2716,20 @@ function JobCardForm({ card, onSave, onClose, department }) {
           totalMtr: totalMtrVal || f.totalMtr
         };
 
+        const calcScaledPart = (stdVal, pcs) => {
+          if (!stdVal) return '';
+          const num = parseFloat(stdVal);
+          if (isNaN(num) || num <= 0) return '';
+          const perPc = num === 1 ? 1 : (num / 100);
+          const total = perPc * pcs;
+          return total % 1 === 0 ? total.toString() : parseFloat(total.toFixed(2)).toString();
+        };
+
         // For new cards: only scale if field has not been explicitly cleared/removed
-        if (f.top !== '' && f.top !== undefined && d.top100) updates.top = ((d.top100 / 100) * pcsVal).toFixed(2);
-        if (f.sleeve !== '' && f.sleeve !== undefined && d.sleeve100) updates.sleeve = ((d.sleeve100 / 100) * pcsVal).toFixed(2);
-        if (f.bottom !== '' && f.bottom !== undefined && d.bottom100) updates.bottom = ((d.bottom100 / 100) * pcsVal).toFixed(2);
-        if (f.dupatta !== '' && f.dupatta !== undefined && d.dupatta100) updates.dupatta = ((d.dupatta100 / 100) * pcsVal).toFixed(2);
+        if (f.top !== '' && f.top !== undefined && d.top100) updates.top = calcScaledPart(d.top100, pcsVal);
+        if (f.sleeve !== '' && f.sleeve !== undefined && d.sleeve100) updates.sleeve = calcScaledPart(d.sleeve100, pcsVal);
+        if (f.bottom !== '' && f.bottom !== undefined && d.bottom100) updates.bottom = calcScaledPart(d.bottom100, pcsVal);
+        if (f.dupatta !== '' && f.dupatta !== undefined && d.dupatta100) updates.dupatta = calcScaledPart(d.dupatta100, pcsVal);
         if (f.setCopy !== '' && f.setCopy !== undefined && d.setCopy100) updates.setCopy = Math.round((d.setCopy100 / 100) * pcsVal).toString();
         if (f.cut !== '' && f.cut !== undefined && d.cut100) updates.cut = d.cut100.toString();
 

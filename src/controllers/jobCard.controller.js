@@ -587,12 +587,19 @@ const createJobCard = async (req, res) => {
       }
       if (d) {
         const pNum = parseFloat(body.pcs) || 0;
+        const scalePart = (val, pcs) => {
+          const num = Number(val || 0);
+          if (num <= 0 || pcs <= 0) return '';
+          const perPc = num === 1 ? 1 : (num / 100);
+          const total = perPc * pcs;
+          return total % 1 === 0 ? total.toString() : parseFloat(total.toFixed(2)).toString();
+        };
         if (!body.consumption && d.totalMtr100) body.consumption = (d.totalMtr100 / 100).toFixed(2);
         if (!body.totalMtr && d.totalMtr100 && pNum > 0) body.totalMtr = ((d.totalMtr100 / 100) * pNum).toFixed(2);
-        if (!body.top && d.top100 && pNum > 0) body.top = ((d.top100 / 100) * pNum).toFixed(2);
-        if (!body.sleeve && d.sleeve100 && pNum > 0) body.sleeve = ((d.sleeve100 / 100) * pNum).toFixed(2);
-        if (!body.bottom && d.bottom100 && pNum > 0) body.bottom = ((d.bottom100 / 100) * pNum).toFixed(2);
-        if (!body.dupatta && d.dupatta100 && pNum > 0) body.dupatta = ((d.dupatta100 / 100) * pNum).toFixed(2);
+        if (!body.top && d.top100 && pNum > 0) body.top = scalePart(d.top100, pNum);
+        if (!body.sleeve && d.sleeve100 && pNum > 0) body.sleeve = scalePart(d.sleeve100, pNum);
+        if (!body.bottom && d.bottom100 && pNum > 0) body.bottom = scalePart(d.bottom100, pNum);
+        if (!body.dupatta && d.dupatta100 && pNum > 0) body.dupatta = scalePart(d.dupatta100, pNum);
         if (!body.cut && d.cut100) body.cut = d.cut100.toString();
         if (!body.setCopy && d.setCopy100 && pNum > 0) body.setCopy = Math.round((d.setCopy100 / 100) * pNum).toString();
         if (!body.pass && d.pass) body.pass = d.pass;
@@ -750,12 +757,19 @@ const createClientBulkOrder = async (req, res) => {
       const totalMtr100 = Number(designDoc?.totalMtr100 ?? item.totalMtr100 ?? 0);
       const setCopy100 = Number(designDoc?.setCopy100 ?? item.setCopy100 ?? 0);
 
+      const scalePart = (val, pcs) => {
+        const num = Number(val || 0);
+        if (num <= 0 || pcs <= 0) return '';
+        const perPc = num === 1 ? 1 : (num / 100);
+        const total = perPc * pcs;
+        return total % 1 === 0 ? total.toString() : parseFloat(total.toFixed(2)).toString();
+      };
       const consumption = totalMtr100 > 0 ? (totalMtr100 / 100).toFixed(2) : (item.consumption || '');
       const totalMtr = totalMtr100 > 0 && pcsNum > 0 ? ((totalMtr100 / 100) * pcsNum).toFixed(2) : (item.totalMtr || '');
-      const top = top100 > 0 && pcsNum > 0 ? ((top100 / 100) * pcsNum).toFixed(2) : (item.top || '');
-      const sleeve = sleeve100 > 0 && pcsNum > 0 ? ((sleeve100 / 100) * pcsNum).toFixed(2) : (item.sleeve || '');
-      const bottom = bottom100 > 0 && pcsNum > 0 ? ((bottom100 / 100) * pcsNum).toFixed(2) : (item.bottom || '');
-      const dupatta = dupatta100 > 0 && pcsNum > 0 ? ((dupatta100 / 100) * pcsNum).toFixed(2) : (item.dupatta || '');
+      const top = top100 > 0 && pcsNum > 0 ? scalePart(top100, pcsNum) : (item.top || '');
+      const sleeve = sleeve100 > 0 && pcsNum > 0 ? scalePart(sleeve100, pcsNum) : (item.sleeve || '');
+      const bottom = bottom100 > 0 && pcsNum > 0 ? scalePart(bottom100, pcsNum) : (item.bottom || '');
+      const dupatta = dupatta100 > 0 && pcsNum > 0 ? scalePart(dupatta100, pcsNum) : (item.dupatta || '');
       const cut = cut100 > 0 ? cut100.toString() : (item.cut || '');
       const setCopy = setCopy100 > 0 && pcsNum > 0 ? Math.round((setCopy100 / 100) * pcsNum).toString() : (item.setCopy || '');
       const expTime = calcExpTime(panna, pass, totalMtr, '');

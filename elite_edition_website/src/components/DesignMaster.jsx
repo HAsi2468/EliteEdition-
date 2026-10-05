@@ -47,13 +47,13 @@ export default function DesignMaster({ department }) {
   const startEdit = (design) => {
     setEditingId(design._id);
     setEditForm({
-      top100: design.top100 || 0,
-      sleeve100: design.sleeve100 || 0,
-      bottom100: design.bottom100 || 0,
-      dupatta100: design.dupatta100 || 0,
-      cut100: design.cut100 || 0,
-      totalMtr100: design.totalMtr100 || 0,
-      setCopy100: design.setCopy100 || 0,
+      top100: design.top100 !== undefined && design.top100 !== null ? String(design.top100) : '',
+      sleeve100: design.sleeve100 !== undefined && design.sleeve100 !== null ? String(design.sleeve100) : '',
+      bottom100: design.bottom100 !== undefined && design.bottom100 !== null ? String(design.bottom100) : '',
+      dupatta100: design.dupatta100 !== undefined && design.dupatta100 !== null ? String(design.dupatta100) : '',
+      cut100: design.cut100 !== undefined && design.cut100 !== null ? String(design.cut100) : '',
+      totalMtr100: design.totalMtr100 !== undefined && design.totalMtr100 !== null ? String(design.totalMtr100) : '',
+      setCopy100: design.setCopy100 !== undefined && design.setCopy100 !== null ? String(design.setCopy100) : '',
     });
   };
 
@@ -61,14 +61,23 @@ export default function DesignMaster({ department }) {
     const { name, value } = e.target;
     setEditForm(prev => ({
       ...prev,
-      [name]: parseFloat(value) || 0
+      [name]: value
     }));
   };
 
   const saveEdit = async (id) => {
     setError('');
     try {
-      const updated = await api.updateDesign(id, editForm);
+      const sanitized = {
+        top100: editForm.top100 === '' || isNaN(Number(editForm.top100)) ? 0 : Number(editForm.top100),
+        sleeve100: editForm.sleeve100 === '' || isNaN(Number(editForm.sleeve100)) ? 0 : Number(editForm.sleeve100),
+        bottom100: editForm.bottom100 === '' || isNaN(Number(editForm.bottom100)) ? 0 : Number(editForm.bottom100),
+        dupatta100: editForm.dupatta100 === '' || isNaN(Number(editForm.dupatta100)) ? 0 : Number(editForm.dupatta100),
+        cut100: editForm.cut100 === '' || isNaN(Number(editForm.cut100)) ? 0 : Number(editForm.cut100),
+        totalMtr100: editForm.totalMtr100 === '' || isNaN(Number(editForm.totalMtr100)) ? 0 : Number(editForm.totalMtr100),
+        setCopy100: editForm.setCopy100 === '' || isNaN(Number(editForm.setCopy100)) ? 0 : Number(editForm.setCopy100),
+      };
+      const updated = await api.updateDesign(id, sanitized);
       setDesigns(prev => prev.map(d => d._id === id ? { ...d, ...updated } : d));
       setEditingId(null);
     } catch (err) {
@@ -213,13 +222,14 @@ export default function DesignMaster({ department }) {
                       {isEditing ? (
                         <input
                           type="number"
+                          step="any"
                           name="top100"
                           value={editForm.top100}
                           onChange={handleEditChange}
                           style={inputStyle}
                         />
                       ) : (
-                        `${d.top100 || 0} pcs`
+                        `${d.top100 || 0}`
                       )}
                     </td>
 
@@ -228,13 +238,14 @@ export default function DesignMaster({ department }) {
                       {isEditing ? (
                         <input
                           type="number"
+                          step="any"
                           name="sleeve100"
                           value={editForm.sleeve100}
                           onChange={handleEditChange}
                           style={inputStyle}
                         />
                       ) : (
-                        `${d.sleeve100 || 0} pcs`
+                        `${d.sleeve100 || 0}`
                       )}
                     </td>
 
@@ -243,13 +254,14 @@ export default function DesignMaster({ department }) {
                       {isEditing ? (
                         <input
                           type="number"
+                          step="any"
                           name="bottom100"
                           value={editForm.bottom100}
                           onChange={handleEditChange}
                           style={inputStyle}
                         />
                       ) : (
-                        `${d.bottom100 || 0} pcs`
+                        `${d.bottom100 || 0}`
                       )}
                     </td>
 
@@ -258,13 +270,14 @@ export default function DesignMaster({ department }) {
                       {isEditing ? (
                         <input
                           type="number"
+                          step="any"
                           name="dupatta100"
                           value={editForm.dupatta100}
                           onChange={handleEditChange}
                           style={inputStyle}
                         />
                       ) : (
-                        `${d.dupatta100 || 0} pcs`
+                        `${d.dupatta100 || 0}`
                       )}
                     </td>
 
@@ -273,13 +286,14 @@ export default function DesignMaster({ department }) {
                       {isEditing ? (
                         <input
                           type="number"
+                          step="any"
                           name="cut100"
                           value={editForm.cut100}
                           onChange={handleEditChange}
                           style={inputStyle}
                         />
                       ) : (
-                        `${d.cut100 || 0} pcs`
+                        `${d.cut100 || 0}`
                       )}
                     </td>
 
@@ -288,6 +302,7 @@ export default function DesignMaster({ department }) {
                       {isEditing ? (
                         <input
                           type="number"
+                          step="any"
                           name="totalMtr100"
                           value={editForm.totalMtr100}
                           onChange={handleEditChange}
@@ -303,13 +318,14 @@ export default function DesignMaster({ department }) {
                       {isEditing ? (
                         <input
                           type="number"
+                          step="any"
                           name="setCopy100"
                           value={editForm.setCopy100}
                           onChange={handleEditChange}
                           style={inputStyle}
                         />
                       ) : (
-                        `${d.setCopy100 || 0} pcs`
+                        `${d.setCopy100 || 0}`
                       )}
                     </td>
 

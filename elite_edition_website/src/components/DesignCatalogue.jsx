@@ -85,8 +85,9 @@ const BLANK_DESIGN = {
 };
 
 // Form Field Component
-function FormField({ label, name, value, onChange, placeholder, type = 'text', options, required }) {
+function FormField({ label, name, value, onChange, placeholder, type = 'text', options, required, step, min, max }) {
   const showColorPreview = name === 'colors' && getColorHex(value);
+  const inputStep = step !== undefined ? step : (type === 'number' ? 'any' : undefined);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 calc(50% - 0.5rem)', minWidth: '180px' }}>
       <label htmlFor={`field-${name}`} style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -99,8 +100,11 @@ function FormField({ label, name, value, onChange, placeholder, type = 'text', o
               <input 
                 id={`field-${name}`}
                 type={type}
+                step={inputStep}
+                min={min}
+                max={max}
                 name={name} 
-                value={value} 
+                value={value ?? ''} 
                 onChange={onChange} 
                 list={`${name}-options`}
                 placeholder={placeholder || 'Select or type...'}
@@ -116,8 +120,11 @@ function FormField({ label, name, value, onChange, placeholder, type = 'text', o
             <input
               id={`field-${name}`}
               type={type}
+              step={inputStep}
+              min={min}
+              max={max}
               name={name}
-              value={value}
+              value={value ?? ''}
               onChange={onChange}
               placeholder={placeholder}
               required={required}
@@ -1027,6 +1034,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       ...BLANK_DESIGN,
       ...d,
       parties: existingParties,
+      top100: (d.top100 !== undefined && d.top100 !== null && d.top100 !== 0) ? d.top100 : (d.top100 === 0 ? '' : ''),
+      sleeve100: (d.sleeve100 !== undefined && d.sleeve100 !== null && d.sleeve100 !== 0) ? d.sleeve100 : (d.sleeve100 === 0 ? '' : ''),
+      bottom100: (d.bottom100 !== undefined && d.bottom100 !== null && d.bottom100 !== 0) ? d.bottom100 : (d.bottom100 === 0 ? '' : ''),
+      dupatta100: (d.dupatta100 !== undefined && d.dupatta100 !== null && d.dupatta100 !== 0) ? d.dupatta100 : (d.dupatta100 === 0 ? '' : ''),
+      cut100: (d.cut100 !== undefined && d.cut100 !== null && d.cut100 !== 0) ? d.cut100 : (d.cut100 === 0 ? '' : ''),
+      totalMtr100: (d.totalMtr100 !== undefined && d.totalMtr100 !== null && d.totalMtr100 !== 0) ? d.totalMtr100 : (d.totalMtr100 === 0 ? '' : ''),
+      setCopy100: (d.setCopy100 !== undefined && d.setCopy100 !== null && d.setCopy100 !== 0) ? d.setCopy100 : (d.setCopy100 === 0 ? '' : ''),
       sizeSalesRates: d.sizeSalesRates || { ...BLANK_DESIGN.sizeSalesRates }
     });
     setFormError('');
@@ -1960,19 +1974,24 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
                   {/* Section: 100 Pcs Standards */}
                   <div style={{
-                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
-                    color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
-                    borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem'
+                    display: 'flex', flexDirection: 'column', gap: '0.2rem',
+                    marginBottom: '0.6rem', marginTop: '0.8rem', width: '100%',
+                    borderBottom: '1px solid var(--border-light)', paddingBottom: '0.4rem'
                   }}>
-                    👗 100 Pcs Standards (for Job Card auto-calculations)
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--primary)' }}>
+                      👗 100 Pcs Standards (for Job Card auto-calculations)
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      💡 Enter total requirement for <strong>100 Garments</strong>. E.g. for 1 Top per garment, enter <strong>100</strong> (so 1 pc = 1 Top). If 2.50m per garment, enter <strong>250</strong>.
+                    </span>
                   </div>
-                  <FormField label="Top (100 Pcs)" name="top100" value={formVal.top100} onChange={handleFormChange} type="number" placeholder="e.g. 250" />
-                  <FormField label="Sleeve (100 Pcs)" name="sleeve100" value={formVal.sleeve100} onChange={handleFormChange} type="number" placeholder="e.g. 60" />
-                  <FormField label="Bottom (100 Pcs)" name="bottom100" value={formVal.bottom100} onChange={handleFormChange} type="number" placeholder="e.g. 200" />
-                  <FormField label="Dupatta (100 Pcs)" name="dupatta100" value={formVal.dupatta100} onChange={handleFormChange} type="number" placeholder="e.g. 225" />
-                  <FormField label="Cut (100 Pcs)" name="cut100" value={formVal.cut100} onChange={handleFormChange} type="number" placeholder="e.g. 735" />
-                  <FormField label="Total Mtr (mtr per 100 pcs)" name="totalMtr100" value={formVal.totalMtr100} onChange={handleFormChange} type="number" placeholder="e.g. 735" />
-                  <FormField label="Set Copy (100 Pcs)" name="setCopy100" value={formVal.setCopy100} onChange={handleFormChange} type="number" placeholder="e.g. 100" />
+                  <FormField label="Top (100 Pcs)" name="top100" value={formVal.top100} onChange={handleFormChange} type="number" step="any" placeholder="e.g. 100 (for 1 pc) or 250 mtr" />
+                  <FormField label="Sleeve (100 Pcs)" name="sleeve100" value={formVal.sleeve100} onChange={handleFormChange} type="number" step="any" placeholder="e.g. 100 or 60 mtr" />
+                  <FormField label="Bottom (100 Pcs)" name="bottom100" value={formVal.bottom100} onChange={handleFormChange} type="number" step="any" placeholder="e.g. 100 or 200 mtr" />
+                  <FormField label="Dupatta (100 Pcs)" name="dupatta100" value={formVal.dupatta100} onChange={handleFormChange} type="number" step="any" placeholder="e.g. 100 or 225 mtr" />
+                  <FormField label="Cut (100 Pcs)" name="cut100" value={formVal.cut100} onChange={handleFormChange} type="number" step="any" placeholder="e.g. 735" />
+                  <FormField label="Total Mtr (mtr per 100 pcs)" name="totalMtr100" value={formVal.totalMtr100} onChange={handleFormChange} type="number" step="any" placeholder="e.g. 735" />
+                  <FormField label="Set Copy (100 Pcs)" name="setCopy100" value={formVal.setCopy100} onChange={handleFormChange} type="number" step="any" placeholder="e.g. 100" />
                 </>
               )}
 
