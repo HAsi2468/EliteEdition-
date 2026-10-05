@@ -323,15 +323,35 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const isAdmin = isMasterAdmin;
 
   const isTaskAssignedToMe = (t) => {
+    const myName = (currentUser?.name || '').toLowerCase().trim();
+    const myUsername = (currentUser?.username || '').toLowerCase().trim();
     return (t?.assignees || []).some((a) => {
-      const aId = String(typeof a === 'object' ? (a?._id || a?.id) : a);
-      return aId === String(myId);
+      if (!a) return false;
+      const aId = String(typeof a === 'object' ? (a?._id || a?.id || '') : a);
+      if (myId && aId === myId) return true;
+      if (typeof a === 'object') {
+        const aName = (a.name || '').toLowerCase().trim();
+        const aUsername = (a.username || '').toLowerCase().trim();
+        if (myName && aName === myName) return true;
+        if (myUsername && aUsername === myUsername) return true;
+      }
+      return false;
     });
   };
 
   const isTaskCreatedByMe = (t) => {
-    const cId = String(typeof t?.createdBy === 'object' ? (t?.createdBy?._id || t?.createdBy?.id) : (t?.createdBy || ''));
-    return cId === String(myId);
+    if (!t?.createdBy) return false;
+    const cId = String(typeof t?.createdBy === 'object' ? (t?.createdBy?._id || t?.createdBy?.id || '') : t?.createdBy);
+    if (myId && cId === myId) return true;
+    if (typeof t.createdBy === 'object') {
+      const myName = (currentUser?.name || '').toLowerCase().trim();
+      const myUsername = (currentUser?.username || '').toLowerCase().trim();
+      const cName = (t.createdBy.name || '').toLowerCase().trim();
+      const cUsername = (t.createdBy.username || '').toLowerCase().trim();
+      if (myName && cName === myName) return true;
+      if (myUsername && cUsername === myUsername) return true;
+    }
+    return false;
   };
 
   const isTaskVisible = (t) => {
@@ -418,17 +438,45 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     try {
       const [tasksRes, usersRes] = await Promise.all([
         api.getTasks(),
-        api.getCommunicationUsers(myId)
+        api.getUsers({ limit: 100 }).catch(() => api.getCommunicationUsers(myId))
       ]);
 
       if (tasksRes.success && tasksRes.data) {
         const rawTasks = tasksRes.data;
         setTasks(isMasterAdmin ? rawTasks : rawTasks.filter(isTaskVisible));
       }
-      if (usersRes.success && usersRes.data) {
-        setAllUsers(usersRes.data);
-        setSelectedAssigneeIds([]);
+      let loadedUsers = [];
+      if (usersRes && usersRes.success && usersRes.data) {
+        loadedUsers = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.results || []);
+      } else if (Array.isArray(usersRes)) {
+        loadedUsers = usersRes;
       }
+
+      // Ensure currentUser is always included in allUsers so their data can be filtered
+      if (currentUser && (currentUser._id || currentUser.id || currentUser.name)) {
+        const myUserId = String(currentUser._id || currentUser.id || '');
+        const myName = (currentUser.name || currentUser.username || '').toLowerCase().trim();
+        const exists = loadedUsers.some((u) => {
+          const uId = String(u._id || u.id || '');
+          const uName = (u.name || u.username || '').toLowerCase().trim();
+          return (myUserId && uId === myUserId) || (myName && uName === myName);
+        });
+        if (!exists && (myUserId || myName)) {
+          loadedUsers = [
+            {
+              _id: myUserId || 'me',
+              name: currentUser.name || currentUser.username || 'Myself',
+              username: currentUser.username,
+              role: currentUser.role,
+              department: currentUser.department
+            },
+            ...loadedUsers
+          ];
+        }
+      }
+
+      setAllUsers(loadedUsers);
+      setSelectedAssigneeIds([]);
     } catch (err) {
       console.error('Failed to fetch task management data:', err);
     } finally {
@@ -872,10 +920,18 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const filteredTasks = visibleTasks.filter((t) => {
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
-    if (assigneeFilter !== 'all') {
+    if (assigneeFilter === 'me') {
+      if (!isTaskAssignedToMe(t)) return false;
+    } else if (assigneeFilter !== 'all') {
       const hasAssignee = (t.assignees || []).some((a) => {
         const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
-        return aId === assigneeFilter;
+        if (aId === String(assigneeFilter)) return true;
+        if (String(assigneeFilter) === myId && isTaskAssignedToMe(t)) return true;
+        if (typeof a === 'object' && a.name) {
+          const matched = allUsers.find((u) => String(u._id || u.id) === String(assigneeFilter));
+          if (matched && (matched.name || '').toLowerCase() === (a.name || '').toLowerCase()) return true;
+        }
+        return false;
       });
       if (!hasAssignee) return false;
     }
@@ -919,9 +975,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
     // Determine target member / scope label
     let targetMemberLabel = 'All Team Members';
-    if (assigneeFilter !== 'all') {
+    if (assigneeFilter === 'me') {
+      targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
+    } else if (assigneeFilter !== 'all') {
       const matchedUser = allUsers.find((u) => String(u._id || u.id) === String(assigneeFilter));
       targetMemberLabel = matchedUser ? (matchedUser.name || matchedUser.username) : 'Selected Member';
+      if (String(assigneeFilter) === myId || (matchedUser && currentUser?.name && (matchedUser.name || '').toLowerCase() === currentUser.name.toLowerCase())) {
+        targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || targetMemberLabel})`;
+      }
     } else if (taskScope === 'my_tasks') {
       targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
     } else if (taskScope === 'delegated') {
@@ -1867,10 +1928,21 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               onChange={(e) => setAssigneeFilter(e.target.value)}
               className="task-select"
             >
-              <option value="all">All Staff</option>
-              {allUsers.map((u) => (
-                <option key={u._id} value={u._id}>{u.name || u.username}</option>
-              ))}
+              <option value="all">👥 All Staff</option>
+              <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
+                👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
+              </option>
+              <optgroup label="Team Members">
+                {allUsers.map((u) => {
+                  const uId = String(u._id || u.id);
+                  const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
+                  return (
+                    <option key={uId} value={uId}>
+                      {u.name || u.username} {isMe ? '(Me)' : ''}
+                    </option>
+                  );
+                })}
+              </optgroup>
             </select>
 
             <select
@@ -2238,10 +2310,21 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 onChange={(e) => setAssigneeFilter(e.target.value)}
                 style={{ fontSize: '0.72rem', height: '30px', padding: '0 0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600, width: '100%' }}
               >
-                <option value="all">All Staff</option>
-                {allUsers.map((u) => (
-                  <option key={u._id} value={u._id}>{u.name || u.username}</option>
-                ))}
+                <option value="all">👥 All Staff</option>
+                <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
+                  👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
+                </option>
+                <optgroup label="Team Members">
+                  {allUsers.map((u) => {
+                    const uId = String(u._id || u.id);
+                    const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
+                    return (
+                      <option key={uId} value={uId}>
+                        {u.name || u.username} {isMe ? '(Me)' : ''}
+                      </option>
+                    );
+                  })}
+                </optgroup>
               </select>
 
               <select
