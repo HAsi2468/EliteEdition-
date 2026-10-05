@@ -174,6 +174,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportScopeChoice, setExportScopeChoice] = useState('filtered');
+  const [exportPaperSize, setExportPaperSize] = useState('A4');
+  const [exportOrientation, setExportOrientation] = useState('landscape');
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -977,7 +979,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   });
 
   // Task Management PDF Report Generator & Export Handler
-  const handleExportPDF = async (targetScope = 'filtered') => {
+  const handleExportPDF = async (targetScope = 'filtered', chosenPaperSize = exportPaperSize, chosenOrientation = exportOrientation) => {
     let tasksToExport = filteredTasks;
     let targetMemberLabel = 'All Team Members';
     let scopeText = 'Filtered Tasks';
@@ -1333,9 +1335,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       title: `Task Report — ${targetMemberLabel} (${new Date().toLocaleDateString('en-GB')})`,
       content: htmlContent,
       defaultSettings: {
-        paperSize: 'A4',
-        orientation: 'landscape',
-        margin: 'default'
+        paperSize: chosenPaperSize || 'A4',
+        orientation: chosenOrientation || 'landscape',
+        margin: 'minimum'
       }
     });
   };
@@ -3651,99 +3653,264 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         )}
       </div>
 
-      {/* ── EXPORT PDF MODAL ── */}
+      {/* ── EXPORT PDF MODAL (REDESIGNED) ── */}
       {showExportModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: 520, background: '#ffffff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', animation: 'slideUp 0.2s ease-out' }}>
-            <div style={{ padding: '1.1rem 1.4rem', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <FileText size={20} color="#fff" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Export Task PDF Report</h3>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: 540, background: '#ffffff', borderRadius: '18px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.35)', border: '1px solid #e2e8f0', animation: 'slideUp 0.2s ease-out' }}>
+            
+            {/* Header with Gradient */}
+            <div style={{ padding: '1.1rem 1.4rem', background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '10px', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <Printer size={20} color="#fff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.01em' }}>Export Task PDF Report</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#bfdbfe', fontWeight: 500 }}>High-resolution, complete audit &amp; worklog document</p>
+                </div>
               </div>
-              <button onClick={() => setShowExportModal(false)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <button 
+                type="button"
+                onClick={() => setShowExportModal(false)} 
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.15s ease' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+              >
                 <X size={16} />
               </button>
             </div>
 
-            <div style={{ padding: '1.2rem 1.4rem' }}>
-              <p style={{ margin: '0 0 1rem 0', fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
-                Generate a high-resolution, print-ready <strong>A4 Landscape</strong> report with complete task data (full descriptions, checklist subtasks, assignees, hours, timeline &amp; comments).
-              </p>
-
-              <div style={{ marginBottom: '1.2rem' }}>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Select Tasks to Export:
+            <div style={{ padding: '1.25rem 1.4rem' }}>
+              
+              {/* Scope Selection Title */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  1. Select Tasks to Include:
                 </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{
-                    display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem',
-                    borderRadius: '8px', border: `1.5px solid ${exportScopeChoice === 'filtered' ? '#2563eb' : '#e2e8f0'}`,
-                    background: exportScopeChoice === 'filtered' ? '#eff6ff' : '#f8fafc', cursor: 'pointer'
-                  }}>
-                    <input type="radio" name="exportScope" value="filtered" checked={exportScopeChoice === 'filtered'} onChange={() => setExportScopeChoice('filtered')} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
-                        Current Filtered Tasks ({filteredTasks.length})
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        Active filters: Scope ({taskScope}) • Status ({statusFilter}) • Priority ({priorityFilter})
-                      </div>
-                    </div>
-                  </label>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Click an option below</span>
+              </div>
 
-                  <label style={{
-                    display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem',
-                    borderRadius: '8px', border: `1.5px solid ${exportScopeChoice === 'my' ? '#2563eb' : '#e2e8f0'}`,
-                    background: exportScopeChoice === 'my' ? '#eff6ff' : '#f8fafc', cursor: 'pointer'
+              {/* 3 Selectable Modern Cards (Custom Radio UI - No native inputs that stretch) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '1.1rem' }}>
+                
+                {/* Option 1: Current Filtered */}
+                <div 
+                  onClick={() => setExportScopeChoice('filtered')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.75rem 0.95rem',
+                    borderRadius: '10px',
+                    border: `1.5px solid ${exportScopeChoice === 'filtered' ? '#2563eb' : '#e2e8f0'}`,
+                    background: exportScopeChoice === 'filtered' ? 'linear-gradient(135deg, #eff6ff 0%, #f0f7ff 100%)' : '#ffffff',
+                    boxShadow: exportScopeChoice === 'filtered' ? '0 4px 12px rgba(37, 99, 235, 0.12)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{
+                    width: 34, height: 34, minWidth: 34, borderRadius: '8px',
+                    background: exportScopeChoice === 'filtered' ? '#2563eb' : '#f1f5f9',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
-                    <input type="radio" name="exportScope" value="my" checked={exportScopeChoice === 'my'} onChange={() => setExportScopeChoice('my')} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
-                        My Assigned Tasks ({myTasksCount})
+                    <Filter size={17} color={exportScopeChoice === 'filtered' ? '#ffffff' : '#64748b'} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: exportScopeChoice === 'filtered' ? '#1e40af' : '#0f172a' }}>
+                        Current Filtered Tasks
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        All tasks assigned to {currentUser?.name || currentUser?.username || 'You'} across the workspace
-                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', background: exportScopeChoice === 'filtered' ? '#2563eb' : '#e2e8f0', color: exportScopeChoice === 'filtered' ? '#ffffff' : '#475569' }}>
+                        {filteredTasks.length} Tasks
+                      </span>
                     </div>
-                  </label>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Filters: Scope ({taskScope}) • Status ({statusFilter}) • Priority ({priorityFilter})
+                    </div>
+                  </div>
+                  <div style={{
+                    width: 20, height: 20, minWidth: 20, maxWidth: 20, borderRadius: '50%',
+                    border: exportScopeChoice === 'filtered' ? '6px solid #2563eb' : '2px solid #cbd5e1',
+                    background: '#ffffff', boxSizing: 'border-box', flexShrink: 0
+                  }} />
+                </div>
 
-                  <label style={{
-                    display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem',
-                    borderRadius: '8px', border: `1.5px solid ${exportScopeChoice === 'all' ? '#2563eb' : '#e2e8f0'}`,
-                    background: exportScopeChoice === 'all' ? '#eff6ff' : '#f8fafc', cursor: 'pointer'
+                {/* Option 2: My Assigned Tasks */}
+                <div 
+                  onClick={() => setExportScopeChoice('my')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.75rem 0.95rem',
+                    borderRadius: '10px',
+                    border: `1.5px solid ${exportScopeChoice === 'my' ? '#2563eb' : '#e2e8f0'}`,
+                    background: exportScopeChoice === 'my' ? 'linear-gradient(135deg, #eff6ff 0%, #f0f7ff 100%)' : '#ffffff',
+                    boxShadow: exportScopeChoice === 'my' ? '0 4px 12px rgba(37, 99, 235, 0.12)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{
+                    width: 34, height: 34, minWidth: 34, borderRadius: '8px',
+                    background: exportScopeChoice === 'my' ? '#059669' : '#f1f5f9',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
-                    <input type="radio" name="exportScope" value="all" checked={exportScopeChoice === 'all'} onChange={() => setExportScopeChoice('all')} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
-                        All Company / Workspace Tasks ({visibleTasks.length})
+                    <UserCheck size={17} color={exportScopeChoice === 'my' ? '#ffffff' : '#64748b'} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: exportScopeChoice === 'my' ? '#1e40af' : '#0f172a' }}>
+                        My Assigned Tasks
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        Complete backlog of all tasks across all departments and members
-                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', background: exportScopeChoice === 'my' ? '#059669' : '#e2e8f0', color: exportScopeChoice === 'my' ? '#ffffff' : '#475569' }}>
+                        {myTasksCount} Tasks
+                      </span>
                     </div>
-                  </label>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      All tasks assigned to {currentUser?.name || currentUser?.username || 'You'} across entire workspace
+                    </div>
+                  </div>
+                  <div style={{
+                    width: 20, height: 20, minWidth: 20, maxWidth: 20, borderRadius: '50%',
+                    border: exportScopeChoice === 'my' ? '6px solid #2563eb' : '2px solid #cbd5e1',
+                    background: '#ffffff', boxSizing: 'border-box', flexShrink: 0
+                  }} />
+                </div>
+
+                {/* Option 3: All Company Backlog */}
+                <div 
+                  onClick={() => setExportScopeChoice('all')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.75rem 0.95rem',
+                    borderRadius: '10px',
+                    border: `1.5px solid ${exportScopeChoice === 'all' ? '#2563eb' : '#e2e8f0'}`,
+                    background: exportScopeChoice === 'all' ? 'linear-gradient(135deg, #eff6ff 0%, #f0f7ff 100%)' : '#ffffff',
+                    boxShadow: exportScopeChoice === 'all' ? '0 4px 12px rgba(37, 99, 235, 0.12)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{
+                    width: 34, height: 34, minWidth: 34, borderRadius: '8px',
+                    background: exportScopeChoice === 'all' ? '#7c3aed' : '#f1f5f9',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <Layers size={17} color={exportScopeChoice === 'all' ? '#ffffff' : '#64748b'} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: exportScopeChoice === 'all' ? '#1e40af' : '#0f172a' }}>
+                        All Company / Workspace Tasks
+                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', background: exportScopeChoice === 'all' ? '#7c3aed' : '#e2e8f0', color: exportScopeChoice === 'all' ? '#ffffff' : '#475569' }}>
+                        {visibleTasks.length} Tasks
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Complete registry across all departments, jobcards, lots, and staff
+                    </div>
+                  </div>
+                  <div style={{
+                    width: 20, height: 20, minWidth: 20, maxWidth: 20, borderRadius: '50%',
+                    border: exportScopeChoice === 'all' ? '6px solid #2563eb' : '2px solid #cbd5e1',
+                    background: '#ffffff', boxSizing: 'border-box', flexShrink: 0
+                  }} />
+                </div>
+
+              </div>
+
+              {/* 2. Paper Size & Orientation Quick Pickers */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.75rem 0.9rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                  
+                  {/* Paper Size */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
+                      📄 Paper Size:
+                    </label>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setExportPaperSize('A4')}
+                        style={{
+                          flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                          border: `1.5px solid ${exportPaperSize === 'A4' ? '#2563eb' : '#cbd5e1'}`,
+                          background: exportPaperSize === 'A4' ? '#eff6ff' : '#ffffff',
+                          color: exportPaperSize === 'A4' ? '#1d4ed8' : '#475569'
+                        }}
+                      >
+                        A4 (Standard)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExportPaperSize('A5')}
+                        style={{
+                          flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                          border: `1.5px solid ${exportPaperSize === 'A5' ? '#2563eb' : '#cbd5e1'}`,
+                          background: exportPaperSize === 'A5' ? '#eff6ff' : '#ffffff',
+                          color: exportPaperSize === 'A5' ? '#1d4ed8' : '#475569'
+                        }}
+                      >
+                        A5 (Compact)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Orientation */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
+                      🔄 Orientation:
+                    </label>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setExportOrientation('landscape')}
+                        style={{
+                          flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                          border: `1.5px solid ${exportOrientation === 'landscape' ? '#2563eb' : '#cbd5e1'}`,
+                          background: exportOrientation === 'landscape' ? '#eff6ff' : '#ffffff',
+                          color: exportOrientation === 'landscape' ? '#1d4ed8' : '#475569'
+                        }}
+                      >
+                        Landscape ↔
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExportOrientation('portrait')}
+                        style={{
+                          flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                          border: `1.5px solid ${exportOrientation === 'portrait' ? '#2563eb' : '#cbd5e1'}`,
+                          background: exportOrientation === 'portrait' ? '#eff6ff' : '#ffffff',
+                          color: exportOrientation === 'portrait' ? '#1d4ed8' : '#475569'
+                        }}
+                      >
+                        Portrait ↕
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
-              {/* Feature Highlights */}
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.85rem', marginBottom: '1rem', fontSize: '0.74rem', color: '#475569' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>✨ Complete Data Fields Included in PDF:</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                  <div>✔ Full Descriptions (No cutoff)</div>
-                  <div>✔ Subtasks &amp; Checklists</div>
-                  <div>✔ Departments &amp; Client Info</div>
-                  <div>✔ Time Logs (Logged vs Est)</div>
-                  <div>✔ Assignees &amp; Created By</div>
-                  <div>✔ Comments &amp; Attachments</div>
-                </div>
+              {/* Data Checklist Highlights */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', padding: '0.5rem 0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', marginBottom: '1.2rem', fontSize: '0.71rem', color: '#166534', fontWeight: 600 }}>
+                <span>✨ <strong>Complete Data:</strong></span>
+                <span>✔ Descriptions</span>
+                <span>•</span>
+                <span>✔ Subtask Checklists</span>
+                <span>•</span>
+                <span>✔ Lot No &amp; References</span>
+                <span>•</span>
+                <span>✔ Time Breakdown</span>
+                <span>•</span>
+                <span>✔ Comments</span>
               </div>
 
-              {/* Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowExportModal(false)}
-                  style={{ padding: '0.55rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{
+                    padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1.5px solid #cbd5e1',
+                    background: '#ffffff', color: '#475569', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer'
+                  }}
                 >
                   Cancel
                 </button>
@@ -3751,14 +3918,20 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   type="button"
                   onClick={() => {
                     setShowExportModal(false);
-                    handleExportPDF(exportScopeChoice);
+                    handleExportPDF(exportScopeChoice, exportPaperSize, exportOrientation);
                   }}
-                  style={{ padding: '0.55rem 1.2rem', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{
+                    padding: '0.6rem 1.4rem', borderRadius: '8px', border: 'none',
+                    background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#ffffff',
+                    fontSize: '0.84rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
+                  }}
                 >
-                  <Printer size={15} />
+                  <Printer size={16} />
                   <span>Generate &amp; Print PDF</span>
                 </button>
               </div>
+
             </div>
           </div>
         </div>
