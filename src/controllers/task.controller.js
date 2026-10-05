@@ -14,9 +14,10 @@ const getTasks = async (req, res) => {
       department,
       assignee,
       projectRef,
+      lotNo,
       search,
       page = 1,
-      limit = 100,
+      limit = 1000,
       sortBy = 'createdAt',
       sortOrder = 'desc'
     } = req.query;
@@ -35,6 +36,9 @@ const getTasks = async (req, res) => {
     if (projectRef) {
       query.projectRef = { $regex: projectRef, $options: 'i' };
     }
+    if (lotNo) {
+      query.lotNo = { $regex: lotNo, $options: 'i' };
+    }
     if (assignee && mongoose.Types.ObjectId.isValid(assignee)) {
       query.assignees = new mongoose.Types.ObjectId(assignee);
     }
@@ -49,6 +53,7 @@ const getTasks = async (req, res) => {
           { description: { $regex: term, $options: 'i' } },
           { projectRef: { $regex: term, $options: 'i' } },
           { clientName: { $regex: term, $options: 'i' } },
+          { lotNo: { $regex: term, $options: 'i' } },
         ]
       });
     }
@@ -165,6 +170,7 @@ const createTask = async (req, res) => {
       department = 'General',
       projectRef = '',
       clientName = '',
+      lotNo = '',
       dueDate,
       estimatedHours = 0,
       assignees = [],
@@ -215,6 +221,7 @@ const createTask = async (req, res) => {
       department,
       projectRef: projectRef.trim(),
       clientName: clientName.trim(),
+      lotNo: (lotNo || '').trim(),
       dueDate: dueDate ? new Date(dueDate) : null,
       estimatedHours: Number(estimatedHours) || 0,
       assignees: finalAssignees,

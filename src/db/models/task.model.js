@@ -43,6 +43,11 @@ const taskSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    lotNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

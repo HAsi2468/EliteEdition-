@@ -28,6 +28,7 @@ import {
   ChevronRight,
   UserCheck,
   FileText,
+  Printer,
   Briefcase,
   Layers,
   Sparkles,
@@ -171,6 +172,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   // Task Creation Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportScopeChoice, setExportScopeChoice] = useState('filtered');
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -178,6 +181,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [newStatus, setNewStatus] = useState('To Do');
   const [newProjectRef, setNewProjectRef] = useState('');
   const [newClientName, setNewClientName] = useState('');
+  const [newLotNo, setNewLotNo] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
   const [newEstHours, setNewEstHours] = useState('');
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState([]);
@@ -193,6 +197,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [editDepartment, setEditDepartment] = useState('General');
   const [editProjectRef, setEditProjectRef] = useState('');
   const [editClientName, setEditClientName] = useState('');
+  const [editLotNo, setEditLotNo] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editEstHours, setEditEstHours] = useState('');
   const [editAssigneeIds, setEditAssigneeIds] = useState([]);
@@ -437,7 +442,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setLoading(true);
     try {
       const [tasksRes, usersRes] = await Promise.all([
-        api.getTasks(),
+        api.getTasks({ limit: 1000 }),
         api.getUsers({ limit: 100 }).catch(() => api.getCommunicationUsers(myId))
       ]);
 
@@ -516,6 +521,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setEditEstHours(task.estimatedHours != null ? String(task.estimatedHours) : '');
     setEditProjectRef(task.projectRef || '');
     setEditClientName(task.clientName || '');
+    setEditLotNo(task.lotNo || task.lotNumber || '');
     setEditAssigneeIds((task.assignees || []).map((a) => String(typeof a === 'object' ? (a._id || a.id) : a)));
     setEditStaffSearch('');
     setShowEditModal(true);
@@ -552,6 +558,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         department: editDepartment,
         projectRef: editProjectRef.trim(),
         clientName: editClientName.trim(),
+        lotNo: editLotNo.trim(),
         dueDate: editDueDate || null,
         estimatedHours: parseFloat(editEstHours) || 0,
         assignees: editAssigneeIds,
@@ -687,6 +694,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         status: newStatus,
         projectRef: newProjectRef.trim(),
         clientName: newClientName.trim(),
+        lotNo: newLotNo.trim(),
         dueDate: newDueDate || undefined,
         estimatedHours: parseFloat(newEstHours) || 0,
         assignees: selectedAssigneeIds && selectedAssigneeIds.length > 0 ? selectedAssigneeIds : (myId ? [myId] : []),
@@ -731,6 +739,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setNewStatus('To Do');
     setNewProjectRef('');
     setNewClientName('');
+    setNewLotNo('');
     setNewDueDate('');
     setNewEstHours('');
     setSelectedAssigneeIds([]);
@@ -962,32 +971,16 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       (t.title || '').toLowerCase().includes(term) ||
       (t.description || '').toLowerCase().includes(term) ||
       (t.projectRef || '').toLowerCase().includes(term) ||
-      (t.clientName || '').toLowerCase().includes(term)
+      (t.clientName || '').toLowerCase().includes(term) ||
+      (t.lotNo || '').toLowerCase().includes(term)
     );
   });
 
   // Task Management PDF Report Generator & Export Handler
-  const handleExportPDF = async () => {
-    if (!filteredTasks.length) {
-      triggerEliteAlert('No Tasks Found', 'No tasks found matching your current filter settings to export.', 'info');
-      return;
-    }
-
-    // Determine target member / scope label
+  const handleExportPDF = async (targetScope = 'filtered') => {
+    let tasksToExport = filteredTasks;
     let targetMemberLabel = 'All Team Members';
-    if (assigneeFilter === 'me') {
-      targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
-    } else if (assigneeFilter !== 'all') {
-      const matchedUser = allUsers.find((u) => String(u._id || u.id) === String(assigneeFilter));
-      targetMemberLabel = matchedUser ? (matchedUser.name || matchedUser.username) : 'Selected Member';
-      if (String(assigneeFilter) === myId || (matchedUser && currentUser?.name && (matchedUser.name || '').toLowerCase() === currentUser.name.toLowerCase())) {
-        targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || targetMemberLabel})`;
-      }
-    } else if (taskScope === 'my_tasks') {
-      targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
-    } else if (taskScope === 'delegated') {
-      targetMemberLabel = `Delegated by ${currentUser?.name || currentUser?.username || 'Me'}`;
-    }
+    let scopeText = 'Filtered Tasks';
 
     const scopeLabels = {
       all: 'All Tasks',
@@ -997,18 +990,49 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       overdue: 'Overdue Tasks',
       completed: 'Completed Tasks'
     };
-    const scopeText = scopeLabels[taskScope] || taskScope;
+
+    if (targetScope === 'all') {
+      tasksToExport = visibleTasks;
+      targetMemberLabel = 'All Team Members';
+      scopeText = 'All Company / Workspace Tasks (Complete Backlog)';
+    } else if (targetScope === 'my') {
+      tasksToExport = visibleTasks.filter((t) => isTaskAssignedToMe(t));
+      targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
+      scopeText = 'My Assigned Tasks';
+    } else {
+      tasksToExport = filteredTasks;
+      scopeText = scopeLabels[taskScope] || taskScope;
+      if (assigneeFilter === 'me') {
+        targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
+      } else if (assigneeFilter !== 'all') {
+        const matchedUser = allUsers.find((u) => String(u._id || u.id) === String(assigneeFilter));
+        targetMemberLabel = matchedUser ? (matchedUser.name || matchedUser.username) : 'Selected Member';
+        if (String(assigneeFilter) === myId || (matchedUser && currentUser?.name && (matchedUser.name || '').toLowerCase() === currentUser.name.toLowerCase())) {
+          targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || targetMemberLabel})`;
+        }
+      } else if (taskScope === 'my_tasks') {
+        targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
+      } else if (taskScope === 'delegated') {
+        targetMemberLabel = `Delegated by ${currentUser?.name || currentUser?.username || 'Me'}`;
+      }
+    }
+
+    if (!tasksToExport.length) {
+      triggerEliteAlert('No Tasks Found', 'No tasks found for the selected export scope.', 'info');
+      return;
+    }
+
     const nowStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     // Analytics calculations
-    const totalCount = filteredTasks.length;
-    const doneCount = filteredTasks.filter((t) => t.status === 'Done').length;
-    const inProgressCount = filteredTasks.filter((t) => t.status === 'In Progress').length;
-    const inReviewCount = filteredTasks.filter((t) => t.status === 'In Review').length;
-    const pendingCount = filteredTasks.filter((t) => t.status === 'To Do' || t.status === 'Backlog').length;
-    const overdueCount = filteredTasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done').length;
-    const totalEstHours = filteredTasks.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
-    const totalLoggedHours = filteredTasks.reduce((sum, t) => sum + (t.timeLogs || []).reduce((s, l) => s + (Number(l.hours) || 0), 0), 0);
+    const totalCount = tasksToExport.length;
+    const doneCount = tasksToExport.filter((t) => t.status === 'Done').length;
+    const inProgressCount = tasksToExport.filter((t) => t.status === 'In Progress').length;
+    const inReviewCount = tasksToExport.filter((t) => t.status === 'In Review').length;
+    const pendingCount = tasksToExport.filter((t) => t.status === 'To Do' || t.status === 'Backlog').length;
+    const overdueCount = tasksToExport.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done').length;
+    const totalEstHours = tasksToExport.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
+    const totalLoggedHours = tasksToExport.reduce((sum, t) => sum + (t.timeLogs || []).reduce((s, l) => s + (Number(l.hours) || 0), 0), 0);
 
     const priorityColors = {
       urgent: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Urgent' },
@@ -1036,9 +1060,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     };
 
     const htmlContent = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 10px; font-size: 10px; line-height: 1.4;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 8px; font-size: 9.5px; line-height: 1.4;">
         <style>
-          @page { size: A4 landscape; margin: 8mm; }
+          @media print {
+            body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            table.task-pdf-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+            thead { display: table-header-group !important; }
+            tfoot { display: table-footer-group !important; }
+          }
           .task-pdf-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #2563eb; padding-bottom: 8px; margin-bottom: 10px; }
           .task-pdf-title { font-size: 16px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.01em; text-transform: uppercase; }
           .task-pdf-subtitle { font-size: 9.5px; color: #64748b; margin-top: 2px; font-weight: 600; }
@@ -1055,11 +1084,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           .task-pdf-kpi-val { font-size: 13px; font-weight: 900; color: #0f172a; margin-top: 1px; }
 
           table.task-pdf-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 4px; }
-          table.task-pdf-table th { background: #0f172a; color: #ffffff; font-size: 7.5px; text-transform: uppercase; padding: 5px 6px; text-align: left; font-weight: 800; letter-spacing: 0.02em; }
-          table.task-pdf-table td { padding: 5px 6px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: top; }
+          table.task-pdf-table th { background: #0f172a; color: #ffffff; font-size: 8px; text-transform: uppercase; padding: 6px 7px; text-align: left; font-weight: 800; letter-spacing: 0.02em; }
+          table.task-pdf-table td { padding: 6px 7px; border-bottom: 1px solid #cbd5e1; color: #334155; vertical-align: top; }
           table.task-pdf-table tr:nth-child(even) td { background: #f8fafc; }
           
-          .badge { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 7.5px; font-weight: 700; white-space: nowrap; }
+          .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 7.5px; font-weight: 700; white-space: nowrap; }
           .badge-overdue { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
           
           .task-pdf-footer { margin-top: 12px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 8px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
@@ -1069,7 +1098,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <div class="task-pdf-header">
           <div>
             <div class="task-pdf-title">Elite Edition Enterprise ERP — Task Management Report</div>
-            <div class="task-pdf-subtitle">Real-time Task Tracking, Assignee Deliverables & Worklog Audit</div>
+            <div class="task-pdf-subtitle">Complete Task Registry, Worklog Audit &amp; Assignee Deliverables</div>
           </div>
           <div class="task-pdf-meta">
             <div><strong>Report Date:</strong> ${nowStr}</div>
@@ -1080,22 +1109,22 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <!-- Filter Bar -->
         <div class="task-pdf-filter-bar">
           <div class="task-pdf-filter-item">
-            <span class="task-pdf-filter-label">Member / Assignee:</span>
-            <span class="task-pdf-filter-val" style="color: #2563eb; background: #eff6ff; padding: 1px 6px; border-radius: 4px; border: 1px solid #bfdbfe;">${escapeHtml(targetMemberLabel)}</span>
+            <span class="task-pdf-filter-label">Export Scope:</span>
+            <span class="task-pdf-filter-val" style="color: #2563eb; background: #eff6ff; padding: 1px 6px; border-radius: 4px; border: 1px solid #bfdbfe;">${escapeHtml(scopeText)}</span>
           </div>
           <div class="task-pdf-filter-item">
-            <span class="task-pdf-filter-label">Scope:</span>
-            <span class="task-pdf-filter-val">${escapeHtml(scopeText)}</span>
+            <span class="task-pdf-filter-label">Target Member:</span>
+            <span class="task-pdf-filter-val">${escapeHtml(targetMemberLabel)}</span>
           </div>
           <div class="task-pdf-filter-item">
             <span class="task-pdf-filter-label">Status Filter:</span>
-            <span class="task-pdf-filter-val">${escapeHtml(statusFilter !== 'all' ? statusFilter : 'All Statuses')}</span>
+            <span class="task-pdf-filter-val">${escapeHtml(targetScope === 'all' ? 'All Statuses' : (statusFilter !== 'all' ? statusFilter : 'All Statuses'))}</span>
           </div>
           <div class="task-pdf-filter-item">
             <span class="task-pdf-filter-label">Priority Filter:</span>
-            <span class="task-pdf-filter-val">${escapeHtml(priorityFilter !== 'all' ? priorityFilter.toUpperCase() : 'All Priorities')}</span>
+            <span class="task-pdf-filter-val">${escapeHtml(targetScope === 'all' ? 'All Priorities' : (priorityFilter !== 'all' ? priorityFilter.toUpperCase() : 'All Priorities'))}</span>
           </div>
-          ${searchQuery ? `
+          ${searchQuery && targetScope === 'filtered' ? `
             <div class="task-pdf-filter-item">
               <span class="task-pdf-filter-label">Search Query:</span>
               <span class="task-pdf-filter-val">"${escapeHtml(searchQuery)}"</span>
@@ -1106,7 +1135,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <!-- KPIs Summary -->
         <div class="task-pdf-kpis">
           <div class="task-pdf-kpi-card" style="border-left-color: #2563eb;">
-            <div class="task-pdf-kpi-label">Total Filtered Tasks</div>
+            <div class="task-pdf-kpi-label">Total Tasks in Report</div>
             <div class="task-pdf-kpi-val" style="color: #2563eb;">${totalCount}</div>
           </div>
           <div class="task-pdf-kpi-card" style="border-left-color: #16a34a;">
@@ -1135,19 +1164,18 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <table class="task-pdf-table">
           <thead>
             <tr>
-              <th style="width: 24px; text-align: center;">#</th>
-              <th style="width: 230px;">Task Title & Details</th>
-              <th style="width: 110px;">Assignees</th>
+              <th style="width: 25px; text-align: center;">#</th>
+              <th>Task Title &amp; Complete Details</th>
+              <th style="width: 120px;">Assignees</th>
               <th style="width: 65px; text-align: center;">Priority</th>
               <th style="width: 75px; text-align: center;">Status</th>
-              <th style="width: 80px; text-align: center;">Due Date</th>
-              <th style="width: 75px; text-align: center;">Checklist</th>
-              <th style="width: 65px; text-align: center;">Hours (Log/Est)</th>
-              <th style="width: 85px;">Created By</th>
+              <th style="width: 85px; text-align: center;">Due Date</th>
+              <th style="width: 70px; text-align: center;">Hours (Log/Est)</th>
+              <th style="width: 90px;">Created By</th>
             </tr>
           </thead>
           <tbody>
-            ${filteredTasks.map((t, idx) => {
+            ${tasksToExport.map((t, idx) => {
               const pri = priorityColors[t.priority] || priorityColors.medium;
               const sta = statusColors[t.status] || { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' };
               const isTaskOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
@@ -1158,17 +1186,111 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               const logged = (t.timeLogs || []).reduce((sum, l) => sum + (l.hours || 0), 0).toFixed(1);
               const assigner = t.createdBy ? (typeof t.createdBy === 'object' ? (t.createdBy.name || t.createdBy.username) : 'Staff') : 'Admin';
               const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'No Due Date';
+              const tagsList = Array.isArray(t.tags) ? t.tags.map(tag => (typeof tag === 'object' && tag ? tag.text : tag)).filter(Boolean) : [];
+              const attachmentsList = Array.isArray(t.attachments) ? t.attachments.filter(Boolean) : [];
 
               return `
-                <tr>
-                  <td style="text-align: center; font-weight: 700; color: #94a3b8;">${idx + 1}</td>
-                  <td>
-                    <div style="font-weight: 700; color: #0f172a; font-size: 9.5px;">${escapeHtml(t.title || 'Untitled Task')}</div>
-                    ${t.description ? `<div style="font-size: 8px; color: #64748b; margin-top: 1px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(t.description)}</div>` : ''}
-                    ${t.projectRef ? `<div style="font-size: 7.5px; color: #2563eb; font-weight: 700; margin-top: 2px;">📁 ${escapeHtml(t.projectRef)} ${t.clientName ? `• ${escapeHtml(t.clientName)}` : ''}</div>` : ''}
+                <tr style="page-break-inside: avoid !important; break-inside: avoid !important;">
+                  <td style="text-align: center; font-weight: 800; color: #64748b; font-size: 9px;">${idx + 1}</td>
+                  <td style="word-break: break-word;">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                      <span style="font-weight: 800; color: #0f172a; font-size: 10px;">${escapeHtml(t.title || 'Untitled Task')}</span>
+                      ${t.department ? `<span style="font-size: 7.5px; font-weight: 700; color: #475569; background: #e2e8f0; padding: 1px 5px; border-radius: 3px;">${escapeHtml(t.department)}</span>` : ''}
+                    </div>
+
+                    ${(t.projectRef || t.clientName || t.lotNo || t.lotNumber) ? `
+                      <div style="font-size: 8px; color: #2563eb; font-weight: 700; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        ${t.clientName ? `<span>👤 Client: <strong>${escapeHtml(t.clientName)}</strong></span>` : ''}
+                        ${(t.lotNo || t.lotNumber) ? `<span style="color: #059669; background: #ecfdf5; padding: 1px 5px; border-radius: 3px; border: 1px solid #a7f3d0;">🏷️ Lot No: <strong>#${escapeHtml(t.lotNo || t.lotNumber)}</strong></span>` : ''}
+                        ${t.projectRef ? `<span>📁 Project/JC Ref: <strong>${escapeHtml(t.projectRef)}</strong></span>` : ''}
+                      </div>
+                    ` : ''}
+
+                    ${tagsList.length > 0 ? `
+                      <div style="margin-top: 2px; display: flex; gap: 4px; flex-wrap: wrap;">
+                        ${tagsList.map(tag => `<span style="font-size: 7px; font-weight: 700; color: #0284c7; background: #f0f9ff; border: 1px solid #bae6fd; padding: 0 4px; border-radius: 3px;">#${escapeHtml(tag)}</span>`).join('')}
+                      </div>
+                    ` : ''}
+
+                    ${t.description ? `
+                      <div style="font-size: 8.5px; color: #1e293b; margin-top: 4px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px 7px;">
+                        <strong style="color: #475569; font-size: 7.5px; text-transform: uppercase; display: block; margin-bottom: 2px;">Description &amp; Instructions:</strong>
+                        ${escapeHtml(t.description)}
+                      </div>
+                    ` : ''}
+
+                    ${checkTotal > 0 ? `
+                      <div style="margin-top: 4px; padding: 4px 6px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        <div style="font-size: 7.5px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 3px; display: flex; justify-content: space-between;">
+                          <span>Subtasks &amp; Checklist (${checkDone}/${checkTotal} Done • ${checkPercent}%):</span>
+                          <span style="color: ${checkDone === checkTotal ? '#16a34a' : '#2563eb'}; font-size: 7.5px;">${checkDone === checkTotal ? '✔ All Completed' : `${checkTotal - checkDone} Remaining`}</span>
+                        </div>
+                        ${(t.checklist || []).map(c => {
+                          let assignedUserName = '';
+                          if (c.assignedTo) {
+                            const uId = String(typeof c.assignedTo === 'object' ? (c.assignedTo._id || c.assignedTo.id) : c.assignedTo);
+                            const matchU = allUsers.find(u => String(u._id || u.id) === uId);
+                            assignedUserName = matchU ? (matchU.name || matchU.username) : '';
+                          }
+                          return `
+                            <div style="font-size: 8px; color: ${c.completed ? '#16a34a' : '#1e293b'}; margin-top: 2px; display: flex; align-items: flex-start; gap: 4px; line-height: 1.35;">
+                              <span style="font-weight: 800; font-size: 9px; line-height: 1; color: ${c.completed ? '#16a34a' : '#64748b'};">${c.completed ? '☑' : '☐'}</span>
+                              <span style="${c.completed ? 'text-decoration: line-through; opacity: 0.75;' : ''}">${escapeHtml(c.text)}</span>
+                              ${assignedUserName ? `<span style="font-size: 7px; color: #64748b; background: #f1f5f9; padding: 0 4px; border-radius: 3px; margin-left: 3px;">👤 ${escapeHtml(assignedUserName)}</span>` : ''}
+                            </div>
+                          `;
+                        }).join('')}
+                      </div>
+                    ` : ''}
+
+                    ${(t.comments && t.comments.length > 0) ? `
+                      <div style="margin-top: 4px; padding: 4px 6px; background: #f0f9ff; border: 1px solid #bae6fd; border-left: 3px solid #0284c7; border-radius: 4px;">
+                        <div style="font-size: 7.5px; font-weight: 800; color: #0369a1; text-transform: uppercase; margin-bottom: 2px;">
+                          💬 Comments &amp; Progress Updates (${t.comments.length}):
+                        </div>
+                        ${t.comments.map(c => `
+                          <div style="font-size: 8px; color: #1e293b; margin-top: 2px; line-height: 1.35;">
+                            <span style="font-weight: 700; color: #0284c7;">${escapeHtml(c.senderName || 'Staff')}:</span>
+                            <span>${escapeHtml(c.text)}</span>
+                            ${c.createdAt ? `<span style="font-size: 7px; color: #64748b; margin-left: 4px;">(${new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })} ${new Date(c.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })})</span>` : ''}
+                          </div>
+                        `).join('')}
+                      </div>
+                    ` : ''}
+
+                    ${(t.timeLogs && t.timeLogs.length > 0 && t.timeLogs.some(l => l.hours > 0 || l.description)) ? `
+                      <div style="margin-top: 4px; padding: 4px 6px; background: #fbf5ff; border: 1px solid #e9d5ff; border-left: 3px solid #7c3aed; border-radius: 4px;">
+                        <div style="font-size: 7.5px; font-weight: 800; color: #6b21a8; text-transform: uppercase; margin-bottom: 2px;">
+                          ⏱ Worklogs &amp; Time Log Breakdown (${logged}h total):
+                        </div>
+                        ${t.timeLogs.map(l => `
+                          <div style="font-size: 7.5px; color: #334155; margin-top: 1.5px; line-height: 1.3;">
+                            <span style="font-weight: 700; color: #6b21a8;">${l.hours}h</span> by <strong>${escapeHtml(l.userName || 'Staff')}</strong>${l.description ? ` — <em>${escapeHtml(l.description)}</em>` : ''}${l.createdAt ? ` <span style="color: #94a3b8; font-size: 7px;">(${new Date(l.createdAt).toLocaleDateString('en-GB')})</span>` : ''}
+                          </div>
+                        `).join('')}
+                      </div>
+                    ` : ''}
+
+                    ${attachmentsList.length > 0 ? `
+                      <div style="margin-top: 3px; font-size: 7.5px; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 3px; padding: 3px 5px;">
+                        📎 <strong>Attachments (${attachmentsList.length}):</strong> ${attachmentsList.map(a => `${escapeHtml(a.fileName)}${a.fileSize ? ` (${Math.round(a.fileSize / 1024)} KB)` : ''}`).join(' • ')}
+                      </div>
+                    ` : ''}
+
+                    ${(t.dependencies && t.dependencies.length > 0) ? `
+                      <div style="margin-top: 3px; font-size: 7.5px; color: #b45309; background: #fefce8; border: 1px solid #fef08a; border-radius: 3px; padding: 2px 5px;">
+                        ⛓️ <strong>Blocking Dependencies:</strong> ${(t.dependencies || []).map(d => typeof d === 'object' ? `${escapeHtml(d.title)} [${d.status}]` : 'Task').join(', ')}
+                      </div>
+                    ` : ''}
+
+                    ${t.recurrence && t.recurrence.isRecurring ? `
+                      <div style="margin-top: 2px; font-size: 7.5px; color: #7c3aed; font-weight: 700;">
+                        🔄 Recurring Task: ${escapeHtml(t.recurrence.frequency || 'Daily')}
+                      </div>
+                    ` : ''}
                   </td>
                   <td>
-                    <span style="font-weight: 600; color: #334155;">${escapeHtml(assigneesStr)}</span>
+                    <div style="font-weight: 700; color: #1e293b; font-size: 8.5px;">${escapeHtml(assigneesStr)}</div>
                   </td>
                   <td style="text-align: center;">
                     <span class="badge" style="background: ${pri.bg}; color: ${pri.color}; border: 1px solid ${pri.border};">
@@ -1181,24 +1303,17 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     </span>
                   </td>
                   <td style="text-align: center;">
-                    <div style="font-weight: 650; font-size: 8.5px; color: ${isTaskOverdue ? '#dc2626' : '#334155'};">
+                    <div style="font-weight: 700; font-size: 8.5px; color: ${isTaskOverdue ? '#dc2626' : '#1e293b'};">
                       ${dueStr}
                     </div>
-                    ${isTaskOverdue ? `<span class="badge badge-overdue" style="font-size: 7px; margin-top: 1px;">OVERDUE</span>` : ''}
-                  </td>
-                  <td style="text-align: center;">
-                    ${checkTotal > 0 ? `
-                      <span style="font-weight: 700; color: ${checkDone === checkTotal ? '#16a34a' : '#2563eb'}; font-size: 8px;">
-                        ${checkDone}/${checkTotal} (${checkPercent}%)
-                      </span>
-                    ` : `<span style="color: #94a3b8; font-size: 8px;">—</span>`}
+                    ${isTaskOverdue ? `<span class="badge badge-overdue" style="font-size: 7px; margin-top: 2px;">OVERDUE</span>` : ''}
                   </td>
                   <td style="text-align: center; font-weight: 700; font-size: 8.5px;">
                     <span style="color: #7c3aed;">${logged}h</span> / <span style="color: #64748b;">${t.estimatedHours || 0}h</span>
                   </td>
                   <td>
-                    <div style="font-weight: 600; color: #475569; font-size: 8.5px;">${escapeHtml(assigner)}</div>
-                    <div style="font-size: 7.5px; color: #94a3b8;">${t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</div>
+                    <div style="font-weight: 700; color: #334155; font-size: 8.5px;">${escapeHtml(assigner)}</div>
+                    <div style="font-size: 7.5px; color: #94a3b8; margin-top: 1px;">Created: ${t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : '—'}</div>
                   </td>
                 </tr>
               `;
@@ -1208,8 +1323,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
         <!-- Footer -->
         <div class="task-pdf-footer">
-          <div>Elite Edition Enterprise ERP — Task Management & Production Operations Report</div>
-          <div>Total Tasks Listed: <strong>${filteredTasks.length}</strong></div>
+          <div>Elite Edition Enterprise ERP — Task Management &amp; Production Operations Report</div>
+          <div>Total Tasks Listed: <strong>${tasksToExport.length}</strong></div>
         </div>
       </div>
     `;
@@ -1878,9 +1993,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             {/* Export PDF Button */}
             <button
               type="button"
-              onClick={handleExportPDF}
+              onClick={() => setShowExportModal(true)}
               className="task-btn-pdf"
-              title="Export filtered tasks to PDF Report"
+              title="Export tasks to PDF Report"
             >
               <FileText size={14} color="#dc2626" />
               <span>Export PDF</span>
@@ -2095,7 +2210,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
           {/* 4. Export PDF Button */}
           <button
-            onClick={handleExportPDF}
+            onClick={() => setShowExportModal(true)}
             style={{
               padding: '0.42rem 0.55rem',
               borderRadius: '8px',
@@ -2623,13 +2738,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                   {t.tags.map((tag, idx) => (
                                     <span key={idx} className="kanban-tag-pill feature" style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px' }}>
-                                      #{tag}
+                                      #{typeof tag === 'object' && tag ? tag.text : tag}
                                     </span>
                                   ))}
                                 </div>
                               )}
 
-                              {/* 2. Title & Project Ref */}
+                              {/* 2. Title & Project Ref & Lot No */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                 <h5 style={{
                                   margin: '0',
@@ -2646,12 +2761,24 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                 }}>
                                   {t.title}
                                 </h5>
-                                {t.projectRef && (
-                                  <div style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                    <ExternalLink size={10} />
-                                    <span>{t.projectRef}</span>
-                                  </div>
-                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  {(t.lotNo || t.lotNumber) && (
+                                    <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#ecfdf5', padding: '1px 5px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                                      <span>🏷️ Lot #{t.lotNo || t.lotNumber}</span>
+                                    </div>
+                                  )}
+                                  {t.projectRef && (
+                                    <div style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                      <ExternalLink size={10} />
+                                      <span>{t.projectRef}</span>
+                                    </div>
+                                  )}
+                                  {t.clientName && (
+                                    <div style={{ fontSize: '0.66rem', color: '#475569', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                      <span>👤 {t.clientName}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
 
                               {/* 3. Sub-Task Checklist Visual Progress Bar */}
@@ -2931,7 +3058,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                           {assignerName}
                         </td>
                         <td style={{ color: '#2563eb', fontWeight: 700 }}>
-                          {t.projectRef || '-'}
+                          {(t.lotNo || t.lotNumber) && (
+                            <div style={{ color: '#059669', fontSize: '0.72rem', fontWeight: 800 }}>🏷️ #{t.lotNo || t.lotNumber}</div>
+                          )}
+                          <div>{t.projectRef || (t.lotNo ? '' : '-')}</div>
                         </td>
                         <td style={{ fontWeight: 600 }}>
                           {calculateTotalLoggedHours(t.timeLogs)}h {t.estimatedHours ? `/ ${t.estimatedHours}h` : ''}
@@ -3521,6 +3651,119 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         )}
       </div>
 
+      {/* ── EXPORT PDF MODAL ── */}
+      {showExportModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: 520, background: '#ffffff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', animation: 'slideUp 0.2s ease-out' }}>
+            <div style={{ padding: '1.1rem 1.4rem', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <FileText size={20} color="#fff" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Export Task PDF Report</h3>
+              </div>
+              <button onClick={() => setShowExportModal(false)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.2rem 1.4rem' }}>
+              <p style={{ margin: '0 0 1rem 0', fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
+                Generate a high-resolution, print-ready <strong>A4 Landscape</strong> report with complete task data (full descriptions, checklist subtasks, assignees, hours, timeline &amp; comments).
+              </p>
+
+              <div style={{ marginBottom: '1.2rem' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Select Tasks to Export:
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem',
+                    borderRadius: '8px', border: `1.5px solid ${exportScopeChoice === 'filtered' ? '#2563eb' : '#e2e8f0'}`,
+                    background: exportScopeChoice === 'filtered' ? '#eff6ff' : '#f8fafc', cursor: 'pointer'
+                  }}>
+                    <input type="radio" name="exportScope" value="filtered" checked={exportScopeChoice === 'filtered'} onChange={() => setExportScopeChoice('filtered')} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                        Current Filtered Tasks ({filteredTasks.length})
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        Active filters: Scope ({taskScope}) • Status ({statusFilter}) • Priority ({priorityFilter})
+                      </div>
+                    </div>
+                  </label>
+
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem',
+                    borderRadius: '8px', border: `1.5px solid ${exportScopeChoice === 'my' ? '#2563eb' : '#e2e8f0'}`,
+                    background: exportScopeChoice === 'my' ? '#eff6ff' : '#f8fafc', cursor: 'pointer'
+                  }}>
+                    <input type="radio" name="exportScope" value="my" checked={exportScopeChoice === 'my'} onChange={() => setExportScopeChoice('my')} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                        My Assigned Tasks ({myTasksCount})
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        All tasks assigned to {currentUser?.name || currentUser?.username || 'You'} across the workspace
+                      </div>
+                    </div>
+                  </label>
+
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem',
+                    borderRadius: '8px', border: `1.5px solid ${exportScopeChoice === 'all' ? '#2563eb' : '#e2e8f0'}`,
+                    background: exportScopeChoice === 'all' ? '#eff6ff' : '#f8fafc', cursor: 'pointer'
+                  }}>
+                    <input type="radio" name="exportScope" value="all" checked={exportScopeChoice === 'all'} onChange={() => setExportScopeChoice('all')} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                        All Company / Workspace Tasks ({visibleTasks.length})
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        Complete backlog of all tasks across all departments and members
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Feature Highlights */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.85rem', marginBottom: '1rem', fontSize: '0.74rem', color: '#475569' }}>
+                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>✨ Complete Data Fields Included in PDF:</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                  <div>✔ Full Descriptions (No cutoff)</div>
+                  <div>✔ Subtasks &amp; Checklists</div>
+                  <div>✔ Departments &amp; Client Info</div>
+                  <div>✔ Time Logs (Logged vs Est)</div>
+                  <div>✔ Assignees &amp; Created By</div>
+                  <div>✔ Comments &amp; Attachments</div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowExportModal(false)}
+                  style={{ padding: '0.55rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportModal(false);
+                    handleExportPDF(exportScopeChoice);
+                  }}
+                  style={{ padding: '0.55rem 1.2rem', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Printer size={15} />
+                  <span>Generate &amp; Print PDF</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── CREATE TASK MODAL ── */}
       {showCreateModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -3884,10 +4127,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: '0.65rem' }}>
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                    Project / Job Card Ref (Optional)
+                    Project / JC Ref (Opt)
                   </label>
                   <input
                     type="text"
@@ -3899,7 +4142,19 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                    Est. Hours (Optional)
+                    Lot No (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 6662 / 315"
+                    value={newLotNo}
+                    onChange={(e) => setNewLotNo(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Est. Hours
                   </label>
                   <input
                     type="number"
@@ -4284,11 +4539,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
               </div>
 
-              {/* Project Ref & Est Hours */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+              {/* Project Ref, Lot No & Est Hours */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: '0.65rem' }}>
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                    Project / Job Card Ref (Optional)
+                    Project / JC Ref (Opt)
                   </label>
                   <input
                     type="text"
@@ -4300,7 +4555,19 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                    Est. Hours (Optional)
+                    Lot No (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 6662 / 315"
+                    value={editLotNo}
+                    onChange={(e) => setEditLotNo(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Est. Hours
                   </label>
                   <input
                     type="number"
@@ -4702,6 +4969,33 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     )}
                   </div>
                 </div>
+
+                {/* References: Department, Lot No, Project, Client */}
+                {(selectedTask.department || selectedTask.lotNo || selectedTask.lotNumber || selectedTask.projectRef || selectedTask.clientName) && (
+                  <div style={{ background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-light)', padding: '0.65rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>References &amp; Details</div>
+                    {selectedTask.department && (
+                      <div style={{ fontSize: '0.75rem', color: '#1e293b' }}>
+                        <span style={{ color: '#64748b' }}>Department:</span> <strong>{selectedTask.department}</strong>
+                      </div>
+                    )}
+                    {(selectedTask.lotNo || selectedTask.lotNumber) && (
+                      <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 800 }}>
+                        <span>🏷️ Lot No:</span> <strong>#{selectedTask.lotNo || selectedTask.lotNumber}</strong>
+                      </div>
+                    )}
+                    {selectedTask.projectRef && (
+                      <div style={{ fontSize: '0.75rem', color: '#2563eb' }}>
+                        <span style={{ color: '#64748b' }}>Project/JC:</span> <strong>{selectedTask.projectRef}</strong>
+                      </div>
+                    )}
+                    {selectedTask.clientName && (
+                      <div style={{ fontSize: '0.75rem', color: '#1e293b' }}>
+                        <span style={{ color: '#64748b' }}>Client:</span> <strong>{selectedTask.clientName}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* ── TaskOPad Work Logs & Time Tracking ── */}
                 <div style={{ background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border-light)', padding: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
