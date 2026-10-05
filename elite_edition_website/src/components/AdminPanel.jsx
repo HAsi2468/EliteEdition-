@@ -36,6 +36,7 @@ import {
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import AdminSignedDocumentsApproval from './AdminSignedDocumentsApproval';
 import AdminClientDetails from './AdminClientDetails';
+import AdminChangeApprovalQueue from './AdminChangeApprovalQueue';
 
 
 export default function AdminPanel() {
@@ -51,7 +52,8 @@ export default function AdminPanel() {
   const [success, setSuccess] = useState('');
 
   // Sub Tab Navigation
-  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users', 'billing', 'backup'
+  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users', 'billing', 'backup', 'approvals'
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [bills, setBills] = useState([]);
   const [billsLoading, setBillsLoading] = useState(false);
   const [billFormData, setBillFormData] = useState({
@@ -134,6 +136,14 @@ export default function AdminPanel() {
     if (activeSubTab === 'billing') {
       fetchBills();
     }
+  }, [activeSubTab]);
+
+  useEffect(() => {
+    api.getChangeApprovalStats().then(res => {
+      if (res?.data?.pending !== undefined) {
+        setPendingApprovalsCount(res.data.pending);
+      }
+    }).catch(() => {});
   }, [activeSubTab]);
 
   const handleBillSubmit = async (e) => {
@@ -708,6 +718,8 @@ export default function AdminPanel() {
             <h2 style={styles.pageTitle}>
               {activeSubTab === 'users'
                 ? 'Admin User Management'
+                : activeSubTab === 'approvals'
+                ? 'Review & Approvals Queue'
                 : activeSubTab === 'clients'
                 ? 'Client Details & Accounts'
                 : activeSubTab === 'billing'
@@ -721,6 +733,8 @@ export default function AdminPanel() {
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
                 ? 'Create system users, set passwords, and manage screen-by-screen functionality credentials.'
+                : activeSubTab === 'approvals'
+                ? 'Review, authorize, or reject data modifications and deletion requests submitted by non-admin staff.'
                 : activeSubTab === 'clients'
                 ? 'Manage client user accounts, company codes, credentials, and Cloudflare R2 profile images.'
                 : activeSubTab === 'billing'
@@ -743,6 +757,27 @@ export default function AdminPanel() {
           style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
         >
           <User size={16} /> User Accounts
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('approvals'); setError(''); setSuccess(''); }}
+          className={activeSubTab === 'approvals' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', position: 'relative' }}
+        >
+          <ShieldAlert size={16} /> Review & Approvals
+          {pendingApprovalsCount > 0 && (
+            <span style={{
+              background: '#2563eb',
+              color: '#ffffff',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              padding: '1px 7px',
+              borderRadius: '10px',
+              marginLeft: '4px',
+              boxShadow: '0 1px 3px rgba(37,99,235,0.3)'
+            }}>
+              {pendingApprovalsCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => { setActiveSubTab('clients'); setError(''); setSuccess(''); }}
@@ -2167,6 +2202,10 @@ export default function AdminPanel() {
             </div>
           </form>
         </div>
+      )}
+
+      {activeSubTab === 'approvals' && (
+        <AdminChangeApprovalQueue onCountChange={setPendingApprovalsCount} />
       )}
 
       {activeSubTab === 'settings' && (

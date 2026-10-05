@@ -69,6 +69,7 @@ const db = {
   DesignerTask: require('./designerTask.model'),
   Facility: require('./facility.model'),
   PushSubscription: require('./pushSubscription.model'),
+  ChangeApprovalRequest: require('./changeApprovalRequest.model'),
   mongoose,
 };
 

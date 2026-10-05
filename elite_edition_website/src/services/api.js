@@ -251,7 +251,17 @@ const request = async (path, options = {}) => {
       throw new Error(errMsg);
     }
     
-    return response.json();
+    const json = await response.json();
+    if (json && json.requiresApproval) {
+      import('../components/NotificationToast').then(({ triggerPushNotification }) => {
+        triggerPushNotification(
+          'Submitted for Admin Approval',
+          json.message || 'Your changes have been submitted for Admin Review & Approval.',
+          'info'
+        );
+      }).catch(() => {});
+    }
+    return json;
   }
 };
 
@@ -2546,6 +2556,61 @@ export const api = {
 
   async getJobStatus(jobId) {
     return request(`/jobs/${jobId}`);
+  },
+
+  // ── Universal Change Review & Approvals ──
+  async getChangeApprovals(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.module) qs.set('module', params.module);
+    if (params.search) qs.set('search', params.search);
+    if (params.page) qs.set('page', params.page);
+    if (params.limit) qs.set('limit', params.limit);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/change-approvals${query}`);
+  },
+
+  async getChangeApprovalStats() {
+    return request('/change-approvals/stats');
+  },
+
+  async approveChangeRequest(id, notes = '') {
+    return request(`/change-approvals/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ notes })
+    });
+  },
+
+  async rejectChangeRequest(id, reason = '') {
+    return request(`/change-approvals/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
+  },
+
+  async bulkApproveChangeRequests(ids, notes = '') {
+    return request('/change-approvals/bulk-approve', {
+      method: 'POST',
+      body: JSON.stringify({ ids, notes })
+    });
+  },
+
+  async bulkRejectChangeRequests(ids, reason = '') {
+    return request('/change-approvals/bulk-reject', {
+      method: 'POST',
+      body: JSON.stringify({ ids, reason })
+    });
+  },
+
+  async getChangeApprovalSettings() {
+    return request('/change-approvals/settings');
+  },
+
+  async updateChangeApprovalSettings(settings) {
+    return request('/change-approvals/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(settings)
+    });
   }
 };
 

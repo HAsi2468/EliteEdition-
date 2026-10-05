@@ -616,6 +616,10 @@ app.use(['/v1', '/api/v1'], verifyCsrfToken);
 const redisIdempotencyMiddleware = require('./middlewares/redisIdempotency.middleware');
 app.use(['/v1', '/api/v1'], redisIdempotencyMiddleware({ required: false }));
 
+// Universal Admin Change Review & Approval Interceptor
+const { approvalInterceptor } = require('./middlewares/approvalInterceptor.middleware');
+app.use(['/v1', '/api/v1'], approvalInterceptor);
+
 // v1 and api/v1 api routes
 app.use('/v1', routes);
 app.use('/api/v1', routes);
