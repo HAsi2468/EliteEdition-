@@ -47,6 +47,7 @@ export const createCsrfMiddleware = (options: CsrfMiddlewareOptions = {}) => {
       req.headers['x-internal-service'] === 'approval-executor' ||
       path.endsWith('/csrf-token') ||
       path.includes('/auth/csrf-token') ||
+      path.includes('/notifications') ||
       path.includes('/challanVerification') ||
       path.startsWith('/verify/challan') ||
       path.startsWith('/verify/jobcard') ||

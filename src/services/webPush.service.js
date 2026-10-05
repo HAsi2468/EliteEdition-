@@ -125,7 +125,7 @@ class WebPushService {
       try {
         await webpush.sendNotification(pushConfig, notificationPayload, {
           TTL: 86400, // 24 hours retention on push service
-          urgency: priority === 'urgent' ? 'high' : 'normal',
+          urgency: 'high', // High urgency wakes mobile devices from background/Doze sleep
         });
       } catch (err) {
         // HTTP 410 Gone or 404 Not Found indicates the browser unsubscribed or expired
@@ -209,7 +209,7 @@ class WebPushService {
         try {
           await webpush.sendNotification(pushConfig, notificationPayload, {
             TTL: 86400, // 24 hours
-            urgency: priority === 'urgent' || priority === 'high' ? 'high' : 'normal',
+            urgency: 'high', // High urgency wakes mobile devices from background/Doze sleep
           });
         } catch (err) {
           if (err.statusCode === 410 || err.statusCode === 404) {

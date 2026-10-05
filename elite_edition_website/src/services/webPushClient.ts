@@ -102,10 +102,19 @@ export class WebPushClientManager {
         } catch (e) {}
       }
 
+      // Extract CSRF token from cookie if available
+      let csrfToken = '';
+      try {
+        const m = document.cookie.match(/(?:^|;\s*)(?:XSRF-TOKEN|xsrf-token)=([^;]*)/);
+        if (m) csrfToken = decodeURIComponent(m[1]);
+      } catch (e) {}
+
       const saveResponse = await fetch('/v1/notifications/subscribe', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
           ...(effectiveUserId ? { 'X-User-Id': effectiveUserId } : {}),
         },
         body: JSON.stringify({
