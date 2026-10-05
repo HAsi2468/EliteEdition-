@@ -2611,6 +2611,23 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(settings)
     });
+  },
+
+  async getUserDataEntries(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.user) qs.set('user', params.user);
+    if (params.module) qs.set('module', params.module);
+    if (params.startDate) qs.set('startDate', params.startDate);
+    if (params.endDate) qs.set('endDate', params.endDate);
+    if (params.search) qs.set('search', params.search);
+    if (params.page) qs.set('page', params.page);
+    if (params.limit) qs.set('limit', params.limit);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/change-approvals/user-entries${query}`);
+  },
+
+  async getEntryUsersList() {
+    return request('/change-approvals/entry-users');
   }
 };
 

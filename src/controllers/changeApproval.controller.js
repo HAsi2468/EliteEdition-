@@ -358,13 +358,302 @@ const bulkReject = async (req, res) => {
 /**
  * Get and Update Approval Settings (Master Toggle)
  */
-const getSettings = (req, res) => {
-  return res.status(200).json({ success: true, data: getApprovalSettings() });
+/**
+ * Review Screen: Fetch all data entries across the ERP created by users
+ */
+const getUserDataEntries = async (req, res) => {
+  try {
+    const {
+      user = 'ALL',
+      module: moduleFilter = 'ALL',
+      startDate = '',
+      endDate = '',
+      search = '',
+      page = 1,
+      limit = 40
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 40));
+
+    // Construct Date Filter
+    const dateFilter = {};
+    if (startDate) {
+      dateFilter.$gte = new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.$lte = end;
+    }
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
+
+    // Construct User Filter
+    const userRegex = (user && user !== 'ALL' && user !== 'All')
+      ? new RegExp(`^${user.trim()}$`, 'i')
+      : null;
+
+    // Construct Search Regex
+    const searchRegex = (search && search.trim())
+      ? new RegExp(search.trim(), 'i')
+      : null;
+
+    const shouldFetch = (modName) => moduleFilter === 'ALL' || moduleFilter === 'All' || moduleFilter === modName;
+
+    const promises = [];
+
+    // 1. Job Cards
+    if (shouldFetch('JobCard') && models.JobCard) {
+      const q = {};
+      if (hasDateFilter) q.createdAt = dateFilter;
+      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
+      if (searchRegex) {
+        const searchOr = [{ jobNo: searchRegex }, { party: searchRegex }, { fabric: searchRegex }];
+        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+        delete q.$or;
+      }
+      promises.push(
+        models.JobCard.find(q)
+          .sort({ createdAt: -1 })
+          .limit(limitNum * pageNum)
+          .lean()
+          .then(docs => docs.map(doc => ({
+            id: doc._id,
+            module: 'JobCard',
+            moduleLabel: 'Job Card',
+            identifier: doc.jobNo || `#${String(doc._id).slice(-6)}`,
+            party: doc.party || 'Internal',
+            details: `${doc.totalMtr || 0} Mtr • Fabric: ${doc.fabric || 'General'} • Design: ${doc.designNo || 'N/A'}`,
+            amountOrQuantity: `${doc.totalMtr || 0} Mtr`,
+            status: doc.status || doc.stage || 'Production',
+            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+            createdAt: doc.createdAt || doc.date || new Date(),
+            rawDoc: doc
+          })))
+      );
+    }
+
+    // 2. Billing Invoices
+    if (shouldFetch('BillingInvoice') && models.BillingInvoice) {
+      const q = {};
+      if (hasDateFilter) q.createdAt = dateFilter;
+      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
+      if (searchRegex) {
+        const searchOr = [{ invoiceNo: searchRegex }, { customerName: searchRegex }, { partyName: searchRegex }];
+        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+        delete q.$or;
+      }
+      promises.push(
+        models.BillingInvoice.find(q)
+          .sort({ createdAt: -1 })
+          .limit(limitNum * pageNum)
+          .lean()
+          .then(docs => docs.map(doc => ({
+            id: doc._id,
+            module: 'BillingInvoice',
+            moduleLabel: 'Tax Invoice',
+            identifier: doc.invoiceNo || `#${String(doc._id).slice(-6)}`,
+            party: doc.customerName || doc.partyName || 'Customer',
+            details: `Grand Total: ₹${Number(doc.grandTotal || 0).toLocaleString('en-IN')} • Due: ₹${Number(doc.balanceDue || 0).toLocaleString('en-IN')}`,
+            amountOrQuantity: `₹${Number(doc.grandTotal || 0).toLocaleString('en-IN')}`,
+            status: doc.paymentStatus || 'UNPAID',
+            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+            createdAt: doc.createdAt || doc.invoiceDate || new Date(),
+            rawDoc: doc
+          })))
+      );
+    }
+
+    // 3. Expenses
+    if (shouldFetch('Expense') && models.Expense) {
+      const q = {};
+      if (hasDateFilter) q.createdAt = dateFilter;
+      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
+      if (searchRegex) {
+        const searchOr = [{ voucherNo: searchRegex }, { partyName: searchRegex }, { vendorName: searchRegex }, { title: searchRegex }];
+        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+        delete q.$or;
+      }
+      promises.push(
+        models.Expense.find(q)
+          .sort({ createdAt: -1 })
+          .limit(limitNum * pageNum)
+          .lean()
+          .then(docs => docs.map(doc => ({
+            id: doc._id,
+            module: 'Expense',
+            moduleLabel: `Expense (${doc.type || 'OUT'})`,
+            identifier: doc.voucherNo || doc.title || `#${String(doc._id).slice(-6)}`,
+            party: doc.partyName || doc.vendorName || doc.title || 'General Expense',
+            details: `${doc.category || 'General'} • Payment Mode: ${doc.paymentMode || 'Cash'}`,
+            amountOrQuantity: `₹${Number(doc.amount || 0).toLocaleString('en-IN')}`,
+            status: doc.type === 'IN' ? 'Cash IN' : 'Cash OUT',
+            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+            createdAt: doc.createdAt || doc.date || new Date(),
+            rawDoc: doc
+          })))
+      );
+    }
+
+    // 4. Fabric Challans
+    if (shouldFetch('FabricChallan') && models.FabricChallan) {
+      const q = {};
+      if (hasDateFilter) q.createdAt = dateFilter;
+      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
+      if (searchRegex) {
+        const searchOr = [{ challanNo: searchRegex }, { partyName: searchRegex }, { fabricType: searchRegex }];
+        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+        delete q.$or;
+      }
+      promises.push(
+        models.FabricChallan.find(q)
+          .sort({ createdAt: -1 })
+          .limit(limitNum * pageNum)
+          .lean()
+          .then(docs => docs.map(doc => ({
+            id: doc._id,
+            module: 'FabricChallan',
+            moduleLabel: 'Fabric Challan',
+            identifier: doc.challanNo ? `Challan #${doc.challanNo}` : `#${String(doc._id).slice(-6)}`,
+            party: doc.partyName || 'Party',
+            details: `${doc.totalMeters || 0} Mtr (${doc.totalRolls || 0} Rolls) • ${doc.fabricType || 'Fabric'}`,
+            amountOrQuantity: `${doc.totalMeters || 0} Mtr`,
+            status: doc.status || 'Active',
+            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+            createdAt: doc.createdAt || doc.date || new Date(),
+            rawDoc: doc
+          })))
+      );
+    }
+
+    // 5. Stitching Challans
+    if (shouldFetch('StitchingChallan') && models.StitchingChallan) {
+      const q = {};
+      if (hasDateFilter) q.createdAt = dateFilter;
+      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
+      if (searchRegex) {
+        const searchOr = [{ challanNo: searchRegex }, { partyName: searchRegex }, { jobNo: searchRegex }];
+        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+        delete q.$or;
+      }
+      promises.push(
+        models.StitchingChallan.find(q)
+          .sort({ createdAt: -1 })
+          .limit(limitNum * pageNum)
+          .lean()
+          .then(docs => docs.map(doc => ({
+            id: doc._id,
+            module: 'StitchingChallan',
+            moduleLabel: 'Stitching Challan',
+            identifier: doc.challanNo ? `Stitching #${doc.challanNo}` : `#${String(doc._id).slice(-6)}`,
+            party: doc.partyName || doc.workerName || 'Worker',
+            details: `${doc.totalPieces || 0} Pcs • Job: ${doc.jobNo || 'N/A'} • Worker: ${doc.workerName || 'N/A'}`,
+            amountOrQuantity: `${doc.totalPieces || 0} Pcs`,
+            status: doc.status || 'Active',
+            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+            createdAt: doc.createdAt || doc.date || new Date(),
+            rawDoc: doc
+          })))
+      );
+    }
+
+    // 6. Inventory Inward/Outward
+    if (shouldFetch('Inventory') && models.Inventory) {
+      const q = {};
+      if (hasDateFilter) q.createdAt = dateFilter;
+      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
+      if (searchRegex) {
+        const searchOr = [{ productName: searchRegex }, { vendorName: searchRegex }];
+        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+        delete q.$or;
+      }
+      promises.push(
+        models.Inventory.find(q)
+          .sort({ createdAt: -1 })
+          .limit(limitNum * pageNum)
+          .lean()
+          .then(docs => docs.map(doc => ({
+            id: doc._id,
+            module: 'Inventory',
+            moduleLabel: 'Inventory Item',
+            identifier: doc.productName || `#${String(doc._id).slice(-6)}`,
+            party: doc.vendorName || doc.supplier || 'Stock',
+            details: `${doc.quantity || 0} ${doc.unit || 'Units'} • Type: ${doc.type || 'Stock'}`,
+            amountOrQuantity: `${doc.quantity || 0} ${doc.unit || 'Units'}`,
+            status: doc.type || 'In Stock',
+            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+            createdAt: doc.createdAt || doc.date || new Date(),
+            rawDoc: doc
+          })))
+      );
+    }
+
+    const resultsArray = await Promise.all(promises);
+    const allEntries = resultsArray.flat();
+
+    // Sort by createdAt descending
+    allEntries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    const totalCount = allEntries.length;
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedItems = allEntries.slice(startIndex, startIndex + limitNum);
+
+    return res.status(200).json({
+      success: true,
+      data: paginatedItems,
+      meta: {
+        total: totalCount,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalCount / limitNum) || 1,
+      },
+    });
+  } catch (err) {
+    logger.error('[ChangeApprovalController] getUserDataEntries error: %o', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch user entries', error: err.message });
+  }
 };
 
-const updateSettings = (req, res) => {
-  const updated = setApprovalSettings(req.body);
-  return res.status(200).json({ success: true, message: 'Approval settings updated', data: updated });
+/**
+ * Get distinct user list who have created or entered data
+ */
+const getEntryUsersList = async (req, res) => {
+  try {
+    const userSet = new Set();
+
+    // Fetch registered active system users
+    if (models.user) {
+      const activeUsers = await models.user.find({}, 'name username role').lean();
+      activeUsers.forEach(u => {
+        if (u.name) userSet.add(u.name.trim());
+        if (u.username) userSet.add(u.username.trim());
+      });
+    }
+
+    // Fetch distinct creators from JobCards and Invoices
+    if (models.JobCard) {
+      const jcUsers = await models.JobCard.distinct('createdByName');
+      jcUsers.forEach(u => u && userSet.add(String(u).trim()));
+    }
+    if (models.BillingInvoice) {
+      const invUsers = await models.BillingInvoice.distinct('createdByName');
+      invUsers.forEach(u => u && userSet.add(String(u).trim()));
+    }
+    if (models.Expense) {
+      const expUsers = await models.Expense.distinct('createdByName');
+      expUsers.forEach(u => u && userSet.add(String(u).trim()));
+    }
+
+    const sortedUsers = Array.from(userSet).filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+    return res.status(200).json({
+      success: true,
+      data: sortedUsers,
+    });
+  } catch (err) {
+    logger.error('[ChangeApprovalController] getEntryUsersList error: %o', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch user list', error: err.message });
+  }
 };
 
 module.exports = {
@@ -376,4 +665,6 @@ module.exports = {
   bulkReject,
   getSettings,
   updateSettings,
+  getUserDataEntries,
+  getEntryUsersList,
 };

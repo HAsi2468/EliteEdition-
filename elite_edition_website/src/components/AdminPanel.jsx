@@ -37,6 +37,7 @@ import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import AdminSignedDocumentsApproval from './AdminSignedDocumentsApproval';
 import AdminClientDetails from './AdminClientDetails';
 import AdminChangeApprovalQueue from './AdminChangeApprovalQueue';
+import AdminUserDataReview from './AdminUserDataReview';
 
 
 export default function AdminPanel() {
@@ -720,6 +721,8 @@ export default function AdminPanel() {
                 ? 'Admin User Management'
                 : activeSubTab === 'approvals'
                 ? 'Review & Approvals Queue'
+                : activeSubTab === 'dataReview'
+                ? 'User Data Entry Review & Audit Feed'
                 : activeSubTab === 'clients'
                 ? 'Client Details & Accounts'
                 : activeSubTab === 'billing'
@@ -735,6 +738,8 @@ export default function AdminPanel() {
                 ? 'Create system users, set passwords, and manage screen-by-screen functionality credentials.'
                 : activeSubTab === 'approvals'
                 ? 'Review, authorize, or reject data modifications and deletion requests submitted by non-admin staff.'
+                : activeSubTab === 'dataReview'
+                ? 'Audit and inspect all data entries, invoices, job cards, expenses, and fabric transactions entered by users.'
                 : activeSubTab === 'clients'
                 ? 'Manage client user accounts, company codes, credentials, and Cloudflare R2 profile images.'
                 : activeSubTab === 'billing'
@@ -778,6 +783,13 @@ export default function AdminPanel() {
               {pendingApprovalsCount}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('dataReview'); setError(''); setSuccess(''); }}
+          className={activeSubTab === 'dataReview' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <FileText size={16} /> Data Entry Review
         </button>
         <button
           onClick={() => { setActiveSubTab('clients'); setError(''); setSuccess(''); }}
@@ -2208,6 +2220,10 @@ export default function AdminPanel() {
         <AdminChangeApprovalQueue onCountChange={setPendingApprovalsCount} />
       )}
 
+      {activeSubTab === 'dataReview' && (
+        <AdminUserDataReview />
+      )}
+
       {activeSubTab === 'settings' && (
         <PrintSettings expenseOnly={true} />
       )}
@@ -2230,7 +2246,7 @@ const styles = {
     flexDirection: 'column',
     gap: '1.5rem',
     width: '100%',
-    maxWidth: '1100px',
+    maxWidth: '1350px',
     margin: '0 auto',
   },
   topBar: {

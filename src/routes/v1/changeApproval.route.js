@@ -9,6 +9,10 @@ router.get('/stats', requireAdmin, changeApprovalController.getApprovalStats);
 router.get('/settings', requireAdmin, changeApprovalController.getSettings);
 router.patch('/settings', requireAdmin, changeApprovalController.updateSettings);
 
+// User Data Entry Review endpoints
+router.get('/user-entries', requireAdmin, changeApprovalController.getUserDataEntries);
+router.get('/entry-users', requireAdmin, changeApprovalController.getEntryUsersList);
+
 router.post('/:id/approve', requireAdmin, changeApprovalController.approveRequest);
 router.post('/:id/reject', requireAdmin, changeApprovalController.rejectRequest);
 
