@@ -31,7 +31,12 @@ import {
   AlertCircle,
   FileCheck,
   Users,
-  Palette
+  Palette,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Sparkles,
+  FilterX
 } from 'lucide-react';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import AdminSignedDocumentsApproval from './AdminSignedDocumentsApproval';
@@ -77,6 +82,8 @@ export default function AdminPanel() {
   // Form & Modal State
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null); // null means "Add Mode"
+  const [modalTab, setModalTab] = useState('profile'); // 'profile', 'privileges', 'screens'
+  const [showPassword, setShowPassword] = useState(false);
   const [availableDesigners, setAvailableDesigners] = useState([]);
   const [permissionSearchTerm, setPermissionSearchTerm] = useState('');
   const [formData, setFormData] = useState({
@@ -474,11 +481,15 @@ export default function AdminPanel() {
     setError('');
     setModalError('');
     setSuccess('');
+    setModalTab('profile');
+    setShowPassword(false);
     setShowUserModal(true);
   };
 
   const handleCreateNewClick = () => {
     setEditingUser(null);
+    setModalTab('profile');
+    setShowPassword(false);
     setFormData({
       name: '',
       email: '',
@@ -527,6 +538,8 @@ export default function AdminPanel() {
   const handleCancelEdit = () => {
     setEditingUser(null);
     setShowUserModal(false);
+    setModalTab('profile');
+    setShowPassword(false);
     setModalError('');
     setPermissionSearchTerm('');
     setFormData({
@@ -709,6 +722,24 @@ export default function AdminPanel() {
     }
   };
 
+  const PRIVILEGE_KEYS = [
+    'canManageTasks', 'canBroadcastChat', 'canExportReports', 'canDeleteRecords', 'canViewFinancials',
+    'canCreateJobCards', 'canEditJobCards', 'canDeleteJobCards', 'canAdvanceJobStage', 'canViewJobCosts',
+    'canCreateDesigns', 'canInputNewDesign', 'canEditDesigns', 'canDeleteDesigns', 'canViewDesignCosts',
+    'canAddFabricInward', 'canIssueFabricOutward', 'canTransferFabricLot', 'canDeleteFabricLogs', 'canViewFabricPrices',
+    'canCreateInvoices', 'canEditInvoiceRates', 'canCancelInvoices', 'canRecordPayments',
+    'canCreateStitchingJobs', 'canIssueStitchingChallans', 'canManageWorkerRates'
+  ];
+  const activePrivilegesCount = PRIVILEGE_KEYS.filter(k => formData[k]).length;
+
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = matchSearchQuery(u, userSearch, ['name', 'email', 'role', 'department']);
+    const matchesCompany = selectedCompanyFilter === 'All' || (Array.isArray(u.allowedCompanies) && u.allowedCompanies.includes(selectedCompanyFilter));
+    const matchesDept = selectedDeptFilter === 'All' || u.department === selectedDeptFilter;
+    const matchesStatus = selectedStatusFilter === 'All' || (u.status || 'Active') === selectedStatusFilter;
+    return matchesSearch && matchesCompany && matchesDept && matchesStatus;
+  });
+
   return (
     <div style={styles.container}>
       {/* Page Title Header */}
@@ -871,68 +902,255 @@ export default function AdminPanel() {
           </div>
 
           {/* 100% Full-Width Users Table Panel */}
-          <div className="glass-panel" style={{ ...styles.tablePanel, width: '100%' }}>
-            <div style={styles.panelHeader}>
-              <Sliders size={16} color="var(--primary)" />
-              <h3 style={styles.panelTitle}>Active User Accounts ({users.length})</h3>
-              {loading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: '0.5rem', color: 'var(--text-muted)' }} />}
-              <button
-                type="button"
-                onClick={handleCreateNewClick}
-                className="btn-primary"
-                style={{ marginLeft: 'auto', padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: '8px' }}
-              >
-                <UserPlus size={15} />
-                <span>Add New User</span>
-              </button>
-            </div>
-
-            {/* Live Search & Multi-Criteria Scope Filters */}
-            <div style={{ display: 'flex', gap: '0.65rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: '1 1 220px' }}>
-                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                <input
-                  type="text"
-                  placeholder="Search user name, email, department, or role..."
-                  value={userSearch}
-                  onChange={e => setUserSearch(e.target.value)}
-                  style={{ width: '100%', paddingLeft: 34, fontSize: '0.82rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px' }}
-                />
+          <div className="glass-panel" style={{ ...styles.tablePanel, width: '100%', padding: '1.25rem' }}>
+            {/* Header with Title, Stats Badges, and Add Button */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                  border: '1px solid #bfdbfe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.08)'
+                }}>
+                  <Users size={20} color="#2563eb" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                      Active User Accounts
+                    </h3>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      padding: '0.15rem 0.6rem',
+                      borderRadius: '999px',
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe'
+                    }}>
+                      {filteredUsers.length}{filteredUsers.length !== users.length ? ` of ${users.length}` : ''}
+                    </span>
+                    {loading && <RotateCw size={14} className="spin-loader" style={{ color: '#64748b' }} />}
+                  </div>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b' }}>
+                    Manage access credentials, company entity assignments, and operational permissions
+                  </p>
+                </div>
               </div>
 
-              <select
-                value={selectedCompanyFilter}
-                onChange={e => setSelectedCompanyFilter(e.target.value)}
-                style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' }}
-              >
-                <option value="All">🌐 All Companies ({users.length})</option>
-                <option value="Elite Edition">🏢 Elite Edition ({users.filter(u => u.allowedCompanies?.includes('Elite Edition')).length})</option>
-                <option value="Elite Fabtex">🏢 Elite Fabtex ({users.filter(u => u.allowedCompanies?.includes('Elite Fabtex')).length})</option>
-                <option value="Elite Online">🏪 Elite Online ({users.filter(u => u.allowedCompanies?.includes('Elite Online')).length})</option>
-                <option value="Elite Stitching">🏭 Elite Stitching ({users.filter(u => u.allowedCompanies?.includes('Elite Stitching')).length})</option>
-                <option value="Elite Digital Print">🖨️ Elite Digital Print ({users.filter(u => u.allowedCompanies?.includes('Elite Digital Print')).length})</option>
-              </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {/* Active / Inactive quick count badges */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '0.25rem 0.6rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem', fontWeight: 700 }}>
+                  <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    ● {users.filter(u => u.status !== 'Inactive').length} Active
+                  </span>
+                  {users.filter(u => u.status === 'Inactive').length > 0 && (
+                    <>
+                      <span style={{ color: '#cbd5e1' }}>|</span>
+                      <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        ● {users.filter(u => u.status === 'Inactive').length} Inactive
+                      </span>
+                    </>
+                  )}
+                </div>
 
-              <select
-                value={selectedDeptFilter}
-                onChange={e => setSelectedDeptFilter(e.target.value)}
-                style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' }}
-              >
-                <option value="All">🏷️ All Departments</option>
-                {DEPARTMENTS_LIST.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+                <button
+                  type="button"
+                  onClick={handleCreateNewClick}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.5rem 1.15rem',
+                    fontSize: '0.85rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <UserPlus size={16} />
+                  <span>Add New User</span>
+                </button>
+              </div>
+            </div>
 
-              <select
-                value={selectedStatusFilter}
-                onChange={e => setSelectedStatusFilter(e.target.value)}
-                style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' }}
-              >
-                <option value="All">⚡ All Statuses</option>
-                <option value="Active">🟢 Active</option>
-                <option value="Inactive">🔴 Inactive / Suspended</option>
-              </select>
+            {/* Filter & Search Toolbar (Unified Single-Line Row) */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              marginTop: '0.85rem',
+              padding: '0.65rem 0.85rem',
+              background: '#f8fafc',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              flexWrap: 'wrap'
+            }}>
+              {/* Search input container */}
+              <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
+                <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, department, or role..."
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 1.8rem 0.5rem 2.2rem',
+                    fontSize: '0.82rem',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    borderRadius: '7px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {userSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setUserSearch('')}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      padding: 2,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Company Filter Dropdown */}
+              <div style={{ flex: '0 0 auto', minWidth: '170px' }}>
+                <select
+                  value={selectedCompanyFilter}
+                  onChange={e => setSelectedCompanyFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.82rem',
+                    borderRadius: '7px',
+                    border: selectedCompanyFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
+                    background: selectedCompanyFilter !== 'All' ? '#eff6ff' : '#ffffff',
+                    color: selectedCompanyFilter !== 'All' ? '#1d4ed8' : '#0f172a',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="All">🌐 All Companies ({users.length})</option>
+                  <option value="Elite Edition">🏢 Elite Edition ({users.filter(u => u.allowedCompanies?.includes('Elite Edition')).length})</option>
+                  <option value="Elite Fabtex">🏭 Elite Fabtex ({users.filter(u => u.allowedCompanies?.includes('Elite Fabtex')).length})</option>
+                  <option value="Elite Online">🏪 Elite Online ({users.filter(u => u.allowedCompanies?.includes('Elite Online')).length})</option>
+                  <option value="Elite Stitching">✂️ Elite Stitching ({users.filter(u => u.allowedCompanies?.includes('Elite Stitching')).length})</option>
+                  <option value="Elite Digital Print">🖨️ Elite Digital Print ({users.filter(u => u.allowedCompanies?.includes('Elite Digital Print')).length})</option>
+                </select>
+              </div>
+
+              {/* Department Filter Dropdown */}
+              <div style={{ flex: '0 0 auto', minWidth: '160px' }}>
+                <select
+                  value={selectedDeptFilter}
+                  onChange={e => setSelectedDeptFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.82rem',
+                    borderRadius: '7px',
+                    border: selectedDeptFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
+                    background: selectedDeptFilter !== 'All' ? '#eff6ff' : '#ffffff',
+                    color: selectedDeptFilter !== 'All' ? '#1d4ed8' : '#0f172a',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="All">🏷️ All Departments</option>
+                  {DEPARTMENTS_LIST.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter Dropdown */}
+              <div style={{ flex: '0 0 auto', minWidth: '135px' }}>
+                <select
+                  value={selectedStatusFilter}
+                  onChange={e => setSelectedStatusFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.82rem',
+                    borderRadius: '7px',
+                    border: selectedStatusFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
+                    background: selectedStatusFilter !== 'All' ? '#eff6ff' : '#ffffff',
+                    color: selectedStatusFilter !== 'All' ? '#1d4ed8' : '#0f172a',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="All">⚡ All Statuses</option>
+                  <option value="Active">🟢 Active</option>
+                  <option value="Inactive">🔴 Inactive / Suspended</option>
+                </select>
+              </div>
+
+              {/* Reset Filters Shortcut */}
+              {(userSearch || selectedCompanyFilter !== 'All' || selectedDeptFilter !== 'All' || selectedStatusFilter !== 'All') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserSearch('');
+                    setSelectedCompanyFilter('All');
+                    setSelectedDeptFilter('All');
+                    setSelectedStatusFilter('All');
+                  }}
+                  style={{
+                    padding: '0.48rem 0.75rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#dc2626',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)'
+                  }}
+                  title="Clear all active search and filter constraints"
+                >
+                  <FilterX size={13} />
+                  <span>Clear Filters</span>
+                </button>
+              )}
             </div>
 
             <div className="table-container" style={styles.tableWrap}>
@@ -945,6 +1163,27 @@ export default function AdminPanel() {
                 <div style={styles.emptyState}>
                   <User size={28} color="var(--text-muted)" />
                   <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>No user accounts found.</p>
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div style={{ ...styles.emptyState, padding: '3rem 1rem' }}>
+                  <FilterX size={32} color="#94a3b8" />
+                  <h4 style={{ margin: '0.6rem 0 0.2rem 0', color: '#1e293b' }}>No Matching Accounts Found</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                    No users match your search query or selected filter criteria.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserSearch('');
+                      setSelectedCompanyFilter('All');
+                      setSelectedDeptFilter('All');
+                      setSelectedStatusFilter('All');
+                    }}
+                    className="btn-secondary"
+                    style={{ marginTop: '0.85rem', padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700 }}
+                  >
+                    Reset All Filters
+                  </button>
                 </div>
               ) : (
                 <table>
@@ -960,14 +1199,7 @@ export default function AdminPanel() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users
-                      .filter(u => {
-                        const matchesSearch = matchSearchQuery(u, userSearch, ['name', 'email', 'role', 'department']);
-                        const matchesCompany = selectedCompanyFilter === 'All' || (Array.isArray(u.allowedCompanies) && u.allowedCompanies.includes(selectedCompanyFilter));
-                        const matchesDept = selectedDeptFilter === 'All' || u.department === selectedDeptFilter;
-                        const matchesStatus = selectedStatusFilter === 'All' || (u.status || 'Active') === selectedStatusFilter;
-                        return matchesSearch && matchesCompany && matchesDept && matchesStatus;
-                      })
+                    {filteredUsers
                       .map((u) => {
                         const isMain = Boolean(u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com');
                         const checkAdmin = u.role === 'admin' || isMain;
@@ -1151,7 +1383,7 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* 🌟 FLOATING MODAL OVERLAY FOR USER FORM 🌟 */}
+          {/* 🌟 ENTERPRISE MODAL OVERLAY FOR USER CREATION & EDITING 🌟 */}
           {showUserModal && (
             <div style={{
               position: 'fixed',
@@ -1159,8 +1391,8 @@ export default function AdminPanel() {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(15, 23, 42, 0.65)',
-              backdropFilter: 'blur(5px)',
+              backgroundColor: 'rgba(15, 23, 42, 0.72)',
+              backdropFilter: 'blur(8px)',
               zIndex: 99999,
               display: 'flex',
               alignItems: 'center',
@@ -1171,10 +1403,10 @@ export default function AdminPanel() {
               <div style={{
                 background: '#ffffff',
                 width: '100%',
-                maxWidth: '680px',
+                maxWidth: '860px',
                 maxHeight: '90vh',
-                borderRadius: '14px',
-                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+                borderRadius: '16px',
+                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
                 border: '1px solid #cbd5e1',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1182,31 +1414,51 @@ export default function AdminPanel() {
               }}>
                 {/* Modal Header */}
                 <div style={{
-                  padding: '1.1rem 1.5rem',
-                  background: '#f8fafc',
+                  padding: '1.2rem 1.6rem',
+                  background: 'linear-gradient(to bottom, #f8fafc, #ffffff)',
                   borderBottom: '1px solid #e2e8f0',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between'
+                  justifyContent: 'space-between',
+                  gap: '1rem'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                     <div style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      background: '#eff6ff',
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                      color: '#ffffff'
                     }}>
-                      <UserPlus size={18} color="#2563eb" />
+                      {editingUser ? <Edit2 size={20} /> : <UserPlus size={20} />}
                     </div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                        {editingUser ? `Edit Account — ${editingUser.name}` : 'Create New Account'}
-                      </h3>
-                      <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                        {editingUser ? 'Update user role, credentials, and screen access permissions.' : 'Configure credentials and assign operational screen permissions.'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                          {editingUser ? `Edit Account: ${editingUser.name}` : 'Create New User Account'}
+                        </h3>
+                        {editingUser && (
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '999px',
+                            background: formData.status === 'Inactive' ? '#fee2e2' : '#dcfce7',
+                            color: formData.status === 'Inactive' ? '#b91c1c' : '#15803d',
+                            border: `1px solid ${formData.status === 'Inactive' ? '#fca5a5' : '#86efac'}`
+                          }}>
+                            {formData.status || 'Active'}
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                        {editingUser
+                          ? 'Modify role classification, company access boundaries, and operational permissions.'
+                          : 'Configure credentials, assign company entity rights, and grant role permissions.'}
                       </p>
                     </div>
                   </div>
@@ -1216,26 +1468,123 @@ export default function AdminPanel() {
                     onClick={handleCancelEdit}
                     style={{
                       background: '#f1f5f9',
-                      border: 'none',
+                      border: '1px solid #e2e8f0',
                       borderRadius: '50%',
-                      width: 32,
-                      height: 32,
+                      width: 34,
+                      height: 34,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       color: '#475569',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
                     }}
+                    title="Close"
                   >
                     <X size={18} />
                   </button>
                 </div>
 
+                {/* Segmented Navigation Tab Switcher */}
+                <div style={{
+                  display: 'flex',
+                  borderBottom: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  padding: '0 1rem',
+                  gap: '0.5rem'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('profile')}
+                    style={{
+                      padding: '0.8rem 1.1rem',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: modalTab === 'profile' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                      color: modalTab === 'profile' ? '#1d4ed8' : '#64748b',
+                      fontWeight: modalTab === 'profile' ? 800 : 600,
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <User size={16} />
+                    <span>1. Profile & Role</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('privileges')}
+                    style={{
+                      padding: '0.8rem 1.1rem',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: modalTab === 'privileges' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                      color: modalTab === 'privileges' ? '#1d4ed8' : '#64748b',
+                      fontWeight: modalTab === 'privileges' ? 800 : 600,
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <ShieldCheck size={16} />
+                    <span>2. Operational Privileges</span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      padding: '0.1rem 0.5rem',
+                      borderRadius: 999,
+                      background: modalTab === 'privileges' ? '#bfdbfe' : '#e2e8f0',
+                      color: modalTab === 'privileges' ? '#1e40af' : '#475569',
+                      fontWeight: 800
+                    }}>
+                      {activePrivilegesCount} / {PRIVILEGE_KEYS.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('screens')}
+                    style={{
+                      padding: '0.8rem 1.1rem',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: modalTab === 'screens' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                      color: modalTab === 'screens' ? '#1d4ed8' : '#64748b',
+                      fontWeight: modalTab === 'screens' ? 800 : 600,
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <Layers size={16} />
+                    <span>3. Screen Access</span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      padding: '0.1rem 0.5rem',
+                      borderRadius: 999,
+                      background: modalTab === 'screens' ? '#bfdbfe' : '#e2e8f0',
+                      color: modalTab === 'screens' ? '#1e40af' : '#475569',
+                      fontWeight: 800
+                    }}>
+                      {formData.permissions?.length || 0} / {AVAILABLE_SCREENS.length}
+                    </span>
+                  </button>
+                </div>
+
                 {/* Modal Form Body */}
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                  <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+                  <div style={{ padding: '1.4rem 1.6rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     
-                    {/* Error Box inside Modal */}
+                    {/* Error Banner */}
                     {modalError && (
                       <div
                         style={{
@@ -1256,222 +1605,384 @@ export default function AdminPanel() {
                       </div>
                     )}
 
-                    {/* ⚡ 1-Click Role Permission Presets Bar */}
-                    <div style={{ background: '#f8fafc', padding: '0.75rem 0.85rem', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: '0.4rem', letterSpacing: '0.04em' }}>
-                        ⚡ Quick 1-Click Role Presets
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => applyRolePreset('full_admin')}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', cursor: 'pointer' }}
-                        >
-                          ⚡ Full Admin
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyRolePreset('executive')}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer' }}
-                        >
-                          👔 Executive
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyRolePreset('production_manager')}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer' }}
-                        >
-                          🏭 Production
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyRolePreset('stitching_master')}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer' }}
-                        >
-                          ✂️ Stitching Master
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyRolePreset('ecommerce_manager')}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer' }}
-                        >
-                          🏪 E-Commerce
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyRolePreset('billing_clerk')}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer' }}
-                        >
-                          💰 Billing Clerk
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyRolePreset('store_keeper')}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer' }}
-                        >
-                          📦 Store Keeper
-                        </button>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-                      <div style={styles.formGroup}>
-                        <label style={styles.label}>Full Name *</label>
-                        <div style={styles.inputWrapper}>
-                          <User size={15} style={styles.inputIcon} />
-                          <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleInputChange}
-                            placeholder="e.g. Rahul Sharma"
-                            required
-                            style={styles.formInput}
-                          />
-                        </div>
-                      </div>
-
-                      <div style={styles.formGroup}>
-                        <label style={styles.label}>Email Address *</label>
-                        <div style={styles.inputWrapper}>
-                          <Mail size={15} style={styles.inputIcon} />
-                          <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleInputChange}
-                            placeholder="rahul@elite.com"
-                            required
-                            style={styles.formInput}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                      <div style={styles.formGroup}>
-                        <label style={styles.label}>
-                          {editingUser ? 'New Password (leave blank to keep)' : 'Password *'}
-                        </label>
-                        <div style={styles.inputWrapper}>
-                          <Lock size={15} style={styles.inputIcon} />
-                          <input
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleInputChange}
-                            placeholder={editingUser ? 'Enter new password...' : 'Enter password...'}
-                            required={!editingUser}
-                            style={styles.formInput}
-                          />
-                        </div>
-                      </div>
-
-                      <div style={styles.formGroup}>
-                        <label style={styles.label}>Primary Department *</label>
-                        <select
-                          name="department"
-                          value={formData.department}
-                          onChange={handleInputChange}
-                          style={styles.selectInput}
-                        >
-                          {DEPARTMENTS_LIST.map(d => (
-                            <option key={d} value={d}>📁 {d}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div style={styles.formGroup}>
-                        <label style={styles.label}>Account Status *</label>
-                        <select
-                          name="status"
-                          value={formData.status}
-                          onChange={handleInputChange}
-                          style={{
-                            ...styles.selectInput,
-                            color: formData.status === 'Inactive' ? '#dc2626' : '#16a34a',
-                            fontWeight: 800
-                          }}
-                        >
-                          <option value="Active">🟢 Active Account</option>
-                          <option value="Inactive">🔴 Inactive / Suspended</option>
-                        </select>
-                      </div>
-
-                      <div style={styles.formGroup}>
-                        <label style={styles.label}>🎨 Connected Designer (Settings &rarr; Designers)</label>
-                        <select
-                          name="designerName"
-                          value={formData.designerName || ''}
-                          onChange={handleInputChange}
-                          style={styles.selectInput}
-                        >
-                          <option value="">-- None (Not a Designer) --</option>
-                          {availableDesigners.map((d, i) => (
-                            <option key={i} value={d}>👤 {d}</option>
-                          ))}
-                        </select>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px', display: 'block' }}>
-                          When selected, user will see only their own designs on the Designer Screen.
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Action & Operational Privileges Card */}
-                    <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                        <div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            ⚙️ Granular Micro-Level Action & Operational Privileges
+                    {/* ========================================================= */}
+                    {/* TAB 1: PROFILE, CREDENTIALS, ROLE & COMPANY ALLOCATION    */}
+                    {/* ========================================================= */}
+                    {modalTab === 'profile' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        {/* ⚡ 1-Click Role Permission Presets Bar */}
+                        <div style={{
+                          background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+                          padding: '0.85rem 1rem',
+                          borderRadius: '12px',
+                          border: '1px solid #bfdbfe'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Sparkles size={15} color="#2563eb" />
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Quick 1-Click Role Presets
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              Auto-populates role, department, company access & screens
+                            </span>
                           </div>
-                          <p style={{ fontSize: '0.73rem', color: '#64748b', margin: '2px 0 0 0' }}>
-                            Configure exact functional capabilities (Create, Edit, Delete, Stage Advances, Costing & Rates) per user within each screen.
-                          </p>
+
+                          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                            {[
+                              { key: 'full_admin', label: '⚡ Full Admin', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+                              { key: 'executive', label: '👔 Executive', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
+                              { key: 'production_manager', label: '🏭 Production Manager', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
+                              { key: 'stitching_master', label: '✂️ Stitching Master', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
+                              { key: 'ecommerce_manager', label: '🏪 E-Commerce Manager', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
+                              { key: 'billing_clerk', label: '💰 Billing Clerk', color: '#334155', bg: '#ffffff', border: '#cbd5e1' },
+                              { key: 'store_keeper', label: '📦 Store Keeper', color: '#334155', bg: '#ffffff', border: '#cbd5e1' }
+                            ].map(p => (
+                              <button
+                                key={p.key}
+                                type="button"
+                                onClick={() => applyRolePreset(p.key)}
+                                style={{
+                                  padding: '0.35rem 0.7rem',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  borderRadius: '6px',
+                                  border: `1px solid ${p.border}`,
+                                  background: p.bg,
+                                  color: p.color,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => setFormData(p => ({
-                              ...p,
-                              canManageTasks: true, canBroadcastChat: true, canExportReports: true, canDeleteRecords: true, canViewFinancials: true,
-                              canCreateJobCards: true, canEditJobCards: true, canDeleteJobCards: true, canAdvanceJobStage: true, canViewJobCosts: true,
-                              canCreateDesigns: true, canInputNewDesign: true, canEditDesigns: true, canDeleteDesigns: true, canViewDesignCosts: true,
-                              canAddFabricInward: true, canIssueFabricOutward: true, canTransferFabricLot: true, canDeleteFabricLogs: true, canViewFabricPrices: true,
-                              canCreateInvoices: true, canEditInvoiceRates: true, canCancelInvoices: true, canRecordPayments: true,
-                              canCreateStitchingJobs: true, canIssueStitchingChallans: true, canManageWorkerRates: true
-                            }))}
-                            className="btn-secondary"
-                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 700 }}
+
+                        {/* Basic Profile Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                          {/* Full Name */}
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Full Name *</label>
+                            <div style={styles.inputWrapper}>
+                              <User size={15} style={styles.inputIcon} />
+                              <input
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleInputChange}
+                                placeholder="e.g. Rahul Sharma"
+                                required
+                                style={styles.formInput}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Email Address */}
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Email Address *</label>
+                            <div style={styles.inputWrapper}>
+                              <Mail size={15} style={styles.inputIcon} />
+                              <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                placeholder="rahul@elite.com"
+                                required
+                                style={styles.formInput}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Password */}
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>
+                              {editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}
+                            </label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <Lock size={15} style={styles.inputIcon} />
+                              <input
+                                type={showPassword ? 'text' : 'password'}
+                                name="password"
+                                value={formData.password}
+                                onChange={handleInputChange}
+                                placeholder={editingUser ? 'Enter new password...' : 'Enter password...'}
+                                required={!editingUser}
+                                style={{ ...styles.formInput, paddingRight: '2.4rem' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                  position: 'absolute',
+                                  right: 8,
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  cursor: 'pointer',
+                                  padding: 4,
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title={showPassword ? 'Hide Password' : 'Show Password'}
+                              >
+                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Account Role & Hierarchy */}
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Account Role & Hierarchy *</label>
+                            <select
+                              name="role"
+                              value={formData.isMainAdmin ? 'main_admin' : formData.role}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === 'main_admin') {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    role: 'admin',
+                                    isMainAdmin: true,
+                                    allowedCompanies: ALL_COMPANY_NAMES,
+                                    permissions: AVAILABLE_SCREENS.map(s => s.id)
+                                  }));
+                                } else if (val === 'admin') {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    role: 'admin',
+                                    isMainAdmin: false,
+                                    permissions: AVAILABLE_SCREENS.map(s => s.id)
+                                  }));
+                                } else {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    role: 'user',
+                                    isMainAdmin: false
+                                  }));
+                                }
+                              }}
+                              style={styles.selectInput}
+                            >
+                              <option value="user">👤 Standard User (Restricted Screen Access)</option>
+                              <option value="admin">🛡️ Company Admin (Allocated Company Authority)</option>
+                              <option value="main_admin">👑 Main Admin / Super Admin (Master Control)</option>
+                            </select>
+                          </div>
+
+                          {/* Primary Department */}
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Primary Department *</label>
+                            <select
+                              name="department"
+                              value={formData.department}
+                              onChange={handleInputChange}
+                              style={styles.selectInput}
+                            >
+                              {DEPARTMENTS_LIST.map(d => (
+                                <option key={d} value={d}>📁 {d}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Account Status */}
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Account Status *</label>
+                            <select
+                              name="status"
+                              value={formData.status}
+                              onChange={handleInputChange}
+                              style={{
+                                ...styles.selectInput,
+                                color: formData.status === 'Inactive' ? '#dc2626' : '#16a34a',
+                                fontWeight: 800
+                              }}
+                            >
+                              <option value="Active">🟢 Active Account</option>
+                              <option value="Inactive">🔴 Inactive / Suspended</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Allocated Companies Section */}
+                        <div style={{
+                          background: '#f8fafc',
+                          padding: '1rem',
+                          borderRadius: '12px',
+                          border: '1px solid #cbd5e1'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                🏢 Authorized Company Entities
+                              </div>
+                              <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                                Select which business entities this account can access and switch between in the top bar.
+                              </p>
+                            </div>
+                            {!formData.isMainAdmin && (
+                              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData(p => ({ ...p, allowedCompanies: ALL_COMPANY_NAMES }))}
+                                  className="btn-secondary"
+                                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', fontWeight: 700 }}
+                                >
+                                  Select All
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData(p => ({ ...p, allowedCompanies: [] }))}
+                                  className="btn-secondary"
+                                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', fontWeight: 700 }}
+                                >
+                                  Clear All
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                            gap: '0.6rem',
+                            marginTop: '0.6rem'
+                          }}>
+                            {ALL_COMPANY_NAMES.map(comp => {
+                              const isChecked = formData.allowedCompanies.includes(comp);
+                              return (
+                                <label
+                                  key={comp}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.6rem',
+                                    padding: '0.6rem 0.8rem',
+                                    borderRadius: '8px',
+                                    border: `1.5px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`,
+                                    background: isChecked ? '#eff6ff' : '#ffffff',
+                                    cursor: formData.isMainAdmin ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.82rem',
+                                    fontWeight: isChecked ? 700 : 500,
+                                    color: isChecked ? '#1d4ed8' : '#334155',
+                                    transition: 'all 0.15s',
+                                    boxShadow: isChecked ? '0 2px 4px rgba(37,99,235,0.08)' : 'none'
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked || formData.isMainAdmin}
+                                    disabled={formData.isMainAdmin}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      setFormData(prev => {
+                                        const nextComps = checked
+                                          ? Array.from(new Set([...prev.allowedCompanies, comp]))
+                                          : prev.allowedCompanies.filter(c => c !== comp);
+                                        return { ...prev, allowedCompanies: nextComps };
+                                      });
+                                    }}
+                                    style={{ accentColor: '#2563eb', width: 16, height: 16 }}
+                                  />
+                                  <span>{comp}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Connected Designer (Settings -> Designers) */}
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>🎨 Connected Designer (Settings &rarr; Designers)</label>
+                          <select
+                            name="designerName"
+                            value={formData.designerName || ''}
+                            onChange={handleInputChange}
+                            style={styles.selectInput}
                           >
-                            Enable All
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFormData(p => ({
-                              ...p,
-                              canManageTasks: false, canBroadcastChat: false, canExportReports: false, canDeleteRecords: false, canViewFinancials: false,
-                              canCreateJobCards: false, canEditJobCards: false, canDeleteJobCards: false, canAdvanceJobStage: false, canViewJobCosts: false,
-                              canCreateDesigns: false, canInputNewDesign: false, canEditDesigns: false, canDeleteDesigns: false, canViewDesignCosts: false,
-                              canAddFabricInward: false, canIssueFabricOutward: false, canTransferFabricLot: false, canDeleteFabricLogs: false, canViewFabricPrices: false,
-                              canCreateInvoices: false, canEditInvoiceRates: false, canCancelInvoices: false, canRecordPayments: false,
-                              canCreateStitchingJobs: false, canIssueStitchingChallans: false, canManageWorkerRates: false
-                            }))}
-                            className="btn-secondary"
-                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 700, color: '#dc2626' }}
-                          >
-                            Disable All
-                          </button>
+                            <option value="">-- None (Not a Designer) --</option>
+                            {availableDesigners.map((d, i) => (
+                              <option key={i} value={d}>👤 {d}</option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px', display: 'block' }}>
+                            When selected, user will see only their own designs on the Designer Screen.
+                          </span>
                         </div>
                       </div>
+                    )}
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.75rem' }}>
-                        
+                    {/* ========================================================= */}
+                    {/* TAB 2: OPERATIONAL MICRO-PRIVILEGES                       */}
+                    {/* ========================================================= */}
+                    {modalTab === 'privileges' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {/* Privileges Header */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '0.6rem',
+                          background: '#f8fafc',
+                          padding: '0.85rem 1rem',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              ⚙️ Granular Operational & Micro-Level Privileges
+                            </div>
+                            <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                              Configure functional capabilities (Create, Edit, Delete, Stage Advances, Costing & Margins) per user.
+                            </p>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.45rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setFormData(p => ({
+                                ...p,
+                                canManageTasks: true, canBroadcastChat: true, canExportReports: true, canDeleteRecords: true, canViewFinancials: true,
+                                canCreateJobCards: true, canEditJobCards: true, canDeleteJobCards: true, canAdvanceJobStage: true, canViewJobCosts: true,
+                                canCreateDesigns: true, canInputNewDesign: true, canEditDesigns: true, canDeleteDesigns: true, canViewDesignCosts: true,
+                                canAddFabricInward: true, canIssueFabricOutward: true, canTransferFabricLot: true, canDeleteFabricLogs: true, canViewFabricPrices: true,
+                                canCreateInvoices: true, canEditInvoiceRates: true, canCancelInvoices: true, canRecordPayments: true,
+                                canCreateStitchingJobs: true, canIssueStitchingChallans: true, canManageWorkerRates: true
+                              }))}
+                              className="btn-secondary"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', borderColor: '#bfdbfe' }}
+                            >
+                              Enable All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormData(p => ({
+                                ...p,
+                                canManageTasks: false, canBroadcastChat: false, canExportReports: false, canDeleteRecords: false, canViewFinancials: false,
+                                canCreateJobCards: false, canEditJobCards: false, canDeleteJobCards: false, canAdvanceJobStage: false, canViewJobCosts: false,
+                                canCreateDesigns: false, canInputNewDesign: false, canEditDesigns: false, canDeleteDesigns: false, canViewDesignCosts: false,
+                                canAddFabricInward: false, canIssueFabricOutward: false, canTransferFabricLot: false, canDeleteFabricLogs: false, canViewFabricPrices: false,
+                                canCreateInvoices: false, canEditInvoiceRates: false, canCancelInvoices: false, canRecordPayments: false,
+                                canCreateStitchingJobs: false, canIssueStitchingChallans: false, canManageWorkerRates: false
+                              }))}
+                              className="btn-secondary"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca' }}
+                            >
+                              Disable All
+                            </button>
+                          </div>
+                        </div>
+
                         {/* Section 1: System & General */}
-                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🌟 System & General Operations</span>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
                             <label style={styles.microLabel(formData.canManageTasks)}>
                               <input type="checkbox" checked={formData.canManageTasks} onChange={e => setFormData(p => ({ ...p, canManageTasks: e.target.checked }))} />
                               <span>📋 Task Creation & Assignment</span>
@@ -1496,11 +2007,11 @@ export default function AdminPanel() {
                         </div>
 
                         {/* Section 2: Job Cards & Digital Print */}
-                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>📦 Digital Printing & Job Cards</span>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
                             <label style={styles.microLabel(formData.canCreateJobCards)}>
                               <input type="checkbox" checked={formData.canCreateJobCards} onChange={e => setFormData(p => ({ ...p, canCreateJobCards: e.target.checked }))} />
                               <span>➕ Create New Job Cards</span>
@@ -1525,14 +2036,14 @@ export default function AdminPanel() {
                         </div>
 
                         {/* Section 3: Design Catalogue */}
-                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🎨 Design Catalogue & Assets</span>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
                             <label style={styles.microLabel(formData.canInputNewDesign)}>
                               <input type="checkbox" checked={formData.canInputNewDesign} onChange={e => setFormData(p => ({ ...p, canInputNewDesign: e.target.checked }))} />
-                              <span>➕ "+ New Sample Design" Button & Sample Image Upload</span>
+                              <span>➕ "+ New Sample Design" Button & Upload</span>
                             </label>
                             <label style={styles.microLabel(formData.canCreateDesigns)}>
                               <input type="checkbox" checked={formData.canCreateDesigns} onChange={e => setFormData(p => ({ ...p, canCreateDesigns: e.target.checked }))} />
@@ -1554,11 +2065,11 @@ export default function AdminPanel() {
                         </div>
 
                         {/* Section 4: Fabric Inventory */}
-                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🧵 Fabric Inventory & Stock Control</span>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
                             <label style={styles.microLabel(formData.canAddFabricInward)}>
                               <input type="checkbox" checked={formData.canAddFabricInward} onChange={e => setFormData(p => ({ ...p, canAddFabricInward: e.target.checked }))} />
                               <span>📥 Inward Fabric Rolls & Lots</span>
@@ -1583,11 +2094,11 @@ export default function AdminPanel() {
                         </div>
 
                         {/* Section 5: Billing & Invoicing */}
-                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#7c3aed', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#7c3aed', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🧾 Billing, Invoices & GST Accounts</span>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
                             <label style={styles.microLabel(formData.canCreateInvoices)}>
                               <input type="checkbox" checked={formData.canCreateInvoices} onChange={e => setFormData(p => ({ ...p, canCreateInvoices: e.target.checked }))} />
                               <span>🧾 Generate Tax Invoices & Challans</span>
@@ -1608,11 +2119,11 @@ export default function AdminPanel() {
                         </div>
 
                         {/* Section 6: Stitching */}
-                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ea580c', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea580c', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>✂️ Garment Stitching Department</span>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
                             <label style={styles.microLabel(formData.canCreateStitchingJobs)}>
                               <input type="checkbox" checked={formData.canCreateStitchingJobs} onChange={e => setFormData(p => ({ ...p, canCreateStitchingJobs: e.target.checked }))} />
                               <span>✂️ Create Stitching Job Cards</span>
@@ -1627,308 +2138,282 @@ export default function AdminPanel() {
                             </label>
                           </div>
                         </div>
-
                       </div>
-                    </div>
+                    )}
 
-                    <div style={styles.formGroup}>
-                      <label style={styles.label}>Account Role & Hierarchy *</label>
-                      <select
-                        name="role"
-                        value={formData.isMainAdmin ? 'main_admin' : formData.role}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === 'main_admin') {
-                            setFormData(prev => ({
-                              ...prev,
-                              role: 'admin',
-                              isMainAdmin: true,
-                              allowedCompanies: ALL_COMPANY_NAMES,
-                              permissions: AVAILABLE_SCREENS.map(s => s.id)
-                            }));
-                          } else if (val === 'admin') {
-                            setFormData(prev => ({
-                              ...prev,
-                              role: 'admin',
-                              isMainAdmin: false,
-                              permissions: AVAILABLE_SCREENS.map(s => s.id)
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              role: 'user',
-                              isMainAdmin: false
-                            }));
-                          }
-                        }}
-                        style={styles.selectInput}
-                      >
-                        <option value="user">👤 Standard User (Restricted Screen Access)</option>
-                        <option value="admin">🛡️ Company Admin (Allocated Company Authority)</option>
-                        <option value="main_admin">👑 Main Admin / Super Admin (Hasi Master Control)</option>
-                      </select>
-                    </div>
-
-                    {/* Allocated Companies Checkbox Grid */}
-                    <div style={styles.formGroup}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                        <label style={styles.label}>🏢 Allocated Companies (Admin Entity Access)</label>
-                        {!formData.isMainAdmin && (
-                          <div style={{ display: 'flex', gap: '0.35rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => setFormData(p => ({ ...p, allowedCompanies: ALL_COMPANY_NAMES }))}
-                              className="btn-secondary"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
-                            >
-                              Select All
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setFormData(p => ({ ...p, allowedCompanies: [] }))}
-                              className="btn-secondary"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
-                            >
-                              Clear All
-                            </button>
+                    {/* ========================================================= */}
+                    {/* TAB 3: FUNCTIONALITY ACCESS & ALLOWED SCREENS             */}
+                    {/* ========================================================= */}
+                    {modalTab === 'screens' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {/* Screens Header */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '0.6rem',
+                          background: '#f8fafc',
+                          padding: '0.85rem 1rem',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              🖥️ Allowed Screen Modules & Navigation
+                            </div>
+                            <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                              Select which operational modules and screens this user is authorized to open in the interface.
+                            </p>
                           </div>
-                        )}
-                      </div>
-                      <p style={styles.helpText}>
-                        Select which company entities this Admin user is authorized to manage and access in the top company bar.
-                      </p>
+                          {formData.role !== 'admin' && (
+                            <div style={{ display: 'flex', gap: '0.45rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
+                                className="btn-secondary"
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', borderColor: '#bfdbfe' }}
+                              >
+                                Select All
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
+                                className="btn-secondary"
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', borderColor: '#fecaca' }}
+                              >
+                                Clear All
+                              </button>
+                            </div>
+                          )}
+                        </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                        {ALL_COMPANY_NAMES.map(comp => {
-                          const isChecked = formData.allowedCompanies.includes(comp);
-                          return (
-                            <label
-                              key={comp}
+                        {/* Real-Time Permission Search Filter */}
+                        <div style={{ position: 'relative' }}>
+                          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                          <input
+                            type="text"
+                            placeholder="Search screens & buttons (e.g. 'sample design', 'catalog', 'inward')..."
+                            value={permissionSearchTerm}
+                            onChange={e => setPermissionSearchTerm(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.55rem 2.2rem 0.55rem 2.4rem',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.82rem',
+                              boxSizing: 'border-box',
+                              background: '#ffffff',
+                              outline: 'none',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                            }}
+                          />
+                          {permissionSearchTerm && (
+                            <button
+                              type="button"
+                              onClick={() => setPermissionSearchTerm('')}
                               style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.45rem 0.65rem',
-                                borderRadius: '6px',
-                                border: `1px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`,
-                                background: isChecked ? '#eff6ff' : '#ffffff',
-                                cursor: formData.isMainAdmin ? 'not-allowed' : 'pointer',
-                                fontSize: '0.8rem',
-                                fontWeight: isChecked ? 700 : 500,
-                                color: isChecked ? '#1d4ed8' : '#334155'
+                                position: 'absolute',
+                                right: 10,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: '#94a3b8',
+                                cursor: 'pointer',
+                                padding: 2
                               }}
                             >
-                              <input
-                                type="checkbox"
-                                checked={isChecked || formData.isMainAdmin}
-                                disabled={formData.isMainAdmin}
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  setFormData(prev => {
-                                    const nextComps = checked
-                                      ? Array.from(new Set([...prev.allowedCompanies, comp]))
-                                      : prev.allowedCompanies.filter(c => c !== comp);
-                                    return { ...prev, allowedCompanies: nextComps };
-                                  });
-                                }}
-                              />
-                              <span>{comp}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                        <label style={styles.label}>Functionality Access (Allowed Screens)</label>
-                        {formData.role !== 'admin' && (
-                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                            <button
-                              type="button"
-                              onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
-                              className="btn-secondary"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
-                            >
-                              Select All
+                              <X size={15} />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
-                              className="btn-secondary"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
-                            >
-                              Clear All
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <p style={styles.helpText}>
-                        Select which operational modules and screens this user is authorized to open.
-                      </p>
+                          )}
+                        </div>
 
-                      {/* Real-Time Permission Search Filter */}
-                      <div style={{ position: 'relative', marginBottom: '0.65rem' }}>
-                        <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                        <input
-                          type="text"
-                          placeholder="Search screens & buttons (e.g. 'sample design', 'catalog', 'inward')..."
-                          value={permissionSearchTerm}
-                          onChange={e => setPermissionSearchTerm(e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '0.45rem 2rem 0.45rem 2.1rem',
-                            borderRadius: '6px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.8rem',
-                            boxSizing: 'border-box',
-                            background: '#ffffff'
-                          }}
-                        />
-                        {permissionSearchTerm && (
-                          <button
-                            type="button"
-                            onClick={() => setPermissionSearchTerm('')}
-                            style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
+                        {(() => {
+                          const term = permissionSearchTerm.trim().toLowerCase();
+                          const matchingScreens = term
+                            ? AVAILABLE_SCREENS.filter(s =>
+                                s.label.toLowerCase().includes(term) ||
+                                s.id.toLowerCase().includes(term) ||
+                                s.category.toLowerCase().includes(term) ||
+                                (s.id === 'jobcards_sample' && 'new sample design'.includes(term))
+                              )
+                            : AVAILABLE_SCREENS;
 
-                      {(() => {
-                        const term = permissionSearchTerm.trim().toLowerCase();
-                        const matchingScreens = term
-                          ? AVAILABLE_SCREENS.filter(s =>
-                              s.label.toLowerCase().includes(term) ||
-                              s.id.toLowerCase().includes(term) ||
-                              s.category.toLowerCase().includes(term) ||
-                              (s.id === 'jobcards_sample' && 'new sample design'.includes(term))
-                            )
-                          : AVAILABLE_SCREENS;
+                          const categories = Array.from(new Set(matchingScreens.map(s => s.category)));
 
-                        const categories = Array.from(new Set(matchingScreens.map(s => s.category)));
-
-                        if (categories.length === 0) {
-                          return (
-                            <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                              No screens found matching "{permissionSearchTerm}".
-                            </div>
-                          );
-                        }
-
-                        return categories.map(cat => {
-                          const catScreens = matchingScreens.filter(s => s.category === cat);
-                          const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
-                          const catTitle = cat === 'General' ? '⚙️ Core & General' :
-                                           cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
-                                           cat === 'Elite Edition' ? '🏢 Elite Edition' :
-                                           cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
-                                           cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
-                                           cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
-
-                          return (
-                            <div key={cat} style={{ marginBottom: '0.85rem', background: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  {catTitle}
-                                </span>
-                                {formData.role !== 'admin' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const ids = catScreens.map(s => s.id);
-                                      setFormData(prev => {
-                                        const hasAll = ids.every(id => prev.permissions.includes(id));
-                                        const updated = hasAll
-                                          ? prev.permissions.filter(id => !ids.includes(id))
-                                          : Array.from(new Set([...prev.permissions, ...ids]));
-                                        return { ...prev, permissions: updated };
-                                      });
-                                    }}
-                                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
-                                  >
-                                    {allChecked ? 'Deselect Category' : 'Select Category'}
-                                  </button>
-                                )}
+                          if (categories.length === 0) {
+                            return (
+                              <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                No screens found matching "{permissionSearchTerm}".
                               </div>
+                            );
+                          }
 
-                              <div style={styles.checkboxGrid}>
-                                {catScreens.map(screen => {
-                                  const isChecked = formData.permissions.includes(screen.id);
-                                  const isSample = screen.id === 'jobcards_sample';
-                                  return (
-                                    <label
-                                      key={screen.id}
-                                      style={{
-                                        ...styles.checkboxLabel,
-                                        background: isChecked ? '#eff6ff' : isSample ? '#fffbeb' : '#ffffff',
-                                        borderColor: isChecked ? '#2563eb' : isSample ? '#f59e0b' : '#e2e8f0',
-                                        ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
+                          return categories.map(cat => {
+                            const catScreens = matchingScreens.filter(s => s.category === cat);
+                            const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
+                            const catTitle = cat === 'General' ? '⚙️ Core & General' :
+                                             cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
+                                             cat === 'Elite Edition' ? '🏢 Elite Edition' :
+                                             cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
+                                             cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
+                                             cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
+
+                            return (
+                              <div key={cat} style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    {catTitle} ({catScreens.filter(s => formData.permissions.includes(s.id)).length} / {catScreens.length})
+                                  </span>
+                                  {formData.role !== 'admin' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const ids = catScreens.map(s => s.id);
+                                        setFormData(prev => {
+                                          const hasAll = ids.every(id => prev.permissions.includes(id));
+                                          const updated = hasAll
+                                            ? prev.permissions.filter(id => !ids.includes(id))
+                                            : Array.from(new Set([...prev.permissions, ...ids]));
+                                          return { ...prev, permissions: updated };
+                                        });
                                       }}
+                                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
                                     >
-                                      <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        disabled={formData.role === 'admin'}
-                                        onChange={() => handlePermissionCheckbox(screen.id)}
-                                        style={styles.checkbox}
-                                      />
-                                      <span style={{ fontSize: '0.82rem', fontWeight: isChecked || isSample ? 700 : 500, color: isChecked ? '#1d4ed8' : isSample ? '#92400e' : '#334155' }}>
-                                        {screen.label}
-                                      </span>
-                                    </label>
-                                  );
-                                })}
+                                      {allChecked ? 'Deselect Category' : 'Select Category'}
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div style={styles.checkboxGrid}>
+                                  {catScreens.map(screen => {
+                                    const isChecked = formData.permissions.includes(screen.id);
+                                    const isSample = screen.id === 'jobcards_sample';
+                                    return (
+                                      <label
+                                        key={screen.id}
+                                        style={{
+                                          ...styles.checkboxLabel,
+                                          background: isChecked ? '#eff6ff' : isSample ? '#fffbeb' : '#ffffff',
+                                          borderColor: isChecked ? '#2563eb' : isSample ? '#f59e0b' : '#cbd5e1',
+                                          boxShadow: isChecked ? '0 1px 3px rgba(37,99,235,0.08)' : 'none',
+                                          ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          disabled={formData.role === 'admin'}
+                                          onChange={() => handlePermissionCheckbox(screen.id)}
+                                          style={styles.checkbox}
+                                        />
+                                        <span style={{ fontSize: '0.82rem', fontWeight: isChecked || isSample ? 700 : 500, color: isChecked ? '#1d4ed8' : isSample ? '#92400e' : '#334155' }}>
+                                          {screen.label}
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Modal Footer Actions */}
                   <div style={{
-                    padding: '1rem 1.5rem',
+                    padding: '1.1rem 1.6rem',
                     background: '#f8fafc',
                     borderTop: '1px solid #e2e8f0',
                     display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '0.75rem'
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    flexWrap: 'wrap'
                   }}>
-                    <button
-                      type="button"
-                      onClick={handleCancelEdit}
-                      className="btn-secondary"
-                      style={{ padding: '0.55rem 1.2rem', fontSize: '0.85rem', fontWeight: 700, borderRadius: '6px' }}
-                    >
-                      <X size={15} />
-                      <span>Cancel</span>
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn-success"
-                      style={{
-                        padding: '0.55rem 1.4rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        borderRadius: '6px',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.4rem'
-                      }}
-                      disabled={submitLoading}
-                    >
-                      {submitLoading ? (
-                        <RotateCw size={15} className="spin-loader" />
-                      ) : (
-                        <Save size={15} />
+                    {/* Left side: Tab navigation shortcuts */}
+                    <div>
+                      {modalTab === 'profile' && (
+                        <button
+                          type="button"
+                          onClick={() => setModalTab('privileges')}
+                          className="btn-secondary"
+                          style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                        >
+                          <span>Next: Operational Privileges &rarr;</span>
+                        </button>
                       )}
-                      <span>{editingUser ? 'Save Credentials' : 'Create User Account'}</span>
-                    </button>
+                      {modalTab === 'privileges' && (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setModalTab('profile')}
+                            className="btn-secondary"
+                            style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                          >
+                            <span>&larr; Profile</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setModalTab('screens')}
+                            className="btn-secondary"
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                          >
+                            <span>Next: Screen Access &rarr;</span>
+                          </button>
+                        </div>
+                      )}
+                      {modalTab === 'screens' && (
+                        <button
+                          type="button"
+                          onClick={() => setModalTab('privileges')}
+                          className="btn-secondary"
+                          style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                        >
+                          <span>&larr; Operational Privileges</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Right side: Cancel & Save Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="btn-secondary"
+                        style={{ padding: '0.55rem 1.2rem', fontSize: '0.85rem', fontWeight: 700, borderRadius: '7px' }}
+                      >
+                        <X size={15} />
+                        <span>Cancel</span>
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn-primary"
+                        style={{
+                          padding: '0.55rem 1.5rem',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          borderRadius: '7px',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer'
+                        }}
+                        disabled={submitLoading}
+                      >
+                        {submitLoading ? (
+                          <RotateCw size={15} className="spin-loader" />
+                        ) : (
+                          <Save size={15} />
+                        )}
+                        <span>{editingUser ? 'Save Changes' : 'Create User Account'}</span>
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
