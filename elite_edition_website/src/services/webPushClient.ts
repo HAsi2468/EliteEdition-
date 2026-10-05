@@ -61,18 +61,50 @@ export class WebPushClientManager {
   }
 
   /**
+   * Detects if the current device is running iOS (iPhone/iPad)
+   */
+  public isIOS(): boolean {
+    if (typeof window === 'undefined') return false;
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+  }
+
+  /**
+   * Detects if the web app is running in Standalone PWA mode.
+   * On iOS, navigator.standalone is true when opened from the Home Screen icon.
+   * On Android / Desktop Chrome, display-mode: standalone matches.
+   */
+  public isStandalone(): boolean {
+    if (typeof window === 'undefined') return false;
+    const isStandaloneNav = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    const isDisplayStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    return isStandaloneNav || isDisplayStandalone;
+  }
+
+  /**
    * Subscribes the workstation browser to system push notifications
    */
-  public async subscribeToPush(userId?: string): Promise<{ success: boolean; subscription?: PushSubscription; error?: string }> {
+  public async subscribeToPush(userId?: string): Promise<{ success: boolean; subscription?: PushSubscription; error?: string; message?: string }> {
+    // 1. Strict iOS standalone check
+    if (this.isIOS() && !this.isStandalone()) {
+      return {
+        success: false,
+        error: 'IOS_NOT_STANDALONE',
+        message: 'On iPhone/iPad, Apple requires installing to the Home Screen first.\n\n1. Tap the Share button (⬆️) in Safari.\n2. Tap "Add to Home Screen".\n3. Open the installed Elite Edition app from your Home Screen to enable notifications.',
+      };
+    }
+
     if (!this.isPushSupported()) {
-      return { success: false, error: 'Web Push is not supported on this browser or platform.' };
+      return { success: false, error: 'UNSUPPORTED', message: 'Web Push is not supported on this browser or platform.' };
     }
 
     try {
-      // 1. Request OS / Browser notification permission
+      // 2. Request OS / Browser notification permission
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        return { success: false, error: 'Notification permission was dismissed or blocked by the user.' };
+        return { success: false, error: 'PERMISSION_DENIED', message: 'Notification permission was dismissed or blocked by the user.' };
       }
 
       // 2. Await active service worker registration

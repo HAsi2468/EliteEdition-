@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info, X, Bell, Trash2, CheckCheck, BellRing, ExternalLink } from 'lucide-react';
+import { webPushClient } from '../services/webPushClient';
 
 export const triggerGlobalDataRefresh = (detail = 'all') => {
   const payload = typeof detail === 'string'
@@ -130,35 +131,34 @@ export const triggerPushNotification = (title, message, type = 'info', actionTab
 };
 
 export const requestNotificationPermission = async () => {
+  // 1. Strict iOS Standalone Guard: Apple Safari only supports Push API inside standalone Home Screen PWAs
+  if (webPushClient.isIOS() && !webPushClient.isStandalone()) {
+    alert('On iPhone and iPad, notifications require adding Elite Edition to your Home Screen first.\n\n1. Tap the Share button (⬆️) at the bottom of Safari.\n2. Tap "Add to Home Screen".\n3. Open the installed Elite Edition icon on your Home Screen to enable notifications.');
+    return 'ios_not_standalone';
+  }
+
   if (!('Notification' in window)) {
-    alert('This browser does not support desktop notifications.');
+    alert('This browser does not support desktop/mobile push notifications.');
     return 'unsupported';
   }
-  if (Notification.permission === 'granted') {
-    window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: 'granted' }));
-    triggerPushNotification('Push Notifications Active 🔔', 'Real-time alerts active for Chat, Tasks, Job Cards, and Sales.', 'info');
-    return 'granted';
-  }
+
   try {
-    let perm = Notification.permission;
-    if (typeof Notification.requestPermission === 'function') {
-      const result = Notification.requestPermission();
-      if (result && typeof result.then === 'function') {
-        perm = await result;
-      } else {
-        perm = await new Promise((resolve) => Notification.requestPermission(resolve));
-      }
-    }
-    const finalPerm = perm || Notification.permission;
-    window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: finalPerm }));
-    if (finalPerm === 'granted' || Notification.permission === 'granted') {
-      triggerPushNotification('Notifications Enabled! 🎉', 'You will now receive real-time popups for Chat, Tasks, and Operations.', 'success');
+    const res = await webPushClient.subscribeToPush();
+    if (res.success) {
+      window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: 'granted' }));
+      triggerPushNotification('Push Notifications Enabled! 🎉', 'You will now receive real-time alerts for Chat, Tasks, and Operations even when closed.', 'success');
       return 'granted';
-    } else if (finalPerm === 'denied' || Notification.permission === 'denied') {
-      alert('Notification permission is currently BLOCKED in your browser.\n\nTo enable notifications:\n1. Click the Lock/Settings icon 🔒 next to the website URL at the top left of your browser bar.\n2. Change "Notifications" from Block to Allow.\n3. Refresh the page.');
-      return 'denied';
+    } else {
+      if (res.error === 'IOS_NOT_STANDALONE') {
+        alert(res.message);
+        return 'ios_not_standalone';
+      }
+      if (Notification.permission === 'denied') {
+        alert('Notification permission is currently BLOCKED in your phone/browser settings.\n\nTo enable notifications:\n1. Open phone Settings > Apps > Elite Edition (or Chrome/Safari)\n2. Tap Notifications > Allow\n3. Return to the app and refresh.');
+        return 'denied';
+      }
+      return Notification.permission;
     }
-    return finalPerm || Notification.permission;
   } catch (e) {
     console.error('Failed to request notification permission:', e);
     const curr = Notification.permission;
