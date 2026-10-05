@@ -564,26 +564,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     setPartyFilter([]);
   };
 
-  // Comprehensive party options combining PrintConfig, existing tasks, and any selected values
-  const allAvailableParties = useMemo(() => {
-    const set = new Set();
-    (printConfig.parties || []).forEach(p => {
-      const val = typeof p === 'string' ? p : p?.name;
-      if (val && val.trim()) set.add(val.trim());
-    });
-    (tasks || []).forEach(t => {
-      (t.parties || []).forEach(p => p && set.add(String(p).trim()));
-      if (t.party && typeof t.party === 'string') {
-        t.party.split(',').forEach(p => p && set.add(String(p).trim()));
-      }
-      if (t.designerName) set.add(String(t.designerName).trim());
-      if (t.colourMatching) set.add(String(t.colourMatching).trim());
-    });
-    (catalogUploadForm?.parties || []).forEach(p => p && set.add(String(p).trim()));
-    (taskFormData?.parties || []).forEach(p => p && set.add(String(p).trim()));
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [printConfig.parties, tasks, catalogUploadForm?.parties, taskFormData?.parties]);
-
   // Create / Edit Design Task Modal State
   const initialTaskForm = {
     date: new Date().toISOString().split('T')[0],
@@ -625,6 +605,26 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     notes: '',
   });
   const [uploadingToCatalog, setUploadingToCatalog] = useState(false);
+
+  // Comprehensive party options combining PrintConfig, existing tasks, and any selected values
+  const allAvailableParties = useMemo(() => {
+    const set = new Set();
+    (printConfig.parties || []).forEach(p => {
+      const val = typeof p === 'string' ? p : p?.name;
+      if (val && val.trim()) set.add(val.trim());
+    });
+    (tasks || []).forEach(t => {
+      (t.parties || []).forEach(p => p && set.add(String(p).trim()));
+      if (t.party && typeof t.party === 'string') {
+        t.party.split(',').forEach(p => p && set.add(String(p).trim()));
+      }
+      if (t.designerName) set.add(String(t.designerName).trim());
+      if (t.colourMatching) set.add(String(t.colourMatching).trim());
+    });
+    (catalogUploadForm?.parties || []).forEach(p => p && set.add(String(p).trim()));
+    (taskFormData?.parties || []).forEach(p => p && set.add(String(p).trim()));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [printConfig.parties, tasks, catalogUploadForm?.parties, taskFormData?.parties]);
 
   // Real-time unique design name check for tasks
   const isDuplicateTaskName = useMemo(() => {
