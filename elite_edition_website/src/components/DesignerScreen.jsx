@@ -564,6 +564,26 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     setPartyFilter([]);
   };
 
+  // Comprehensive party options combining PrintConfig, existing tasks, and any selected values
+  const allAvailableParties = useMemo(() => {
+    const set = new Set();
+    (printConfig.parties || []).forEach(p => {
+      const val = typeof p === 'string' ? p : p?.name;
+      if (val && val.trim()) set.add(val.trim());
+    });
+    (tasks || []).forEach(t => {
+      (t.parties || []).forEach(p => p && set.add(String(p).trim()));
+      if (t.party && typeof t.party === 'string') {
+        t.party.split(',').forEach(p => p && set.add(String(p).trim()));
+      }
+      if (t.designerName) set.add(String(t.designerName).trim());
+      if (t.colourMatching) set.add(String(t.colourMatching).trim());
+    });
+    (catalogUploadForm?.parties || []).forEach(p => p && set.add(String(p).trim()));
+    (taskFormData?.parties || []).forEach(p => p && set.add(String(p).trim()));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [printConfig.parties, tasks, catalogUploadForm?.parties, taskFormData?.parties]);
+
   // Create / Edit Design Task Modal State
   const initialTaskForm = {
     date: new Date().toISOString().split('T')[0],
@@ -593,6 +613,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [catalogUploadModalTask, setCatalogUploadModalTask] = useState(null);
   const [catalogUploadForm, setCatalogUploadForm] = useState({
     designName: '',
+    recommendedDesignName: '',
+    sampleDesignName: '',
     category: '',
     fabricName: '',
     colourMatching: '',
@@ -1066,8 +1088,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     let recommendedName = '';
     try {
       const nextNumRes = await api.getNextDesignNumber({ department: 'digital_print' });
-      if (nextNumRes && (nextNumRes.nextNumber || nextNumRes.nextDesignNumber)) {
-        recommendedName = nextNumRes.nextNumber || nextNumRes.nextDesignNumber;
+      if (nextNumRes && (nextNumRes.nextDesignNo || nextNumRes.nextNumber || nextNumRes.nextDesignNumber)) {
+        recommendedName = nextNumRes.nextDesignNo || nextNumRes.nextNumber || nextNumRes.nextDesignNumber;
       }
     } catch (e) {
       console.warn('Could not fetch next design number:', e);
@@ -1081,17 +1103,37 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       ? task.colourMatches.join(', ')
       : (task.colourMatching || '');
 
-    const taskParties = Array.isArray(task.parties) && task.parties.length > 0
-      ? task.parties
-      : (task.party ? [task.party] : []);
+    // Extract parties from task: check parties array, party string, or fallback to assigned team/parties
+    let taskParties = [];
+    if (Array.isArray(task.parties) && task.parties.length > 0) {
+      taskParties = task.parties.map(p => String(p).trim()).filter(Boolean);
+    } else if (task.party) {
+      taskParties = typeof task.party === 'string'
+        ? task.party.split(',').map(p => p.trim()).filter(Boolean)
+        : [String(task.party).trim()];
+    }
+    
+    // If still empty, check if task had designers/colourMatches that were displayed as party badges on the card
+    if (taskParties.length === 0) {
+      const candidates = [
+        ...(Array.isArray(task.designers) ? task.designers : []),
+        ...(Array.isArray(task.colourMatches) ? task.colourMatches : []),
+        task.designerName,
+        task.colourMatching
+      ].filter(Boolean).map(c => String(c).trim());
+      taskParties = Array.from(new Set(candidates));
+    }
 
     setCatalogUploadForm({
       designName: recommendedName || task.designName || '',
+      recommendedDesignName: recommendedName || '',
+      sampleDesignName: task.designName || '',
       category: task.category || (task.fabrics && task.fabrics[0] ? task.fabrics[0] : 'ALLOWER'),
       fabricName: taskFabrics,
       colourMatching: taskColourMatches,
       colors: task.colors || task.priority || 'Medium',
       parties: taskParties,
+      party: taskParties[0] || '',
       imageUrl: bestImage,
       imageUrl2: secondImage,
       notes: task.notes ? `From sample ${task.designName}: ${task.notes}` : `Created from sample ${task.designName}`,
@@ -1109,13 +1151,18 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
     setUploadingToCatalog(true);
     try {
+      const partiesList = Array.isArray(catalogUploadForm.parties)
+        ? catalogUploadForm.parties.map(p => String(p).trim()).filter(Boolean)
+        : (catalogUploadForm.parties ? [String(catalogUploadForm.parties).trim()] : []);
+
       const payload = {
         designName: catalogUploadForm.designName.trim(),
         category: catalogUploadForm.category || 'ALLOWER',
         fabricName: catalogUploadForm.fabricName || '',
         colourMatching: catalogUploadForm.colourMatching || '',
         colors: catalogUploadForm.colors || '',
-        parties: Array.isArray(catalogUploadForm.parties) ? catalogUploadForm.parties.filter(Boolean) : (catalogUploadForm.parties ? [catalogUploadForm.parties] : []),
+        parties: partiesList,
+        party: partiesList[0] || '',
         imageUrl: catalogUploadForm.imageUrl || '',
         imageUrl2: catalogUploadForm.imageUrl2 || '',
         notes: catalogUploadForm.notes || '',
@@ -1133,8 +1180,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         finalDesignStatus: 'Approved',
       });
 
-      triggerPushNotification('🎉 Published to Design Catalog', `Design "${payload.designName}" is now active in Design Catalog!`, 'success');
+      triggerPushNotification('Published to Design Catalog', `Design "${payload.designName}" is now active in Design Catalog!`, 'success');
       triggerGlobalDataRefresh('catalog');
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'catalog', designName: payload.designName } }));
       setCatalogUploadModalTask(null);
       loadData(true);
     } catch (err) {
@@ -2803,9 +2851,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
                         {/* Assigned Parties / Team */}
                         {(() => {
-                          const effectiveParties = (Array.isArray(task.parties) && task.parties.length > 0)
+                          const rawList = (Array.isArray(task.parties) && task.parties.length > 0)
                             ? task.parties
-                            : (task.party ? [task.party] : [...(allDesigners.length > 0 ? allDesigners : []), ...(allColourMatches.length > 0 ? allColourMatches : [])]);
+                            : (task.party
+                                ? (typeof task.party === 'string' ? task.party.split(',').map(p => p.trim()).filter(Boolean) : [task.party])
+                                : [...(allDesigners.length > 0 ? allDesigners : []), ...(allColourMatches.length > 0 ? allColourMatches : [])]);
+                          const effectiveParties = Array.from(new Set(rawList.map(p => String(p).trim()))).filter(Boolean);
                           return (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
                               {effectiveParties.slice(0, 2).map((pName, pIdx) => (
@@ -2813,12 +2864,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                   key={pIdx}
                                   style={{
                                     fontSize: '0.68rem',
-                                    color: '#10b981',
+                                    color: '#1d4ed8',
                                     fontWeight: 700,
-                                    background: 'rgba(16, 185, 129, 0.12)',
+                                    background: '#eff6ff',
                                     padding: '2px 7px',
                                     borderRadius: '4px',
-                                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                                    border: '1px solid #bfdbfe',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '3px'
@@ -2832,12 +2883,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                 <span
                                   style={{
                                     fontSize: '0.68rem',
-                                    color: '#10b981',
+                                    color: '#1d4ed8',
                                     fontWeight: 700,
-                                    background: 'rgba(16, 185, 129, 0.12)',
+                                    background: '#eff6ff',
                                     padding: '2px 7px',
                                     borderRadius: '4px',
-                                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                                    border: '1px solid #bfdbfe',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '3px'
@@ -2924,7 +2975,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                               padding: '0.4rem 0.6rem',
                               fontSize: '0.75rem',
                               borderRadius: 'var(--radius-sm)',
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                               border: 'none',
                               color: '#ffffff',
                               fontWeight: 800,
@@ -2932,7 +2983,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
+                              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
                               whiteSpace: 'nowrap',
                               transition: 'all 0.15s ease'
                             }}
@@ -2945,8 +2996,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                           onClick={() => handleDeleteTask(task)}
                           style={{
                             padding: '0.4rem 0.6rem', fontSize: '0.78rem', borderRadius: 'var(--radius-sm)',
-                            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-                            color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem',
+                            background: '#f8fafc', border: '1px solid #cbd5e1',
+                            color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem',
                             fontFamily: 'var(--font-sans)', transition: 'all 0.15s'
                           }}
                           title="Delete Design"
@@ -3907,7 +3958,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                   title="Approve & Upload to Design Catalog"
                                   style={{
                                     padding: '0.32rem 0.55rem',
-                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
                                     border: 'none',
                                     borderRadius: '6px',
                                     color: '#ffffff',
@@ -3918,7 +3969,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                     alignItems: 'center',
                                     gap: '3px',
                                     whiteSpace: 'nowrap',
-                                    boxShadow: '0 2px 5px rgba(16, 185, 129, 0.25)'
+                                    boxShadow: '0 2px 5px rgba(37, 99, 235, 0.25)'
                                   }}
                                 >
                                   <UploadCloud size={12} /> To Catalog
@@ -5785,10 +5836,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               <MultiSelectBox
                 label="Party / Client"
                 icon={Building2}
-                options={printConfig.parties || []}
+                options={allAvailableParties}
                 selected={taskFormData.parties || []}
                 onChange={(selected) => setTaskFormData((prev) => ({ ...prev, parties: selected, party: selected[0] || '' }))}
-                tagTheme={{ bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' }}
+                tagTheme={{ bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }}
               />
 
               {/* Multi-Select: Designers */}
@@ -6022,7 +6073,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 alignItems: 'center',
                 padding: '1.25rem 1.5rem',
                 borderBottom: '1px solid #e2e8f0',
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)',
                 borderTopLeftRadius: '16px',
                 borderTopRightRadius: '16px',
               }}
@@ -6033,12 +6084,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     width: '38px',
                     height: '38px',
                     borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#ffffff',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
                   }}
                 >
                   <UploadCloud size={20} />
@@ -6081,7 +6132,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.25rem' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#059669', background: '#ecfdf5', padding: '2px 7px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1d4ed8', background: '#eff6ff', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
                       SOURCE: {catalogUploadModalTask.designName}
                     </span>
                     <span style={{ fontSize: '0.7rem', color: '#64748b' }}>➔ Design Catalog</span>
@@ -6107,6 +6158,45 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       outline: 'none',
                     }}
                   />
+                  {/* Quick select pills */}
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                    {catalogUploadForm.recommendedDesignName && (
+                      <button
+                        type="button"
+                        onClick={() => setCatalogUploadForm(prev => ({ ...prev, designName: prev.recommendedDesignName }))}
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          border: catalogUploadForm.designName === catalogUploadForm.recommendedDesignName ? '1.5px solid #2563eb' : '1px solid #bfdbfe',
+                          background: catalogUploadForm.designName === catalogUploadForm.recommendedDesignName ? '#eff6ff' : '#ffffff',
+                          color: '#1d4ed8',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ⚡ Use Next ED No: <b>{catalogUploadForm.recommendedDesignName}</b>
+                      </button>
+                    )}
+                    {catalogUploadForm.sampleDesignName && (
+                      <button
+                        type="button"
+                        onClick={() => setCatalogUploadForm(prev => ({ ...prev, designName: prev.sampleDesignName }))}
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          border: catalogUploadForm.designName === catalogUploadForm.sampleDesignName ? '1.5px solid #2563eb' : '1px solid #bfdbfe',
+                          background: catalogUploadForm.designName === catalogUploadForm.sampleDesignName ? '#eff6ff' : '#ffffff',
+                          color: '#1d4ed8',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🔖 Keep Sample Name: <b>{catalogUploadForm.sampleDesignName}</b>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -6226,10 +6316,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               <MultiSelectBox
                 label="Assigned Parties (Clients)"
                 icon={Building2}
-                options={printConfig.parties || []}
+                options={allAvailableParties}
                 selected={catalogUploadForm.parties || []}
-                onChange={(selected) => setCatalogUploadForm(prev => ({ ...prev, parties: selected }))}
-                tagTheme={{ bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' }}
+                onChange={(selected) => setCatalogUploadForm(prev => ({ ...prev, parties: selected, party: selected[0] || '' }))}
+                tagTheme={{ bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }}
               />
 
               {/* Image URL preview / edit */}
@@ -6298,14 +6388,14 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   disabled={uploadingToCatalog}
                   style={{
                     padding: '0.55rem 1.35rem',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.82rem',
                     fontWeight: 800,
                     color: '#ffffff',
                     cursor: uploadingToCatalog ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px'

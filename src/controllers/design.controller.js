@@ -59,7 +59,8 @@ const getAll = async (req, res) => {
       if (!filter.category) {
         filter.category = { $ne: 'Stitching' };
       }
-      filter.designName = { $regex: '^ED-', $options: 'i' };
+      // Allow all digital print designs (including sample designs like SM-18), only exclude stitching PKD- prefixes
+      filter.designName = { $not: /^PKD-/i };
     }
 
     if (deptOr) {
@@ -130,6 +131,14 @@ const create = async (req, res) => {
       body.parties = Array.isArray(body.parties)
         ? body.parties.map(p => String(p).trim()).filter(Boolean)
         : (typeof body.parties === 'string' && body.parties.trim() ? [body.parties.trim()] : []);
+      if (!body.party && body.parties.length > 0) {
+        body.party = body.parties[0];
+      }
+    } else if (body.party && !body.parties) {
+      body.parties = typeof body.party === 'string' ? body.party.split(',').map(p => p.trim()).filter(Boolean) : [body.party];
+    }
+    if (body.party && (!body.parties || body.parties.length === 0)) {
+      body.parties = [body.party.trim()];
     }
     const doc = await db.Design.create(body);
     const result = doc.toObject ? doc.toObject() : doc;
@@ -196,7 +205,12 @@ const getNextDesignNumber = async (req, res) => {
       }
     });
 
-    res.json({ nextDesignNo: `${prefix}-${maxNo + 1}` });
+    const nextNo = `${prefix}-${maxNo + 1}`;
+    res.json({
+      nextDesignNo: nextNo,
+      nextNumber: nextNo,
+      nextDesignNumber: nextNo
+    });
   } catch (err) {
     logger.error('design.getNextDesignNumber error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });

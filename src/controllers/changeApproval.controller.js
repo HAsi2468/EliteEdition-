@@ -386,17 +386,22 @@ const getUserDataEntries = async (req, res) => {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 40));
 
-    // Construct Date Filter
-    const dateFilter = {};
+    // Construct Date Range Objects & Strings
+    let dateStartObj = null;
+    let dateEndObj = null;
+    let startDateStr = '';
+    let endDateStr = '';
+
     if (startDate) {
-      dateFilter.$gte = new Date(startDate);
+      dateStartObj = new Date(startDate);
+      startDateStr = startDate.split('T')[0];
     }
     if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      dateFilter.$lte = end;
+      dateEndObj = new Date(endDate);
+      dateEndObj.setHours(23, 59, 59, 999);
+      endDateStr = endDate.split('T')[0];
     }
-    const hasDateFilter = Object.keys(dateFilter).length > 0;
+    const hasDate = Boolean(dateStartObj || dateEndObj);
 
     // Construct User Filter
     const userRegex = (user && user !== 'ALL' && user !== 'All')
@@ -411,190 +416,400 @@ const getUserDataEntries = async (req, res) => {
     const shouldFetch = (modName) => moduleFilter === 'ALL' || moduleFilter === 'All' || moduleFilter === modName;
 
     const promises = [];
+    const maxFetch = limitNum * pageNum + 80;
 
-    // 1. Job Cards
+    // 1. Job Cards (Digital Printing)
     if (shouldFetch('JobCard') && models.JobCard) {
       const q = {};
-      if (hasDateFilter) q.createdAt = dateFilter;
-      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
-      if (searchRegex) {
-        const searchOr = [{ jobNo: searchRegex }, { party: searchRegex }, { fabric: searchRegex }];
-        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+
+        const strCond = {};
+        if (startDateStr) strCond.$gte = startDateStr;
+        if (endDateStr) strCond.$lte = endDateStr;
+
+        q.$or = [
+          { created_date_time: dateCond },
+          { date: strCond },
+          { createdAt: dateCond },
+        ];
+      }
+      if (userRegex) {
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { fusingOperator: userRegex },
+          { printOperator: userRegex },
+          { designer: userRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
+      if (searchRegex) {
+        const searchOr = [
+          { jobNo: searchRegex },
+          { party: searchRegex },
+          { partyName: searchRegex },
+          { clientName: searchRegex },
+          { fabric: searchRegex },
+          { fabricName: searchRegex },
+          { designNo: searchRegex },
+          { designName: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
       promises.push(
         models.JobCard.find(q)
-          .sort({ createdAt: -1 })
-          .limit(limitNum * pageNum)
+          .sort({ created_date_time: -1, _id: -1 })
+          .limit(maxFetch)
           .lean()
-          .then(docs => docs.map(doc => ({
-            id: doc._id,
-            module: 'JobCard',
-            moduleLabel: 'Job Card',
-            identifier: doc.jobNo || `#${String(doc._id).slice(-6)}`,
-            party: doc.party || 'Internal',
-            details: `${doc.totalMtr || 0} Mtr • Fabric: ${doc.fabric || 'General'} • Design: ${doc.designNo || 'N/A'}`,
-            amountOrQuantity: `${doc.totalMtr || 0} Mtr`,
-            status: doc.status || doc.stage || 'Production',
-            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
-            createdAt: doc.createdAt || doc.date || new Date(),
-            rawDoc: doc
-          })))
+          .then(docs => docs.map(doc => {
+            const rawParty = doc.partyName || doc.party || doc.clientName || 'Internal';
+            const rawFabric = doc.fabric || doc.fabricName || doc.fabricType || 'Fabric';
+            const rawMtr = doc.totalMtr || doc.freshMtr || doc.fusingMtr || 0;
+            const parsedDate = doc.created_date_time || (doc.date ? new Date(doc.date) : (doc.createdAt || new Date()));
+            return {
+              id: doc._id,
+              module: 'JobCard',
+              moduleLabel: 'Job Card',
+              identifier: doc.jobNo || `#${String(doc._id).slice(-6)}`,
+              party: rawParty,
+              details: `${rawMtr} Mtr • ${rawFabric} • Design: ${doc.designNo || doc.designName || 'N/A'}${doc.fusingMtr ? ` • Fused: ${doc.fusingMtr}m` : ''}${doc.printMtr ? ` • Print: ${doc.printMtr}m` : ''}`,
+              amountOrQuantity: `${rawMtr} Mtr`,
+              status: doc.fusingStatus || doc.printStatus || doc.status || doc.productionStage || 'Production',
+              createdBy: doc.createdByName || doc.createdBy || doc.updatedByName || doc.fusingOperator || doc.printOperator || 'Staff User',
+              createdAt: parsedDate,
+              rawDoc: doc,
+            };
+          }))
       );
     }
 
-    // 2. Billing Invoices
+    // 2. Garment Job Cards
+    if (shouldFetch('GarmentJobCard') && models.GarmentJobCard) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ created_date_time: dateCond }, { createdAt: dateCond }, { targetDate: dateCond }];
+      }
+      if (userRegex) {
+        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }, { designer: userRegex }];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
+        delete q.$or;
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { jobNo: searchRegex },
+          { clientName: searchRegex },
+          { partyName: searchRegex },
+          { styleNo: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.GarmentJobCard.find(q)
+          .sort({ created_date_time: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const pcs = doc.totalPieces || doc.pieces || 0;
+            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            return {
+              id: doc._id,
+              module: 'GarmentJobCard',
+              moduleLabel: 'Garment Job Card',
+              identifier: doc.jobNo ? `Garment #${doc.jobNo}` : 'Garment Job',
+              party: doc.clientName || doc.partyName || 'Client',
+              details: `${pcs} Pcs • Style: ${doc.styleNo || 'N/A'} • Status: ${doc.status || 'Active'}`,
+              amountOrQuantity: `${pcs} Pcs`,
+              status: doc.status || 'Active',
+              createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+              createdAt: parsedDate,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 3. Billing Invoices
     if (shouldFetch('BillingInvoice') && models.BillingInvoice) {
       const q = {};
-      if (hasDateFilter) q.createdAt = dateFilter;
-      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
-      if (searchRegex) {
-        const searchOr = [{ invoiceNo: searchRegex }, { customerName: searchRegex }, { partyName: searchRegex }];
-        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [
+          { invoiceDate: dateCond },
+          { created_at: dateCond },
+          { createdAt: dateCond },
+        ];
+      }
+      if (userRegex) {
+        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
+      if (searchRegex) {
+        const searchOr = [
+          { invoiceNo: searchRegex },
+          { 'customer.name': searchRegex },
+          { 'customer.businessName': searchRegex },
+          { customerName: searchRegex },
+          { partyName: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
       promises.push(
         models.BillingInvoice.find(q)
-          .sort({ createdAt: -1 })
-          .limit(limitNum * pageNum)
+          .sort({ invoiceDate: -1, created_at: -1, _id: -1 })
+          .limit(maxFetch)
           .lean()
-          .then(docs => docs.map(doc => ({
-            id: doc._id,
-            module: 'BillingInvoice',
-            moduleLabel: 'Tax Invoice',
-            identifier: doc.invoiceNo || `#${String(doc._id).slice(-6)}`,
-            party: doc.customerName || doc.partyName || 'Customer',
-            details: `Grand Total: ₹${Number(doc.grandTotal || 0).toLocaleString('en-IN')} • Due: ₹${Number(doc.balanceDue || 0).toLocaleString('en-IN')}`,
-            amountOrQuantity: `₹${Number(doc.grandTotal || 0).toLocaleString('en-IN')}`,
-            status: doc.paymentStatus || 'UNPAID',
-            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
-            createdAt: doc.createdAt || doc.invoiceDate || new Date(),
-            rawDoc: doc
-          })))
+          .then(docs => docs.map(doc => {
+            const rawParty = doc.customer?.name || doc.customer?.businessName || doc.customerName || doc.partyName || 'Customer';
+            const total = Number(doc.grandTotal || doc.totalAmount || 0);
+            const paid = Number(doc.paidAmount || 0);
+            const due = Number(doc.balanceDue || (total - paid));
+            const parsedDate = doc.invoiceDate || doc.created_at || doc.createdAt || new Date();
+            return {
+              id: doc._id,
+              module: 'BillingInvoice',
+              moduleLabel: 'Tax Invoice',
+              identifier: doc.invoiceNo || (doc.invoicePrefix ? `${doc.invoicePrefix}${doc.invoiceSeq}` : 'Invoice'),
+              party: rawParty,
+              details: `Total: ₹${total.toLocaleString('en-IN')} • Paid: ₹${paid.toLocaleString('en-IN')} • Due: ₹${due.toLocaleString('en-IN')} • ${doc.items?.length || 0} Items`,
+              amountOrQuantity: `₹${total.toLocaleString('en-IN')}`,
+              status: `${doc.paymentStatus || 'UNPAID'} (${doc.invoiceStatus || 'FINAL'})`,
+              createdBy: doc.createdByName || doc.createdBy || 'Billing Team',
+              createdAt: parsedDate,
+              rawDoc: doc,
+            };
+          }))
       );
     }
 
-    // 3. Expenses
+    // 4. Expenses
     if (shouldFetch('Expense') && models.Expense) {
       const q = {};
-      if (hasDateFilter) q.createdAt = dateFilter;
-      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
-      if (searchRegex) {
-        const searchOr = [{ voucherNo: searchRegex }, { partyName: searchRegex }, { vendorName: searchRegex }, { title: searchRegex }];
-        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+      if (hasDate) {
+        const strCond = {};
+        if (startDateStr) strCond.$gte = startDateStr;
+        if (endDateStr) strCond.$lte = endDateStr;
+
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+
+        q.$or = [
+          { date: strCond },
+          { createdAt: dateCond },
+        ];
+      }
+      if (userRegex) {
+        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
+      if (searchRegex) {
+        const searchOr = [
+          { voucherNo: searchRegex },
+          { category: searchRegex },
+          { title: searchRegex },
+          { partyName: searchRegex },
+          { vendorName: searchRegex },
+          { paidToOrReceivedFrom: searchRegex },
+          { description: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
       promises.push(
         models.Expense.find(q)
-          .sort({ createdAt: -1 })
-          .limit(limitNum * pageNum)
+          .sort({ date: -1, createdAt: -1, _id: -1 })
+          .limit(maxFetch)
           .lean()
-          .then(docs => docs.map(doc => ({
-            id: doc._id,
-            module: 'Expense',
-            moduleLabel: `Expense (${doc.type || 'OUT'})`,
-            identifier: doc.voucherNo || doc.title || `#${String(doc._id).slice(-6)}`,
-            party: doc.partyName || doc.vendorName || doc.title || 'General Expense',
-            details: `${doc.category || 'General'} • Payment Mode: ${doc.paymentMode || 'Cash'}`,
-            amountOrQuantity: `₹${Number(doc.amount || 0).toLocaleString('en-IN')}`,
-            status: doc.type === 'IN' ? 'Cash IN' : 'Cash OUT',
-            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
-            createdAt: doc.createdAt || doc.date || new Date(),
-            rawDoc: doc
-          })))
+          .then(docs => docs.map(doc => {
+            const rawParty = doc.paidToOrReceivedFrom || doc.partyName || doc.vendorName || doc.title || 'General';
+            const amt = Number(doc.amount || 0);
+            const parsedDate = doc.date ? new Date(doc.date) : (doc.createdAt || new Date());
+            return {
+              id: doc._id,
+              module: 'Expense',
+              moduleLabel: `Expense (${doc.type || 'OUT'})`,
+              identifier: doc.voucherNo || doc.title || 'Expense',
+              party: rawParty,
+              details: `${doc.category || 'General'} • Mode: ${doc.paymentMode || 'Cash'} ${doc.description ? `• ${doc.description}` : ''}`,
+              amountOrQuantity: `₹${amt.toLocaleString('en-IN')}`,
+              status: doc.type === 'IN' ? 'Cash IN' : 'Cash OUT',
+              createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+              createdAt: parsedDate,
+              rawDoc: doc,
+            };
+          }))
       );
     }
 
-    // 4. Fabric Challans
+    // 5. Fabric Challans
     if (shouldFetch('FabricChallan') && models.FabricChallan) {
       const q = {};
-      if (hasDateFilter) q.createdAt = dateFilter;
-      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
-      if (searchRegex) {
-        const searchOr = [{ challanNo: searchRegex }, { partyName: searchRegex }, { fabricType: searchRegex }];
-        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ date: dateCond }, { createdAt: dateCond }];
+      }
+      if (userRegex) {
+        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }, { deliveryBy: userRegex }];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
+      if (searchRegex) {
+        const numVal = Number(search.trim());
+        const searchOr = [
+          { partyName: searchRegex },
+          { fabricName: searchRegex },
+          { lotNo: searchRegex },
+          { vendorChallanNo: searchRegex },
+        ];
+        if (!isNaN(numVal) && numVal > 0) {
+          searchOr.push({ challanNo: numVal });
+        }
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
       promises.push(
         models.FabricChallan.find(q)
-          .sort({ createdAt: -1 })
-          .limit(limitNum * pageNum)
+          .sort({ date: -1, createdAt: -1, _id: -1 })
+          .limit(maxFetch)
           .lean()
-          .then(docs => docs.map(doc => ({
-            id: doc._id,
-            module: 'FabricChallan',
-            moduleLabel: 'Fabric Challan',
-            identifier: doc.challanNo ? `Challan #${doc.challanNo}` : `#${String(doc._id).slice(-6)}`,
-            party: doc.partyName || 'Party',
-            details: `${doc.totalMeters || 0} Mtr (${doc.totalRolls || 0} Rolls) • ${doc.fabricType || 'Fabric'}`,
-            amountOrQuantity: `${doc.totalMeters || 0} Mtr`,
-            status: doc.status || 'Active',
-            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
-            createdAt: doc.createdAt || doc.date || new Date(),
-            rawDoc: doc
-          })))
+          .then(docs => docs.map(doc => {
+            const mtr = doc.totalMtr || doc.totalMeters || doc.freshMtr || 0;
+            const rolls = doc.totalRolls || (doc.tpDetails?.length || 0);
+            const parsedDate = doc.date || doc.createdAt || new Date();
+            return {
+              id: doc._id,
+              module: 'FabricChallan',
+              moduleLabel: 'Fabric Challan',
+              identifier: doc.challanNo ? `Challan #${doc.challanNo}` : 'Fabric Challan',
+              party: doc.partyName || 'Party',
+              details: `${mtr} Mtr (${rolls} Rolls) • ${doc.fabricName || 'Fabric'} • Lot: ${doc.lotNo || 'N/A'}`,
+              amountOrQuantity: `${mtr} Mtr`,
+              status: doc.status || 'Active',
+              createdBy: doc.createdByName || doc.createdBy || doc.deliveryBy || 'Staff User',
+              createdAt: parsedDate,
+              rawDoc: doc,
+            };
+          }))
       );
     }
 
-    // 5. Stitching Challans
+    // 6. Stitching Challans
     if (shouldFetch('StitchingChallan') && models.StitchingChallan) {
       const q = {};
-      if (hasDateFilter) q.createdAt = dateFilter;
-      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
-      if (searchRegex) {
-        const searchOr = [{ challanNo: searchRegex }, { partyName: searchRegex }, { jobNo: searchRegex }];
-        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ created_date_time: dateCond }, { date: dateCond }, { createdAt: dateCond }];
+      }
+      if (userRegex) {
+        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }, { workerName: userRegex }];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
+      if (searchRegex) {
+        const numVal = Number(search.trim());
+        const searchOr = [
+          { partyName: searchRegex },
+          { workerName: searchRegex },
+          { jobNo: searchRegex },
+        ];
+        if (!isNaN(numVal) && numVal > 0) {
+          searchOr.push({ challanNo: numVal });
+        }
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
       promises.push(
         models.StitchingChallan.find(q)
-          .sort({ createdAt: -1 })
-          .limit(limitNum * pageNum)
+          .sort({ created_date_time: -1, date: -1, _id: -1 })
+          .limit(maxFetch)
           .lean()
-          .then(docs => docs.map(doc => ({
-            id: doc._id,
-            module: 'StitchingChallan',
-            moduleLabel: 'Stitching Challan',
-            identifier: doc.challanNo ? `Stitching #${doc.challanNo}` : `#${String(doc._id).slice(-6)}`,
-            party: doc.partyName || doc.workerName || 'Worker',
-            details: `${doc.totalPieces || 0} Pcs • Job: ${doc.jobNo || 'N/A'} • Worker: ${doc.workerName || 'N/A'}`,
-            amountOrQuantity: `${doc.totalPieces || 0} Pcs`,
-            status: doc.status || 'Active',
-            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
-            createdAt: doc.createdAt || doc.date || new Date(),
-            rawDoc: doc
-          })))
+          .then(docs => docs.map(doc => {
+            const pcs = doc.totalPieces || doc.pieces || 0;
+            const parsedDate = doc.created_date_time || doc.date || doc.createdAt || new Date();
+            return {
+              id: doc._id,
+              module: 'StitchingChallan',
+              moduleLabel: 'Stitching Challan',
+              identifier: doc.challanNo ? `Stitching #${doc.challanNo}` : 'Stitching Challan',
+              party: doc.partyName || doc.workerName || 'Worker',
+              details: `${pcs} Pcs • Job #${doc.jobNo || 'N/A'} • Worker: ${doc.workerName || 'N/A'}`,
+              amountOrQuantity: `${pcs} Pcs`,
+              status: doc.status || 'Active',
+              createdBy: doc.createdByName || doc.createdBy || doc.workerName || 'Staff User',
+              createdAt: parsedDate,
+              rawDoc: doc,
+            };
+          }))
       );
     }
 
-    // 6. Inventory Inward/Outward
+    // 7. Inventory Inward/Stock
     if (shouldFetch('Inventory') && models.Inventory) {
       const q = {};
-      if (hasDateFilter) q.createdAt = dateFilter;
-      if (userRegex) q.$or = [{ createdByName: userRegex }, { createdBy: userRegex }];
-      if (searchRegex) {
-        const searchOr = [{ productName: searchRegex }, { vendorName: searchRegex }];
-        q.$and = q.$or ? [{ $or: q.$or }, { $or: searchOr }] : searchOr;
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ created_date_time: dateCond }, { createdAt: dateCond }];
+      }
+      if (userRegex) {
+        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
+      if (searchRegex) {
+        const searchOr = [
+          { productName: searchRegex },
+          { itemName: searchRegex },
+          { vendorName: searchRegex },
+          { supplier: searchRegex },
+          { category: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
       promises.push(
         models.Inventory.find(q)
-          .sort({ createdAt: -1 })
-          .limit(limitNum * pageNum)
+          .sort({ created_date_time: -1, _id: -1 })
+          .limit(maxFetch)
           .lean()
-          .then(docs => docs.map(doc => ({
-            id: doc._id,
-            module: 'Inventory',
-            moduleLabel: 'Inventory Item',
-            identifier: doc.productName || `#${String(doc._id).slice(-6)}`,
-            party: doc.vendorName || doc.supplier || 'Stock',
-            details: `${doc.quantity || 0} ${doc.unit || 'Units'} • Type: ${doc.type || 'Stock'}`,
-            amountOrQuantity: `${doc.quantity || 0} ${doc.unit || 'Units'}`,
-            status: doc.type || 'In Stock',
-            createdBy: doc.createdByName || doc.createdBy || 'Staff User',
-            createdAt: doc.createdAt || doc.date || new Date(),
-            rawDoc: doc
-          })))
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            const qty = doc.quantity || 0;
+            const unit = doc.unit || 'Units';
+            return {
+              id: doc._id,
+              module: 'Inventory',
+              moduleLabel: 'Inventory Item',
+              identifier: doc.productName || doc.itemName || 'Inventory Item',
+              party: doc.vendorName || doc.supplier || 'Stock',
+              details: `${qty} ${unit} • ${doc.category || doc.type || 'Stock'}${doc.sku ? ` • SKU: ${doc.sku}` : ''}`,
+              amountOrQuantity: `${qty} ${unit}`,
+              status: doc.type || doc.category || 'In Stock',
+              createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+              createdAt: parsedDate,
+              rawDoc: doc,
+            };
+          }))
       );
     }
 
@@ -631,27 +846,55 @@ const getEntryUsersList = async (req, res) => {
   try {
     const userSet = new Set();
 
-    // Fetch registered active system users
+    // 1. Registered active system users
     if (models.user) {
       const activeUsers = await models.user.find({}, 'name username role').lean();
       activeUsers.forEach(u => {
-        if (u.name) userSet.add(u.name.trim());
-        if (u.username) userSet.add(u.username.trim());
+        if (u.name && u.name.trim()) userSet.add(u.name.trim());
+        if (u.username && u.username.trim()) userSet.add(u.username.trim());
       });
     }
 
-    // Fetch distinct creators from JobCards and Invoices
+    // 2. JobCards creators, updaters, and department operators
     if (models.JobCard) {
-      const jcUsers = await models.JobCard.distinct('createdByName');
-      jcUsers.forEach(u => u && userSet.add(String(u).trim()));
+      const jcCreators = await models.JobCard.distinct('createdByName');
+      jcCreators.forEach(u => u && userSet.add(String(u).trim()));
+      const jcUpdaters = await models.JobCard.distinct('updatedByName');
+      jcUpdaters.forEach(u => u && userSet.add(String(u).trim()));
+      const jcFusingOps = await models.JobCard.distinct('fusingOperator');
+      jcFusingOps.forEach(u => u && userSet.add(String(u).trim()));
+      const jcPrintOps = await models.JobCard.distinct('printOperator');
+      jcPrintOps.forEach(u => u && userSet.add(String(u).trim()));
+      const jcDesigners = await models.JobCard.distinct('designer');
+      jcDesigners.forEach(u => u && userSet.add(String(u).trim()));
     }
+
+    // 3. Billing Invoices
     if (models.BillingInvoice) {
-      const invUsers = await models.BillingInvoice.distinct('createdByName');
-      invUsers.forEach(u => u && userSet.add(String(u).trim()));
+      const invCreators = await models.BillingInvoice.distinct('createdBy');
+      invCreators.forEach(u => u && userSet.add(String(u).trim()));
+      const invNames = await models.BillingInvoice.distinct('createdByName');
+      invNames.forEach(u => u && userSet.add(String(u).trim()));
     }
+
+    // 4. Expenses
     if (models.Expense) {
-      const expUsers = await models.Expense.distinct('createdByName');
-      expUsers.forEach(u => u && userSet.add(String(u).trim()));
+      const expCreators = await models.Expense.distinct('createdByName');
+      expCreators.forEach(u => u && userSet.add(String(u).trim()));
+    }
+
+    // 5. Fabric Challans
+    if (models.FabricChallan) {
+      const fcCreators = await models.FabricChallan.distinct('createdByName');
+      fcCreators.forEach(u => u && userSet.add(String(u).trim()));
+      const fcDeliv = await models.FabricChallan.distinct('deliveryBy');
+      fcDeliv.forEach(u => u && userSet.add(String(u).trim()));
+    }
+
+    // 6. Stitching Challans
+    if (models.StitchingChallan) {
+      const scWorkers = await models.StitchingChallan.distinct('workerName');
+      scWorkers.forEach(u => u && userSet.add(String(u).trim()));
     }
 
     const sortedUsers = Array.from(userSet).filter(Boolean).sort((a, b) => a.localeCompare(b));
@@ -665,6 +908,7 @@ const getEntryUsersList = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to fetch user list', error: err.message });
   }
 };
+
 
 module.exports = {
   getApprovalRequests,

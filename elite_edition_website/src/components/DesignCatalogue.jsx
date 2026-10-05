@@ -906,7 +906,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [search, categoryFilter, colorFilter, partyFilter, statusFilter, sortBy, sortOrder, department]);
+  }, [search, categoryFilter, colorFilter, partyFilter, statusFilter, sortBy, sortOrder, department, activeSubTab]);
 
   const pageRef = useRef(page);
   pageRef.current = page;
