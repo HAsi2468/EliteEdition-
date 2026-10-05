@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
+import { openPrintOptionsDialog } from '../utils/printService';
 import '../styles/taskManager.css';
 import {
   Check,
@@ -909,10 +910,264 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     );
   });
 
-  // TaskOPad CSV Export Handler
+  // Task Management PDF Report Generator & Export Handler
+  const handleExportPDF = async () => {
+    if (!filteredTasks.length) {
+      triggerEliteAlert('No Tasks Found', 'No tasks found matching your current filter settings to export.', 'info');
+      return;
+    }
+
+    // Determine target member / scope label
+    let targetMemberLabel = 'All Team Members';
+    if (assigneeFilter !== 'all') {
+      const matchedUser = allUsers.find((u) => String(u._id || u.id) === String(assigneeFilter));
+      targetMemberLabel = matchedUser ? (matchedUser.name || matchedUser.username) : 'Selected Member';
+    } else if (taskScope === 'my_tasks') {
+      targetMemberLabel = `Myself (${currentUser?.name || currentUser?.username || 'Current User'})`;
+    } else if (taskScope === 'delegated') {
+      targetMemberLabel = `Delegated by ${currentUser?.name || currentUser?.username || 'Me'}`;
+    }
+
+    const scopeLabels = {
+      all: 'All Tasks',
+      my_tasks: 'My Assigned Tasks',
+      delegated: 'Delegated Tasks',
+      today: "Today's Tasks",
+      overdue: 'Overdue Tasks',
+      completed: 'Completed Tasks'
+    };
+    const scopeText = scopeLabels[taskScope] || taskScope;
+    const nowStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    // Analytics calculations
+    const totalCount = filteredTasks.length;
+    const doneCount = filteredTasks.filter((t) => t.status === 'Done').length;
+    const inProgressCount = filteredTasks.filter((t) => t.status === 'In Progress').length;
+    const inReviewCount = filteredTasks.filter((t) => t.status === 'In Review').length;
+    const pendingCount = filteredTasks.filter((t) => t.status === 'To Do' || t.status === 'Backlog').length;
+    const overdueCount = filteredTasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done').length;
+    const totalEstHours = filteredTasks.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
+    const totalLoggedHours = filteredTasks.reduce((sum, t) => sum + (t.timeLogs || []).reduce((s, l) => s + (Number(l.hours) || 0), 0), 0);
+
+    const priorityColors = {
+      urgent: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Urgent' },
+      high: { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa', label: 'High' },
+      medium: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', label: 'Medium' },
+      low: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Low' }
+    };
+
+    const statusColors = {
+      'Backlog': { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' },
+      'To Do': { bg: '#e0f2fe', color: '#0369a1', border: '#bae6fd' },
+      'In Progress': { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
+      'In Review': { bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+      'Done': { bg: '#dcfce7', color: '#15803d', border: '#86efac' }
+    };
+
+    const escapeHtml = (str) => {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 10px; font-size: 10px; line-height: 1.4;">
+        <style>
+          @page { size: A4 landscape; margin: 8mm; }
+          .task-pdf-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #2563eb; padding-bottom: 8px; margin-bottom: 10px; }
+          .task-pdf-title { font-size: 16px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.01em; text-transform: uppercase; }
+          .task-pdf-subtitle { font-size: 9.5px; color: #64748b; margin-top: 2px; font-weight: 600; }
+          .task-pdf-meta { text-align: right; font-size: 9px; color: #475569; line-height: 1.5; }
+          
+          .task-pdf-filter-bar { display: flex; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-size: 9px; flex-wrap: wrap; }
+          .task-pdf-filter-item { display: inline-flex; align-items: center; gap: 4px; }
+          .task-pdf-filter-label { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 8px; }
+          .task-pdf-filter-val { font-weight: 800; color: #0f172a; }
+
+          .task-pdf-kpis { display: flex; gap: 8px; margin-bottom: 10px; }
+          .task-pdf-kpi-card { flex: 1; padding: 6px 8px; border-radius: 6px; background: #ffffff; border: 1px solid #cbd5e1; border-left: 3.5px solid #94a3b8; }
+          .task-pdf-kpi-label { font-size: 7.5px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+          .task-pdf-kpi-val { font-size: 13px; font-weight: 900; color: #0f172a; margin-top: 1px; }
+
+          table.task-pdf-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 4px; }
+          table.task-pdf-table th { background: #0f172a; color: #ffffff; font-size: 7.5px; text-transform: uppercase; padding: 5px 6px; text-align: left; font-weight: 800; letter-spacing: 0.02em; }
+          table.task-pdf-table td { padding: 5px 6px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: top; }
+          table.task-pdf-table tr:nth-child(even) td { background: #f8fafc; }
+          
+          .badge { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 7.5px; font-weight: 700; white-space: nowrap; }
+          .badge-overdue { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+          
+          .task-pdf-footer { margin-top: 12px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 8px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
+        </style>
+
+        <!-- Header -->
+        <div class="task-pdf-header">
+          <div>
+            <div class="task-pdf-title">Elite Edition Enterprise ERP — Task Management Report</div>
+            <div class="task-pdf-subtitle">Real-time Task Tracking, Assignee Deliverables & Worklog Audit</div>
+          </div>
+          <div class="task-pdf-meta">
+            <div><strong>Report Date:</strong> ${nowStr}</div>
+            <div><strong>Generated By:</strong> ${escapeHtml(currentUser?.name || currentUser?.username || 'Staff')}</div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="task-pdf-filter-bar">
+          <div class="task-pdf-filter-item">
+            <span class="task-pdf-filter-label">Member / Assignee:</span>
+            <span class="task-pdf-filter-val" style="color: #2563eb; background: #eff6ff; padding: 1px 6px; border-radius: 4px; border: 1px solid #bfdbfe;">${escapeHtml(targetMemberLabel)}</span>
+          </div>
+          <div class="task-pdf-filter-item">
+            <span class="task-pdf-filter-label">Scope:</span>
+            <span class="task-pdf-filter-val">${escapeHtml(scopeText)}</span>
+          </div>
+          <div class="task-pdf-filter-item">
+            <span class="task-pdf-filter-label">Status Filter:</span>
+            <span class="task-pdf-filter-val">${escapeHtml(statusFilter !== 'all' ? statusFilter : 'All Statuses')}</span>
+          </div>
+          <div class="task-pdf-filter-item">
+            <span class="task-pdf-filter-label">Priority Filter:</span>
+            <span class="task-pdf-filter-val">${escapeHtml(priorityFilter !== 'all' ? priorityFilter.toUpperCase() : 'All Priorities')}</span>
+          </div>
+          ${searchQuery ? `
+            <div class="task-pdf-filter-item">
+              <span class="task-pdf-filter-label">Search Query:</span>
+              <span class="task-pdf-filter-val">"${escapeHtml(searchQuery)}"</span>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- KPIs Summary -->
+        <div class="task-pdf-kpis">
+          <div class="task-pdf-kpi-card" style="border-left-color: #2563eb;">
+            <div class="task-pdf-kpi-label">Total Filtered Tasks</div>
+            <div class="task-pdf-kpi-val" style="color: #2563eb;">${totalCount}</div>
+          </div>
+          <div class="task-pdf-kpi-card" style="border-left-color: #16a34a;">
+            <div class="task-pdf-kpi-label">Completed (Done)</div>
+            <div class="task-pdf-kpi-val" style="color: #16a34a;">${doneCount}</div>
+          </div>
+          <div class="task-pdf-kpi-card" style="border-left-color: #0284c7;">
+            <div class="task-pdf-kpi-label">In Progress</div>
+            <div class="task-pdf-kpi-val" style="color: #0284c7;">${inProgressCount}</div>
+          </div>
+          <div class="task-pdf-kpi-card" style="border-left-color: #f59e0b;">
+            <div class="task-pdf-kpi-label">In Review / Pending</div>
+            <div class="task-pdf-kpi-val" style="color: #b45309;">${inReviewCount + pendingCount}</div>
+          </div>
+          <div class="task-pdf-kpi-card" style="border-left-color: #ef4444;">
+            <div class="task-pdf-kpi-label">Overdue Tasks</div>
+            <div class="task-pdf-kpi-val" style="color: #dc2626;">${overdueCount}</div>
+          </div>
+          <div class="task-pdf-kpi-card" style="border-left-color: #8b5cf6;">
+            <div class="task-pdf-kpi-label">Logged / Est Hours</div>
+            <div class="task-pdf-kpi-val" style="color: #7c3aed;">${totalLoggedHours.toFixed(1)}h / ${totalEstHours}h</div>
+          </div>
+        </div>
+
+        <!-- Tasks Table -->
+        <table class="task-pdf-table">
+          <thead>
+            <tr>
+              <th style="width: 24px; text-align: center;">#</th>
+              <th style="width: 230px;">Task Title & Details</th>
+              <th style="width: 110px;">Assignees</th>
+              <th style="width: 65px; text-align: center;">Priority</th>
+              <th style="width: 75px; text-align: center;">Status</th>
+              <th style="width: 80px; text-align: center;">Due Date</th>
+              <th style="width: 75px; text-align: center;">Checklist</th>
+              <th style="width: 65px; text-align: center;">Hours (Log/Est)</th>
+              <th style="width: 85px;">Created By</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredTasks.map((t, idx) => {
+              const pri = priorityColors[t.priority] || priorityColors.medium;
+              const sta = statusColors[t.status] || { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' };
+              const isTaskOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
+              const assigneesStr = (t.assignees || []).map((a) => (typeof a === 'object' ? (a.name || a.username) : 'Staff')).join(', ') || 'Unassigned';
+              const checkTotal = (t.checklist || []).length;
+              const checkDone = (t.checklist || []).filter((c) => c.completed).length;
+              const checkPercent = checkTotal > 0 ? Math.round((checkDone / checkTotal) * 100) : null;
+              const logged = (t.timeLogs || []).reduce((sum, l) => sum + (l.hours || 0), 0).toFixed(1);
+              const assigner = t.createdBy ? (typeof t.createdBy === 'object' ? (t.createdBy.name || t.createdBy.username) : 'Staff') : 'Admin';
+              const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'No Due Date';
+
+              return `
+                <tr>
+                  <td style="text-align: center; font-weight: 700; color: #94a3b8;">${idx + 1}</td>
+                  <td>
+                    <div style="font-weight: 700; color: #0f172a; font-size: 9.5px;">${escapeHtml(t.title || 'Untitled Task')}</div>
+                    ${t.description ? `<div style="font-size: 8px; color: #64748b; margin-top: 1px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(t.description)}</div>` : ''}
+                    ${t.projectRef ? `<div style="font-size: 7.5px; color: #2563eb; font-weight: 700; margin-top: 2px;">📁 ${escapeHtml(t.projectRef)} ${t.clientName ? `• ${escapeHtml(t.clientName)}` : ''}</div>` : ''}
+                  </td>
+                  <td>
+                    <span style="font-weight: 600; color: #334155;">${escapeHtml(assigneesStr)}</span>
+                  </td>
+                  <td style="text-align: center;">
+                    <span class="badge" style="background: ${pri.bg}; color: ${pri.color}; border: 1px solid ${pri.border};">
+                      ${pri.label}
+                    </span>
+                  </td>
+                  <td style="text-align: center;">
+                    <span class="badge" style="background: ${sta.bg}; color: ${sta.color}; border: 1px solid ${sta.border};">
+                      ${t.status}
+                    </span>
+                  </td>
+                  <td style="text-align: center;">
+                    <div style="font-weight: 650; font-size: 8.5px; color: ${isTaskOverdue ? '#dc2626' : '#334155'};">
+                      ${dueStr}
+                    </div>
+                    ${isTaskOverdue ? `<span class="badge badge-overdue" style="font-size: 7px; margin-top: 1px;">OVERDUE</span>` : ''}
+                  </td>
+                  <td style="text-align: center;">
+                    ${checkTotal > 0 ? `
+                      <span style="font-weight: 700; color: ${checkDone === checkTotal ? '#16a34a' : '#2563eb'}; font-size: 8px;">
+                        ${checkDone}/${checkTotal} (${checkPercent}%)
+                      </span>
+                    ` : `<span style="color: #94a3b8; font-size: 8px;">—</span>`}
+                  </td>
+                  <td style="text-align: center; font-weight: 700; font-size: 8.5px;">
+                    <span style="color: #7c3aed;">${logged}h</span> / <span style="color: #64748b;">${t.estimatedHours || 0}h</span>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: #475569; font-size: 8.5px;">${escapeHtml(assigner)}</div>
+                    <div style="font-size: 7.5px; color: #94a3b8;">${t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : ''}</div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <!-- Footer -->
+        <div class="task-pdf-footer">
+          <div>Elite Edition Enterprise ERP — Task Management & Production Operations Report</div>
+          <div>Total Tasks Listed: <strong>${filteredTasks.length}</strong></div>
+        </div>
+      </div>
+    `;
+
+    await openPrintOptionsDialog({
+      title: `Task Report — ${targetMemberLabel} (${new Date().toLocaleDateString('en-GB')})`,
+      content: htmlContent,
+      defaultSettings: {
+        paperSize: 'A4',
+        orientation: 'landscape',
+        margin: 'default'
+      }
+    });
+  };
+
+  // TaskOPad CSV Export Fallback Handler (available if needed)
   const handleExportCSV = () => {
     if (!filteredTasks.length) {
-      alert('No tasks found to export with the current filters.');
+      triggerEliteAlert('No Tasks Found', 'No tasks found to export with the current filters.', 'info');
       return;
     }
 
@@ -1559,15 +1814,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               )}
             </div>
 
-            {/* Export CSV Button */}
+            {/* Export PDF Button */}
             <button
               type="button"
-              onClick={handleExportCSV}
-              className="task-btn-secondary"
-              title="Export current tasks to CSV file"
+              onClick={handleExportPDF}
+              className="task-btn-pdf"
+              title="Export filtered tasks to PDF Report"
             >
-              <Download size={13} color="#2563eb" />
-              <span>Export CSV</span>
+              <FileText size={14} color="#dc2626" />
+              <span>Export PDF</span>
             </button>
 
             {/* Create Task Button */}
@@ -1766,22 +2021,23 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             )}
           </button>
 
-          {/* 4. Export CSV Button */}
+          {/* 4. Export PDF Button */}
           <button
-            onClick={handleExportCSV}
+            onClick={handleExportPDF}
             style={{
               padding: '0.42rem 0.55rem',
               borderRadius: '8px',
-              background: '#f8fafc',
-              border: '1px solid var(--border-light)',
+              background: '#fef2f2',
+              border: '1px solid #fca5a5',
               cursor: 'pointer',
-              color: '#2563eb',
+              color: '#dc2626',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
-            title="Export CSV"
+            title="Export PDF Report"
           >
-            <Download size={13} />
+            <FileText size={13} color="#dc2626" />
           </button>
         </div>
 

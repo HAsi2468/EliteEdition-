@@ -155,6 +155,31 @@
   color: #0f172a !important;
 }
 
+.task-btn-pdf {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 5px 12px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  background: #fef2f2 !important;
+  border: 1px solid #fca5a5 !important;
+  color: #dc2626 !important;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.06) !important;
+}
+
+.task-btn-pdf:hover {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #b91c1c !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.12) !important;
+}
+
 .task-btn-primary {
   display: inline-flex !important;
   align-items: center !important;
