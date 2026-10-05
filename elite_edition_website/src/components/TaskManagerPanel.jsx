@@ -453,8 +453,18 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         setTasks(isMasterAdmin ? rawTasks : rawTasks.filter(isTaskVisible));
       }
       let loadedUsers = [];
-      if (usersRes && usersRes.success && usersRes.data) {
-        loadedUsers = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.results || []);
+      if (usersRes?.users?.rows && Array.isArray(usersRes.users.rows)) {
+        loadedUsers = usersRes.users.rows;
+      } else if (usersRes?.users && Array.isArray(usersRes.users)) {
+        loadedUsers = usersRes.users;
+      } else if (usersRes?.data && Array.isArray(usersRes.data)) {
+        loadedUsers = usersRes.data;
+      } else if (usersRes?.data?.rows && Array.isArray(usersRes.data.rows)) {
+        loadedUsers = usersRes.data.rows;
+      } else if (usersRes?.data?.results && Array.isArray(usersRes.data.results)) {
+        loadedUsers = usersRes.data.results;
+      } else if (usersRes?.results && Array.isArray(usersRes.results)) {
+        loadedUsers = usersRes.results;
       } else if (Array.isArray(usersRes)) {
         loadedUsers = usersRes;
       }

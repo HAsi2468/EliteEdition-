@@ -5,7 +5,7 @@ const { userService } = require('../services');
 
 const getUsers = catchAsync(async (req, res) => {
 	const users = await userService.getUsers(req);
-	res.send({ users });
+	res.send({ success: true, data: users.rows, count: users.count, users });
 });
 
 const getUser = catchAsync(async (req, res) => {
