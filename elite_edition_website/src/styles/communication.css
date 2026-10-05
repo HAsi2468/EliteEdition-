@@ -487,12 +487,5 @@
 }
 
 .wa-hover-actions {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
-}
-
-.wa-msg-row:hover .wa-hover-actions {
-  opacity: 1;
-  visibility: visible;
+  display: none !important;
 }

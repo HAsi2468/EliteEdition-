@@ -191,6 +191,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const touchStartXRef = useRef(null);
 
   const [activeMsgMenuId, setActiveMsgMenuId] = useState(null);
+  const msgHoldTimerRef = useRef(null);
+
+  const handleStartMsgHold = (msgId) => {
+    if (msgHoldTimerRef.current) {
+      clearTimeout(msgHoldTimerRef.current);
+    }
+    // "click 3 sec after that show this reaction" -> user requested 2.8 - 3s long press
+    msgHoldTimerRef.current = setTimeout(() => {
+      setActiveMsgMenuId((prev) => (prev === msgId ? null : msgId));
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(60); } catch (e) {}
+      }
+    }, 2800);
+  };
+
+  const handleCancelMsgHold = () => {
+    if (msgHoldTimerRef.current) {
+      clearTimeout(msgHoldTimerRef.current);
+      msgHoldTimerRef.current = null;
+    }
+  };
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [viewportHeight, setViewportHeight] = useState(null);
 
@@ -2937,27 +2958,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     });
 
-    const contactUsers = (allUsers || []).filter((u) => {
-      const uId = String(u._id || u.id || '');
-      return uId && uId !== myId && !existingDmUserIds.has(uId);
-    }).map((u) => ({
-      _id: `contact_${u._id || u.id}`,
-      isVirtualContact: true,
-      user: u,
-      name: u.name || u.username || u.email || 'Colleague',
-      type: 'direct',
-      department: u.department || 'General',
-      unreadCount: 0
-    }));
-
     let baseItems = [];
     if (rosterTab === 'groups') {
       baseItems = groups.filter((g) => g.type !== 'direct');
     } else if (rosterTab === 'direct') {
-      baseItems = [...activeDmRooms, ...contactUsers];
+      baseItems = [...activeDmRooms];
     } else {
-      // 'all': combined groups, active DMs, and colleagues
-      baseItems = [...groups.filter((g) => g.type !== 'direct'), ...activeDmRooms, ...contactUsers];
+      // 'all': ONLY real existing groups and active DMs
+      baseItems = [...groups.filter((g) => g.type !== 'direct'), ...activeDmRooms];
     }
 
     // Filter by Phoenix Segmented Tabs: All | Read | Unread
@@ -2967,14 +2975,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) > 0);
     }
 
+    // When NO search query is typed, show ONLY existing chats (no random un-messaged users)
     if (!term) return baseItems;
 
-    return baseItems.filter((item) => {
-      if (item.isVirtualContact) {
-        return (item.name || '').toLowerCase().includes(term) ||
-               (item.user?.department || '').toLowerCase().includes(term) ||
-               (item.user?.role || '').toLowerCase().includes(term);
-      }
+    // Filter existing chats matching the search term
+    const matchedExisting = baseItems.filter((item) => {
       if (item.type === 'direct') {
         const colleague = getDMColleague(item);
         const cName = colleague ? (colleague.name || colleague.username || '').toLowerCase() : (item.name || '').toLowerCase();
@@ -2986,6 +2991,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         (item.permissionScope || '').toLowerCase().includes(term)
       );
     });
+
+    // When searching, also search staff directory for new people to message
+    const matchedStaff = (allUsers || []).filter((u) => {
+      const uId = String(u._id || u.id || '');
+      if (!uId || uId === myId || existingDmUserIds.has(uId)) return false;
+      const uName = (u.name || u.username || u.email || '').toLowerCase();
+      const uDept = (u.department || '').toLowerCase();
+      const uRole = (u.role || '').toLowerCase();
+      return uName.includes(term) || uDept.includes(term) || uRole.includes(term);
+    }).map((u) => ({
+      _id: `contact_${u._id || u.id}`,
+      isVirtualContact: true,
+      user: u,
+      name: u.name || u.username || u.email || 'Colleague',
+      type: 'direct',
+      department: u.department || 'General',
+      unreadCount: 0
+    }));
+
+    return [...matchedExisting, ...matchedStaff];
   }, [groups, allUsers, rosterTab, phoenixFilter, searchQuery, currentUser]);
 
   const getDeptColor = (dept) => {
@@ -3417,7 +3442,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         }}>
                           {group.lastMessage
                             ? (group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged' : group.lastMessage.content)
-                            : (isDirect ? 'Say Hi to your new friend now' : (group.description || 'Channel conversation'))}
+                            : (isVirtual ? 'Tap to start a new chat' : (isDirect ? 'Direct conversation' : (group.description || 'Channel conversation')))}
                         </p>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
@@ -4107,6 +4132,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           >
                             <div
                               className={isMe ? 'phoenix-bubble-sent' : 'phoenix-bubble-received'}
+                              onMouseDown={() => handleStartMsgHold(msg._id)}
+                              onMouseUp={handleCancelMsgHold}
+                              onMouseLeave={handleCancelMsgHold}
+                              onTouchStart={() => handleStartMsgHold(msg._id)}
+                              onTouchEnd={handleCancelMsgHold}
+                              onTouchCancel={handleCancelMsgHold}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                setActiveMsgMenuId((prev) => (prev === msg._id ? null : msg._id));
+                              }}
                               style={{
                                 background: msg.priority === 'urgent'
                                   ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
@@ -4159,78 +4194,104 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               <ChevronDown size={12} />
                             </button>
 
-                            {/* WhatsApp Dropdown Action Menu */}
+                            {/* 3-Second Hold / Options Popup Menu */}
                             {activeMsgMenuId === msg._id && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: '24px',
-                                  right: isMe ? 0 : 'auto',
-                                  left: isMe ? 'auto' : 0,
-                                  background: '#ffffff',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 4px 18px rgba(0,0,0,0.18)',
-                                  zIndex: 50,
-                                  minWidth: '170px',
-                                  padding: '4px 0',
-                                  border: '1px solid #e2e8f0',
-                                  animation: 'fadeIn 0.12s ease'
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {/* Quick Reactions */}
-                                <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>
-                                  {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emo) => (
+                              <>
+                                <div
+                                  style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMsgMenuId(null);
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: '24px',
+                                    right: isMe ? 0 : 'auto',
+                                    left: isMe ? 'auto' : 0,
+                                    background: '#ffffff',
+                                    borderRadius: '10px',
+                                    boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
+                                    zIndex: 50,
+                                    minWidth: '190px',
+                                    padding: '6px 0',
+                                    border: '1.5px solid #bfdbfe',
+                                    animation: 'fadeIn 0.15s ease'
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {/* Quick Reactions Bar */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>
+                                    {['👍', '❤️', '😂', '😮', '😢', '🙏', '👏', '🔥'].map((emo) => (
+                                      <button
+                                        key={emo}
+                                        type="button"
+                                        onClick={() => {
+                                          handleToggleReaction(msg._id, emo);
+                                          setActiveMsgMenuId(null);
+                                        }}
+                                        style={{ background: 'none', border: 'none', fontSize: '1.15rem', cursor: 'pointer', padding: '2px', transition: 'transform 0.1s' }}
+                                        title={`React ${emo}`}
+                                      >
+                                        {emo}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setReplyToMessage(msg);
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <Reply size={14} color="#2563eb" />
+                                    <span>Reply</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleOpenForwardModal(msg);
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <CornerUpRight size={14} color="#8b5cf6" />
+                                    <span>Forward</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleTogglePin(msg._id);
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    {msg.isPinned ? <PinOff size={14} color="#d97706" /> : <Pin size={14} color="#64748b" />}
+                                    <span>{msg.isPinned ? 'Unpin message' : 'Pin message'}</span>
+                                  </button>
+
+                                  {msg.content && (
                                     <button
-                                      key={emo}
                                       type="button"
                                       onClick={() => {
-                                        handleToggleReaction(msg._id, emo);
+                                        if (navigator.clipboard) {
+                                          navigator.clipboard.writeText(msg.content);
+                                        }
                                         setActiveMsgMenuId(null);
                                       }}
-                                      style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', padding: '2px', transition: 'transform 0.1s' }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
                                     >
-                                      {emo}
+                                      <span>📋</span>
+                                      <span>Copy Text</span>
                                     </button>
-                                  ))}
+                                  )}
                                 </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setReplyToMessage(msg);
-                                    setActiveMsgMenuId(null);
-                                  }}
-                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
-                                >
-                                  <Reply size={14} color="#2563eb" />
-                                  <span>Reply</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleOpenForwardModal(msg);
-                                    setActiveMsgMenuId(null);
-                                  }}
-                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
-                                >
-                                  <CornerUpRight size={14} color="#8b5cf6" />
-                                  <span>Forward</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleTogglePin(msg._id);
-                                    setActiveMsgMenuId(null);
-                                  }}
-                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
-                                >
-                                  {msg.isPinned ? <PinOff size={14} color="#d97706" /> : <Pin size={14} color="#64748b" />}
-                                  <span>{msg.isPinned ? 'Unpin message' : 'Pin message'}</span>
-                                </button>
-                              </div>
+                              </>
                             )}
 
                             {/* Sender Name (only shown for others in group chats) */}
@@ -4735,84 +4796,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             </div>
                           )}
 
-                          {/* Desktop Hover Action Floating Bar */}
-                          {!isMobileScreen && (
-                            <div
-                              className="wa-hover-actions"
-                              style={{
-                                position: 'absolute',
-                                top: '-24px',
-                                [isMe ? 'right' : 'left']: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '2px',
-                                background: 'rgba(255,255,255,0.98)',
-                                backdropFilter: 'blur(6px)',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '20px',
-                                padding: '2px 6px',
-                                boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
-                                zIndex: 10
-                              }}
-                            >
-                              {/* 1-Click Quick Emoji Reaction Bar */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', borderRight: '1px solid #e2e8f0', paddingRight: '4px', marginRight: '2px' }}>
-                                {['👍', '❤️', '😂', '👏', '🔥', '✅'].map((emo) => (
-                                  <button
-                                    key={emo}
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleReaction(msg._id, emo);
-                                    }}
-                                    className="quick-hover-emoji"
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      fontSize: '0.85rem',
-                                      padding: '2px',
-                                      borderRadius: '4px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}
-                                    title={`React ${emo}`}
-                                  >
-                                    {emo}
-                                  </button>
-                                ))}
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => setReplyToMessage(msg)}
-                                style={{ background: 'none', border: 'none', color: '#54656f', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
-                                title="Reply"
-                              >
-                                <Reply size={13} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenForwardModal(msg)}
-                                style={{ background: 'none', border: 'none', color: '#54656f', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
-                                title="Forward"
-                              >
-                                <CornerUpRight size={13} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMsgMenuId(activeMsgMenuId === msg._id ? null : msg._id);
-                                }}
-                                style={{ background: 'none', border: 'none', color: '#54656f', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
-                                title="More"
-                              >
-                                <MoreVertical size={13} />
-                              </button>
-                            </div>
-                          )}
                           </div>
                         </div>
                       </React.Fragment>

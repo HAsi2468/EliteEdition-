@@ -29,6 +29,13 @@ const getGroups = async (req, res) => {
     const currentUserIdStr = currentUserId ? String(currentUserId) : (rawUserId ? String(rawUserId) : null);
 
     const isClient = req.user && (req.user.isClient || req.user.role === 'Client');
+    const isSuperOrAdmin = req.user && (
+      req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.isAdmin === true ||
+      req.user.isMainAdmin === true ||
+      req.headers['x-is-admin'] === 'true'
+    );
     let query;
 
     if (isClient) {
@@ -38,21 +45,35 @@ const getGroups = async (req, res) => {
         members: currentUserId,
         isInternalOnly: { $ne: true }
       };
+    } else if (isSuperOrAdmin) {
+      // Administrators oversee all company group channels, and their own direct rooms
+      if (currentUserId || currentUserIdStr) {
+        const userMemberFilter = { $in: [currentUserId, currentUserIdStr].filter(Boolean) };
+        query = {
+          isArchived: { $ne: true },
+          $or: [
+            { type: { $ne: 'direct' } },
+            { members: userMemberFilter }
+          ]
+        };
+      } else {
+        query = {
+          isArchived: { $ne: true },
+          type: { $ne: 'direct' }
+        };
+      }
     } else if (currentUserId || currentUserIdStr) {
+      // Standard staff members ONLY see groups and chats where they are an explicit member
       const userMemberFilter = { $in: [currentUserId, currentUserIdStr].filter(Boolean) };
       query = {
         isArchived: { $ne: true },
-        $or: [
-          { type: { $ne: 'direct' }, isPrivate: { $ne: true } },
-          { members: userMemberFilter }
-        ]
+        members: userMemberFilter
       };
     } else {
-      // If user identity is missing, do NOT expose direct 1-on-1 messages or private channels
+      // If user identity is missing, do NOT expose any communication channels
       query = {
         isArchived: { $ne: true },
-        type: { $ne: 'direct' },
-        isPrivate: { $ne: true }
+        _id: null
       };
     }
 
@@ -173,14 +194,13 @@ const getGroupMessages = async (req, res) => {
 
       if (!isMember) {
         if (room.type === 'direct') {
-          // Do NOT allow non-members to view or auto-join private 1-on-1 direct rooms
+          // Do NOT allow non-members to view private 1-on-1 direct rooms
           return res.status(403).json({ success: false, message: 'Access denied to direct message conversation' });
         }
         if (room.isPrivate && !isSuperOrAdmin) {
           return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this private group' });
         }
-        // Auto-join public/authority group rooms if user has access
-        await ChatRoom.findByIdAndUpdate(groupId, { $addToSet: { members: rawReqUserId } });
+        // Do NOT auto-join users to groups
       }
     }
 
