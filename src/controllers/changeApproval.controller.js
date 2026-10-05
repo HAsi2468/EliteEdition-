@@ -358,6 +358,16 @@ const bulkReject = async (req, res) => {
 /**
  * Get and Update Approval Settings (Master Toggle)
  */
+const getSettings = (req, res) => {
+  const settings = getApprovalSettings();
+  return res.status(200).json({ success: true, data: settings });
+};
+
+const updateSettings = (req, res) => {
+  const updated = setApprovalSettings(req.body);
+  return res.status(200).json({ success: true, message: 'Approval settings updated', data: updated });
+};
+
 /**
  * Review Screen: Fetch all data entries across the ERP created by users
  */
