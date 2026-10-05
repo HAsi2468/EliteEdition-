@@ -1585,16 +1585,16 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     onClick={() => handleModeSelect('PARTY')}
                     style={{
                       padding: '0.6rem 0.3rem', fontSize: '0.78rem', fontWeight: 800, borderRadius: '8px',
-                      border: transactionMode === 'PARTY' ? '2px solid #0284c7' : '1px solid var(--border-light)',
-                      background: transactionMode === 'PARTY' ? 'rgba(14,165,233,0.18)' : 'rgba(255,255,255,0.03)',
-                      color: transactionMode === 'PARTY' ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer',
+                      border: transactionMode === 'PARTY' ? '2px solid #2563eb' : '1px solid var(--border-light)',
+                      background: transactionMode === 'PARTY' ? '#eff6ff' : 'rgba(255,255,255,0.03)',
+                      color: transactionMode === 'PARTY' ? '#1d4ed8' : 'var(--text-muted)', cursor: 'pointer',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                      boxShadow: transactionMode === 'PARTY' ? '0 0 10px rgba(14,165,233,0.2)' : 'none',
+                      boxShadow: transactionMode === 'PARTY' ? '0 0 10px rgba(37,99,235,0.2)' : 'none',
                       transition: 'all 0.15s ease'
                     }}
                   >
                     <span>👥 Party</span>
-                    <span style={{ fontSize: '0.62rem', opacity: 0.8, fontWeight: 600 }}>Bill Payment (IN)</span>
+                    <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Bill Payment (IN)</span>
                   </button>
 
                   {/* 4. Vendor */}
@@ -1603,29 +1603,29 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     onClick={() => handleModeSelect('VENDOR')}
                     style={{
                       padding: '0.6rem 0.3rem', fontSize: '0.78rem', fontWeight: 800, borderRadius: '8px',
-                      border: transactionMode === 'VENDOR' ? '2px solid #d97706' : '1px solid var(--border-light)',
-                      background: transactionMode === 'VENDOR' ? 'rgba(217,119,6,0.18)' : 'rgba(255,255,255,0.03)',
-                      color: transactionMode === 'VENDOR' ? '#fbbf24' : 'var(--text-muted)', cursor: 'pointer',
+                      border: transactionMode === 'VENDOR' ? '2px solid #2563eb' : '1px solid var(--border-light)',
+                      background: transactionMode === 'VENDOR' ? '#eff6ff' : 'rgba(255,255,255,0.03)',
+                      color: transactionMode === 'VENDOR' ? '#1d4ed8' : 'var(--text-muted)', cursor: 'pointer',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                      boxShadow: transactionMode === 'VENDOR' ? '0 0 10px rgba(217,119,6,0.2)' : 'none',
+                      boxShadow: transactionMode === 'VENDOR' ? '0 0 10px rgba(37,99,235,0.2)' : 'none',
                       transition: 'all 0.15s ease'
                     }}
                   >
                     <span>🏢 Vendor</span>
-                    <span style={{ fontSize: '0.62rem', opacity: 0.8, fontWeight: 600 }}>Supplier (OUT)</span>
+                    <span style={{ fontSize: '0.62rem', opacity: 0.85, fontWeight: 600 }}>Supplier (OUT)</span>
                   </button>
                 </div>
               </div>
 
-              {/* PARTY MODE: PARTY SELECTOR & INVOICE PAYMENT PICKER */}
+              {/* PARTY MODE: PARTY SELECTOR & INVOICE PAYMENT PICKER (WHITE & BLUE THEME) */}
               {transactionMode === 'PARTY' && (
-                <div style={{ background: 'rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.25)', borderRadius: '10px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', boxShadow: '0 2px 10px rgba(37,99,235,0.05)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                      <Users size={16} /> Select Party Name *
+                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                      <Users size={16} color="#1d4ed8" /> Select Party Name *
                     </label>
                     {loadingPartiesData && (
-                      <span style={{ fontSize: '0.7rem', color: '#38bdf8' }}>Loading parties & invoices...</span>
+                      <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>Loading parties & invoices...</span>
                     )}
                   </div>
 
@@ -1633,7 +1633,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     <select
                       value={selectedParty}
                       onChange={e => handlePartyChange(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 700 }}
+                      style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', border: '1.5px solid #bfdbfe' }}
                     >
                       <option value="">-- Select Party / Client --</option>
                       {partiesList.map((p, idx) => (
@@ -1646,30 +1646,30 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
                   {/* Party Invoices List */}
                   {selectedParty && (
-                    <div style={{ borderTop: '1px solid rgba(14, 165, 233, 0.2)', paddingTop: '0.75rem' }}>
+                    <div style={{ borderTop: '1px solid #bfdbfe', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e3a8a' }}>
                           Select Invoices for Payment ({currentPartyInvoices.length} found):
                         </span>
                         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                           <button
                             type="button"
                             onClick={handleSelectAllPending}
-                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(56, 189, 248, 0.4)', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', cursor: 'pointer' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #2563eb', background: '#2563eb', color: '#ffffff', cursor: 'pointer', boxShadow: '0 1px 3px rgba(37,99,235,0.2)' }}
                           >
                             Select All Unpaid
                           </button>
                           <button
                             type="button"
                             onClick={handleDeselectAllInvoices}
-                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', cursor: 'pointer' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer' }}
                           >
                             Clear
                           </button>
                           <button
                             type="button"
                             onClick={() => setShowAllPartyInvoices(prev => !prev)}
-                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', background: showAllPartyInvoices ? 'rgba(14,165,233,0.2)' : 'rgba(255,255,255,0.05)', color: showAllPartyInvoices ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #bfdbfe', background: showAllPartyInvoices ? '#eff6ff' : '#ffffff', color: showAllPartyInvoices ? '#1d4ed8' : '#2563eb', cursor: 'pointer' }}
                           >
                             {showAllPartyInvoices ? 'Showing All' : 'Show All'}
                           </button>
@@ -1677,11 +1677,11 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                       </div>
 
                       {currentPartyInvoices.length === 0 ? (
-                        <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                        <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.78rem', color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
                           No unpaid invoices found for {selectedParty}. (You can still record an advance or click "Show All" to view paid invoices)
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
                           {currentPartyInvoices.map((inv) => {
                             const isSelected = !!selectedInvoicesMap[inv._id]?.selected;
                             const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
@@ -1693,40 +1693,42 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                 key={inv._id}
                                 style={{
                                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                  padding: '0.5rem 0.7rem', borderRadius: '7px',
-                                  background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255,255,255,0.025)',
-                                  border: isSelected ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid var(--border-light)',
+                                  padding: '0.55rem 0.75rem', borderRadius: '8px',
+                                  background: isSelected ? '#eff6ff' : '#ffffff',
+                                  border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                                  boxShadow: isSelected ? '0 2px 6px rgba(37, 99, 235, 0.1)' : 'none',
                                   gap: '0.5rem'
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: '1 1 auto', minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: '1 1 auto', minWidth: 0 }}>
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => handleToggleInvoice(inv)}
-                                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#0284c7' }}
+                                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2563eb' }}
                                   />
                                   <div style={{ minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                                      <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>
                                         {inv.invoiceNo}
                                       </span>
                                       <span style={{
-                                        fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: '8px',
-                                        background: isPaid ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                                        color: isPaid ? '#34d399' : '#f87171'
+                                        fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px',
+                                        background: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #bfdbfe'
                                       }}>
                                         {inv.paymentStatus || (isPaid ? 'PAID' : 'UNPAID')}
                                       </span>
                                     </div>
-                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                                      {inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN') : ''} • Total: ₹{inv.grandTotal?.toLocaleString('en-IN')} • Due: <strong style={{ color: due > 0 ? '#f87171' : '#34d399' }}>₹{due.toLocaleString('en-IN')}</strong>
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
+                                      {inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN') : ''} • Total: ₹{inv.grandTotal?.toLocaleString('en-IN')} • Due: <strong style={{ color: '#1d4ed8' }}>₹{due.toLocaleString('en-IN')}</strong>
                                     </div>
                                   </div>
                                 </div>
 
-                                <div style={{ width: '110px', flexShrink: 0 }}>
-                                  <label style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>
+                                <div style={{ width: '115px', flexShrink: 0 }}>
+                                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#1e40af', display: 'block', marginBottom: 2 }}>
                                     Paying (₹)
                                   </label>
                                   <input
@@ -1737,10 +1739,12 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                     onChange={e => handleInvoicePayingAmountChange(inv, e.target.value)}
                                     placeholder="0.00"
                                     style={{
-                                      width: '100%', padding: '0.3rem 0.45rem', fontSize: '0.8rem', fontWeight: 800,
-                                      color: isSelected ? '#38bdf8' : 'var(--text-muted)',
-                                      border: isSelected ? '1px solid #38bdf8' : '1px solid var(--border-light)',
-                                      background: isSelected ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.03)'
+                                      width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.88rem', fontWeight: 800,
+                                      color: isSelected ? '#1d4ed8' : '#64748b',
+                                      border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                      background: '#ffffff',
+                                      borderRadius: '6px',
+                                      boxShadow: isSelected ? '0 1px 3px rgba(37,99,235,0.15)' : 'none'
                                     }}
                                   />
                                 </div>
@@ -1750,13 +1754,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                         </div>
                       )}
 
-                      {/* Selected Summary */}
+                      {/* Selected Summary (Pure White & Blue) */}
                       {Object.values(selectedInvoicesMap).filter(e => e?.selected).length > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.65rem', padding: '0.45rem 0.75rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px' }}>
-                          <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#34d399' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.65rem', padding: '0.55rem 0.85rem', background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #93c5fd', borderRadius: '7px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>
                             ✓ {Object.values(selectedInvoicesMap).filter(e => e?.selected).length} Invoice(s) Selected
                           </span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#34d399' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1d4ed8' }}>
                             Total: ₹{Number(formVal.amount || 0).toLocaleString('en-IN')} (Stored as Cash IN)
                           </span>
                         </div>
@@ -1766,15 +1770,15 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </div>
               )}
 
-              {/* VENDOR MODE: VENDOR SELECTOR & PURCHASE BILL PAYMENT PICKER */}
+              {/* VENDOR MODE: VENDOR SELECTOR & PURCHASE BILL PAYMENT PICKER (WHITE & BLUE THEME) */}
               {transactionMode === 'VENDOR' && (
-                <div style={{ background: 'rgba(217, 119, 6, 0.05)', border: '1px solid rgba(217, 119, 6, 0.25)', borderRadius: '10px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', boxShadow: '0 2px 10px rgba(37,99,235,0.05)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                      <Building2 size={16} /> Select Vendor (Supplier / Inward) *
+                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                      <Building2 size={16} color="#1d4ed8" /> Select Vendor (Supplier / Inward) *
                     </label>
                     {loadingPartiesData && (
-                      <span style={{ fontSize: '0.7rem', color: '#fbbf24' }}>Loading vendors & purchases...</span>
+                      <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>Loading vendors & purchases...</span>
                     )}
                   </div>
 
@@ -1782,7 +1786,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                     <select
                       value={selectedVendor}
                       onChange={e => handleVendorChange(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 700 }}
+                      style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', border: '1.5px solid #bfdbfe' }}
                     >
                       <option value="">-- Choose Vendor / Supplier --</option>
                       {vendorsList.map((v, idx) => (
@@ -1795,30 +1799,30 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
                   {/* Vendor Purchases List */}
                   {selectedVendor && (
-                    <div style={{ borderTop: '1px solid rgba(217, 119, 6, 0.2)', paddingTop: '0.75rem' }}>
+                    <div style={{ borderTop: '1px solid #bfdbfe', paddingTop: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e3a8a' }}>
                           Select Purchase Bills for Payment ({currentVendorPurchases.length} found):
                         </span>
                         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                           <button
                             type="button"
                             onClick={handleSelectAllPendingPurchases}
-                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.4)', background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24', cursor: 'pointer' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #2563eb', background: '#2563eb', color: '#ffffff', cursor: 'pointer', boxShadow: '0 1px 3px rgba(37,99,235,0.2)' }}
                           >
                             Select All Unpaid
                           </button>
                           <button
                             type="button"
                             onClick={handleDeselectAllPurchases}
-                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', cursor: 'pointer' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer' }}
                           >
                             Clear
                           </button>
                           <button
                             type="button"
                             onClick={() => setShowAllVendorPurchases(prev => !prev)}
-                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', background: showAllVendorPurchases ? 'rgba(217, 119, 6, 0.2)' : 'rgba(255,255,255,0.05)', color: showAllVendorPurchases ? '#fbbf24' : 'var(--text-muted)', cursor: 'pointer' }}
+                            style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '5px', border: '1px solid #bfdbfe', background: showAllVendorPurchases ? '#eff6ff' : '#ffffff', color: showAllVendorPurchases ? '#1d4ed8' : '#2563eb', cursor: 'pointer' }}
                           >
                             {showAllVendorPurchases ? 'Showing All' : 'Show All'}
                           </button>
@@ -1826,11 +1830,11 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                       </div>
 
                       {currentVendorPurchases.length === 0 ? (
-                        <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
-                          No unpaid purchase bills found for {selectedVendor}. (You can still record a manual payment/advance or click &quot;Show All&quot; to view paid bills)
+                        <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.78rem', color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                          No unpaid purchase bills found for {selectedVendor}. (You can still record a manual payment/advance or click "Show All" to view paid bills)
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
                           {currentVendorPurchases.map((pur) => {
                             const purKey = pur.id || pur.purchaseNo;
                             const isSelected = !!selectedPurchasesMap[purKey]?.selected;
@@ -1850,48 +1854,50 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                 key={purKey}
                                 style={{
                                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                  padding: '0.5rem 0.7rem', borderRadius: '7px',
-                                  background: isSelected ? 'rgba(217, 119, 6, 0.12)' : 'rgba(255,255,255,0.025)',
-                                  border: isSelected ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--border-light)',
+                                  padding: '0.55rem 0.75rem', borderRadius: '8px',
+                                  background: isSelected ? '#eff6ff' : '#ffffff',
+                                  border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                                  boxShadow: isSelected ? '0 2px 6px rgba(37, 99, 235, 0.1)' : 'none',
                                   gap: '0.5rem'
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: '1 1 auto', minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: '1 1 auto', minWidth: 0 }}>
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => handleTogglePurchase(pur)}
-                                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#d97706' }}
+                                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2563eb' }}
                                   />
                                   <div style={{ minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                                      <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>
                                         {pur.purchaseNo}
                                       </span>
                                       <span style={{
-                                        fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: '8px',
-                                        background: isPaid ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                                        color: isPaid ? '#34d399' : '#f87171'
+                                        fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px',
+                                        background: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #bfdbfe'
                                       }}>
                                         {pur.paymentStatus || (isPaid ? 'PAID' : 'UNPAID')}
                                       </span>
                                       {pur.gstRate > 0 && (
-                                        <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
                                           {pur.gstRate}% GST
                                         </span>
                                       )}
                                     </div>
-                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>
                                       {itemsSummary}
                                     </div>
-                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                                      {pur.date ? new Date(pur.date).toLocaleDateString('en-IN') : ''} • Bill Total: ₹{totalAmt.toLocaleString('en-IN')} • Due: <strong style={{ color: due > 0 ? '#f87171' : '#34d399' }}>₹{due.toLocaleString('en-IN')}</strong>
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 1 }}>
+                                      {pur.date ? new Date(pur.date).toLocaleDateString('en-IN') : ''} • Bill Total: ₹{totalAmt.toLocaleString('en-IN')} • Due: <strong style={{ color: '#1d4ed8' }}>₹{due.toLocaleString('en-IN')}</strong>
                                     </div>
                                   </div>
                                 </div>
 
-                                <div style={{ width: '110px', flexShrink: 0 }}>
-                                  <label style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>
+                                <div style={{ width: '115px', flexShrink: 0 }}>
+                                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#1e40af', display: 'block', marginBottom: 2 }}>
                                     Paying (₹)
                                   </label>
                                   <input
@@ -1902,10 +1908,12 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                     onChange={e => handlePurchasePayingAmountChange(pur, e.target.value)}
                                     placeholder="0.00"
                                     style={{
-                                      width: '100%', padding: '0.3rem 0.45rem', fontSize: '0.8rem', fontWeight: 800,
-                                      color: isSelected ? '#fbbf24' : 'var(--text-muted)',
-                                      border: isSelected ? '1px solid #fbbf24' : '1px solid var(--border-light)',
-                                      background: isSelected ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.03)'
+                                      width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.88rem', fontWeight: 800,
+                                      color: isSelected ? '#1d4ed8' : '#64748b',
+                                      border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                      background: '#ffffff',
+                                      borderRadius: '6px',
+                                      boxShadow: isSelected ? '0 1px 3px rgba(37,99,235,0.15)' : 'none'
                                     }}
                                   />
                                 </div>
@@ -1915,13 +1923,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                         </div>
                       )}
 
-                      {/* Selected Purchases Summary */}
+                      {/* Selected Purchases Summary (Pure White & Blue) */}
                       {Object.values(selectedPurchasesMap).filter(e => e?.selected).length > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.65rem', padding: '0.45rem 0.75rem', background: 'rgba(217, 119, 6, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px' }}>
-                          <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#fbbf24' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.65rem', padding: '0.55rem 0.85rem', background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #93c5fd', borderRadius: '7px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>
                             ✓ {Object.values(selectedPurchasesMap).filter(e => e?.selected).length} Purchase Bill(s) Selected
                           </span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fbbf24' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1d4ed8' }}>
                             Total: ₹{Number(formVal.amount || 0).toLocaleString('en-IN')} (Stored as Cash OUT)
                           </span>
                         </div>
@@ -2074,7 +2082,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   disabled={saving || uploading}
                   style={{
                     padding: '0.55rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px', border: 'none',
-                    background: formVal.type === 'IN' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    background: (transactionMode === 'PARTY' || transactionMode === 'VENDOR')
+                      ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
+                      : formVal.type === 'IN' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
                     color: '#fff', cursor: saving || uploading ? 'not-allowed' : 'pointer', opacity: saving || uploading ? 0.6 : 1
                   }}
                 >
