@@ -80,6 +80,13 @@ export const buildPrintStyles = ({
     }
     @media print {
       html, body {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        overflow-x: visible !important;
+        overflow-y: visible !important;
+        position: static !important;
         background: #ffffff !important;
         color: #000000 !important;
         -webkit-print-color-adjust: exact !important;
@@ -87,8 +94,30 @@ export const buildPrintStyles = ({
         margin: 0 !important;
         padding: 0 !important;
       }
-      .no-print, .print-btn, .action-buttons, header, nav {
+      #root, #app, .app-container, .main-content, .workspace-container {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        position: static !important;
+        display: block !important;
+      }
+      .no-print, .print-btn, .action-buttons, header, nav, aside {
         display: none !important;
+      }
+      table {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+      }
+      tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      thead {
+        display: table-header-group !important;
+      }
+      tfoot {
+        display: table-footer-group !important;
       }
       ${scale !== 100 ? `body { zoom: ${scale}%; transform: scale(${scale / 100}); transform-origin: top left; }` : ''}
     }
@@ -126,15 +155,18 @@ export const executeCleanPrint = ({
       .map(style => style.outerHTML)
       .join('\n');
 
-    // Create isolated invisible iframe
+    // Create isolated invisible iframe with full layout viewport for accurate multi-page pagination
     const iframe = document.createElement('iframe');
     iframe.id = 'elite-print-isolated-frame';
     iframe.style.position = 'fixed';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
+    iframe.style.top = '0';
+    iframe.style.left = '0';
+    iframe.style.width = '100vw';
+    iframe.style.height = '100vh';
     iframe.style.border = 'none';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.zIndex = '-9999';
 
     document.body.appendChild(iframe);
 

@@ -39,11 +39,27 @@ const diskStorage = multer.diskStorage({
 const axios = require('axios');
 const sharp = require('sharp');
 
-const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.gif', '.csv', '.xlsx', '.zip']);
+const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.jfif', '.png', '.webp', '.pdf', '.gif', '.csv', '.xlsx', '.zip', '.svg', '.bmp']);
+
+const MIME_TO_EXT = {
+  'image/jpeg': '.jpg',
+  'image/pjpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/jfif': '.jfif',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/bmp': '.bmp',
+  'image/svg+xml': '.svg',
+  'application/pdf': '.pdf',
+  'text/csv': '.csv',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'application/zip': '.zip',
+};
 
 function verifyFileSignature(buffer, ext) {
   if (!buffer || buffer.length < 4) return false;
-  // JPEG: FF D8 FF
+  // JPEG / JFIF: FF D8 FF
   if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return true;
   // PNG: 89 50 4E 47
   if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return true;
@@ -53,19 +69,42 @@ function verifyFileSignature(buffer, ext) {
   if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) return true;
   // WEBP: 52 49 46 46 (RIFF) ... 57 45 42 50 (WEBP)
   if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') return true;
+  // BMP: 42 4D
+  if (buffer[0] === 0x42 && buffer[1] === 0x4D) return true;
   // ZIP / XLSX: 50 4B 03 04
   if (buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07)) return true;
-  // CSV / plain text
-  if (ext === '.csv' || ext === '.txt') {
+  // CSV / plain text / SVG
+  if (ext === '.csv' || ext === '.txt' || ext === '.svg') {
     return !buffer.slice(0, 512).includes(0x00);
+  }
+  // Generic fallback: check if starts with known safe image magic bytes
+  if ((buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) ||
+      (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) ||
+      (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP')) {
+    return true;
   }
   return false;
 }
 
 const fileFilter = (req, file, cb) => {
-  const ext = path.extname(file.originalname || '').toLowerCase();
+  let ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = (file.mimetype || '').toLowerCase();
+
+  // If no extension or name is blob/generic, infer from mimetype
+  if ((!ext || ext === '.') && MIME_TO_EXT[mime]) {
+    ext = MIME_TO_EXT[mime];
+    file.originalname = `${path.basename(file.originalname || 'upload', ext)}${ext}`;
+  }
+
   if (!ALLOWED_EXTENSIONS.has(ext)) {
-    return cb(new Error(`File extension '${ext}' is not permitted. Allowed: ${Array.from(ALLOWED_EXTENSIONS).join(', ')}`), false);
+    if (MIME_TO_EXT[mime]) {
+      ext = MIME_TO_EXT[mime];
+      file.originalname = `${path.basename(file.originalname || 'upload', ext)}${ext}`;
+      return cb(null, true);
+    }
+    const err = new Error(`File extension '${ext}' is not permitted. Allowed: ${Array.from(ALLOWED_EXTENSIONS).join(', ')}`);
+    err.statusCode = 400;
+    return cb(err, false);
   }
   cb(null, true);
 };
@@ -146,14 +185,28 @@ router.get('/preview', async (req, res) => {
   }
 });
 
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File size exceeds maximum limit of 100MB' });
+      }
+      return res.status(400).json({ error: err.message || 'File upload validation failed' });
+    }
+    next();
+  });
+}, async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image or attachment file provided' });
   }
 
-  // Check and disallow TIFF files
-  const fileExt = path.extname(req.file.originalname || '').toLowerCase();
+  let fileExt = path.extname(req.file.originalname || '').toLowerCase();
   const fileMime = (req.file.mimetype || '').toLowerCase();
+  if (!fileExt || fileExt === '.') {
+    fileExt = MIME_TO_EXT[fileMime] || '.jpg';
+  }
+
+  // Check and disallow TIFF files
   if (fileExt === '.tif' || fileExt === '.tiff' || fileMime === 'image/tiff' || fileMime === 'image/tif') {
     return res.status(400).json({
       error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
@@ -178,61 +231,46 @@ router.post('/', upload.single('image'), async (req, res) => {
   const designName = (req.body?.designName || req.query?.designName || '').trim();
 
   // 1. Cloudflare R2 Upload Path
-  if (isR2Configured()) {
+  if (isR2Configured() && req.file.buffer) {
     try {
-      let ext = path.extname(req.file.originalname);
-      if (!ext || ext === '.') {
-        if (req.file.mimetype === 'image/jpeg') ext = '.jpg';
-        else if (req.file.mimetype === 'image/png') ext = '.png';
-        else if (req.file.mimetype === 'image/webp') ext = '.webp';
-        else if (req.file.mimetype === 'application/pdf') ext = '.pdf';
-        else ext = '.bin';
-      }
-
+      let ext = fileExt;
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const rawBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `${rawBase || 'file'}-${uniqueSuffix}${ext}`;
 
-      // Upload file to R2 under specified folder (e.g. "Complaints/Digital_Print" or "designs")
+      // Upload file to R2 under specified folder (e.g. "Complaints/Digital_Print" or "designs" or "sample_reference")
       const r2Url = await uploadToR2({
         buffer: req.file.buffer,
         fileName: filename,
-        mimeType: req.file.mimetype,
+        mimeType: req.file.mimetype || 'image/jpeg',
         folder: folder
       });
-
-      // If TIFF file, generate and upload high-quality JPEG web preview companion
-      let previewUrl = null;
-      const isTiff = ext.toLowerCase() === '.tif' || ext.toLowerCase() === '.tiff' || (req.file.mimetype && req.file.mimetype.includes('tiff'));
-      if (isTiff) {
-        try {
-          const previewBuffer = await sharp(req.file.buffer).rotate().jpeg({ quality: 85 }).toBuffer();
-          const previewFilename = `${rawBase || 'file'}-${uniqueSuffix}-preview.jpg`;
-          previewUrl = await uploadToR2({
-            buffer: previewBuffer,
-            fileName: previewFilename,
-            mimeType: 'image/jpeg',
-            folder: folder
-          });
-        } catch (previewErr) {
-          console.warn('[R2 Upload] Failed to generate TIFF companion preview:', previewErr.message);
-        }
-      }
 
       // If designName is provided and folder is designs, also upload named version e.g. "ED-709.jpg"
       if (designName && folder === 'designs') {
         await uploadToR2({
           buffer: req.file.buffer,
           fileName: `${designName}${ext}`,
-          mimeType: req.file.mimetype,
+          mimeType: req.file.mimetype || 'image/jpeg',
           folder: 'designs'
         }).catch(err => console.warn('[R2] Failed to save designName copy:', err.message));
       }
 
-      return res.json({ url: r2Url, previewUrl, filename, folder });
+      return res.json({ url: r2Url, previewUrl: null, filename, folder });
     } catch (err) {
       console.error('[Cloudflare R2] Upload error:', err);
-      return res.status(500).json({ error: 'Failed to upload file to Cloudflare R2: ' + err.message });
+      // Fallback: save to disk if R2 fails
+      try {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const fallbackFilename = `r2fallback-${uniqueSuffix}${fileExt}`;
+        const diskPath = path.join(uploadDir, fallbackFilename);
+        fs.writeFileSync(diskPath, req.file.buffer);
+        const fileUrl = `/uploads/${fallbackFilename}`;
+        console.warn('[Cloudflare R2] Saved to local disk fallback:', fileUrl);
+        return res.json({ url: fileUrl, filename: fallbackFilename, folder, warning: 'Saved locally as R2 fallback' });
+      } catch (fallbackErr) {
+        return res.status(500).json({ error: 'Failed to upload file to Cloudflare R2: ' + err.message });
+      }
     }
   }
 

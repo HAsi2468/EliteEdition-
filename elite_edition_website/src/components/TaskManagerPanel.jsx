@@ -1062,38 +1062,73 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     };
 
     const htmlContent = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 8px; font-size: 9.5px; line-height: 1.4;">
+      <div class="task-pdf-root" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 4px; font-size: 8.5px; line-height: 1.35;">
         <style>
-          @media print {
-            body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            table.task-pdf-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-            thead { display: table-header-group !important; }
-            tfoot { display: table-footer-group !important; }
+          @page {
+            size: ${chosenPaperSize || 'A4'} ${chosenOrientation || 'landscape'};
+            margin: 6mm 6mm;
           }
-          .task-pdf-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #2563eb; padding-bottom: 8px; margin-bottom: 10px; }
-          .task-pdf-title { font-size: 16px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.01em; text-transform: uppercase; }
-          .task-pdf-subtitle { font-size: 9.5px; color: #64748b; margin-top: 2px; font-weight: 600; }
-          .task-pdf-meta { text-align: right; font-size: 9px; color: #475569; line-height: 1.5; }
+          @media print {
+            html, body {
+              height: auto !important;
+              min-height: 0 !important;
+              max-height: none !important;
+              overflow: visible !important;
+              overflow-x: visible !important;
+              overflow-y: visible !important;
+              position: static !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              font-size: 8.5px !important;
+              background: #ffffff !important;
+            }
+            .task-pdf-root {
+              padding: 0 !important;
+              margin: 0 !important;
+              width: 100% !important;
+            }
+            table.task-pdf-table {
+              width: 100% !important;
+              page-break-inside: auto !important;
+              break-inside: auto !important;
+            }
+            table.task-pdf-table tr {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            thead {
+              display: table-header-group !important;
+            }
+            tfoot {
+              display: table-footer-group !important;
+            }
+          }
+          .task-pdf-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin-bottom: 6px; }
+          .task-pdf-title { font-size: 14px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.01em; text-transform: uppercase; line-height: 1.1; }
+          .task-pdf-subtitle { font-size: 8px; color: #64748b; margin-top: 1px; font-weight: 600; }
+          .task-pdf-meta { text-align: right; font-size: 8px; color: #475569; line-height: 1.35; }
           
-          .task-pdf-filter-bar { display: flex; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-size: 9px; flex-wrap: wrap; }
-          .task-pdf-filter-item { display: inline-flex; align-items: center; gap: 4px; }
-          .task-pdf-filter-label { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 8px; }
+          .task-pdf-filter-bar { display: flex; gap: 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 4px 8px; margin-bottom: 6px; font-size: 8px; flex-wrap: wrap; align-items: center; }
+          .task-pdf-filter-item { display: inline-flex; align-items: center; gap: 3px; }
+          .task-pdf-filter-label { color: #64748b; font-weight: 700; text-transform: uppercase; font-size: 7px; }
           .task-pdf-filter-val { font-weight: 800; color: #0f172a; }
 
-          .task-pdf-kpis { display: flex; gap: 8px; margin-bottom: 10px; }
-          .task-pdf-kpi-card { flex: 1; padding: 6px 8px; border-radius: 6px; background: #ffffff; border: 1px solid #cbd5e1; border-left: 3.5px solid #94a3b8; }
-          .task-pdf-kpi-label { font-size: 7.5px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-          .task-pdf-kpi-val { font-size: 13px; font-weight: 900; color: #0f172a; margin-top: 1px; }
+          .task-pdf-kpis { display: flex; gap: 6px; margin-bottom: 6px; }
+          .task-pdf-kpi-card { flex: 1; padding: 4px 6px; border-radius: 5px; background: #ffffff; border: 1px solid #cbd5e1; border-left: 3px solid #94a3b8; }
+          .task-pdf-kpi-label { font-size: 7px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.02em; }
+          .task-pdf-kpi-val { font-size: 11px; font-weight: 900; color: #0f172a; margin-top: 0.5px; line-height: 1.1; }
 
-          table.task-pdf-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 4px; }
-          table.task-pdf-table th { background: #0f172a; color: #ffffff; font-size: 8px; text-transform: uppercase; padding: 6px 7px; text-align: left; font-weight: 800; letter-spacing: 0.02em; }
-          table.task-pdf-table td { padding: 6px 7px; border-bottom: 1px solid #cbd5e1; color: #334155; vertical-align: top; }
+          table.task-pdf-table { width: 100%; border-collapse: collapse; font-size: 8px; margin-top: 2px; }
+          table.task-pdf-table th { background: #0f172a; color: #ffffff; font-size: 7.5px; text-transform: uppercase; padding: 4px 5px; text-align: left; font-weight: 800; letter-spacing: 0.02em; }
+          table.task-pdf-table td { padding: 3.5px 5px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: top; }
           table.task-pdf-table tr:nth-child(even) td { background: #f8fafc; }
           
-          .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 7.5px; font-weight: 700; white-space: nowrap; }
+          .badge { display: inline-block; padding: 1.5px 5px; border-radius: 3px; font-size: 7px; font-weight: 700; white-space: nowrap; }
           .badge-overdue { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
           
-          .task-pdf-footer { margin-top: 12px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 8px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
+          .task-pdf-footer { margin-top: 8px; border-top: 1px solid #cbd5e1; padding-top: 4px; font-size: 7.5px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
         </style>
 
         <!-- Header -->
@@ -1112,7 +1147,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <div class="task-pdf-filter-bar">
           <div class="task-pdf-filter-item">
             <span class="task-pdf-filter-label">Export Scope:</span>
-            <span class="task-pdf-filter-val" style="color: #2563eb; background: #eff6ff; padding: 1px 6px; border-radius: 4px; border: 1px solid #bfdbfe;">${escapeHtml(scopeText)}</span>
+            <span class="task-pdf-filter-val" style="color: #2563eb; background: #eff6ff; padding: 0.5px 5px; border-radius: 3px; border: 1px solid #bfdbfe;">${escapeHtml(scopeText)}</span>
           </div>
           <div class="task-pdf-filter-item">
             <span class="task-pdf-filter-label">Target Member:</span>
@@ -1166,14 +1201,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <table class="task-pdf-table">
           <thead>
             <tr>
-              <th style="width: 25px; text-align: center;">#</th>
+              <th style="width: 22px; text-align: center;">#</th>
               <th>Task Title &amp; Complete Details</th>
-              <th style="width: 120px;">Assignees</th>
-              <th style="width: 65px; text-align: center;">Priority</th>
-              <th style="width: 75px; text-align: center;">Status</th>
-              <th style="width: 85px; text-align: center;">Due Date</th>
-              <th style="width: 70px; text-align: center;">Hours (Log/Est)</th>
-              <th style="width: 90px;">Created By</th>
+              <th style="width: 110px;">Assignees</th>
+              <th style="width: 58px; text-align: center;">Priority</th>
+              <th style="width: 68px; text-align: center;">Status</th>
+              <th style="width: 76px; text-align: center;">Due Date</th>
+              <th style="width: 65px; text-align: center;">Hours (Log/Est)</th>
+              <th style="width: 85px;">Created By</th>
             </tr>
           </thead>
           <tbody>
@@ -1184,115 +1219,69 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               const assigneesStr = (t.assignees || []).map((a) => (typeof a === 'object' ? (a.name || a.username) : 'Staff')).join(', ') || 'Unassigned';
               const checkTotal = (t.checklist || []).length;
               const checkDone = (t.checklist || []).filter((c) => c.completed).length;
-              const checkPercent = checkTotal > 0 ? Math.round((checkDone / checkTotal) * 100) : null;
               const logged = (t.timeLogs || []).reduce((sum, l) => sum + (l.hours || 0), 0).toFixed(1);
               const assigner = t.createdBy ? (typeof t.createdBy === 'object' ? (t.createdBy.name || t.createdBy.username) : 'Staff') : 'Admin';
-              const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'No Due Date';
+              const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
               const tagsList = Array.isArray(t.tags) ? t.tags.map(tag => (typeof tag === 'object' && tag ? tag.text : tag)).filter(Boolean) : [];
               const attachmentsList = Array.isArray(t.attachments) ? t.attachments.filter(Boolean) : [];
 
               return `
                 <tr style="page-break-inside: avoid !important; break-inside: avoid !important;">
-                  <td style="text-align: center; font-weight: 800; color: #64748b; font-size: 9px;">${idx + 1}</td>
+                  <td style="text-align: center; font-weight: 800; color: #64748b; font-size: 8px;">${idx + 1}</td>
                   <td style="word-break: break-word;">
-                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                      <span style="font-weight: 800; color: #0f172a; font-size: 10px;">${escapeHtml(t.title || 'Untitled Task')}</span>
-                      ${t.department ? `<span style="font-size: 7.5px; font-weight: 700; color: #475569; background: #e2e8f0; padding: 1px 5px; border-radius: 3px;">${escapeHtml(t.department)}</span>` : ''}
+                    <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                      <span style="font-weight: 800; color: #0f172a; font-size: 9px;">${escapeHtml(t.title || 'Untitled Task')}</span>
+                      ${t.department ? `<span style="font-size: 6.8px; font-weight: 700; color: #475569; background: #e2e8f0; padding: 0.5px 4px; border-radius: 3px;">${escapeHtml(t.department)}</span>` : ''}
                     </div>
 
                     ${(t.projectRef || t.clientName || t.lotNo || t.lotNumber) ? `
-                      <div style="font-size: 8px; color: #2563eb; font-weight: 700; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap;">
+                      <div style="font-size: 7.5px; color: #2563eb; font-weight: 700; margin-top: 1px; display: flex; gap: 6px; flex-wrap: wrap;">
+                        ${(t.lotNo || t.lotNumber) ? `<span style="color: #059669; background: #ecfdf5; padding: 0.5px 4px; border-radius: 3px; border: 1px solid #a7f3d0;">🏷️ Lot No: <strong>#${escapeHtml(t.lotNo || t.lotNumber)}</strong></span>` : ''}
                         ${t.clientName ? `<span>👤 Client: <strong>${escapeHtml(t.clientName)}</strong></span>` : ''}
-                        ${(t.lotNo || t.lotNumber) ? `<span style="color: #059669; background: #ecfdf5; padding: 1px 5px; border-radius: 3px; border: 1px solid #a7f3d0;">🏷️ Lot No: <strong>#${escapeHtml(t.lotNo || t.lotNumber)}</strong></span>` : ''}
-                        ${t.projectRef ? `<span>📁 Project/JC Ref: <strong>${escapeHtml(t.projectRef)}</strong></span>` : ''}
+                        ${t.projectRef ? `<span>📁 Project/JC: <strong>${escapeHtml(t.projectRef)}</strong></span>` : ''}
                       </div>
                     ` : ''}
 
                     ${tagsList.length > 0 ? `
-                      <div style="margin-top: 2px; display: flex; gap: 4px; flex-wrap: wrap;">
-                        ${tagsList.map(tag => `<span style="font-size: 7px; font-weight: 700; color: #0284c7; background: #f0f9ff; border: 1px solid #bae6fd; padding: 0 4px; border-radius: 3px;">#${escapeHtml(tag)}</span>`).join('')}
+                      <div style="margin-top: 1px; display: flex; gap: 3px; flex-wrap: wrap;">
+                        ${tagsList.map(tag => `<span style="font-size: 6.8px; font-weight: 700; color: #0284c7; background: #f0f9ff; border: 1px solid #bae6fd; padding: 0 3px; border-radius: 2px;">#${escapeHtml(tag)}</span>`).join('')}
                       </div>
                     ` : ''}
 
                     ${t.description ? `
-                      <div style="font-size: 8.5px; color: #1e293b; margin-top: 4px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px 7px;">
-                        <strong style="color: #475569; font-size: 7.5px; text-transform: uppercase; display: block; margin-bottom: 2px;">Description &amp; Instructions:</strong>
-                        ${escapeHtml(t.description)}
+                      <div style="font-size: 7.8px; color: #475569; margin-top: 2px; line-height: 1.3; word-break: break-word;">
+                        <span style="font-weight: 700; color: #334155; font-size: 7px; text-transform: uppercase;">Note:</span>
+                        <span>${escapeHtml(t.description)}</span>
                       </div>
                     ` : ''}
 
                     ${checkTotal > 0 ? `
-                      <div style="margin-top: 4px; padding: 4px 6px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px;">
-                        <div style="font-size: 7.5px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 3px; display: flex; justify-content: space-between;">
-                          <span>Subtasks &amp; Checklist (${checkDone}/${checkTotal} Done • ${checkPercent}%):</span>
-                          <span style="color: ${checkDone === checkTotal ? '#16a34a' : '#2563eb'}; font-size: 7.5px;">${checkDone === checkTotal ? '✔ All Completed' : `${checkTotal - checkDone} Remaining`}</span>
-                        </div>
-                        ${(t.checklist || []).map(c => {
-                          let assignedUserName = '';
-                          if (c.assignedTo) {
-                            const uId = String(typeof c.assignedTo === 'object' ? (c.assignedTo._id || c.assignedTo.id) : c.assignedTo);
-                            const matchU = allUsers.find(u => String(u._id || u.id) === uId);
-                            assignedUserName = matchU ? (matchU.name || matchU.username) : '';
-                          }
-                          return `
-                            <div style="font-size: 8px; color: ${c.completed ? '#16a34a' : '#1e293b'}; margin-top: 2px; display: flex; align-items: flex-start; gap: 4px; line-height: 1.35;">
-                              <span style="font-weight: 800; font-size: 9px; line-height: 1; color: ${c.completed ? '#16a34a' : '#64748b'};">${c.completed ? '☑' : '☐'}</span>
-                              <span style="${c.completed ? 'text-decoration: line-through; opacity: 0.75;' : ''}">${escapeHtml(c.text)}</span>
-                              ${assignedUserName ? `<span style="font-size: 7px; color: #64748b; background: #f1f5f9; padding: 0 4px; border-radius: 3px; margin-left: 3px;">👤 ${escapeHtml(assignedUserName)}</span>` : ''}
-                            </div>
-                          `;
-                        }).join('')}
+                      <div style="margin-top: 2px; font-size: 7.5px; color: #475569; line-height: 1.25;">
+                        <span style="font-weight: 700; color: #2563eb;">Subtasks (${checkDone}/${checkTotal}):</span>
+                        ${(t.checklist || []).slice(0, 4).map(c => `
+                          <span style="margin-left: 3px; ${c.completed ? 'text-decoration: line-through; color: #16a34a;' : 'color: #334155;'}">
+                            ${c.completed ? '☑' : '☐'} ${escapeHtml(c.text)}
+                          </span>
+                        `).join('; ')}
+                        ${checkTotal > 4 ? `<span style="color: #64748b; font-style: italic;"> +${checkTotal - 4} more</span>` : ''}
                       </div>
                     ` : ''}
 
                     ${(t.comments && t.comments.length > 0) ? `
-                      <div style="margin-top: 4px; padding: 4px 6px; background: #f0f9ff; border: 1px solid #bae6fd; border-left: 3px solid #0284c7; border-radius: 4px;">
-                        <div style="font-size: 7.5px; font-weight: 800; color: #0369a1; text-transform: uppercase; margin-bottom: 2px;">
-                          💬 Comments &amp; Progress Updates (${t.comments.length}):
-                        </div>
-                        ${t.comments.map(c => `
-                          <div style="font-size: 8px; color: #1e293b; margin-top: 2px; line-height: 1.35;">
-                            <span style="font-weight: 700; color: #0284c7;">${escapeHtml(c.senderName || 'Staff')}:</span>
-                            <span>${escapeHtml(c.text)}</span>
-                            ${c.createdAt ? `<span style="font-size: 7px; color: #64748b; margin-left: 4px;">(${new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })} ${new Date(c.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })})</span>` : ''}
-                          </div>
-                        `).join('')}
-                      </div>
-                    ` : ''}
-
-                    ${(t.timeLogs && t.timeLogs.length > 0 && t.timeLogs.some(l => l.hours > 0 || l.description)) ? `
-                      <div style="margin-top: 4px; padding: 4px 6px; background: #fbf5ff; border: 1px solid #e9d5ff; border-left: 3px solid #7c3aed; border-radius: 4px;">
-                        <div style="font-size: 7.5px; font-weight: 800; color: #6b21a8; text-transform: uppercase; margin-bottom: 2px;">
-                          ⏱ Worklogs &amp; Time Log Breakdown (${logged}h total):
-                        </div>
-                        ${t.timeLogs.map(l => `
-                          <div style="font-size: 7.5px; color: #334155; margin-top: 1.5px; line-height: 1.3;">
-                            <span style="font-weight: 700; color: #6b21a8;">${l.hours}h</span> by <strong>${escapeHtml(l.userName || 'Staff')}</strong>${l.description ? ` — <em>${escapeHtml(l.description)}</em>` : ''}${l.createdAt ? ` <span style="color: #94a3b8; font-size: 7px;">(${new Date(l.createdAt).toLocaleDateString('en-GB')})</span>` : ''}
-                          </div>
-                        `).join('')}
+                      <div style="margin-top: 1.5px; font-size: 7.2px; color: #0369a1; line-height: 1.2;">
+                        <span style="font-weight: 700;">💬 Latest Update:</span>
+                        <span>${escapeHtml(t.comments[t.comments.length - 1].senderName || 'Staff')}: ${escapeHtml(t.comments[t.comments.length - 1].text)}</span>
                       </div>
                     ` : ''}
 
                     ${attachmentsList.length > 0 ? `
-                      <div style="margin-top: 3px; font-size: 7.5px; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 3px; padding: 3px 5px;">
-                        📎 <strong>Attachments (${attachmentsList.length}):</strong> ${attachmentsList.map(a => `${escapeHtml(a.fileName)}${a.fileSize ? ` (${Math.round(a.fileSize / 1024)} KB)` : ''}`).join(' • ')}
-                      </div>
-                    ` : ''}
-
-                    ${(t.dependencies && t.dependencies.length > 0) ? `
-                      <div style="margin-top: 3px; font-size: 7.5px; color: #b45309; background: #fefce8; border: 1px solid #fef08a; border-radius: 3px; padding: 2px 5px;">
-                        ⛓️ <strong>Blocking Dependencies:</strong> ${(t.dependencies || []).map(d => typeof d === 'object' ? `${escapeHtml(d.title)} [${d.status}]` : 'Task').join(', ')}
-                      </div>
-                    ` : ''}
-
-                    ${t.recurrence && t.recurrence.isRecurring ? `
-                      <div style="margin-top: 2px; font-size: 7.5px; color: #7c3aed; font-weight: 700;">
-                        🔄 Recurring Task: ${escapeHtml(t.recurrence.frequency || 'Daily')}
+                      <div style="margin-top: 1px; font-size: 7px; color: #64748b;">
+                        📎 <strong>Attachments (${attachmentsList.length}):</strong> ${attachmentsList.map(a => escapeHtml(a.fileName)).join(', ')}
                       </div>
                     ` : ''}
                   </td>
                   <td>
-                    <div style="font-weight: 700; color: #1e293b; font-size: 8.5px;">${escapeHtml(assigneesStr)}</div>
+                    <div style="font-weight: 700; color: #1e293b; font-size: 8px;">${escapeHtml(assigneesStr)}</div>
                   </td>
                   <td style="text-align: center;">
                     <span class="badge" style="background: ${pri.bg}; color: ${pri.color}; border: 1px solid ${pri.border};">
@@ -1305,17 +1294,20 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     </span>
                   </td>
                   <td style="text-align: center;">
-                    <div style="font-weight: 700; font-size: 8.5px; color: ${isTaskOverdue ? '#dc2626' : '#1e293b'};">
+                    <div style="font-weight: 700; font-size: 8px; color: ${isTaskOverdue ? '#dc2626' : '#1e293b'};">
                       ${dueStr}
                     </div>
-                    ${isTaskOverdue ? `<span class="badge badge-overdue" style="font-size: 7px; margin-top: 2px;">OVERDUE</span>` : ''}
+                    ${isTaskOverdue ? `<span class="badge badge-overdue" style="font-size: 6.5px; margin-top: 1px;">OVERDUE</span>` : ''}
                   </td>
-                  <td style="text-align: center; font-weight: 700; font-size: 8.5px;">
-                    <span style="color: #7c3aed;">${logged}h</span> / <span style="color: #64748b;">${t.estimatedHours || 0}h</span>
+                  <td style="text-align: center; font-size: 8px;">
+                    ${(Number(logged) > 0 || Number(t.estimatedHours) > 0)
+                      ? `<span style="font-weight: 700; color: #7c3aed;">${logged}h</span> / <span style="color: #64748b;">${t.estimatedHours || 0}h</span>`
+                      : `<span style="color: #cbd5e1; font-weight: 600;">—</span>`
+                    }
                   </td>
                   <td>
-                    <div style="font-weight: 700; color: #334155; font-size: 8.5px;">${escapeHtml(assigner)}</div>
-                    <div style="font-size: 7.5px; color: #94a3b8; margin-top: 1px;">Created: ${t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : '—'}</div>
+                    <div style="font-weight: 700; color: #334155; font-size: 8px;">${escapeHtml(assigner)}</div>
+                    <div style="font-size: 7px; color: #94a3b8; margin-top: 0.5px;">${t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : '—'}</div>
                   </td>
                 </tr>
               `;

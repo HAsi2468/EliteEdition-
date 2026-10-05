@@ -950,8 +950,19 @@ export const api = {
       }
     }
 
+    let fileName = file?.name || 'upload.jpg';
+    if (!/\.[a-zA-Z0-9]+$/.test(fileName) || fileName === 'blob') {
+      const type = (file?.type || '').toLowerCase();
+      let ext = '.jpg';
+      if (type.includes('png')) ext = '.png';
+      else if (type.includes('webp')) ext = '.webp';
+      else if (type.includes('gif')) ext = '.gif';
+      else if (type.includes('pdf')) ext = '.pdf';
+      fileName = `${fileName === 'blob' ? 'upload' : fileName}${ext}`;
+    }
+
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('image', file, fileName);
     if (folder) formData.append('folder', folder);
 
     return request('/upload', {
