@@ -2617,6 +2617,8 @@ export const api = {
     const qs = new URLSearchParams();
     if (params.user) qs.set('user', params.user);
     if (params.module) qs.set('module', params.module);
+    if (params.company) qs.set('company', params.company);
+    if (params.department) qs.set('department', params.department);
     if (params.startDate) qs.set('startDate', params.startDate);
     if (params.endDate) qs.set('endDate', params.endDate);
     if (params.search) qs.set('search', params.search);

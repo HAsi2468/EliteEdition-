@@ -121,7 +121,7 @@ export class WebPushClientManager {
       const convertedVapidKey = urlBase64ToUint8Array(publicKey);
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true, // Guarantees all pushes display a user-visible notification
-        applicationServerKey: convertedVapidKey,
+        applicationServerKey: convertedVapidKey as unknown as BufferSource,
       });
 
       // 5. Send subscription payload to backend database

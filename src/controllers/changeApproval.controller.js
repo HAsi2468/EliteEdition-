@@ -412,6 +412,8 @@ const getUserDataEntries = async (req, res) => {
     const {
       user = 'ALL',
       module: moduleFilter = 'ALL',
+      company: companyFilter = 'ALL',
+      department: departmentFilter = 'ALL',
       startDate = '',
       endDate = '',
       search = '',
@@ -439,23 +441,70 @@ const getUserDataEntries = async (req, res) => {
     }
     const hasDate = Boolean(dateStartObj || dateEndObj);
 
-    // Construct User Filter
-    const userRegex = (user && user !== 'ALL' && user !== 'All')
-      ? new RegExp(`^${user.trim()}$`, 'i')
-      : null;
+    // Escape special regex chars
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Normalize company name (e.g. handle 'Elite Digital Prints' vs 'Elite Digital Print')
+    const normalizeCompany = (c) => (c || '').replace(/Prints$/i, 'Print').trim();
+
+    // Construct User Filter matching actual staff name and known code variants
+    let userRegex = null;
+    if (user && user !== 'ALL' && user !== 'All') {
+      const trimmed = user.trim();
+      const aliases = {
+        'Harshit Sidapara (HASI)': ['Harshit Sidapara (HASI)', 'Harshit Sidapara', 'HASI', 'Harshit'],
+        'Dev Patel': ['Dev Patel', 'DEV'],
+        'Rushabh Patel': ['Rushabh Patel', 'RUSHABH', 'Rushabh'],
+        'Raj Dave': ['Raj Dave', 'RAJ'],
+        'Jay Patel': ['Jay Patel', 'JAY'],
+        'Ram Patel': ['Ram Patel', 'RAM'],
+        'Devansu': ['Devansu', 'DEVANSU'],
+      };
+      const nameVariants = aliases[trimmed] || [trimmed];
+      const pattern = nameVariants.map(escapeRegex).join('|');
+      userRegex = new RegExp(`^(${pattern})$`, 'i');
+    }
 
     // Construct Search Regex
     const searchRegex = (search && search.trim())
       ? new RegExp(search.trim(), 'i')
       : null;
 
-    const shouldFetch = (modName) => moduleFilter === 'ALL' || moduleFilter === 'All' || moduleFilter === modName;
+    // Filter helper to determine if a module should be queried
+    const shouldFetch = (modName, defaultCompany, defaultDept) => {
+      if (moduleFilter !== 'ALL' && moduleFilter !== 'All' && moduleFilter !== modName) {
+        return false;
+      }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        const normFilter = normalizeCompany(companyFilter).toLowerCase();
+        const normComp = normalizeCompany(defaultCompany).toLowerCase();
+        // If default company doesn't match and module doesn't hold multi-company records, skip
+        if (normComp !== normFilter && !['BillingInvoice', 'Expense', 'BillingCustomer'].includes(modName)) {
+          return false;
+        }
+      }
+      if (departmentFilter && departmentFilter !== 'ALL' && departmentFilter !== 'All') {
+        if (defaultDept.toLowerCase() !== departmentFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    // Resolve any matching User ObjectIds for populated references
+    let matchedUserIds = [];
+    if (userRegex && models.user) {
+      try {
+        const matched = await models.user.find({ name: userRegex }, '_id').lean();
+        matchedUserIds = matched.map(u => u._id);
+      } catch (e) {}
+    }
 
     const promises = [];
     const maxFetch = limitNum * pageNum + 80;
 
     // 1. Job Cards (Digital Printing)
-    if (shouldFetch('JobCard') && models.JobCard) {
+    if (shouldFetch('JobCard', 'Elite Digital Print', 'Digital Printing') && models.JobCard) {
       const q = {};
       if (hasDate) {
         const dateCond = {};
@@ -477,6 +526,9 @@ const getUserDataEntries = async (req, res) => {
           { createdByName: userRegex },
           { createdBy: userRegex },
           { updatedByName: userRegex },
+          { updatedBy: userRegex },
+          { 'auditTrail.performedByName': userRegex },
+          { 'auditTrail.performedBy': userRegex },
           { fusingOperator: userRegex },
           { printOperator: userRegex },
           { designer: userRegex },
@@ -508,25 +560,364 @@ const getUserDataEntries = async (req, res) => {
             const rawFabric = doc.fabric || doc.fabricName || doc.fabricType || 'Fabric';
             const rawMtr = doc.totalMtr || doc.freshMtr || doc.fusingMtr || 0;
             const parsedDate = doc.created_date_time || (doc.date ? new Date(doc.date) : (doc.createdAt || new Date()));
+            const lastAudit = Array.isArray(doc.auditTrail) && doc.auditTrail.length > 0
+              ? doc.auditTrail[doc.auditTrail.length - 1]
+              : null;
+            const editorName = doc.updatedByName || doc.updatedBy || (lastAudit ? (lastAudit.performedByName || lastAudit.performedBy) : '');
+            const editorDate = doc.modified_date_time || doc.updatedAt || (lastAudit ? lastAudit.timestamp : null);
+
             return {
               id: doc._id,
               module: 'JobCard',
               moduleLabel: 'Job Card',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Digital Printing',
               identifier: doc.jobNo || `#${String(doc._id).slice(-6)}`,
               party: rawParty,
               details: `${rawMtr} Mtr • ${rawFabric} • Design: ${doc.designNo || doc.designName || 'N/A'}${doc.fusingMtr ? ` • Fused: ${doc.fusingMtr}m` : ''}${doc.printMtr ? ` • Print: ${doc.printMtr}m` : ''}`,
               amountOrQuantity: `${rawMtr} Mtr`,
               status: doc.fusingStatus || doc.printStatus || doc.status || doc.productionStage || 'Production',
-              createdBy: doc.createdByName || doc.createdBy || doc.updatedByName || doc.fusingOperator || doc.printOperator || 'Staff User',
+              createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
+              auditTrail: doc.auditTrail || [],
               rawDoc: doc,
             };
           }))
       );
     }
 
-    // 2. Garment Job Cards
-    if (shouldFetch('GarmentJobCard') && models.GarmentJobCard) {
+    // 2. Projects & Tasks
+    if (shouldFetch('Task', 'Elite Edition', 'Projects & Tasks') && models.Task) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ createdAt: dateCond }, { updatedAt: dateCond }, { dueDate: dateCond }];
+      }
+      if (userRegex) {
+        const userOr = [
+          { 'auditLogs.userName': userRegex },
+          { 'comments.senderName': userRegex },
+        ];
+        if (matchedUserIds.length > 0) {
+          userOr.push({ createdBy: { $in: matchedUserIds } });
+          userOr.push({ assignees: { $in: matchedUserIds } });
+        }
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
+        delete q.$or;
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { title: searchRegex },
+          { projectRef: searchRegex },
+          { clientName: searchRegex },
+          { department: searchRegex },
+          { description: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.Task.find(q)
+          .populate('createdBy', 'name username')
+          .populate('assignees', 'name username')
+          .sort({ updatedAt: -1, createdAt: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.createdAt || new Date();
+            const lastAudit = Array.isArray(doc.auditLogs) && doc.auditLogs.length > 0
+              ? doc.auditLogs[doc.auditLogs.length - 1]
+              : null;
+            const editorName = lastAudit?.userName || '';
+            const editorDate = lastAudit?.timestamp || doc.updatedAt || null;
+            const creatorName = doc.createdBy?.name || doc.createdBy?.username || 'Staff User';
+            const projTitle = doc.projectRef ? `[${doc.projectRef}] ${doc.title}` : doc.title;
+            const assigneeNames = Array.isArray(doc.assignees) ? doc.assignees.map(a => a.name || a.username).filter(Boolean).join(', ') : '';
+
+            return {
+              id: doc._id,
+              module: 'Task',
+              moduleLabel: 'Project / Task',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Edition'),
+              department: doc.department && doc.department !== 'General' ? doc.department : 'Projects & Tasks',
+              identifier: projTitle,
+              party: doc.clientName || doc.projectRef || 'General Project',
+              project: doc.projectRef || '',
+              details: `Dept: ${doc.department || 'General'} • Priority: ${doc.priority || 'medium'}${assigneeNames ? ` • Assigned: ${assigneeNames}` : ''}${doc.auditLogs?.length ? ` • ${doc.auditLogs.length} updates logged` : ''}`,
+              amountOrQuantity: doc.estimatedHours ? `${doc.estimatedHours} hrs` : (doc.status || 'Active'),
+              status: doc.status || 'To Do',
+              createdBy: creatorName,
+              createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
+              auditTrail: (doc.auditLogs || []).map(al => ({
+                performedByName: al.userName || 'Staff',
+                action: 'UPDATE',
+                details: `${al.fieldChanged}: '${al.oldValue || ''}' ➔ '${al.newValue || ''}'`,
+                timestamp: al.timestamp
+              })),
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 3. Fabric Inward & Outward Transactions
+    if (shouldFetch('FabricTransaction', 'Elite Digital Print', 'Fabric & Stock') && (models.FabricTransaction || models.Fabric) && !userRegex) {
+      const targetModel = models.FabricTransaction || models.Fabric;
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ date: dateCond }, { createdAt: dateCond }];
+      }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        q.companyEntity = new RegExp(`^${escapeRegex(companyFilter)}`, 'i');
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { fabricQuality: searchRegex },
+          { vendorName: searchRegex },
+          { partyName: searchRegex },
+          { billTo: searchRegex },
+          { notes: searchRegex },
+        ];
+        const numVal = Number(search.trim());
+        if (!isNaN(numVal) && numVal > 0) {
+          searchOr.push({ lotNo: numVal });
+        }
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        targetModel.find(q)
+          .sort({ date: -1, createdAt: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.date || doc.createdAt || new Date();
+            const rawParty = doc.partyName || doc.vendorName || (doc.type === 'INWARD' ? 'Vendor Inward' : 'Party Outward');
+            const rolls = doc.totalTp || (doc.tpDetails?.length || 0);
+            return {
+              id: doc._id,
+              module: 'FabricTransaction',
+              moduleLabel: `Fabric ${doc.type === 'INWARD' ? 'Inward' : 'Outward'}`,
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Fabric & Stock',
+              identifier: doc.type === 'INWARD' ? `Lot #${doc.lotNo || '—'}` : (doc.jobNo ? `Job #${doc.jobNo}` : `Outward Lot #${doc.lotNo || '—'}`),
+              party: rawParty,
+              details: `${doc.qty || 0} Mtr (${rolls} Rolls) • ${doc.fabricQuality || 'Fabric'}${doc.panna ? ` • Panna: ${doc.panna}` : ''}${doc.challanNo ? ` • Challan: ${doc.challanNo}` : ''}`,
+              amountOrQuantity: `${doc.qty || 0} Mtr`,
+              status: doc.type === 'INWARD' ? 'Stock Inward' : 'Stock Outward',
+              createdBy: doc.companyEntity || 'Fabric Dept',
+              createdAt: parsedDate,
+              updatedBy: '',
+              updatedByName: '',
+              updatedAt: doc.updatedAt || null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 4. Raw Material Transactions
+    if (shouldFetch('RawMaterialTransaction', 'Elite Digital Print', 'Fabric & Stock') && models.RawMaterialTransaction) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ date: dateCond }, { createdAt: dateCond }];
+      }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        q.companyEntity = new RegExp(`^${escapeRegex(companyFilter)}`, 'i');
+      }
+      if (userRegex) {
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+          { receivedBy: userRegex },
+          { issuedTo: userRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : [{ $or: userOr }];
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { materialName: searchRegex },
+          { vendorName: searchRegex },
+          { receivedBy: searchRegex },
+          { issuedTo: searchRegex },
+          { challanNo: searchRegex },
+          { jobNo: searchRegex },
+          { purpose: searchRegex },
+          { remarks: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.RawMaterialTransaction.find(q)
+          .sort({ date: -1, createdAt: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.date || doc.createdAt || new Date();
+            const partyStr = doc.type === 'INWARD' ? (doc.vendorName || 'Supplier Inward') : (doc.issuedTo || 'Internal Issue');
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            return {
+              id: doc._id,
+              module: 'RawMaterialTransaction',
+              moduleLabel: `Raw Material (${doc.type || 'INWARD'})`,
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Fabric & Stock',
+              identifier: doc.type === 'INWARD'
+                ? (doc.challanNo ? `Challan #${doc.challanNo}` : (doc.lotNo ? `Lot #${doc.lotNo}` : 'RM Inward'))
+                : (doc.jobNo ? `Job #${doc.jobNo}` : 'RM Outward'),
+              party: partyStr,
+              details: `${doc.materialName} • ${doc.qty} ${doc.unit || 'Rolls'}${doc.purpose ? ` • ${doc.purpose}` : ''}${doc.remarks ? ` • ${doc.remarks}` : ''}`,
+              amountOrQuantity: `${doc.qty} ${doc.unit || 'Rolls'}`,
+              status: doc.type === 'INWARD' ? 'RM Inward' : 'RM Outward',
+              createdBy: doc.createdByName || doc.createdBy || doc.receivedBy || 'Staff User',
+              createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: doc.updatedAt || null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 5. Catalog Designs
+    if (shouldFetch('Design', 'Elite Digital Print', 'Design & Pre-Press') && models.Design) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ created_date_time: dateCond }, { createdAt: dateCond }];
+      }
+      if (userRegex) {
+        const userOr = [{ designerName: userRegex }];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
+        delete q.$or;
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { designName: searchRegex },
+          { designerName: searchRegex },
+          { fabricName: searchRegex },
+          { category: searchRegex },
+          { parties: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.Design.find(q)
+          .sort({ created_date_time: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            const partyStr = Array.isArray(doc.parties) && doc.parties.length ? doc.parties.join(', ') : 'Catalog';
+            return {
+              id: doc._id,
+              module: 'Design',
+              moduleLabel: 'Catalog Design',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Design & Pre-Press',
+              identifier: doc.designName || 'Design',
+              party: partyStr,
+              details: `Category: ${doc.category || 'General'} • Fabric: ${doc.fabricName || '—'}${doc.colors ? ` • Colors: ${doc.colors}` : ''}${doc.panna ? ` • Panna: ${doc.panna}` : ''}`,
+              amountOrQuantity: doc.category || 'Design',
+              status: doc.status || 'Active',
+              createdBy: doc.designerName || 'Design Team',
+              createdAt: parsedDate,
+              updatedBy: '',
+              updatedByName: '',
+              updatedAt: doc.modified_date_time || doc.updatedAt || null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 6. Designer Tasks
+    if (shouldFetch('DesignerTask', 'Elite Digital Print', 'Design & Pre-Press') && models.DesignerTask) {
+      const q = {};
+      if (hasDate) {
+        const strCond = {};
+        if (startDateStr) strCond.$gte = startDateStr;
+        if (endDateStr) strCond.$lte = endDateStr;
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ date: strCond }, { createdAt: dateCond }];
+      }
+      if (userRegex) {
+        const userOr = [
+          { designerName: userRegex },
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : [{ $or: userOr }];
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { taskNo: searchRegex },
+          { designName: searchRegex },
+          { clientName: searchRegex },
+          { designerName: searchRegex },
+          { category: searchRegex },
+          { notes: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.DesignerTask.find(q)
+          .sort({ date: -1, createdAt: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.date ? new Date(doc.date) : (doc.createdAt || new Date());
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            return {
+              id: doc._id,
+              module: 'DesignerTask',
+              moduleLabel: 'Designer Task',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Design & Pre-Press',
+              identifier: doc.taskNo ? `Task #${doc.taskNo}` : (doc.designName || 'Designer Task'),
+              party: doc.clientName || 'In-House Pre-Press',
+              details: `Designer: ${doc.designerName || 'Unassigned'} • Category: ${doc.category || 'General'} • Priority: ${doc.priority || 'Normal'}`,
+              amountOrQuantity: doc.category || 'Design Task',
+              status: doc.status || 'Pending',
+              createdBy: doc.createdByName || doc.createdBy || doc.designerName || 'Design Team',
+              createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: doc.updatedAt || null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 7. Garment Job Cards
+    if (shouldFetch('GarmentJobCard', 'Elite Stitching', 'Stitching & Garments') && models.GarmentJobCard) {
       const q = {};
       if (hasDate) {
         const dateCond = {};
@@ -535,7 +926,13 @@ const getUserDataEntries = async (req, res) => {
         q.$or = [{ created_date_time: dateCond }, { createdAt: dateCond }, { targetDate: dateCond }];
       }
       if (userRegex) {
-        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }, { designer: userRegex }];
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+          { designer: userRegex },
+        ];
         q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
@@ -557,10 +954,14 @@ const getUserDataEntries = async (req, res) => {
           .then(docs => docs.map(doc => {
             const pcs = doc.totalPieces || doc.pieces || 0;
             const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            const editorDate = doc.modified_date_time || doc.updatedAt || null;
             return {
               id: doc._id,
               module: 'GarmentJobCard',
               moduleLabel: 'Garment Job Card',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Stitching'),
+              department: 'Stitching & Garments',
               identifier: doc.jobNo ? `Garment #${doc.jobNo}` : 'Garment Job',
               party: doc.clientName || doc.partyName || 'Client',
               details: `${pcs} Pcs • Style: ${doc.styleNo || 'N/A'} • Status: ${doc.status || 'Active'}`,
@@ -568,14 +969,17 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Active',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
               rawDoc: doc,
             };
           }))
       );
     }
 
-    // 3. Billing Invoices
-    if (shouldFetch('BillingInvoice') && models.BillingInvoice) {
+    // 8. Billing Invoices
+    if (shouldFetch('BillingInvoice', 'Elite Digital Print', 'Billing & Accounts') && models.BillingInvoice) {
       const q = {};
       if (hasDate) {
         const dateCond = {};
@@ -587,8 +991,18 @@ const getUserDataEntries = async (req, res) => {
           { createdAt: dateCond },
         ];
       }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        q.companyEntity = new RegExp(`^${escapeRegex(companyFilter)}`, 'i');
+      }
       if (userRegex) {
-        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }];
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+          { uploadedByName: userRegex },
+          { approvedByName: userRegex },
+        ];
         q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
@@ -614,10 +1028,14 @@ const getUserDataEntries = async (req, res) => {
             const paid = Number(doc.paidAmount || 0);
             const due = Number(doc.balanceDue || (total - paid));
             const parsedDate = doc.invoiceDate || doc.created_at || doc.createdAt || new Date();
+            const editorName = doc.uploadedByName || doc.approvedByName || doc.updatedByName || doc.updatedBy || '';
+            const editorDate = doc.approvedAt || doc.updated_at || doc.updatedAt || null;
             return {
               id: doc._id,
               module: 'BillingInvoice',
               moduleLabel: 'Tax Invoice',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Billing & Accounts',
               identifier: doc.invoiceNo || (doc.invoicePrefix ? `${doc.invoicePrefix}${doc.invoiceSeq}` : 'Invoice'),
               party: rawParty,
               details: `Total: ₹${total.toLocaleString('en-IN')} • Paid: ₹${paid.toLocaleString('en-IN')} • Due: ₹${due.toLocaleString('en-IN')} • ${doc.items?.length || 0} Items`,
@@ -625,14 +1043,69 @@ const getUserDataEntries = async (req, res) => {
               status: `${doc.paymentStatus || 'UNPAID'} (${doc.invoiceStatus || 'FINAL'})`,
               createdBy: doc.createdByName || doc.createdBy || 'Billing Team',
               createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
               rawDoc: doc,
             };
           }))
       );
     }
 
-    // 4. Expenses
-    if (shouldFetch('Expense') && models.Expense) {
+    // 9. Billing Purchases
+    if (shouldFetch('BillingPurchase', 'Elite Digital Print', 'Billing & Accounts') && models.BillingPurchase && !userRegex) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ date: dateCond }, { createdAt: dateCond }];
+      }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        q.companyEntity = new RegExp(`^${escapeRegex(companyFilter)}`, 'i');
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { purchaseNo: searchRegex },
+          { vendorName: searchRegex },
+          { itemName: searchRegex },
+          { notes: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.BillingPurchase.find(q)
+          .sort({ date: -1, createdAt: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const amt = Number(doc.totalAmount || 0);
+            const parsedDate = doc.date || doc.createdAt || new Date();
+            return {
+              id: doc._id,
+              module: 'BillingPurchase',
+              moduleLabel: 'Purchase Bill',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Billing & Accounts',
+              identifier: doc.purchaseNo ? `PO #${doc.purchaseNo}` : 'Purchase Bill',
+              party: doc.vendorName || 'Vendor',
+              details: `${doc.items?.length || 1} Items • Taxable: ₹${Number(doc.taxableAmount || 0).toLocaleString('en-IN')}${doc.notes ? ` • ${doc.notes}` : ''}`,
+              amountOrQuantity: `₹${amt.toLocaleString('en-IN')}`,
+              status: 'Purchase Bill',
+              createdBy: 'Accounts / Purchase',
+              createdAt: parsedDate,
+              updatedBy: '',
+              updatedByName: '',
+              updatedAt: doc.updatedAt || null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 10. Expenses
+    if (shouldFetch('Expense', 'Elite Digital Print', 'Billing & Accounts') && models.Expense) {
       const q = {};
       if (hasDate) {
         const strCond = {};
@@ -648,8 +1121,16 @@ const getUserDataEntries = async (req, res) => {
           { createdAt: dateCond },
         ];
       }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        q.companyEntity = new RegExp(`^${escapeRegex(companyFilter)}`, 'i');
+      }
       if (userRegex) {
-        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }];
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+        ];
         q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
@@ -675,10 +1156,14 @@ const getUserDataEntries = async (req, res) => {
             const rawParty = doc.paidToOrReceivedFrom || doc.partyName || doc.vendorName || doc.title || 'General';
             const amt = Number(doc.amount || 0);
             const parsedDate = doc.date ? new Date(doc.date) : (doc.createdAt || new Date());
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            const editorDate = doc.updatedAt || null;
             return {
               id: doc._id,
               module: 'Expense',
               moduleLabel: `Expense (${doc.type || 'OUT'})`,
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Billing & Accounts',
               identifier: doc.voucherNo || doc.title || 'Expense',
               party: rawParty,
               details: `${doc.category || 'General'} • Mode: ${doc.paymentMode || 'Cash'} ${doc.description ? `• ${doc.description}` : ''}`,
@@ -686,14 +1171,85 @@ const getUserDataEntries = async (req, res) => {
               status: doc.type === 'IN' ? 'Cash IN' : 'Cash OUT',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
               rawDoc: doc,
             };
           }))
       );
     }
 
-    // 5. Fabric Challans
-    if (shouldFetch('FabricChallan') && models.FabricChallan) {
+    // 11. Complaints & Quality Management
+    if (shouldFetch('Complaint', 'Elite Digital Print', 'Quality & Complaints') && models.Complaint) {
+      const q = {};
+      if (hasDate) {
+        const strCond = {};
+        if (startDateStr) strCond.$gte = startDateStr;
+        if (endDateStr) strCond.$lte = endDateStr;
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ date: strCond }, { createdAt: dateCond }, { resolvedDate: dateCond }];
+      }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        q.companyEntity = new RegExp(`^${escapeRegex(companyFilter)}`, 'i');
+      }
+      if (userRegex) {
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+          { assignedTo: userRegex },
+          { responsiblePerson: userRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: userOr }] : [{ $or: userOr }];
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { complaintNo: searchRegex },
+          { partyName: searchRegex },
+          { jobCardNo: searchRegex },
+          { invoiceNo: searchRegex },
+          { category: searchRegex },
+          { description: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.Complaint.find(q)
+          .sort({ createdAt: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.createdAt || (doc.date ? new Date(doc.date) : new Date());
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            return {
+              id: doc._id,
+              module: 'Complaint',
+              moduleLabel: 'Quality Complaint',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Quality & Complaints',
+              identifier: doc.complaintNo ? `#${doc.complaintNo}` : 'Complaint',
+              party: doc.partyName || 'Party',
+              details: `${doc.category || 'Printing Defect'} • Defective: ${doc.defectiveMeters || 0}m • Priority: ${doc.priority || 'Medium'}${doc.jobCardNo ? ` • Job: #${doc.jobCardNo}` : ''}${doc.responsiblePerson ? ` • Resp: ${doc.responsiblePerson}` : ''}`,
+              amountOrQuantity: doc.defectiveMeters ? `${doc.defectiveMeters} Mtr` : (doc.expectedAmount ? `₹${doc.expectedAmount}` : 'Complaint'),
+              status: doc.status || 'Open',
+              createdBy: doc.createdByName || doc.createdBy || 'Staff User',
+              createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: doc.updatedAt || null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 12. Fabric Challans
+    if (shouldFetch('FabricChallan', 'Elite Digital Print', 'Fabric & Stock') && models.FabricChallan) {
       const q = {};
       if (hasDate) {
         const dateCond = {};
@@ -701,8 +1257,17 @@ const getUserDataEntries = async (req, res) => {
         if (dateEndObj) dateCond.$lte = dateEndObj;
         q.$or = [{ date: dateCond }, { createdAt: dateCond }];
       }
+      if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+        q.companyEntity = new RegExp(`^${escapeRegex(companyFilter)}`, 'i');
+      }
       if (userRegex) {
-        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }, { deliveryBy: userRegex }];
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+          { deliveryBy: userRegex },
+        ];
         q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
@@ -729,10 +1294,14 @@ const getUserDataEntries = async (req, res) => {
             const mtr = doc.totalMtr || doc.totalMeters || doc.freshMtr || 0;
             const rolls = doc.totalRolls || (doc.tpDetails?.length || 0);
             const parsedDate = doc.date || doc.createdAt || new Date();
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            const editorDate = doc.updatedAt || null;
             return {
               id: doc._id,
               module: 'FabricChallan',
               moduleLabel: 'Fabric Challan',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Fabric & Stock',
               identifier: doc.challanNo ? `Challan #${doc.challanNo}` : 'Fabric Challan',
               party: doc.partyName || 'Party',
               details: `${mtr} Mtr (${rolls} Rolls) • ${doc.fabricName || 'Fabric'} • Lot: ${doc.lotNo || 'N/A'}`,
@@ -740,14 +1309,17 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Active',
               createdBy: doc.createdByName || doc.createdBy || doc.deliveryBy || 'Staff User',
               createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
               rawDoc: doc,
             };
           }))
       );
     }
 
-    // 6. Stitching Challans
-    if (shouldFetch('StitchingChallan') && models.StitchingChallan) {
+    // 13. Stitching Challans
+    if (shouldFetch('StitchingChallan', 'Elite Stitching', 'Stitching & Garments') && models.StitchingChallan) {
       const q = {};
       if (hasDate) {
         const dateCond = {};
@@ -756,7 +1328,13 @@ const getUserDataEntries = async (req, res) => {
         q.$or = [{ created_date_time: dateCond }, { date: dateCond }, { createdAt: dateCond }];
       }
       if (userRegex) {
-        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }, { workerName: userRegex }];
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+          { workerName: userRegex },
+        ];
         q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
@@ -781,10 +1359,14 @@ const getUserDataEntries = async (req, res) => {
           .then(docs => docs.map(doc => {
             const pcs = doc.totalPieces || doc.pieces || 0;
             const parsedDate = doc.created_date_time || doc.date || doc.createdAt || new Date();
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            const editorDate = doc.updatedAt || null;
             return {
               id: doc._id,
               module: 'StitchingChallan',
               moduleLabel: 'Stitching Challan',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Stitching'),
+              department: 'Stitching & Garments',
               identifier: doc.challanNo ? `Stitching #${doc.challanNo}` : 'Stitching Challan',
               party: doc.partyName || doc.workerName || 'Worker',
               details: `${pcs} Pcs • Job #${doc.jobNo || 'N/A'} • Worker: ${doc.workerName || 'N/A'}`,
@@ -792,14 +1374,17 @@ const getUserDataEntries = async (req, res) => {
               status: doc.status || 'Active',
               createdBy: doc.createdByName || doc.createdBy || doc.workerName || 'Staff User',
               createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
               rawDoc: doc,
             };
           }))
       );
     }
 
-    // 7. Inventory Inward/Stock
-    if (shouldFetch('Inventory') && models.Inventory) {
+    // 14. Inventory Inward/Stock
+    if (shouldFetch('Inventory', 'Elite Edition', 'Inventory & Warehouse') && models.Inventory) {
       const q = {};
       if (hasDate) {
         const dateCond = {};
@@ -808,7 +1393,12 @@ const getUserDataEntries = async (req, res) => {
         q.$or = [{ created_date_time: dateCond }, { createdAt: dateCond }];
       }
       if (userRegex) {
-        const userOr = [{ createdByName: userRegex }, { createdBy: userRegex }];
+        const userOr = [
+          { createdByName: userRegex },
+          { createdBy: userRegex },
+          { updatedByName: userRegex },
+          { updatedBy: userRegex },
+        ];
         q.$and = q.$and ? [...q.$and, { $or: userOr }] : (q.$or ? [{ $or: q.$or }, { $or: userOr }] : [{ $or: userOr }]);
         delete q.$or;
       }
@@ -832,10 +1422,14 @@ const getUserDataEntries = async (req, res) => {
             const parsedDate = doc.created_date_time || doc.createdAt || new Date();
             const qty = doc.quantity || 0;
             const unit = doc.unit || 'Units';
+            const editorName = doc.updatedByName || doc.updatedBy || '';
+            const editorDate = doc.updatedAt || null;
             return {
               id: doc._id,
               module: 'Inventory',
               moduleLabel: 'Inventory Item',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Edition'),
+              department: 'Inventory & Warehouse',
               identifier: doc.productName || doc.itemName || 'Inventory Item',
               party: doc.vendorName || doc.supplier || 'Stock',
               details: `${qty} ${unit} • ${doc.category || doc.type || 'Stock'}${doc.sku ? ` • SKU: ${doc.sku}` : ''}`,
@@ -843,6 +1437,108 @@ const getUserDataEntries = async (req, res) => {
               status: doc.type || doc.category || 'In Stock',
               createdBy: doc.createdByName || doc.createdBy || 'Staff User',
               createdAt: parsedDate,
+              updatedBy: editorName,
+              updatedByName: editorName,
+              updatedAt: editorDate,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 15. Stock Out Dispatches
+    if (shouldFetch('StockOut', 'Elite Edition', 'Inventory & Warehouse') && models.StockOut && !userRegex) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ created_date_time: dateCond }, { createdAt: dateCond }];
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { skuCode: searchRegex },
+          { party: searchRegex },
+          { facility: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.StockOut.find(q)
+          .sort({ created_date_time: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.created_date_time || doc.createdAt || new Date();
+            return {
+              id: doc._id,
+              module: 'StockOut',
+              moduleLabel: 'Stock Out Dispatch',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Edition'),
+              department: 'Inventory & Warehouse',
+              identifier: doc.skuCode ? `SKU: ${doc.skuCode}` : 'Stock Out',
+              party: doc.party || 'Customer / Dispatch',
+              details: `Qty Out: ${doc.qtyOut || 1} • Facility: ${doc.facility || 'Warehouse'}`,
+              amountOrQuantity: `${doc.qtyOut || 1} Units`,
+              status: 'Dispatched',
+              createdBy: doc.facility || 'Warehouse Staff',
+              createdAt: parsedDate,
+              updatedBy: '',
+              updatedByName: '',
+              updatedAt: doc.modified_date_time || doc.updatedAt || null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 16. Sale Orders (Online)
+    if (shouldFetch('SaleOrder', 'Elite Online', 'E-Commerce & Orders') && models.SaleOrder && !userRegex) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [{ createdAt: dateCond }, { orderDate: dateCond }];
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { displayOrderCode: searchRegex },
+          { saleOrderItemCode: searchRegex },
+          { shippingAddressName: searchRegex },
+          { billingAddressName: searchRegex },
+          { itemSKUCode: searchRegex },
+          { itemTypeName: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.SaleOrder.find(q)
+          .sort({ createdAt: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.createdAt || (doc.orderDate ? new Date(doc.orderDate) : new Date());
+            const cust = doc.shippingAddressName || doc.billingAddressName || 'Online Order';
+            const price = doc.totalPrice ? `₹${Number(doc.totalPrice).toLocaleString('en-IN')}` : 'Order Item';
+            return {
+              id: doc._id,
+              module: 'SaleOrder',
+              moduleLabel: 'Sale Order',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Online'),
+              department: 'E-Commerce & Orders',
+              identifier: doc.displayOrderCode || doc.saleOrderItemCode || 'Order',
+              party: cust,
+              details: `SKU: ${doc.itemSKUCode || '—'} • ${doc.itemTypeName || 'Garment'} • City: ${doc.shippingAddressCity || '—'}`,
+              amountOrQuantity: price,
+              status: doc.saleOrderItemStatus || doc.saleOrderStatus || 'Pending',
+              createdBy: 'Marketplace / Web',
+              createdAt: parsedDate,
+              updatedBy: '',
+              updatedByName: '',
+              updatedAt: doc.updatedAt || null,
               rawDoc: doc,
             };
           }))
@@ -850,7 +1546,19 @@ const getUserDataEntries = async (req, res) => {
     }
 
     const resultsArray = await Promise.all(promises);
-    const allEntries = resultsArray.flat();
+    let allEntries = resultsArray.flat();
+
+    // Post-filter by company if specified
+    if (companyFilter && companyFilter !== 'ALL' && companyFilter !== 'All') {
+      const normFilter = normalizeCompany(companyFilter).toLowerCase();
+      allEntries = allEntries.filter(e => normalizeCompany(e.companyEntity).toLowerCase() === normFilter);
+    }
+
+    // Post-filter by department if specified
+    if (departmentFilter && departmentFilter !== 'ALL' && departmentFilter !== 'All') {
+      const normDept = departmentFilter.toLowerCase();
+      allEntries = allEntries.filter(e => (e.department || '').toLowerCase() === normDept);
+    }
 
     // Sort by createdAt descending
     allEntries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -876,62 +1584,46 @@ const getUserDataEntries = async (req, res) => {
 };
 
 /**
- * Get distinct user list who have created or entered data
+ * Get distinct user list who have created, updated, or audited data
  */
 const getEntryUsersList = async (req, res) => {
   try {
     const userSet = new Set();
+    const excluded = new Set([
+      'eliteedition', 'eliteac', 'admin', 'system', 'operator', 'staff user',
+      '3', '350', 'porter', 'self drive', 'dubeji', 'sankar ji', 'lukman'
+    ]);
 
-    // 1. Registered active system users
+    // 1. Registered staff accounts from models.user
     if (models.user) {
-      const activeUsers = await models.user.find({}, 'name username role').lean();
+      const activeUsers = await models.user.find({}, 'name role email').lean();
       activeUsers.forEach(u => {
-        if (u.name && u.name.trim()) userSet.add(u.name.trim());
-        if (u.username && u.username.trim()) userSet.add(u.username.trim());
+        const name = (u.name || '').trim();
+        if (name && !excluded.has(name.toLowerCase())) {
+          userSet.add(name);
+        }
       });
     }
 
-    // 2. JobCards creators, updaters, and department operators
-    if (models.JobCard) {
-      const jcCreators = await models.JobCard.distinct('createdByName');
-      jcCreators.forEach(u => u && userSet.add(String(u).trim()));
-      const jcUpdaters = await models.JobCard.distinct('updatedByName');
-      jcUpdaters.forEach(u => u && userSet.add(String(u).trim()));
-      const jcFusingOps = await models.JobCard.distinct('fusingOperator');
-      jcFusingOps.forEach(u => u && userSet.add(String(u).trim()));
-      const jcPrintOps = await models.JobCard.distinct('printOperator');
-      jcPrintOps.forEach(u => u && userSet.add(String(u).trim()));
-      const jcDesigners = await models.JobCard.distinct('designer');
-      jcDesigners.forEach(u => u && userSet.add(String(u).trim()));
-    }
-
-    // 3. Billing Invoices
-    if (models.BillingInvoice) {
-      const invCreators = await models.BillingInvoice.distinct('createdBy');
-      invCreators.forEach(u => u && userSet.add(String(u).trim()));
-      const invNames = await models.BillingInvoice.distinct('createdByName');
-      invNames.forEach(u => u && userSet.add(String(u).trim()));
-    }
-
-    // 4. Expenses
-    if (models.Expense) {
-      const expCreators = await models.Expense.distinct('createdByName');
-      expCreators.forEach(u => u && userSet.add(String(u).trim()));
-    }
-
-    // 5. Fabric Challans
-    if (models.FabricChallan) {
-      const fcCreators = await models.FabricChallan.distinct('createdByName');
-      fcCreators.forEach(u => u && userSet.add(String(u).trim()));
-      const fcDeliv = await models.FabricChallan.distinct('deliveryBy');
-      fcDeliv.forEach(u => u && userSet.add(String(u).trim()));
-    }
-
-    // 6. Stitching Challans
-    if (models.StitchingChallan) {
-      const scWorkers = await models.StitchingChallan.distinct('workerName');
-      scWorkers.forEach(u => u && userSet.add(String(u).trim()));
-    }
+    // 2. Recognized staff members who entered or edited ERP data
+    const recognizedStaff = [
+      'Ajay Bind',
+      'Dev Patel',
+      'Devansu',
+      'Dhruv Patel',
+      'Durgesh Yadav',
+      'Harshil',
+      'Harshit Sidapara (HASI)',
+      'Jay Asodariya',
+      'Jay Patel',
+      'Kaushik Nakum',
+      'Parth Asodariya',
+      'Raj Dave',
+      'Ram Patel',
+      'Rohit',
+      'Rushabh Patel'
+    ];
+    recognizedStaff.forEach(s => userSet.add(s));
 
     const sortedUsers = Array.from(userSet).filter(Boolean).sort((a, b) => a.localeCompare(b));
 
