@@ -1034,6 +1034,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       const pStateCode = partyInfo.stateCode;
 
       if (grandTotal > 0) {
+        let prodService = '';
+        if (Array.isArray(inv.items) && inv.items.length > 0) {
+          const itemNames = Array.from(new Set(inv.items.map(it => it.itemName?.trim()).filter(Boolean)));
+          prodService = itemNames.join(', ');
+        }
+        if (!prodService) {
+          prodService = inv.itemName || inv.productName || (inv.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"');
+        }
+
         periodTx.push({
           date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
           rawDate: invDate,
@@ -1046,7 +1055,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           gstin: pGstin,
           state: pState,
           stateCode: pStateCode,
-          opposingLedger: 'Sales - Digital Print',
+          opposingLedger: prodService,
+          productService: prodService,
           taxableAmount: taxDetails.taxable,
           cgstAmount: taxDetails.cgst,
           sgstAmount: taxDetails.sgst,
@@ -1075,6 +1085,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           state: pState,
           stateCode: pStateCode,
           opposingLedger: isCash ? 'Cash Account' : 'Bank Account',
+          productService: isCash ? 'Cash Account' : 'Bank Account',
           taxableAmount: 0,
           cgstAmount: 0,
           sgstAmount: 0,
@@ -1405,12 +1416,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
         // ── SHEET 2: TALLY PRIME / ACCOUNTING IMPORT FORMAT ──
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Sales / Bank Ledger', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN', 'Narration']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
         ledger.transactions.forEach(t => {
           const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
-          const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
+          const prodService = t.productService || t.opposingLedger || (vType === 'Sales' ? (t.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"') : 'Bank Account');
           const totAmt = t.debit > 0 ? t.debit : t.credit;
 
           const rowPartyName = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
@@ -1423,7 +1434,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             vType,
             t.voucherNo,
             rowPartyName,
-            oppLedger,
+            prodService,
             Number(t.taxableAmount) || 0,
             Number(t.cgstAmount) || 0,
             Number(t.sgstAmount) || 0,
@@ -1432,8 +1443,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             Number(t.debit) || 0,
             Number(t.credit) || 0,
             rowState,
-            cleanRowGst,
-            t.narration || t.particulars || ''
+            cleanRowGst
           ]);
         });
 
@@ -1443,7 +1453,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           { wch: 14 }, // Voucher Type
           { wch: 20 }, // Voucher No
           { wch: 32 }, // Party Ledger Name
-          { wch: 26 }, // Sales/Bank Ledger
+          { wch: 32 }, // Product / Service
           { wch: 16 }, // Taxable Amount
           { wch: 12 }, // CGST
           { wch: 12 }, // SGST
@@ -1453,7 +1463,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           { wch: 14 }, // Credit
           { wch: 18 }, // POS
           { wch: 18 }, // GSTIN
-          { wch: 45 }, // Narration
         ];
         XLSX.utils.book_append_sheet(wb, wsTally, 'Tally Import Format');
 
@@ -1678,6 +1687,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
           const taxD = extractInvoiceTaxDetails(inv);
           if (grandTotal > 0) {
+            let prodService = '';
+            if (Array.isArray(inv.items) && inv.items.length > 0) {
+              const itemNames = Array.from(new Set(inv.items.map(it => it.itemName?.trim()).filter(Boolean)));
+              prodService = itemNames.join(', ');
+            }
+            if (!prodService) {
+              prodService = inv.itemName || inv.productName || (inv.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"');
+            }
+
             allTransactions.push({
               date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
               rawDate: invDate,
@@ -1689,7 +1707,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               partyName: pInfo.partyName,
               partyGstin: pInfo.partyGstin,
               partyState: pInfo.state,
-              opposingLedger: 'Sales - Digital Print',
+              opposingLedger: prodService,
+              productService: prodService,
               taxableAmount: taxD.taxable,
               cgstAmount: taxD.cgst,
               sgstAmount: taxD.sgst,
@@ -1735,25 +1754,25 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         allTransactions.sort((a, b) => (a.rawDate || 0) - (b.rawDate || 0));
 
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Sales / Bank Ledger', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN', 'Narration']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
         allTransactions.forEach(t => {
           const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
-          const oppLedger = t.opposingLedger || (vType === 'Sales' ? 'Sales - Digital Print' : 'Bank Account');
+          const prodService = t.productService || t.opposingLedger || (vType === 'Sales' ? (t.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"') : 'Bank Account');
           const totAmt = t.debit > 0 ? t.debit : t.credit;
 
           const rowPartyName = t.partyName || 'Sundry Debtors';
           const rowGstin = (t.partyGstin || t.gstin || '').trim().toUpperCase();
           const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
-          const rowState = t.partyState || t.state || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+          const rowState = t.partyState || t.state || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : (cleanRowGst ? 'Inter-State' : 'Gujarat (24)'));
 
           tallyRows.push([
             t.date,
             vType,
             t.voucherNo,
             rowPartyName,
-            oppLedger,
+            prodService,
             Number(t.taxableAmount) || 0,
             Number(t.cgstAmount) || 0,
             Number(t.sgstAmount) || 0,
@@ -1762,8 +1781,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             Number(t.debit) || 0,
             Number(t.credit) || 0,
             rowState,
-            cleanRowGst,
-            t.narration || t.particulars || ''
+            cleanRowGst
           ]);
         });
 
@@ -1773,7 +1791,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           { wch: 14 },
           { wch: 20 },
           { wch: 32 },
-          { wch: 26 },
+          { wch: 32 },
           { wch: 16 },
           { wch: 12 },
           { wch: 12 },
@@ -1783,7 +1801,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           { wch: 14 },
           { wch: 18 },
           { wch: 18 },
-          { wch: 45 },
         ];
         XLSX.utils.book_append_sheet(wb, wsTally, 'Tally All Vouchers');
 
