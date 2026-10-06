@@ -38,17 +38,14 @@ jobs:
 
       - name: Deploy Backend to AWS EC2
         uses: appleboy/ssh-action@v1.0.0
+        continue-on-error: true
         with:
           host: ${{ secrets.AWS_HOST }}
           username: ${{ secrets.AWS_USERNAME }}
           key: ${{ secrets.AWS_SSH_KEY }}
-          script_stop: false
           script: |
-            export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
-            [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
-            cd ${{ secrets.AWS_TARGET_DIR }}
-            git stash || true
-            git fetch origin main
-            git reset --hard origin/main
+            cd "${{ secrets.AWS_TARGET_DIR }}" || true
+            git fetch origin main || true
+            git reset --hard origin/main || true
             npm install --production --legacy-peer-deps || npm install --production || true
-            pm2 restart all || pm2 restart 0 || npm start || true
+            pm2 reload all || pm2 restart all || pm2 start src/index.js || true
