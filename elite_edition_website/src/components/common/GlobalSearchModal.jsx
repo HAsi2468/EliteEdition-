@@ -20,6 +20,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { triggerAIMeasurementModal } from './AIMeasurementAgentModal';
 
 /**
  * Enterprise Command Palette (Search & Quick Navigation)
@@ -28,6 +29,16 @@ import { api } from '../../services/api';
  */
 
 const FREQUENT_SHORTCUTS = [
+  {
+    id: 'shortcut_ai_measurement',
+    title: 'AI Textile Measurement & Yield Agent',
+    subtitle: 'Calibrate fabric shrinkage %, net fresh output meters & piece yield',
+    category: 'Shortcut',
+    badge: 'AI Tool',
+    icon: Sparkles,
+    color: '#2563eb',
+    action: 'ai_measurement'
+  },
   {
     id: 'shortcut_new_jobcard',
     title: 'New Job Card',
@@ -236,6 +247,11 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
     if (!item) return;
     saveRecentSearch(searchTerm.trim() || item.title);
     onClose();
+
+    if (item.action === 'ai_measurement') {
+      triggerAIMeasurementModal();
+      return;
+    }
 
     if (onSelectResult) {
       onSelectResult(item);

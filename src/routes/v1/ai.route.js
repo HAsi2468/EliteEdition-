@@ -1,5 +1,7 @@
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { z } = require('zod');
+const { validateRequest } = require('../../middlewares/validateRequest');
 const router = express.Router();
 
 let genAI = null;
@@ -311,8 +313,22 @@ function processSmartLocalNlp(text) {
   };
 }
 
+// Validation Schema for Textile Measurement & Yield Agent
+const calculateMeasurementSchema = z.object({
+  inputMeters: z.union([z.number(), z.string()]).transform((val) => Math.max(0, parseFloat(val) || 0)).optional().default(100),
+  fabricQuality: z.string().optional().default('French Crepe'),
+  panna: z.string().optional().default('58"'),
+  temp: z.union([z.number(), z.string()]).optional().default(205),
+  speed: z.union([z.number(), z.string()]).optional().default(80),
+  garmentType: z.string().optional().default('Kurti'),
+  customPieceMeters: z.union([z.number(), z.string(), z.null()]).optional(),
+  costPerMeter: z.union([z.number(), z.string(), z.null()]).optional(),
+  shrinkageOverride: z.union([z.number(), z.string(), z.null()]).optional(),
+  userPrompt: z.string().max(1500).optional().default('')
+});
+
 // POST /v1/ai/calculate-measurement - AI Textile Production Measurement Agent
-router.post('/calculate-measurement', async (req, res) => {
+router.post('/calculate-measurement', validateRequest({ body: calculateMeasurementSchema }), async (req, res) => {
   try {
     const {
       inputMeters = 100,
@@ -323,6 +339,7 @@ router.post('/calculate-measurement', async (req, res) => {
       garmentType = 'Kurti',
       customPieceMeters = null,
       costPerMeter = null,
+      shrinkageOverride = null,
       userPrompt = ''
     } = req.body;
 
@@ -337,7 +354,9 @@ router.post('/calculate-measurement', async (req, res) => {
     let recSpeed = '80 m/min';
     let fabricCategory = 'Polyester Base';
 
-    if (fLower.includes('crepe') || fLower.includes('french')) {
+    if (shrinkageOverride !== null && shrinkageOverride !== undefined && !isNaN(parseFloat(shrinkageOverride))) {
+      shrinkagePct = parseFloat(shrinkageOverride);
+    } else if (fLower.includes('crepe') || fLower.includes('french')) {
       shrinkagePct = 3.5;
       recTemp = '210°C';
       recSpeed = '80 m/min';

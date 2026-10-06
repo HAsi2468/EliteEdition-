@@ -1,28 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
-import { Sparkles, Calculator, Check, Copy, X, ArrowRight, Gauge, Thermometer, Layers, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  FABRIC_PRESETS,
+  GARMENT_PRESETS,
+  findFabricPreset,
+  calculateTextileYield
+} from '../../utils/textileCalculation';
+import {
+  Sparkles,
+  Calculator,
+  Check,
+  Copy,
+  X,
+  Gauge,
+  Thermometer,
+  Layers,
+  RefreshCw,
+  Sliders,
+  DollarSign
+} from 'lucide-react';
 
-const FABRIC_PRESETS = [
-  { name: 'French Crepe', panna: '58"', temp: 210, speed: 80, shrinkage: 3.5 },
-  { name: 'Poly Crepe', panna: '58"', temp: 210, speed: 80, shrinkage: 3.5 },
-  { name: 'Georgette', panna: '44"', temp: 200, speed: 80, shrinkage: 4.0 },
-  { name: 'Chiffon', panna: '44"', temp: 200, speed: 80, shrinkage: 4.0 },
-  { name: 'Organza', panna: '58"', temp: 195, speed: 80, shrinkage: 1.8 },
-  { name: 'Satin', panna: '58"', temp: 205, speed: 80, shrinkage: 2.2 },
-  { name: 'Poly Rayon', panna: '44"', temp: 190, speed: 76, shrinkage: 5.2 },
-  { name: 'Kohinoor Linen', panna: '58"', temp: 200, speed: 78, shrinkage: 4.5 },
-  { name: 'Heavy Velvet', panna: '58"', temp: 205, speed: 70, shrinkage: 3.0 },
-];
+export { FABRIC_PRESETS, GARMENT_PRESETS };
 
-const GARMENT_PRESETS = [
-  { id: 'Kurti', label: 'Kurti (1.75m @ 58" / 2.25m @ 44")' },
-  { id: 'Saree', label: 'Saree (5.5m)' },
-  { id: 'Dupatta', label: 'Dupatta (2.4m)' },
-  { id: 'Gown', label: 'Gown / Anarkali (3.0m @ 58" / 3.75m @ 44")' },
-  { id: 'Top', label: 'Top / Tunic (1.35m @ 58" / 1.75m @ 44")' },
-  { id: 'Co-ord', label: 'Co-ord Set (3.2m @ 58" / 4.0m @ 44")' },
-  { id: 'Custom', label: 'Custom Piece Length' },
-];
+export function triggerAIMeasurementModal(initialData = {}, onApply = null) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('open-ai-measurement', { detail: { initialData, onApply } }));
+  }
+}
 
 export default function AIMeasurementAgentModal({
   isOpen,
@@ -30,11 +34,16 @@ export default function AIMeasurementAgentModal({
   initialData = {},
   onApply = null
 }) {
-  const [fabricQuality, setFabricQuality] = useState(initialData.fabric || 'French Crepe');
-  const [panna, setPanna] = useState(initialData.panna || '58"');
-  const [inputMeters, setInputMeters] = useState(initialData.meters || initialData.fusingMtr || 100);
-  const [garmentType, setGarmentType] = useState('Kurti');
+  const initialFabric = initialData.fabric || initialData.fabricQuality || 'French Crepe';
+  const initialPanna = initialData.panna || '58"';
+  const initialMeters = initialData.meters || initialData.fusingMtr || initialData.totalMtr || initialData.printedMtr || 100;
+
+  const [fabricQuality, setFabricQuality] = useState(initialFabric);
+  const [panna, setPanna] = useState(initialPanna);
+  const [inputMeters, setInputMeters] = useState(initialMeters);
+  const [garmentType, setGarmentType] = useState(initialData.garmentType || 'Kurti');
   const [customPieceMeters, setCustomPieceMeters] = useState('');
+  const [shrinkageOverride, setShrinkageOverride] = useState('');
   const [costPerMeter, setCostPerMeter] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
 
@@ -42,65 +51,92 @@ export default function AIMeasurementAgentModal({
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
 
+  // Sync state whenever initialData changes
+  useEffect(() => {
+    if (isOpen) {
+      const f = initialData.fabric || initialData.fabricQuality || 'French Crepe';
+      const p = initialData.panna || '58"';
+      const m = initialData.meters || initialData.fusingMtr || initialData.totalMtr || initialData.printedMtr || 100;
+      setFabricQuality(f);
+      setPanna(p);
+      setInputMeters(m);
+      if (initialData.garmentType) setGarmentType(initialData.garmentType);
+      
+      const preset = findFabricPreset(f);
+      setShrinkageOverride(preset.shrinkage);
+
+      // Auto-run baseline calculation upon opening
+      const baseCalc = calculateTextileYield({
+        inputMeters: m,
+        fabricQuality: f,
+        panna: p,
+        garmentType: initialData.garmentType || 'Kurti',
+        shrinkageOverride: preset.shrinkage
+      });
+      setResult(baseCalc);
+    }
+  }, [isOpen, initialData]);
+
   if (!isOpen) return null;
 
   const handleSelectPreset = (preset) => {
     setFabricQuality(preset.name);
     setPanna(preset.panna);
+    setShrinkageOverride(preset.shrinkage);
+    
+    // Recalculate instantly
+    const updated = calculateTextileYield({
+      inputMeters,
+      fabricQuality: preset.name,
+      panna: preset.panna,
+      garmentType,
+      customPieceMeters: garmentType === 'Custom' ? Number(customPieceMeters) : null,
+      costPerMeter: costPerMeter ? Number(costPerMeter) : null,
+      shrinkageOverride: preset.shrinkage
+    });
+    setResult(updated);
   };
 
   const handleCalculate = async (e) => {
     if (e) e.preventDefault();
     setLoading(true);
-    setResult(null);
+
+    const mNum = Math.max(0, Number(inputMeters) || 0);
+    const shrinkNum = shrinkageOverride !== '' ? Number(shrinkageOverride) : null;
 
     try {
+      // 1. Try backend AI endpoint
       const res = await api.calculateAiMeasurement({
-        inputMeters: Number(inputMeters) || 0,
+        inputMeters: mNum,
         fabricQuality,
         panna,
         garmentType,
         customPieceMeters: garmentType === 'Custom' ? Number(customPieceMeters) : null,
         costPerMeter: costPerMeter ? Number(costPerMeter) : null,
+        shrinkageOverride: shrinkNum,
         userPrompt
       });
 
       if (res && res.calculation) {
         setResult(res.calculation);
+        return;
       }
     } catch (err) {
-      console.error('AI Measurement calculation error:', err);
-      // Deterministic client-side fallback calculation
-      const mIn = Number(inputMeters) || 100;
-      const pNum = parseInt(String(panna).replace(/\D/g, '')) || 58;
-      const preset = FABRIC_PRESETS.find(p => p.name.toLowerCase() === fabricQuality.toLowerCase()) || { shrinkage: 3.5 };
-      const shrinkMtr = Number(((mIn * preset.shrinkage) / 100).toFixed(2));
-      const trimMtr = Number(((mIn * 1.5) / 100).toFixed(2));
-      const totalWaste = Number((shrinkMtr + trimMtr).toFixed(2));
-      const netOut = Number(Math.max(0, mIn - totalWaste).toFixed(2));
-      const pLen = pNum >= 56 ? 1.75 : 2.25;
-      const pieces = Math.floor(netOut / pLen);
-
-      setResult({
-        inputMeters: mIn,
-        fabric: fabricQuality,
-        panna,
-        shrinkagePct: preset.shrinkage,
-        trimLossPct: 1.5,
-        shrinkageMeters: shrinkMtr,
-        trimmingMeters: trimMtr,
-        totalWastageMeters: totalWaste,
-        netOutputMeters: netOut,
-        efficiencyPct: Number(((netOut / mIn) * 100).toFixed(1)),
-        garmentType,
-        pieceLengthMeters: pLen,
-        expectedPieces: pieces,
-        remnantMeters: Number((netOut - (pieces * pLen)).toFixed(2)),
-        aiAdvice: `Calculated with textile standards: ${fabricQuality} shrinks approx ${preset.shrinkage}% at sublimation heat. Yield is ${netOut}m net output.`
-      });
-    } finally {
-      setLoading(false);
+      console.warn('Backend AI measurement call failed, using local domain calculation engine:', err.message);
     }
+
+    // 2. High-precision deterministic domain engine fallback
+    const localRes = calculateTextileYield({
+      inputMeters: mNum,
+      fabricQuality,
+      panna,
+      garmentType,
+      customPieceMeters: garmentType === 'Custom' ? Number(customPieceMeters) : null,
+      costPerMeter: costPerMeter ? Number(costPerMeter) : null,
+      shrinkageOverride: shrinkNum
+    });
+    setResult(localRes);
+    setLoading(false);
   };
 
   const handleCopy = () => {
@@ -112,6 +148,7 @@ Net Fresh Output: ${result.netOutputMeters} m
 Total Wastage: ${result.totalWastageMeters} m (${result.shrinkagePct}% Shrinkage + ${result.trimLossPct}% Trim)
 Efficiency: ${result.efficiencyPct}%
 Yield: ${result.expectedPieces} pieces of ${result.garmentType} (Remnant: ${result.remnantMeters}m)
+Parameters: ${result.recommendedTemp} @ ${result.recommendedSpeed}
 Advice: ${result.aiAdvice}`;
 
     navigator.clipboard.writeText(summary);
@@ -122,13 +159,21 @@ Advice: ${result.aiAdvice}`;
   const handleApplyToForm = () => {
     if (!result || !onApply) return;
     onApply({
+      inputMeters: result.inputMeters,
       freshMtr: result.netOutputMeters,
       wasteMtr: result.totalWastageMeters,
       shrinkageMtr: result.shrinkageMeters,
+      shrinkagePct: result.shrinkagePct,
+      freshYieldPct: result.efficiencyPct,
       efficiencyPct: result.efficiencyPct,
       pieces: result.expectedPieces,
+      expectedPieces: result.expectedPieces,
       fabric: result.fabric,
-      panna: result.panna
+      panna: result.panna,
+      temp: result.recommendedTemp,
+      temperature: result.recommendedTemp,
+      speed: result.recommendedSpeed,
+      result
     });
     onClose();
   };
@@ -141,8 +186,8 @@ Advice: ${result.aiAdvice}`;
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
-        backdropFilter: 'blur(3px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        backdropFilter: 'blur(4px)',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
@@ -155,12 +200,12 @@ Advice: ${result.aiAdvice}`;
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '12px',
+          borderRadius: '14px',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           width: '100%',
-          maxWidth: '680px',
-          maxHeight: '90vh',
+          maxWidth: '720px',
+          maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
@@ -172,35 +217,35 @@ Advice: ${result.aiAdvice}`;
           style={{
             padding: '16px 20px',
             borderBottom: '1px solid #e2e8f0',
-            background: '#ffffff',
+            background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: '#eff6ff',
-                color: '#2563eb',
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: '1px solid #dbeafe'
+                boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.3)'
               }}
             >
               <Sparkles size={20} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                AI Textile Measurement Agent
+              <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: '#0f172a' }}>
+                AI Textile Measurement & Yield Agent
               </h3>
               <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>
-                Instant fabric shrinkage, net fresh meters & garment yield calculation
+                Thermal sublimation shrinkage calibration, net fresh meters & garment piece estimator
               </p>
             </div>
           </div>
@@ -225,12 +270,12 @@ Advice: ${result.aiAdvice}`;
         </div>
 
         {/* Scrollable Body */}
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           {/* Quick Presets */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Quick Fabric Presets
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>
+              Standard Textile Presets
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {FABRIC_PRESETS.map(p => {
@@ -246,7 +291,7 @@ Advice: ${result.aiAdvice}`;
                       color: isSelected ? '#1d4ed8' : '#334155',
                       padding: '4px 10px',
                       borderRadius: '6px',
-                      fontSize: '0.78rem',
+                      fontSize: '0.76rem',
                       fontWeight: isSelected ? 700 : 500,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
@@ -261,11 +306,11 @@ Advice: ${result.aiAdvice}`;
 
           {/* Input Grid */}
           <form onSubmit={handleCalculate} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
               {/* Raw Meters */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Raw Input (Meters)*
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  Raw Input (MTR)*
                 </label>
                 <input
                   type="number"
@@ -276,11 +321,11 @@ Advice: ${result.aiAdvice}`;
                   placeholder="e.g. 100"
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
+                    padding: '8px 10px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
@@ -289,7 +334,7 @@ Advice: ${result.aiAdvice}`;
 
               {/* Fabric Name */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                   Fabric Quality
                 </label>
                 <input
@@ -299,11 +344,11 @@ Advice: ${result.aiAdvice}`;
                   placeholder="e.g. French Crepe"
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
+                    padding: '8px 10px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
@@ -312,7 +357,7 @@ Advice: ${result.aiAdvice}`;
 
               {/* Panna */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                   Panna (Width)
                 </label>
                 <select
@@ -320,10 +365,10 @@ Advice: ${result.aiAdvice}`;
                   onChange={(e) => setPanna(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
+                    padding: '8px 10px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.9rem',
+                    fontSize: '0.88rem',
                     fontWeight: 600,
                     background: '#ffffff',
                     outline: 'none',
@@ -338,20 +383,44 @@ Advice: ${result.aiAdvice}`;
                 </select>
               </div>
 
+              {/* Shrinkage % Override */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  Shrinkage %
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={shrinkageOverride}
+                  onChange={(e) => setShrinkageOverride(e.target.value)}
+                  placeholder="Auto (e.g. 3.5)"
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
               {/* Garment Target */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Target Garment
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  Garment Target
                 </label>
                 <select
                   value={garmentType}
                   onChange={(e) => setGarmentType(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
+                    padding: '8px 10px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.9rem',
+                    fontSize: '0.88rem',
                     fontWeight: 600,
                     background: '#ffffff',
                     outline: 'none',
@@ -359,7 +428,7 @@ Advice: ${result.aiAdvice}`;
                   }}
                 >
                   {GARMENT_PRESETS.map(g => (
-                    <option key={g.id} value={g.id}>{g.label}</option>
+                    <option key={g.id} value={g.id}>{g.id}</option>
                   ))}
                 </select>
               </div>
@@ -368,8 +437,8 @@ Advice: ${result.aiAdvice}`;
             {/* Custom Piece Length (Conditional) */}
             {garmentType === 'Custom' && (
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Meters per Custom Piece
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  Meters Per Piece (Custom)
                 </label>
                 <input
                   type="number"
@@ -378,11 +447,11 @@ Advice: ${result.aiAdvice}`;
                   onChange={(e) => setCustomPieceMeters(e.target.value)}
                   placeholder="e.g. 2.15"
                   style={{
-                    width: '200px',
-                    padding: '8px 12px',
+                    width: '180px',
+                    padding: '8px 10px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.9rem',
+                    fontSize: '0.88rem',
                     boxSizing: 'border-box'
                   }}
                 />
@@ -390,27 +459,27 @@ Advice: ${result.aiAdvice}`;
             )}
 
             {/* Action Row */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
               <button
                 type="submit"
                 disabled={loading || !inputMeters}
                 style={{
-                  background: '#2563eb',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   color: '#ffffff',
                   border: 'none',
                   padding: '9px 18px',
                   borderRadius: '8px',
                   fontWeight: 700,
-                  fontSize: '0.88rem',
+                  fontSize: '0.85rem',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.25)'
                 }}
               >
-                {loading ? <RefreshCw size={16} className="spin-loader" /> : <Calculator size={16} />}
-                <span>{loading ? 'Calculating...' : 'Run AI Measurement'}</span>
+                {loading ? <RefreshCw size={15} className="spin-loader" /> : <Calculator size={15} />}
+                <span>{loading ? 'Calculating...' : 'Recalculate AI Yield'}</span>
               </button>
             </div>
           </form>
@@ -422,20 +491,20 @@ Advice: ${result.aiAdvice}`;
                 background: '#f8fafc',
                 border: '1px solid #e2e8f0',
                 borderRadius: '10px',
-                padding: '16px',
+                padding: '14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '14px'
+                gap: '12px'
               }}
             >
               {/* 4 KPI Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
                 <div style={{ background: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>
                     Fresh Output
                   </span>
                   <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#15803d', marginTop: '2px' }}>
-                    {result.netOutputMeters} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>m</span>
+                    {result.netOutputMeters} <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>m</span>
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#16a34a' }}>
                     {result.efficiencyPct}% yield
@@ -443,11 +512,11 @@ Advice: ${result.aiAdvice}`;
                 </div>
 
                 <div style={{ background: '#ffffff', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase' }}>
-                    Total Wastage
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase' }}>
+                    Wastage & Trim
                   </span>
                   <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#c2410c', marginTop: '2px' }}>
-                    {result.totalWastageMeters} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>m</span>
+                    {result.totalWastageMeters} <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>m</span>
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#ea580c' }}>
                     {result.shrinkagePct}% shrink + {result.trimLossPct}% trim
@@ -455,11 +524,11 @@ Advice: ${result.aiAdvice}`;
                 </div>
 
                 <div style={{ background: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 12px' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
                     Garment Yield
                   </span>
                   <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1d4ed8', marginTop: '2px' }}>
-                    {result.expectedPieces} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>pcs</span>
+                    {result.expectedPieces} <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>pcs</span>
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>
                     {result.pieceLengthMeters}m / piece
@@ -467,14 +536,14 @@ Advice: ${result.aiAdvice}`;
                 </div>
 
                 <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
-                    Remnant Piece
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                    Machine Settings
                   </span>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#334155', marginTop: '2px' }}>
-                    {result.remnantMeters} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>m</span>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#334155', marginTop: '4px' }}>
+                    {result.recommendedTemp}
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    Leftover remnant
+                    {result.recommendedSpeed}
                   </span>
                 </div>
               </div>
@@ -486,14 +555,14 @@ Advice: ${result.aiAdvice}`;
                     background: '#eff6ff',
                     border: '1px solid #dbeafe',
                     borderRadius: '8px',
-                    padding: '12px 14px',
+                    padding: '10px 12px',
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '10px'
                   }}
                 >
-                  <Sparkles size={18} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#1e40af', lineHeight: 1.45, fontWeight: 500 }}>
+                  <Sparkles size={16} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#1e40af', lineHeight: 1.45, fontWeight: 500 }}>
                     <strong>Shop Floor Advice:</strong> {result.aiAdvice}
                   </p>
                 </div>
@@ -575,7 +644,7 @@ Advice: ${result.aiAdvice}`;
                 }}
               >
                 <Check size={16} />
-                <span>Apply Output ({result.netOutputMeters}m)</span>
+                <span>Apply Output ({result.netOutputMeters}m / {result.expectedPieces} pcs)</span>
               </button>
             )}
           </div>

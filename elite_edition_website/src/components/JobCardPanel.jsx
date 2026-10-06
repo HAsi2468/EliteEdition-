@@ -112,6 +112,7 @@ import { triggerPushNotification, triggerGlobalDataRefresh } from './Notificatio
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import JobCardTooltip from './JobCardTooltip';
+import AIMeasurementAgentModal from './common/AIMeasurementAgentModal';
 
 // ─── EXP.TIME calculation (mirrors Apps Script exactly) ─────────────────────
 const SPEED_GRANDO = {
@@ -2466,6 +2467,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
   const [designsList, setDesignsList] = useState([]);
   const [selectedDesign, setSelectedDesign] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
 
   // Dropdown options loaded from backend Print Settings
   const [printConfig, setPrintConfig] = useState({
@@ -3189,10 +3191,34 @@ function JobCardForm({ card, onSave, onClose, department }) {
                   width: '100%',
                   boxSizing: 'border-box'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                    <Cpu size={14} /> 🧮 Smart Material Consumption Estimate
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                      <Cpu size={14} /> 🧮 Smart Material Consumption Estimate
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAiModal(true)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm, 6px)',
+                        padding: '0.35rem 0.75rem',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(37,99,235,0.25)',
+                        transition: 'transform 0.1s ease'
+                      }}
+                    >
+                      <Sparkles size={13} />
+                      AI Measurement & Yield Agent
+                    </button>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginTop: '0.1rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginTop: '0.2rem' }}>
                     <div>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Fabric Needed:</span>
                       <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>{estimatedFabric} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>meters</span></div>
@@ -3205,6 +3231,18 @@ function JobCardForm({ card, onSave, onClose, department }) {
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Ink consumed (Est):</span>
                       <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>{estimatedInk} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>liters</span></div>
                     </div>
+                    {form.shrinkagePct && (
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: '#c2410c' }}>Calibrated Shrinkage:</span>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ea580c' }}>{form.shrinkagePct}%</div>
+                      </div>
+                    )}
+                    {form.freshYieldPct && (
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: '#166534' }}>Net Fresh Yield:</span>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#16a34a' }}>{form.freshYieldPct}%</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -3333,6 +3371,32 @@ function JobCardForm({ card, onSave, onClose, department }) {
           </button>
         </div>
       </form>
+
+      {showAiModal && (
+        <AIMeasurementAgentModal
+          isOpen={showAiModal}
+          onClose={() => setShowAiModal(false)}
+          initialData={{
+            fabric: form.fabric,
+            panna: form.panna,
+            meters: form.totalMtr,
+            garmentType: form.category || 'Kurti'
+          }}
+          onApply={(data) => {
+            setForm(prev => ({
+              ...prev,
+              totalMtr: String(data.inputMeters || prev.totalMtr),
+              pcs: data.expectedPieces > 0 ? String(data.expectedPieces) : prev.pcs,
+              shrinkagePct: data.shrinkagePct !== undefined ? String(data.shrinkagePct) : prev.shrinkagePct,
+              freshYieldPct: data.freshYieldPct !== undefined ? String(data.freshYieldPct) : prev.freshYieldPct,
+              temperature: data.temp || prev.temperature,
+              speed: data.speed || prev.speed,
+              panna: data.panna || prev.panna
+            }));
+            triggerPushNotification('✨ AI Yield Applied', `Shrinkage: ${data.shrinkagePct}% | Yield: ${data.freshYieldPct}% (${data.freshMtr}m net / ${data.expectedPieces} pcs)`, 'success');
+          }}
+        />
+      )}
     </div>
   );
 }

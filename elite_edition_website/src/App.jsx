@@ -97,6 +97,7 @@ import PermissionHelpModal from './components/PermissionHelpModal';
 import { useSocket } from './contexts/SocketContext';
 import { socketManager } from './services/socketManager';
 import GlobalSearchModal from './components/common/GlobalSearchModal';
+import AIMeasurementAgentModal from './components/common/AIMeasurementAgentModal';
 import MobileBottomNav from './components/common/MobileBottomNav';
 import UndoToastContainer from './components/common/UndoToast';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -216,6 +217,18 @@ export default function App() {
 
   // Chat unread count tracking for notification badges
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  // Global AI Measurement Agent modal state
+  const [globalAiMeasurement, setGlobalAiMeasurement] = useState({ isOpen: false, initialData: {}, onApply: null });
+
+  useEffect(() => {
+    const handleOpenAi = (e) => {
+      const { initialData = {}, onApply = null } = e?.detail || {};
+      setGlobalAiMeasurement({ isOpen: true, initialData, onApply });
+    };
+    window.addEventListener('open-ai-measurement', handleOpenAi);
+    return () => window.removeEventListener('open-ai-measurement', handleOpenAi);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -3466,6 +3479,16 @@ export default function App() {
         onClose={() => setShowPermHelpModal(false)}
         onOpenDeviceHub={() => setShowPermissionsModal(true)}
       />
+
+      {/* Global AI Textile Measurement & Yield Agent Modal */}
+      {globalAiMeasurement.isOpen && (
+        <AIMeasurementAgentModal
+          isOpen={globalAiMeasurement.isOpen}
+          onClose={() => setGlobalAiMeasurement({ isOpen: false, initialData: {}, onApply: null })}
+          initialData={globalAiMeasurement.initialData}
+          onApply={globalAiMeasurement.onApply}
+        />
+      )}
 
       {/* Mobile Bottom Navigation (Company-Specific Quick Screens, text only, safe-area inset) */}
       {isMobile && isAuthenticated && !['communication', 'workspace', 'task_management'].includes(activeTab) && (

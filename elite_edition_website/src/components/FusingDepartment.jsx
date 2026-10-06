@@ -5,7 +5,7 @@ import {
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, FileText, FileSpreadsheet,
   AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle, ChevronDown,
-  ChevronUp, PlayCircle, Filter, ArrowRight
+  ChevronUp, PlayCircle, Filter, ArrowRight, Sparkles
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
@@ -14,6 +14,7 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import AIMeasurementAgentModal from './common/AIMeasurementAgentModal';
 import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
@@ -307,6 +308,7 @@ export default function FusingDepartment() {
     fusingOperator: accountFullName,
     notes: ''
   });
+  const [showAiModal, setShowAiModal] = useState(false);
 
   // Dynamic calculation of total wastage across all 4 fault types in Top Form
   const totalTopWastageMtr = useMemo(() => {
@@ -1954,14 +1956,37 @@ export default function FusingDepartment() {
                 {/* 3. FRESH FUSED OUTPUT (MTR) — Auto-Calculated as (Printed - Total Wastage) & Editable */}
                 <div className="fusing-field-col">
                   <div className="fusing-field-label-between">
-                    <label className="fusing-field-label" style={{ color: '#15803d', margin: 0 }}>
+                    <label className="fusing-field-label" style={{ color: '#15803d', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <CheckCircle2 size={13} color="#15803d" /> FRESH FUSED (MTR) *
                     </label>
-                    {parseFloat(topForm.printedMtr) > 0 && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px' }}>
-                        {(((parseFloat(topForm.freshMtr) || 0) / parseFloat(topForm.printedMtr)) * 100).toFixed(0)}% yield
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAiModal(true)}
+                        title="Calculate expected fresh meters using AI fabric shrinkage"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          color: '#2563eb',
+                          borderRadius: '4px',
+                          padding: '2px 7px',
+                          fontSize: '0.67rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 2px rgba(37,99,235,0.1)'
+                        }}
+                      >
+                        <Sparkles size={11} /> AI Yield
+                      </button>
+                      {parseFloat(topForm.printedMtr) > 0 && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px' }}>
+                          {(((parseFloat(topForm.freshMtr) || 0) / parseFloat(topForm.printedMtr)) * 100).toFixed(0)}% yield
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <input
                     type="number"
@@ -4318,6 +4343,34 @@ export default function FusingDepartment() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── MODAL: AI TEXTILE MEASUREMENT & YIELD AGENT ── */}
+      {showAiModal && (
+        <AIMeasurementAgentModal
+          isOpen={showAiModal}
+          onClose={() => setShowAiModal(false)}
+          initialData={{
+            fabric: topForm.fabricName || (cardToUpdate && cardToUpdate.fabric) || '',
+            panna: topForm.panna || (cardToUpdate && cardToUpdate.panna) || '58"',
+            meters: topForm.printedMtr || (cardToUpdate && cardToUpdate.fusingMtr) || 100,
+            fusingMtr: topForm.printedMtr || 100
+          }}
+          onApply={(data) => {
+            setTopForm(prev => ({
+              ...prev,
+              freshMtr: String(data.freshMtr || prev.freshMtr),
+              fusingTemp: data.temp || prev.fusingTemp,
+              fusingSpeed: data.speed ? String(data.speed).replace(/\D/g, '') : prev.fusingSpeed,
+              panna: data.panna || prev.panna
+            }));
+            triggerPushNotification(
+              '✨ AI Fusing Yield Applied',
+              `Applied ${data.freshMtr}m Fresh Output (${data.shrinkagePct}% shrinkage, ${data.temp} @ ${data.speed})`,
+              'success'
+            );
+          }}
+        />
       )}
 
     </div>
