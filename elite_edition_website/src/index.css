@@ -2156,6 +2156,60 @@ div:has(> table) {
   box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   IOS SAFARI & WEBKIT ENGINE HARDENING (ANTI-DRIFT, AUTO-ZOOM & MODAL FIXES)
+   ══════════════════════════════════════════════════════════════════════════ */
 
+/* 1. Prevent iOS Auto-Zoom: Form inputs & dropdowns MUST be at least 16px on mobile */
+@media screen and (max-width: 850px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  .form-input,
+  .phoenix-form-input,
+  .phoenix-form-select,
+  .input-field {
+    font-size: 16px !important;
+  }
+}
 
+/* 2. WebKit Native Dropdown Appearance Reset */
+select {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 14px 14px !important;
+  padding-right: 2.2rem !important;
+}
 
+/* 3. Universal WebKit flex-child min-width 0: Prevents wide tables from expanding the entire viewport */
+.glass-panel,
+.table-panel,
+.table-wrap,
+.table-container,
+.main-layout-container,
+.content-area-wrap,
+.ent-screen-container,
+.workspace-container,
+.app-container {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 4. Disable iOS gesture magnifying / text inflation jitter */
+html, body {
+  -webkit-text-size-adjust: 100% !important;
+  -webkit-touch-callout: none;
+  overscroll-behavior-x: none;
+}
+
+/* 5. Smooth iOS momentum scrolling on all scrollable modal dialogs and drawers */
+.modal-body-scroll,
+.drawer-body-scroll,
+[role="dialog"] {
+  -webkit-overflow-scrolling: touch;
+}

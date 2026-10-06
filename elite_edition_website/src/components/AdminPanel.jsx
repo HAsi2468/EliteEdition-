@@ -57,6 +57,19 @@ export default function AdminPanel() {
   const [modalError, setModalError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Mobile & iOS Viewport Detection
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Sub Tab Navigation
   const [activeSubTab, setActiveSubTab] = useState('users'); // 'users', 'billing', 'backup', 'approvals'
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
@@ -785,19 +798,26 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Sub Tabs Selection */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+      {/* Sub Tabs Selection (Scrollable on iOS & Mobile) */}
+      <div className="tab-scroll-container" style={{
+        display: 'flex',
+        gap: '0.5rem',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        paddingBottom: '4px',
+        maxWidth: '100%'
+      }}>
         <button
           onClick={() => { setActiveSubTab('users'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'users' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <User size={16} /> User Accounts
         </button>
         <button
           onClick={() => { setActiveSubTab('approvals'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'approvals' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', position: 'relative' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', position: 'relative', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <ShieldAlert size={16} /> Review & Approvals
           {pendingApprovalsCount > 0 && (
@@ -818,42 +838,42 @@ export default function AdminPanel() {
         <button
           onClick={() => { setActiveSubTab('dataReview'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'dataReview' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <FileText size={16} /> Data Entry Review
         </button>
         <button
           onClick={() => { setActiveSubTab('clients'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'clients' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <Users size={16} /> Client Details
         </button>
         <button
           onClick={() => { setActiveSubTab('settings'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'settings' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <Settings size={16} /> Expense Settings
         </button>
         <button
           onClick={() => { setActiveSubTab('billing'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'billing' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <CreditCard size={16} /> Infrastructure Billing
         </button>
         <button
           onClick={() => { setActiveSubTab('backup'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'backup' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <Database size={16} /> Data Backup
         </button>
         <button
           onClick={() => { setActiveSubTab('signedDocs'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'signedDocs' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           <FileCheck size={16} /> Signed Documents Approval
         </button>
@@ -982,20 +1002,20 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* Filter & Search Toolbar (Unified Single-Line Row) */}
+            {/* Filter & Search Toolbar (Unified Single-Line Row / Responsive on Mobile) */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.6rem',
               marginTop: '0.85rem',
-              padding: '0.65rem 0.85rem',
+              padding: isMobile ? '0.55rem 0.65rem' : '0.65rem 0.85rem',
               background: '#f8fafc',
               borderRadius: '10px',
               border: '1px solid #e2e8f0',
               flexWrap: 'wrap'
             }}>
               {/* Search input container */}
-              <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
+              <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '1 1 240px', minWidth: isMobile ? '100%' : '220px' }}>
                 <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input
                   type="text"
@@ -1004,8 +1024,9 @@ export default function AdminPanel() {
                   onChange={e => setUserSearch(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '0.5rem 1.8rem 0.5rem 2.2rem',
-                    fontSize: '0.82rem',
+                    padding: '0.55rem 1.8rem 0.55rem 2.2rem',
+                    fontSize: '16px',
+                    minHeight: '44px',
                     background: '#ffffff',
                     border: '1px solid #cbd5e1',
                     color: '#0f172a',
@@ -1040,14 +1061,15 @@ export default function AdminPanel() {
               </div>
 
               {/* Company Filter Dropdown */}
-              <div style={{ flex: '0 0 auto', minWidth: '170px' }}>
+              <div style={{ flex: isMobile ? '1 1 calc(50% - 0.3rem)' : '0 0 auto', minWidth: isMobile ? '130px' : '170px' }}>
                 <select
                   value={selectedCompanyFilter}
                   onChange={e => setSelectedCompanyFilter(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.82rem',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '16px',
+                    minHeight: '44px',
                     borderRadius: '7px',
                     border: selectedCompanyFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
                     background: selectedCompanyFilter !== 'All' ? '#eff6ff' : '#ffffff',
@@ -1056,7 +1078,8 @@ export default function AdminPanel() {
                     cursor: 'pointer',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                     boxSizing: 'border-box',
-                    outline: 'none'
+                    outline: 'none',
+                    WebkitAppearance: 'none'
                   }}
                 >
                   <option value="All">🌐 All Companies ({users.length})</option>
@@ -1069,14 +1092,15 @@ export default function AdminPanel() {
               </div>
 
               {/* Department Filter Dropdown */}
-              <div style={{ flex: '0 0 auto', minWidth: '160px' }}>
+              <div style={{ flex: isMobile ? '1 1 calc(50% - 0.3rem)' : '0 0 auto', minWidth: isMobile ? '130px' : '160px' }}>
                 <select
                   value={selectedDeptFilter}
                   onChange={e => setSelectedDeptFilter(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.82rem',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '16px',
+                    minHeight: '44px',
                     borderRadius: '7px',
                     border: selectedDeptFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
                     background: selectedDeptFilter !== 'All' ? '#eff6ff' : '#ffffff',
@@ -1085,7 +1109,8 @@ export default function AdminPanel() {
                     cursor: 'pointer',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                     boxSizing: 'border-box',
-                    outline: 'none'
+                    outline: 'none',
+                    WebkitAppearance: 'none'
                   }}
                 >
                   <option value="All">🏷️ All Departments</option>
@@ -1096,14 +1121,15 @@ export default function AdminPanel() {
               </div>
 
               {/* Status Filter Dropdown */}
-              <div style={{ flex: '0 0 auto', minWidth: '135px' }}>
+              <div style={{ flex: isMobile ? '1 1 100%' : '0 0 auto', minWidth: isMobile ? '100%' : '135px' }}>
                 <select
                   value={selectedStatusFilter}
                   onChange={e => setSelectedStatusFilter(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.82rem',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '16px',
+                    minHeight: '44px',
                     borderRadius: '7px',
                     border: selectedStatusFilter !== 'All' ? '1px solid #3b82f6' : '1px solid #cbd5e1',
                     background: selectedStatusFilter !== 'All' ? '#eff6ff' : '#ffffff',
@@ -1112,7 +1138,8 @@ export default function AdminPanel() {
                     cursor: 'pointer',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                     boxSizing: 'border-box',
-                    outline: 'none'
+                    outline: 'none',
+                    WebkitAppearance: 'none'
                   }}
                 >
                   <option value="All">⚡ All Statuses</option>
@@ -1143,7 +1170,9 @@ export default function AdminPanel() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
-                    boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)'
+                    boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)',
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: 'center'
                   }}
                   title="Clear all active search and filter constraints"
                 >
@@ -1383,7 +1412,7 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* 🌟 ENTERPRISE MODAL OVERLAY FOR USER CREATION & EDITING 🌟 */}
+          {/* 🌟 ENTERPRISE MODAL OVERLAY FOR USER CREATION & EDITING (iOS & Mobile Optimized) 🌟 */}
           {showUserModal && (
             <div style={{
               position: 'fixed',
@@ -1391,55 +1420,61 @@ export default function AdminPanel() {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(15, 23, 42, 0.72)',
+              backgroundColor: 'rgba(15, 23, 42, 0.75)',
               backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
               zIndex: 99999,
               display: 'flex',
-              alignItems: 'center',
+              alignItems: isMobile ? 'stretch' : 'center',
               justifyContent: 'center',
-              padding: '1rem',
+              padding: isMobile ? 0 : '1rem',
               animation: 'fadeIn 0.2s ease-out'
             }}>
               <div style={{
                 background: '#ffffff',
                 width: '100%',
-                maxWidth: '860px',
-                maxHeight: '90vh',
-                borderRadius: '16px',
+                maxWidth: isMobile ? '100%' : '860px',
+                height: isMobile ? '100dvh' : 'auto',
+                maxHeight: isMobile ? '100dvh' : '90vh',
+                borderRadius: isMobile ? 0 : '16px',
                 boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
-                border: '1px solid #cbd5e1',
+                border: isMobile ? 'none' : '1px solid #cbd5e1',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden'
               }}>
                 {/* Modal Header */}
                 <div style={{
-                  padding: '1.2rem 1.6rem',
+                  padding: isMobile
+                    ? 'calc(0.75rem + env(safe-area-inset-top, 0px)) 1rem 0.75rem 1rem'
+                    : '1.2rem 1.6rem',
                   background: 'linear-gradient(to bottom, #f8fafc, #ffffff)',
                   borderBottom: '1px solid #e2e8f0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '1rem'
+                  gap: '0.75rem',
+                  flexShrink: 0
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                     <div style={{
-                      width: 42,
-                      height: 42,
+                      width: 40,
+                      height: 40,
                       borderRadius: 12,
                       background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-                      color: '#ffffff'
+                      color: '#ffffff',
+                      flexShrink: 0
                     }}>
                       {editingUser ? <Edit2 size={20} /> : <UserPlus size={20} />}
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                          {editingUser ? `Edit Account: ${editingUser.name}` : 'Create New User Account'}
+                        <h3 style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                          {editingUser ? `Edit: ${editingUser.name}` : 'Create User Account'}
                         </h3>
                         {editingUser && (
                           <span style={{
@@ -1455,10 +1490,10 @@ export default function AdminPanel() {
                           </span>
                         )}
                       </div>
-                      <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>
                         {editingUser
-                          ? 'Modify role classification, company access boundaries, and operational permissions.'
-                          : 'Configure credentials, assign company entity rights, and grant role permissions.'}
+                          ? 'Modify role, company access boundaries, and operational permissions.'
+                          : 'Configure credentials, entity rights, and role permissions.'}
                       </p>
                     </div>
                   </div>
@@ -1470,13 +1505,14 @@ export default function AdminPanel() {
                       background: '#f1f5f9',
                       border: '1px solid #e2e8f0',
                       borderRadius: '50%',
-                      width: 34,
-                      height: 34,
+                      width: 36,
+                      height: 36,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       color: '#475569',
                       cursor: 'pointer',
+                      flexShrink: 0,
                       transition: 'all 0.15s'
                     }}
                     title="Close"
@@ -1485,13 +1521,18 @@ export default function AdminPanel() {
                   </button>
                 </div>
 
-                {/* Segmented Navigation Tab Switcher */}
+                {/* Segmented Navigation Tab Switcher (Scrollable horizontally on iOS) */}
                 <div style={{
                   display: 'flex',
                   borderBottom: '1px solid #e2e8f0',
                   background: '#f8fafc',
-                  padding: '0 1rem',
-                  gap: '0.5rem'
+                  padding: '0 0.5rem',
+                  gap: '0.35rem',
+                  overflowX: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  flexShrink: 0,
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
                 }}>
                   <button
                     type="button"
@@ -1551,7 +1592,7 @@ export default function AdminPanel() {
                     type="button"
                     onClick={() => setModalTab('screens')}
                     style={{
-                      padding: '0.8rem 1.1rem',
+                      padding: isMobile ? '0.65rem 0.85rem' : '0.8rem 1.1rem',
                       border: 'none',
                       background: 'none',
                       borderBottom: modalTab === 'screens' ? '2.5px solid #2563eb' : '2.5px solid transparent',
@@ -1562,6 +1603,8 @@ export default function AdminPanel() {
                       alignItems: 'center',
                       gap: '0.45rem',
                       cursor: 'pointer',
+                      flexShrink: 0,
+                      whiteSpace: 'nowrap',
                       transition: 'all 0.15s'
                     }}
                   >
@@ -1581,8 +1624,16 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Modal Form Body */}
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                  <div style={{ padding: '1.4rem 1.6rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 0 }}>
+                  <div style={{
+                    padding: isMobile ? '1rem' : '1.4rem 1.6rem',
+                    overflowY: 'auto',
+                    WebkitOverflowScrolling: 'touch',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.25rem'
+                  }}>
                     
                     {/* Error Banner */}
                     {modalError && (
@@ -2201,7 +2252,8 @@ export default function AdminPanel() {
                               padding: '0.55rem 2.2rem 0.55rem 2.4rem',
                               borderRadius: '8px',
                               border: '1px solid #cbd5e1',
-                              fontSize: '0.82rem',
+                              fontSize: '16px',
+                              minHeight: '44px',
                               boxSizing: 'border-box',
                               background: '#ffffff',
                               outline: 'none',
@@ -2323,36 +2375,39 @@ export default function AdminPanel() {
                     )}
                   </div>
 
-                  {/* Modal Footer Actions */}
+                  {/* Modal Footer Actions (Sticky Bottom with Safe Area Clearance) */}
                   <div style={{
-                    padding: '1.1rem 1.6rem',
+                    padding: isMobile
+                      ? '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px)) 1rem'
+                      : '1.1rem 1.6rem',
                     background: '#f8fafc',
                     borderTop: '1px solid #e2e8f0',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '0.75rem',
-                    flexWrap: 'wrap'
+                    flexWrap: 'wrap',
+                    flexShrink: 0
                   }}>
                     {/* Left side: Tab navigation shortcuts */}
-                    <div>
+                    <div style={{ display: 'flex', gap: '0.5rem', width: isMobile ? '100%' : 'auto' }}>
                       {modalTab === 'profile' && (
                         <button
                           type="button"
                           onClick={() => setModalTab('privileges')}
                           className="btn-secondary"
-                          style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                          style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px', flex: isMobile ? 1 : 'none' }}
                         >
                           <span>Next: Operational Privileges &rarr;</span>
                         </button>
                       )}
                       {modalTab === 'privileges' && (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', width: isMobile ? '100%' : 'auto', flex: 1 }}>
                           <button
                             type="button"
                             onClick={() => setModalTab('profile')}
                             className="btn-secondary"
-                            style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                            style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px', flex: isMobile ? 1 : 'none' }}
                           >
                             <span>&larr; Profile</span>
                           </button>
@@ -2360,7 +2415,7 @@ export default function AdminPanel() {
                             type="button"
                             onClick={() => setModalTab('screens')}
                             className="btn-secondary"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px', flex: isMobile ? 1 : 'none' }}
                           >
                             <span>Next: Screen Access &rarr;</span>
                           </button>
@@ -2371,7 +2426,7 @@ export default function AdminPanel() {
                           type="button"
                           onClick={() => setModalTab('privileges')}
                           className="btn-secondary"
-                          style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px' }}
+                          style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '7px', flex: isMobile ? 1 : 'none' }}
                         >
                           <span>&larr; Operational Privileges</span>
                         </button>
@@ -2379,12 +2434,12 @@ export default function AdminPanel() {
                     </div>
 
                     {/* Right side: Cancel & Save Buttons */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: isMobile ? '100%' : 'auto' }}>
                       <button
                         type="button"
                         onClick={handleCancelEdit}
                         className="btn-secondary"
-                        style={{ padding: '0.55rem 1.2rem', fontSize: '0.85rem', fontWeight: 700, borderRadius: '7px' }}
+                        style={{ padding: '0.55rem 1.2rem', fontSize: '0.85rem', fontWeight: 700, borderRadius: '7px', flex: isMobile ? 1 : 'none' }}
                       >
                         <X size={15} />
                         <span>Cancel</span>
@@ -2401,8 +2456,10 @@ export default function AdminPanel() {
                           boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
                           display: 'inline-flex',
                           alignItems: 'center',
+                          justifyContent: 'center',
                           gap: '0.45rem',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          flex: isMobile ? 2 : 'none'
                         }}
                         disabled={submitLoading}
                       >
@@ -2789,7 +2846,12 @@ const styles = {
     margin: 0
   },
   tableWrap: {
-    flex: 1
+    flex: 1,
+    minWidth: 0,
+    width: '100%',
+    maxWidth: '100%',
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch'
   },
   avatar: (isAdmin) => ({
     width: '32px',
@@ -2891,7 +2953,8 @@ const styles = {
     border: '1px solid #cbd5e1',
     color: '#0f172a',
     borderRadius: '6px',
-    fontSize: '0.88rem'
+    fontSize: '16px',
+    minHeight: '44px'
   },
   formInputWithoutIcon: {
     width: '100%',
@@ -2899,7 +2962,8 @@ const styles = {
     border: '1px solid #cbd5e1',
     color: '#0f172a',
     borderRadius: '6px',
-    fontSize: '0.88rem'
+    fontSize: '16px',
+    minHeight: '44px'
   },
   selectInput: {
     width: '100%',
@@ -2908,7 +2972,8 @@ const styles = {
     border: '1px solid #cbd5e1',
     color: '#0f172a',
     borderRadius: '6px',
-    fontSize: '0.88rem',
+    fontSize: '16px',
+    minHeight: '44px',
     fontWeight: 600,
     outline: 'none',
   },
@@ -2934,7 +2999,7 @@ const styles = {
   }),
   checkboxGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
     gap: '0.5rem',
   },
   checkboxLabel: {
