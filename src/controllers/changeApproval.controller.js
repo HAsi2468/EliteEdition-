@@ -459,6 +459,12 @@ const getUserDataEntries = async (req, res) => {
         'Jay Patel': ['Jay Patel', 'JAY'],
         'Ram Patel': ['Ram Patel', 'RAM'],
         'Devansu': ['Devansu', 'DEVANSU'],
+        'Durgesh Yadav': ['Durgesh Yadav', 'Durgesh', 'DURGESH'],
+        'Ajay Bind': ['Ajay Bind', 'Ajay', 'AJAY'],
+        'Dhruv Patel': ['Dhruv Patel', 'Dhruv', 'DHRUV'],
+        'Jay Asodariya': ['Jay Asodariya', 'Jay A', 'JAY A'],
+        'Parth Asodariya': ['Parth Asodariya', 'Parth', 'PARTH'],
+        'Kaushik Nakum': ['Kaushik Nakum', 'Kaushik', 'KAUSHIK'],
       };
       const nameVariants = aliases[trimmed] || [trimmed];
       const pattern = nameVariants.map(escapeRegex).join('|');
@@ -484,8 +490,15 @@ const getUserDataEntries = async (req, res) => {
         }
       }
       if (departmentFilter && departmentFilter !== 'ALL' && departmentFilter !== 'All') {
-        if (defaultDept.toLowerCase() !== departmentFilter.toLowerCase()) {
-          return false;
+        const filterClean = departmentFilter.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const deptClean = defaultDept.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!deptClean.includes(filterClean) && !filterClean.includes(deptClean)) {
+          // Special alias: 'print' / 'printing' matches 'digitalprinting' / 'digitalprint'
+          const isPrintFilter = filterClean.includes('print');
+          const isPrintDept = deptClean.includes('print');
+          if (!(isPrintFilter && isPrintDept)) {
+            return false;
+          }
         }
       }
       return true;
@@ -583,6 +596,64 @@ const getUserDataEntries = async (req, res) => {
               updatedByName: editorName,
               updatedAt: editorDate,
               auditTrail: doc.auditTrail || [],
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 1b. Daily Printing Machine Production Logs (JobPrintLog)
+    if (shouldFetch('JobPrintLog', 'Elite Digital Print', 'Digital Printing') && models.JobPrintLog) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [
+          { date: dateCond },
+          { created_date_time: dateCond },
+          { createdAt: dateCond },
+        ];
+      }
+      if (userRegex) {
+        q.operatorName = userRegex;
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { jobNo: searchRegex },
+          { machineName: searchRegex },
+          { operatorName: searchRegex },
+          { pass: searchRegex },
+          { shift: searchRegex },
+          { notes: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.JobPrintLog.find(q)
+          .sort({ date: -1, created_date_time: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.date || doc.created_date_time || doc.createdAt || new Date();
+            const meters = doc.meters || 0;
+            return {
+              id: doc._id,
+              module: 'JobPrintLog',
+              moduleLabel: 'Printing Machine Log',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Digital Printing',
+              identifier: doc.jobNo ? `${doc.jobNo} • ${doc.machineName || 'Machine'}` : `Print Log #${String(doc._id).slice(-6)}`,
+              party: doc.machineName ? `Machine: ${doc.machineName}` : 'Printing Unit',
+              details: `${meters} Mtr • ${doc.pass || '4 Pass'} • Shift: ${doc.shift || 'General'}${doc.notes ? ` • ${doc.notes}` : ''}`,
+              amountOrQuantity: `${meters} Mtr`,
+              status: `${doc.shift || 'General'} Shift`,
+              createdBy: doc.operatorName || 'Printing Operator',
+              createdAt: parsedDate,
+              updatedBy: '',
+              updatedByName: '',
+              updatedAt: doc.modified_date_time || null,
               rawDoc: doc,
             };
           }))
@@ -1556,8 +1627,14 @@ const getUserDataEntries = async (req, res) => {
 
     // Post-filter by department if specified
     if (departmentFilter && departmentFilter !== 'ALL' && departmentFilter !== 'All') {
-      const normDept = departmentFilter.toLowerCase();
-      allEntries = allEntries.filter(e => (e.department || '').toLowerCase() === normDept);
+      const filterClean = departmentFilter.toLowerCase().replace(/[^a-z0-9]/g, '');
+      allEntries = allEntries.filter(e => {
+        const deptClean = (e.department || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (deptClean.includes(filterClean) || filterClean.includes(deptClean)) return true;
+        const isPrintFilter = filterClean.includes('print');
+        const isPrintDept = deptClean.includes('print');
+        return isPrintFilter && isPrintDept;
+      });
     }
 
     // Sort by createdAt descending
@@ -1589,47 +1666,24 @@ const getUserDataEntries = async (req, res) => {
 const getEntryUsersList = async (req, res) => {
   try {
     const userSet = new Set();
-    const excluded = new Set([
-      'eliteedition', 'eliteac', 'admin', 'system', 'operator', 'staff user',
-      '3', '350', 'porter', 'self drive', 'dubeji', 'sankar ji', 'lukman'
-    ]);
 
-    // 1. Registered staff accounts from models.user
+    // Directly fetch all current registered user accounts in models.user
     if (models.user) {
-      const activeUsers = await models.user.find({}, 'name role email').lean();
-      activeUsers.forEach(u => {
+      const dbUsers = await models.user.find({}, 'name role email').sort({ name: 1 }).lean();
+      dbUsers.forEach(u => {
         const name = (u.name || '').trim();
-        if (name && !excluded.has(name.toLowerCase())) {
+        if (name) {
           userSet.add(name);
         }
       });
     }
-
-    // 2. Recognized staff members who entered or edited ERP data
-    const recognizedStaff = [
-      'Ajay Bind',
-      'Dev Patel',
-      'Devansu',
-      'Dhruv Patel',
-      'Durgesh Yadav',
-      'Harshil',
-      'Harshit Sidapara (HASI)',
-      'Jay Asodariya',
-      'Jay Patel',
-      'Kaushik Nakum',
-      'Parth Asodariya',
-      'Raj Dave',
-      'Ram Patel',
-      'Rohit',
-      'Rushabh Patel'
-    ];
-    recognizedStaff.forEach(s => userSet.add(s));
 
     const sortedUsers = Array.from(userSet).filter(Boolean).sort((a, b) => a.localeCompare(b));
 
     return res.status(200).json({
       success: true,
       data: sortedUsers,
+      count: sortedUsers.length,
     });
   } catch (err) {
     logger.error('[ChangeApprovalController] getEntryUsersList error: %o', err);

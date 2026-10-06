@@ -197,7 +197,8 @@ export default function AdminUserDataReview() {
 
   const moduleOptions = [
     { value: 'ALL', label: 'All Modules' },
-    { value: 'JobCard', label: 'Job Cards (Printing)' },
+    { value: 'JobCard', label: 'Job Cards (Digital Print)' },
+    { value: 'JobPrintLog', label: 'Printing Logs (Machine Meterage)' },
     { value: 'Task', label: 'Projects & Tasks' },
     { value: 'FabricTransaction', label: 'Fabric Inward/Outward' },
     { value: 'RawMaterialTransaction', label: 'Raw Materials' },
@@ -1397,6 +1398,29 @@ export default function AdminUserDataReview() {
                         <a href={raw.outputLink} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 700 }}>{raw.outputLink}</a>
                       </div>
                     )}
+                    {raw.notes && (
+                      <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.6rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.74rem' }}>
+                        <b>Notes:</b> {raw.notes}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 16. Printing Machine Log Details */}
+                {inspectEntry.module === 'JobPrintLog' && (
+                  <div style={{ background: '#f8faff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.85rem' }}>
+                    <h5 style={{ margin: '0 0 0.6rem', fontSize: '0.82rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Printer size={15} /> Printing Machine Production Log
+                    </h5>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', fontSize: '0.78rem' }}>
+                      <div><span style={{ color: '#64748b' }}>Job No:</span> <b style={{ color: '#0f172a' }}>{raw.jobNo}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Machine:</span> <b style={{ color: '#1d4ed8' }}>{raw.machineName}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Printed Meters:</span> <b style={{ color: '#1d4ed8', fontSize: '0.9rem' }}>{raw.meters} Mtr</b></div>
+                      <div><span style={{ color: '#64748b' }}>Pass:</span> <b style={{ color: '#0f172a' }}>{raw.pass || '4 Pass'}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Operator:</span> <b style={{ color: '#0f172a' }}>{raw.operatorName || '—'}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Shift:</span> <b style={{ color: '#0f172a' }}>{raw.shift || 'General'}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Date:</span> <b style={{ color: '#0f172a' }}>{raw.date ? new Date(raw.date).toLocaleDateString('en-IN') : '—'}</b></div>
+                    </div>
                     {raw.notes && (
                       <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.6rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.74rem' }}>
                         <b>Notes:</b> {raw.notes}
