@@ -4,7 +4,7 @@ const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const sharp = require('sharp');
 const { fetchSalesReportData } = require('../services/product.service');
-const { extractBaseSku } = require('../utils/skuHelper');
+const { extractBaseSku, extractSizeFromSku } = require('../utils/skuHelper');
 
 // ─────────────────────────────────────────────────────────────
 // Fetch & convert image to JPEG buffer (handles WebP from CDN)

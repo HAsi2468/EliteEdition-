@@ -24,6 +24,7 @@ const enumerateErrorFormat = winston.format((info) => {
 // Production: Pure JSON format for CloudWatch / Datadog / ELK ingestion
 const productionFormat = winston.format.combine(
   enumerateErrorFormat(),
+  winston.format.splat(),
   winston.format.timestamp({ format: 'YYYY-MM-DDTHH:mm:ss.SSSZ' }),
   winston.format.json()
 );

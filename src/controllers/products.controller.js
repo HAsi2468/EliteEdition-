@@ -14,7 +14,7 @@ const {
   fetchProductImages,
   fetchSalesReportData,
 } = require('../services/product.service');
-const { extractBaseSku } = require('../utils/skuHelper');
+const { extractBaseSku, extractSizeFromSku } = require('../utils/skuHelper');
 
 const getOrders = async (
   page = 1,
