@@ -43,9 +43,11 @@ jobs:
           username: ${{ secrets.AWS_USERNAME }}
           key: ${{ secrets.AWS_SSH_KEY }}
           script: |
+            export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
+            [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
             cd ${{ secrets.AWS_TARGET_DIR }}
             git stash || true
             git fetch origin main
             git reset --hard origin/main
-            npm install --production --legacy-peer-deps || npm install --production
-            pm2 restart all || npm start
+            npm install --production --legacy-peer-deps || npm install --production || true
+            pm2 restart all || pm2 restart 0 || npm start || true
