@@ -44,7 +44,8 @@ jobs:
           key: ${{ secrets.AWS_SSH_KEY }}
           script: |
             cd ${{ secrets.AWS_TARGET_DIR }}
-            git pull origin main
+            git stash || true
+            git fetch origin main
+            git reset --hard origin/main
             npm install --production --legacy-peer-deps || npm install --production
-            cp -rf elite_edition_website_dist/* /home/ubuntu/elite_edition_website_dist/ 2>/dev/null || true
             pm2 restart all || npm start
