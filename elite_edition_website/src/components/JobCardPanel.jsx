@@ -2149,14 +2149,6 @@ function Field({ label, name, form, onChange, type='text', options, half, readOn
                 name={name} 
                 value={form[name]} 
                 onChange={onChange} 
-                onBlur={(e) => {
-                  if (name === 'fabric' && e.target.value) {
-                    const norm = normalizeFabricName(e.target.value, form.panna);
-                    if (norm && norm !== form[name]) {
-                      onChange({ target: { name: 'fabric', value: norm } });
-                    }
-                  }
-                }}
                 list={`${name}-options`}
                 readOnly={readOnly}
                 placeholder="Select or type..."
@@ -2481,6 +2473,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
   });
 
   const suggestionsRef = useRef(null);
+  const userEditedRef = useRef(new Set());
 
   useEffect(() => {
     // Fetch dynamic print settings
@@ -2550,12 +2543,15 @@ function JobCardForm({ card, onSave, onClose, department }) {
 
   const handleDesignNameChange = (e) => {
     const { value } = e.target;
+    userEditedRef.current.add('designName');
+    userEditedRef.current.add('designNo');
     setForm(f => ({ ...f, designName: value, designNo: value }));
     setShowSuggestions(true);
   };
 
   const selectDesign = (d, imageMode = 'both') => {
     setSelectedDesign(d);
+    userEditedRef.current.clear();
 
     const rawInput = (form.designName || form.designNo || '').trim();
     const existingNames = extractDesignNames(rawInput);
@@ -2672,25 +2668,31 @@ function JobCardForm({ card, onSave, onClose, department }) {
     if (et !== form.expTime) setForm(f => ({ ...f, expTime: et }));
   }, [form.panna, form.pass, form.totalMtr, form.machineName]);
 
-  // Auto-resolve profile when machine changes
-  useEffect(() => {
-    if (selectedDesign && selectedDesign.machineProfiles && form.machineName) {
-      const p = selectedDesign.machineProfiles[form.machineName];
-      if (p !== undefined) {
-        setForm(f => ({ ...f, profile: p }));
+  const handleMachineSelect = (m) => {
+    setForm(f => {
+      const updates = { ...f, machineName: m };
+      // Only auto-resolve profile if user has NOT manually customized/edited profile
+      if (!userEditedRef.current.has('profile') && selectedDesign?.machineProfiles && selectedDesign.machineProfiles[m]) {
+        updates.profile = selectedDesign.machineProfiles[m];
       }
-    }
-  }, [form.machineName, selectedDesign]);
+      return updates;
+    });
+  };
 
   const onChange = e => {
     const { name, value } = e.target;
+    userEditedRef.current.add(name);
 
     if (name === 'pcs') {
       const pcsVal = parseFloat(value) || 0;
       setForm(f => {
         const isExisting = Boolean(card && card._id);
         const consVal = parseFloat(f.consumption) || (selectedDesign?.totalMtr100 ? selectedDesign.totalMtr100 / 100 : 0);
-        const totalMtrVal = consVal > 0 && pcsVal > 0 ? (pcsVal * consVal).toFixed(2) : f.totalMtr;
+        // Only auto-recalculate totalMtr if user did NOT explicitly edit totalMtr
+        const shouldUpdateTotalMtr = !userEditedRef.current.has('totalMtr');
+        const totalMtrVal = (shouldUpdateTotalMtr && consVal > 0 && pcsVal > 0)
+          ? (pcsVal * consVal).toFixed(2)
+          : f.totalMtr;
 
         if (isExisting) {
           // Editing existing job card: NEVER resurrect removed fields or override user-edited values
@@ -2725,20 +2727,23 @@ function JobCardForm({ card, onSave, onClose, department }) {
           return total % 1 === 0 ? total.toString() : parseFloat(total.toFixed(2)).toString();
         };
 
-        // For new cards: only scale if field has not been explicitly cleared/removed
-        if (f.top !== '' && f.top !== undefined && d.top100) updates.top = calcScaledPart(d.top100, pcsVal);
-        if (f.sleeve !== '' && f.sleeve !== undefined && d.sleeve100) updates.sleeve = calcScaledPart(d.sleeve100, pcsVal);
-        if (f.bottom !== '' && f.bottom !== undefined && d.bottom100) updates.bottom = calcScaledPart(d.bottom100, pcsVal);
-        if (f.dupatta !== '' && f.dupatta !== undefined && d.dupatta100) updates.dupatta = calcScaledPart(d.dupatta100, pcsVal);
-        if (f.setCopy !== '' && f.setCopy !== undefined && d.setCopy100) updates.setCopy = Math.round((d.setCopy100 / 100) * pcsVal).toString();
-        if (f.cut !== '' && f.cut !== undefined && d.cut100) updates.cut = d.cut100.toString();
+        // ONLY scale measurement fields if user has NOT manually edited or cleared them
+        if (!userEditedRef.current.has('top') && f.top !== '' && f.top !== undefined && d.top100) updates.top = calcScaledPart(d.top100, pcsVal);
+        if (!userEditedRef.current.has('sleeve') && f.sleeve !== '' && f.sleeve !== undefined && d.sleeve100) updates.sleeve = calcScaledPart(d.sleeve100, pcsVal);
+        if (!userEditedRef.current.has('bottom') && f.bottom !== '' && f.bottom !== undefined && d.bottom100) updates.bottom = calcScaledPart(d.bottom100, pcsVal);
+        if (!userEditedRef.current.has('dupatta') && f.dupatta !== '' && f.dupatta !== undefined && d.dupatta100) updates.dupatta = calcScaledPart(d.dupatta100, pcsVal);
+        if (!userEditedRef.current.has('setCopy') && f.setCopy !== '' && f.setCopy !== undefined && d.setCopy100) updates.setCopy = Math.round((d.setCopy100 / 100) * pcsVal).toString();
+        if (!userEditedRef.current.has('cut') && f.cut !== '' && f.cut !== undefined && d.cut100) updates.cut = d.cut100.toString();
 
         return updates;
       });
     } else if (name === 'consumption') {
       const pcsVal = parseFloat(form.pcs) || 0;
       const consVal = parseFloat(value) || 0;
-      const totalMtrVal = (pcsVal * consVal).toFixed(2);
+      const shouldUpdateTotalMtr = !userEditedRef.current.has('totalMtr');
+      const totalMtrVal = (shouldUpdateTotalMtr && pcsVal > 0 && consVal > 0)
+        ? (pcsVal * consVal).toFixed(2)
+        : form.totalMtr;
       setForm(f => ({
         ...f,
         consumption: value,
@@ -2753,7 +2758,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
     e.preventDefault();
     if (!form.jobNo.trim()) { setError('Job No. is required.'); return; }
     setSaving(true); setError('');
-    const cleanFabric = normalizeFabricName(form.fabric, form.panna);
+    const cleanFabric = (form.fabric || '').trim();
     const cleanDesign = cleanDesignNameString(form.designName || form.designNo);
     const activeUser = api.getCurrentUser() || {};
     const uName = activeUser.name || activeUser.username || 'HASI';
@@ -2765,6 +2770,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
       fabric: cleanFabric || form.fabric,
       department: department || (card?.department) || 'digital_print',
       category: form.category || (department === 'stitching' ? 'Stitching' : ''),
+      isClientForm: true,
       userId: uId,
       createdById: uId,
       updatedById: uId,
@@ -2842,7 +2848,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
                 const primaryColor = m === 'GRANDO' ? '#3b82f6' : m === 'PRINTDOT' ? '#ef4444' : '#8b5cf6';
                 const bgColor = m === 'GRANDO' ? 'rgba(59,130,246,0.15)' : m === 'PRINTDOT' ? 'rgba(239,68,68,0.15)' : 'rgba(139,92,246,0.15)';
                 return (
-                  <button type="button" key={m} onClick={() => setForm(f=>({...f,machineName:m}))}
+                  <button type="button" key={m} onClick={() => handleMachineSelect(m)}
                     style={{ flex: '1 1 auto', minWidth: '100px', padding:'0.6rem', borderRadius:'var(--radius-sm)', fontWeight:700, fontSize:'0.9rem',
                       border:`2px solid ${isSelected ? primaryColor : 'var(--border-light)'}`,
                       background: isSelected ? bgColor : 'transparent',

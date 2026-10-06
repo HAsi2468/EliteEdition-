@@ -500,6 +500,7 @@ function normalizeDateStr(dtStr) {
 }
 
 const syncDesignImage = async (body, existingCard = null) => {
+  if (body.isClientForm) return; // Client form explicitly managed images
   const dName = body.designName || body.designNo || (existingCard ? (existingCard.designName || existingCard.designNo) : '');
   if (dName) {
     const rawParts = String(dName).split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
@@ -569,62 +570,66 @@ const createJobCard = async (req, res) => {
       }
     ];
 
-    // Auto-fill from design catalogue if fields are missing
-    const rawDesign = String(body.designName || body.designNo || '').trim();
-    if (rawDesign) {
-      let d = await db.Design.findOne({ designName: rawDesign }).lean();
-      if (!d) d = await db.Design.findOne({ designNo: rawDesign }).lean();
-      if (!d) {
-        const clean = rawDesign.replace(/^ED-/i, '').trim();
-        const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        d = await db.Design.findOne({
-          $or: [
-            { designName: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
-            { designNo: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
-            { designName: { $regex: new RegExp(escaped, 'i') } }
-          ]
-        }).lean();
+    // Auto-fill from design catalogue if fields are missing (only for automated background calls, NEVER overwrite client form edits)
+    if (!body.isClientForm) {
+      const rawDesign = String(body.designName || body.designNo || '').trim();
+      if (rawDesign) {
+        let d = await db.Design.findOne({ designName: rawDesign }).lean();
+        if (!d) d = await db.Design.findOne({ designNo: rawDesign }).lean();
+        if (!d) {
+          const clean = rawDesign.replace(/^ED-/i, '').trim();
+          const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          d = await db.Design.findOne({
+            $or: [
+              { designName: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+              { designNo: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+              { designName: { $regex: new RegExp(escaped, 'i') } }
+            ]
+          }).lean();
+        }
+        if (d) {
+          const pNum = parseFloat(body.pcs) || 0;
+          const scalePart = (val, pcs) => {
+            const num = Number(val || 0);
+            if (num <= 0 || pcs <= 0) return '';
+            const perPc = num === 1 ? 1 : (num / 100);
+            const total = perPc * pcs;
+            return total % 1 === 0 ? total.toString() : parseFloat(total.toFixed(2)).toString();
+          };
+          if (body.consumption === undefined && d.totalMtr100) body.consumption = (d.totalMtr100 / 100).toFixed(2);
+          if (body.totalMtr === undefined && d.totalMtr100 && pNum > 0) body.totalMtr = ((d.totalMtr100 / 100) * pNum).toFixed(2);
+          if (body.top === undefined && d.top100 && pNum > 0) body.top = scalePart(d.top100, pNum);
+          if (body.sleeve === undefined && d.sleeve100 && pNum > 0) body.sleeve = scalePart(d.sleeve100, pNum);
+          if (body.bottom === undefined && d.bottom100 && pNum > 0) body.bottom = scalePart(d.bottom100, pNum);
+          if (body.dupatta === undefined && d.dupatta100 && pNum > 0) body.dupatta = scalePart(d.dupatta100, pNum);
+          if (body.cut === undefined && d.cut100) body.cut = d.cut100.toString();
+          if (body.setCopy === undefined && d.setCopy100 && pNum > 0) body.setCopy = Math.round((d.setCopy100 / 100) * pNum).toString();
+          if (body.pass === undefined && d.pass) body.pass = d.pass;
+          if (body.speed === undefined && d.speed) body.speed = d.speed;
+          if (body.designer === undefined && d.designerName) body.designer = d.designerName;
+          if (body.colourMatching === undefined && d.colourMatching) body.colourMatching = d.colourMatching;
+          if (body.paperType === undefined && d.paperType) body.paperType = d.paperType;
+          const fused = d.fusingTemp || d.temperature || '';
+          if (body.fusingTemp === undefined && fused) body.fusingTemp = fused;
+          if (body.temperature === undefined && fused) body.temperature = fused;
+          if (body.fabric === undefined && d.fabricName) body.fabric = d.fabricName;
+          if (body.category === undefined && d.category) body.category = d.category;
+          if (body.colors === undefined && d.colors) body.colors = d.colors;
+          if (body.panna === undefined && d.panna) body.panna = d.panna;
+          if (body.imageUrl1 === undefined && d.imageUrl) body.imageUrl1 = d.imageUrl;
+          if (body.imageUrl === undefined && d.imageUrl) body.imageUrl = d.imageUrl;
+        }
       }
-      if (d) {
-        const pNum = parseFloat(body.pcs) || 0;
-        const scalePart = (val, pcs) => {
-          const num = Number(val || 0);
-          if (num <= 0 || pcs <= 0) return '';
-          const perPc = num === 1 ? 1 : (num / 100);
-          const total = perPc * pcs;
-          return total % 1 === 0 ? total.toString() : parseFloat(total.toFixed(2)).toString();
-        };
-        if (!body.consumption && d.totalMtr100) body.consumption = (d.totalMtr100 / 100).toFixed(2);
-        if (!body.totalMtr && d.totalMtr100 && pNum > 0) body.totalMtr = ((d.totalMtr100 / 100) * pNum).toFixed(2);
-        if (!body.top && d.top100 && pNum > 0) body.top = scalePart(d.top100, pNum);
-        if (!body.sleeve && d.sleeve100 && pNum > 0) body.sleeve = scalePart(d.sleeve100, pNum);
-        if (!body.bottom && d.bottom100 && pNum > 0) body.bottom = scalePart(d.bottom100, pNum);
-        if (!body.dupatta && d.dupatta100 && pNum > 0) body.dupatta = scalePart(d.dupatta100, pNum);
-        if (!body.cut && d.cut100) body.cut = d.cut100.toString();
-        if (!body.setCopy && d.setCopy100 && pNum > 0) body.setCopy = Math.round((d.setCopy100 / 100) * pNum).toString();
-        if (!body.pass && d.pass) body.pass = d.pass;
-        if (!body.speed && d.speed) body.speed = d.speed;
-        if (!body.designer && d.designerName) body.designer = d.designerName;
-        if (!body.colourMatching && d.colourMatching) body.colourMatching = d.colourMatching;
-        if (!body.paperType && d.paperType) body.paperType = d.paperType;
-        const fused = d.fusingTemp || d.temperature || '';
-        if (!body.fusingTemp && fused) body.fusingTemp = fused;
-        if (!body.temperature && fused) body.temperature = fused;
-        if (!body.fabric && d.fabricName) body.fabric = d.fabricName;
-        if (!body.category && d.category) body.category = d.category;
-        if (!body.colors && d.colors) body.colors = d.colors;
-        if (!body.panna && d.panna) body.panna = d.panna;
-        if (!body.imageUrl1 && d.imageUrl) body.imageUrl1 = d.imageUrl;
-        if (!body.imageUrl && d.imageUrl) body.imageUrl = d.imageUrl;
-      }
+      const pcsNum = parseFloat(body.pcs) || 0;
+      const mtrNum = parseFloat(body.totalMtr) || 0;
+      const consNum = parseFloat(body.consumption) || 0;
+      if (body.consumption === undefined && mtrNum > 0 && pcsNum > 0) body.consumption = (mtrNum / pcsNum).toFixed(2);
+      if (body.totalMtr === undefined && consNum > 0 && pcsNum > 0) body.totalMtr = (consNum * pcsNum).toFixed(2);
+      if (body.fusingTemp === undefined && body.temperature) body.fusingTemp = body.temperature;
+      if (body.temperature === undefined && body.fusingTemp) body.temperature = body.fusingTemp;
     }
-    const pcsNum = parseFloat(body.pcs) || 0;
-    const mtrNum = parseFloat(body.totalMtr) || 0;
-    const consNum = parseFloat(body.consumption) || 0;
-    if (!body.consumption && mtrNum > 0 && pcsNum > 0) body.consumption = (mtrNum / pcsNum).toFixed(2);
-    if (!body.totalMtr && consNum > 0 && pcsNum > 0) body.totalMtr = (consNum * pcsNum).toFixed(2);
-    if (!body.fusingTemp && body.temperature) body.fusingTemp = body.temperature;
-    if (!body.temperature && body.fusingTemp) body.temperature = body.fusingTemp;
+
+    delete body.isClientForm;
 
     const card = await db.JobCard.create(body);
 
@@ -874,6 +879,7 @@ const updateJobCard = async (req, res) => {
     delete body.created_date_time;
     delete body.modified_date_time;
     delete body.__v;
+    delete body.isClientForm;
     if (!body.orderChatRoomId) delete body.orderChatRoomId;
 
     if (body.date) body.date = normalizeDateStr(body.date);
