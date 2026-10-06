@@ -670,7 +670,7 @@ export default function App() {
     } else if (dept === 'elite_fabtex') {
       setActiveTab('ef_dashboard');
     } else if (dept === 'elite_online') {
-      const firstTab = getFirstEETab();
+      const firstTab = getFirstOnlineTab();
       setActiveTab(firstTab);
     }
   };
