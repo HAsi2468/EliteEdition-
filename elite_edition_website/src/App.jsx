@@ -510,7 +510,7 @@ export default function App() {
   };
 
   // Department permission helpers
-  const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses'];
+  const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses', 'eo_settings'];
   const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses'];
   const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
@@ -705,7 +705,7 @@ export default function App() {
     setSales([]);
     setParties([]);
     triggerGlobalDataRefresh('company-switch');
-    triggerPushNotification('Switched Department 🔄', `Now viewing ${comp.name} (${comp.type}).`, 'info');
+    fetchData();
     if (dept === 'digital_print') {
       const firstTab = getFirstJobCardsTab();
       setActiveTab(firstTab);
@@ -755,7 +755,7 @@ export default function App() {
       'dashboard', 'workspace', 'communication', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
       'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
       'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
-      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
+      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses', 'eo_settings',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
@@ -2300,22 +2300,22 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard') || currentUser.permissions?.includes('elite_online')) && (
                       <button onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
                         Dashboard Overview
                       </button>
                     )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
                       <button onClick={() => { setActiveTab('inventory'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'inventory' ? 'active' : ''}`}>
                         Store Inventory
                       </button>
                     )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
                       <button onClick={() => { setActiveTab('returns'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'returns' ? 'active' : ''}`}>
                         Returns Department
                       </button>
                     )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
                       <button onClick={() => { setActiveTab('sales'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'sales' ? 'active' : ''}`}>
                         Sales Orders
                       </button>
@@ -2323,15 +2323,20 @@ export default function App() {
                     <button onClick={() => { setActiveTab('eo_complaints'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_complaints' ? 'active' : ''}`}>
                       Complaints
                     </button>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
                       <button onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'reports' ? 'active' : ''}`}>
                         Reports Center
+                      </button>
+                    )}
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) && (
+                      <button onClick={() => { setActiveTab('eo_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_settings' ? 'active' : ''}`}>
+                        Settings
                       </button>
                     )}
                   </>
                 )}
 
-                {currentUser && currentUser.role === 'admin' && (
+                {currentUser && (isSuperOrAdmin || currentUser.role === 'admin') && (
                   <button onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'admin' ? 'active' : ''}`}>
                     Admin Panel
                   </button>
@@ -2702,33 +2707,36 @@ export default function App() {
 
               return (
                 <>
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) &&
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard') || currentUser.permissions?.includes('elite_online')) &&
                     renderNavItem('dashboard', 'Dashboard Overview', LayoutDashboard, null, 'Dashboard')
                   }
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) &&
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) &&
                     renderNavItem('inventory', 'Store Inventory', Database, null, 'Inventory')
                   }
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) &&
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) &&
                     renderNavItem('returns', 'Returns Department', PackageMinus, null, 'Returns')
                   }
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) &&
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) &&
                     renderNavItem('sales', 'Sales Orders', ShoppingBag, null, 'Sales')
                   }
                   {renderNavItem('eo_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) &&
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) &&
                     renderNavItem('reports', 'Reports Center', BarChart3, null, 'Reports')
                   }
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) &&
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) &&
                     renderNavItem('unicommerce', 'Uniware Integrations', RefreshCw, null, 'Uniware')
                   }
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) &&
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) &&
                     renderNavItem('myntra', 'Myntra Integrations', ShoppingBag, null, 'Myntra')
+                  }
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) &&
+                    renderNavItem('eo_settings', 'Settings', Settings, null, 'Settings')
                   }
                 </>
               );
             })()}
 
-            {currentUser && currentUser.role === 'admin' && (
+            {currentUser && (isSuperOrAdmin || currentUser.role === 'admin') && (
               isSidebarCollapsed ? (
                 <button
                   type="button"
@@ -2822,10 +2830,10 @@ export default function App() {
             <PullToRefresh onRefresh={async () => { await fetchData(); triggerGlobalDataRefresh(); }}>
             <Suspense fallback={<DashboardSkeleton />}>
 
-            {activeTab === 'dashboard' ? (
+            {activeTab === 'dashboard' || activeTab === 'elite_online' ? (
               <DashboardStats items={items} sales={sales} />
-          ) : activeTab === 'elite_online' ? (
-            <ReportsCenter department="elite-online" />
+          ) : activeTab === 'eo_settings' ? (
+            <CompanySettingsPanel companyEntity="Elite Online" />
           ) : activeTab === 'inventory' ? (
             <InventoryGrid
               items={items}
