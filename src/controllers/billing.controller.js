@@ -1136,6 +1136,206 @@ const recordPayment = async (req, res) => {
   }
 };
 
+// ── ROBUST IMAGE RESOLVER FOR INVOICE PDF GENERATION ─────────────────────────
+const findLocalImageByDesignToken = (dName) => {
+  if (!dName) return null;
+  const clean = String(dName).trim().replace(/^ED-/i, '');
+  const pattern = new RegExp(`^(ED-)?${clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\([^)]+\\)|\\s.*)?\\.(jpg|jpeg|png|webp)$`, 'i');
+
+  const possibleDirs = [
+    path.join(__dirname, '../../elite_edition_images'),
+    path.join(__dirname, '../../../elite_edition_images'),
+    '/home/ubuntu/elite_edition_images',
+    path.join(__dirname, '../elite_edition_images'),
+    path.join(__dirname, '../../Digital print'),
+    path.join(__dirname, '../../../Digital print'),
+    '/home/ubuntu/Digital print',
+    '/home/ubuntu/Node projects/Elite_Edition/Digital print',
+    '/home/ubuntu/Node projects/Elite_Edition/elite_edition_images',
+    path.join(process.cwd(), 'Digital print'),
+    path.join(process.cwd(), 'elite_edition_images')
+  ];
+
+  for (const pDir of possibleDirs) {
+    if (fs.existsSync(pDir)) {
+      try {
+        const files = fs.readdirSync(pDir);
+        const matchedFile = files.find(f => pattern.test(f));
+        if (matchedFile) return path.join(pDir, matchedFile);
+      } catch (e) {}
+    }
+  }
+  return null;
+};
+
+const resolveInvoiceImagePath = async (urlOrPath, designNameHint = '', cache = null) => {
+  if (!urlOrPath) return null;
+  if (Buffer.isBuffer(urlOrPath)) return urlOrPath;
+
+  const str = String(urlOrPath).trim();
+  if (!str) return null;
+
+  if (cache && cache.has(str)) return cache.get(str);
+
+  // 1. Base64 Data URL
+  if (str.startsWith('data:image/')) {
+    try {
+      const base64Data = str.split(',')[1];
+      if (base64Data) {
+        const buf = Buffer.from(base64Data, 'base64');
+        if (cache) cache.set(str, buf);
+        return buf;
+      }
+    } catch (e) {}
+  }
+
+  // 2. Direct local file path
+  if (fs.existsSync(str) && fs.statSync(str).isFile()) {
+    if (cache) cache.set(str, str);
+    return str;
+  }
+
+  // 3. Remote HTTP / HTTPS URL (Cloudflare R2, Google Drive, AWS S3, CloudFront)
+  const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+  let targetUrl = str;
+  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+    const norm = normalizeImageUrl(str, designNameHint);
+    if (norm && (norm.startsWith('http://') || norm.startsWith('https://'))) {
+      targetUrl = norm;
+    }
+  }
+
+  if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+    try {
+      const axios = require('axios');
+      const r = await axios.get(targetUrl, {
+        responseType: 'arraybuffer',
+        timeout: 7000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      });
+      if (r.data && Buffer.isBuffer(r.data)) {
+        if (cache) cache.set(str, r.data);
+        return r.data;
+      } else if (r.data) {
+        const buf = Buffer.from(r.data);
+        if (cache) cache.set(str, buf);
+        return buf;
+      }
+    } catch (netErr) {}
+  }
+
+  // 4. Local directories check for filename
+  let filename = str.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').replace(/^.*\/uploads\//, '').trim();
+  try { filename = decodeURIComponent(filename); } catch(e) {}
+  filename = filename.split('?')[0].split('#')[0];
+
+  const dirs = [
+    path.join(__dirname, '../../elite_edition_images'),
+    path.join(__dirname, '../../../elite_edition_images'),
+    '/home/ubuntu/elite_edition_images',
+    path.join(__dirname, '../elite_edition_images'),
+    path.join(__dirname, '../../Digital print'),
+    path.join(__dirname, '../../../Digital print'),
+    '/home/ubuntu/Digital print',
+    '/home/ubuntu/Node projects/Elite_Edition/Digital print',
+    '/home/ubuntu/Node projects/Elite_Edition/elite_edition_images',
+    path.join(process.cwd(), 'Digital print'),
+    path.join(process.cwd(), 'elite_edition_images')
+  ];
+
+  for (const d of dirs) {
+    if (!fs.existsSync(d)) continue;
+    const direct = path.join(d, filename);
+    if (fs.existsSync(direct) && fs.statSync(direct).isFile()) {
+      if (cache) cache.set(str, direct);
+      return direct;
+    }
+    try {
+      const f = fs.readdirSync(d).find(x => x.toLowerCase() === filename.toLowerCase());
+      if (f) {
+        const fullP = path.join(d, f);
+        if (fs.statSync(fullP).isFile()) {
+          if (cache) cache.set(str, fullP);
+          return fullP;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 5. Check exact design token ONLY if designNameHint or filename starts with ED-
+  const tokenToSearch = designNameHint || (filename.match(/^ED-?\d+/i) ? filename.replace(/\.[^.]+$/, '') : '');
+  if (tokenToSearch) {
+    const found = findLocalImageByDesignToken(tokenToSearch);
+    if (found) {
+      if (cache) cache.set(str, found);
+      return found;
+    }
+  }
+
+  return null;
+};
+
+// Helper to resolve exact images for invoice line items without mismatched fallbacks
+const resolveItemsImages = async (items, jobCardMap, cache) => {
+  return Promise.all(items.map(async (item) => {
+    // 1. Direct item.imageUrl (the perfect exact image assigned to this item)
+    if (item.imageUrl) {
+      const res = await resolveInvoiceImagePath(item.imageUrl, item.designNo || item.itemName, cache);
+      if (res) return res;
+    }
+
+    // 2. Strict job card lookup ONLY using item.jobNo
+    if (item.jobNo) {
+      const nums = String(item.jobNo).match(/\d+/g) || [];
+      for (const num of nums) {
+        const jd = jobCardMap[num];
+        if (jd) {
+          const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
+          if (url) {
+            const res = await resolveInvoiceImagePath(url, jd.designNo || jd.designName, cache);
+            if (res) return res;
+          }
+          const des = jd.designNo || jd.designName;
+          if (des) {
+            const res = await resolveInvoiceImagePath(des, des, cache);
+            if (res) return res;
+          }
+        }
+      }
+    }
+
+    // 3. Fallback: explicit item.designNo
+    if (item.designNo) {
+      const res = await resolveInvoiceImagePath(item.designNo, item.designNo, cache);
+      if (res) return res;
+    }
+
+    // 4. Fallback: check if item.challanId is linked to a FabricChallan
+    if (item.challanId) {
+      try {
+        const FabricChallan = require('../db/models/fabricChallan.model');
+        const chDoc = await FabricChallan.findById(item.challanId).lean();
+        if (chDoc && (chDoc.designImage || chDoc.imageUrl)) {
+          const res = await resolveInvoiceImagePath(chDoc.designImage || chDoc.imageUrl, chDoc.designNo, cache);
+          if (res) return res;
+        }
+      } catch (e) {}
+    }
+
+    return null;
+  }));
+};
+
+const cleanJobDisplay = (jobStr) => {
+  if (!jobStr) return '';
+  const matches = String(jobStr).match(/\d+/g);
+  if (matches && matches.length > 0) {
+    const unique = [...new Set(matches)];
+    return unique.length === 1 ? `Job Card: ${unique[0]}` : `Job Cards: ${unique.join(', ')}`;
+  }
+  return String(jobStr).replace(/JOB NO\.-?\s*/gi,'').replace(/Job\s*#?\s*/gi,'').trim();
+};
+
 // ── 9. DOWNLOAD INVOICE PDF ──────────────────────────────────────────────────
 const downloadInvoicePdf = async (req, res) => {
   const startTime = Date.now();
@@ -1195,106 +1395,22 @@ const downloadInvoicePdf = async (req, res) => {
       return `${String(dt.getDate()).padStart(2,'0')}-${String(dt.getMonth()+1).padStart(2,'0')}-${dt.getFullYear()}`;
     };
 
-    const findImageByDesignToken = (dName) => {
-      if (!dName) return null;
-      const clean = dName.trim().replace(/^ED-/i, '');
-      const pattern = new RegExp(`^(ED-)?${clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\([^)]+\\)|\\s.*)?\\.(jpg|jpeg|png|webp)$`, 'i');
-
-      const possibleDirs = [
-        path.join(__dirname, '../../elite_edition_images'),
-        path.join(__dirname, '../../../elite_edition_images'),
-        '/home/ubuntu/elite_edition_images',
-        path.join(__dirname, '../elite_edition_images'),
-        path.join(__dirname, '../../Digital print'),
-        path.join(__dirname, '../../../Digital print'),
-        '/home/ubuntu/Digital print',
-        '/home/ubuntu/Node projects/Elite_Edition/Digital print',
-        '/home/ubuntu/Node projects/Elite_Edition/elite_edition_images',
-        path.join(process.cwd(), 'Digital print'),
-        path.join(process.cwd(), 'elite_edition_images')
-      ];
-
-      for (const pDir of possibleDirs) {
-        if (fs.existsSync(pDir)) {
-          try {
-            const files = fs.readdirSync(pDir);
-            const matchedFile = files.find(f => pattern.test(f));
-            if (matchedFile) return path.join(pDir, matchedFile);
-          } catch (e) {}
-        }
-      }
-      return null;
-    };
-
-    const resolveImagePath = (urlOrPath) => {
-      if (!urlOrPath) return null;
-      let str = String(urlOrPath).trim();
-      if (!str) return null;
-      if (str.startsWith('data:image/')) {
-        try {
-          const base64Data = str.split(',')[1];
-          if (base64Data) return Buffer.from(base64Data, 'base64');
-        } catch (e) {}
-      }
-      let filename = str.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
-      try { filename = decodeURIComponent(filename); } catch(e) {}
-      const dirs = [
-        path.join(__dirname, '../../elite_edition_images'),
-        path.join(__dirname, '../../../elite_edition_images'),
-        '/home/ubuntu/elite_edition_images',
-        path.join(__dirname, '../elite_edition_images'),
-        path.join(__dirname, '../../Digital print'),
-        path.join(__dirname, '../../../Digital print'),
-        '/home/ubuntu/Digital print',
-        '/home/ubuntu/Node projects/Elite_Edition/Digital print',
-        '/home/ubuntu/Node projects/Elite_Edition/elite_edition_images',
-        path.join(process.cwd(), 'Digital print'),
-        path.join(process.cwd(), 'elite_edition_images')
-      ];
-      for (const d of dirs) {
-        if (!fs.existsSync(d)) continue;
-        const direct = path.join(d, filename);
-        if (fs.existsSync(direct)) return direct;
-        try {
-          const f = fs.readdirSync(d).find(x => x.toLowerCase() === filename.toLowerCase());
-          if (f) return path.join(d, f);
-        } catch(e) {}
-      }
-
-      // Try filename matching by design token
-      const dNameMatch = filename.match(/ED-?\d+/i) || filename.match(/\d+/);
-      if (dNameMatch) {
-        const found = findImageByDesignToken(dNameMatch[0]);
-        if (found) return found;
-      }
-
-      return null;
-    };
-
-    const cleanJobDisplay = (jobStr) => {
-      if (!jobStr) return '';
-      const matches = String(jobStr).match(/\d+/g);
-      if (matches && matches.length > 0) {
-        const unique = [...new Set(matches)];
-        return unique.length === 1 ? `Job Card: ${unique[0]}` : `Job Cards: ${unique.join(', ')}`;
-      }
-      return String(jobStr).replace(/JOB NO\.-?\s*/gi,'').replace(/Job\s*#?\s*/gi,'').trim();
-    };
-
     // ── COLUMN WIDTHS ────────────────────────────────────────────────────────────
     const COL = [18, 100, 132, 54, 34, 60, 60, 30, 71.28];
     const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
 
-    // ── OPTIMIZED HIGH-SPEED PRE-LOAD IMAGES ──────────────────────────────────
+    // ── OPTIMIZED HIGH-SPEED PRE-LOAD IMAGES (STRICT JOB NUMBER MATCHING ONLY) ──
     const items = invoice.items || [];
+    const imageCache = new Map();
 
     const allJobNumsSet = new Set();
     items.forEach(it => {
-      const combinedText = `${it.jobNo || ''} ${it.description || ''} ${it.itemName || ''}`;
-      const matches = combinedText.match(/\d+/g) || [];
-      matches.forEach(n => {
-        if (n.length >= 3 && n.length <= 6) allJobNumsSet.add(n);
-      });
+      if (it.jobNo) {
+        const matches = String(it.jobNo).match(/\d+/g) || [];
+        matches.forEach(n => {
+          if (n.length >= 2 && n.length <= 6) allJobNumsSet.add(n);
+        });
+      }
     });
     const jobNumArray = Array.from(allJobNumsSet);
 
@@ -1313,96 +1429,7 @@ const downloadInvoicePdf = async (req, res) => {
       } catch(e) {}
     }
 
-    const Design = require('../db/models/design.model');
-
-    const itemImages = await Promise.all(items.map(async (item) => {
-      let imgPath = resolveImagePath(item.imageUrl);
-
-      // 1. Check Job Cards collected from item.jobNo, item.description, item.ourChallanNo
-      const combinedText = `${item.jobNo || ''} ${item.description || ''} ${item.ourChallanNo || ''}`;
-      const nums = combinedText.match(/\d+/g) || [];
-
-      for (const num of nums) {
-        const jd = jobCardMap[num];
-        if (jd) {
-          const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
-          if (url) {
-            imgPath = resolveImagePath(url);
-            if (imgPath) break;
-          }
-          // Check design catalog by job card design number
-          const desNo = jd.designNo || jd.designName;
-          if (desNo) {
-            const cleanName = String(desNo).replace(/^ED-/i, '');
-            try {
-              const dDoc = await Design.findOne({
-                $or: [
-                  { designName: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
-                  { designNo: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
-                ]
-              }).lean();
-              if (dDoc && (dDoc.imageUrl || dDoc.imageUrl2)) {
-                imgPath = resolveImagePath(dDoc.imageUrl || dDoc.imageUrl2);
-                if (imgPath) break;
-              }
-            } catch (e) {}
-
-            const fileByDesign = findImageByDesignToken(desNo);
-            if (fileByDesign) {
-              imgPath = fileByDesign;
-              break;
-            }
-          }
-        }
-      }
-
-      // 2. Fallback: check FabricChallans linked to this invoice or item.ourChallanNo
-      if (!imgPath) {
-        const chNumMatch = combinedText.match(/EDP-(\d+)/i) || combinedText.match(/(\d{3,4})/);
-        if (chNumMatch) {
-          try {
-            const FabricChallan = require('../db/models/fabricChallan.model');
-            const chDoc = await FabricChallan.findOne({
-              $or: [{ challanNo: parseInt(chNumMatch[1], 10) }, { _id: item.challanId || undefined }]
-            }).lean();
-
-            if (chDoc) {
-              if (chDoc.designImage || chDoc.imageUrl) {
-                imgPath = resolveImagePath(chDoc.designImage || chDoc.imageUrl);
-              }
-              if (!imgPath && chDoc.designNo) {
-                const fileByDesign = findImageByDesignToken(chDoc.designNo);
-                if (fileByDesign) imgPath = fileByDesign;
-              }
-            }
-          } catch (e) {}
-        }
-      }
-
-      // 3. Fallback: check Design Catalog by any design token in description or itemName
-      if (!imgPath) {
-        const dNameMatch = (item.description || item.itemName || '').match(/ED-?\d+/i) || (item.description || '').match(/\b\d{3,4}\b/);
-        if (dNameMatch) {
-          try {
-            const cleanName = dNameMatch[0].replace(/^ED-/i, '');
-            const dDoc = await Design.findOne({
-              $or: [
-                { designName: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
-                { designNo: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
-              ]
-            }).lean();
-            if (dDoc && (dDoc.imageUrl || dDoc.imageUrl2)) {
-              imgPath = resolveImagePath(dDoc.imageUrl || dDoc.imageUrl2);
-            }
-            if (!imgPath) {
-              imgPath = findImageByDesignToken(dNameMatch[0]);
-            }
-          } catch (e) {}
-        }
-      }
-
-      return imgPath;
-    }));
+    const itemImages = await resolveItemsImages(items, jobCardMap, imageCache);
 
     const taxType = invoice.taxType || (invoice.customer && invoice.customer.stateCode && String(invoice.customer.stateCode).trim() !== '24' ? 'IGST' : 'CGST_SGST');
     const isIgst = taxType === 'IGST';
@@ -1656,10 +1683,11 @@ const downloadInvoicePdf = async (req, res) => {
           const imgPath = itemImages[idx];
           const imgMaxW = COL[1] - 6;
           const imgMaxH = Math.min(rowH - 10, 100);
-          if (imgPath && fs.existsSync(imgPath)) {
+          const hasImage = imgPath && (Buffer.isBuffer(imgPath) || (typeof imgPath === 'string' && fs.existsSync(imgPath)));
+          if (hasImage) {
             try {
               const imgY = Y + Math.max(4, Math.floor((rowH - imgMaxH) / 2));
-              doc.image(imgPath, colX[1] + 3, imgY, { fit: [imgMaxW, imgMaxH] });
+              doc.image(imgPath, colX[1] + 3, imgY, { fit: [imgMaxW, imgMaxH], align: 'center', valign: 'center' });
             } catch(e) {
               doc.fillColor(S200).fontSize(7).font('Helvetica')
                 .text('N/A', colX[1], Y + contentPadY + 6, { width: COL[1], align: 'center' });
@@ -2016,40 +2044,6 @@ const downloadBulkInvoicesPdf = async (req, res) => {
       return `${String(dt.getDate()).padStart(2,'0')}-${String(dt.getMonth()+1).padStart(2,'0')}-${dt.getFullYear()}`;
     };
 
-    const resolveImagePath = (urlOrPath) => {
-      if (!urlOrPath) return null;
-      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
-      try { filename = decodeURIComponent(filename); } catch(e) {}
-      const dirs = [
-        path.join(__dirname, '../../elite_edition_images'),
-        path.join(__dirname, '../../../elite_edition_images'),
-        '/home/ubuntu/elite_edition_images',
-        path.join(__dirname, '../elite_edition_images'),
-        path.join(__dirname, '../../Digital print'),
-        '/home/ubuntu/Digital print'
-      ];
-      for (const d of dirs) {
-        if (!fs.existsSync(d)) continue;
-        const direct = path.join(d, filename);
-        if (fs.existsSync(direct)) return direct;
-        try {
-          const f = fs.readdirSync(d).find(x => x.toLowerCase() === filename.toLowerCase());
-          if (f) return path.join(d, f);
-        } catch(e) {}
-      }
-      return null;
-    };
-
-    const cleanJobDisplay = (jobStr) => {
-      if (!jobStr) return '';
-      const matches = String(jobStr).match(/\d+/g);
-      if (matches && matches.length > 0) {
-        const unique = [...new Set(matches)];
-        return unique.length === 1 ? `Job Card: ${unique[0]}` : `Job Cards: ${unique.join(', ')}`;
-      }
-      return String(jobStr).replace(/JOB NO\.-?\s*/gi,'').replace(/Job\s*#?\s*/gi,'').trim();
-    };
-
     const COL = [18, 100, 132, 54, 34, 60, 60, 30, 71.28];
     const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
 
@@ -2086,12 +2080,17 @@ const downloadBulkInvoicesPdf = async (req, res) => {
           bulkLogoBufferOrPath = logoStr;
         }
       }
+
       const items = invoice.items || [];
+      const imageCache = new Map();
+
       const allJobNumsSet = new Set();
       items.forEach(it => {
         if (it.jobNo) {
           const matches = String(it.jobNo).match(/\d+/g) || [];
-          matches.forEach(n => allJobNumsSet.add(n));
+          matches.forEach(n => {
+            if (n.length >= 2 && n.length <= 6) allJobNumsSet.add(n);
+          });
         }
       });
       const jobNumArray = Array.from(allJobNumsSet);
@@ -2101,9 +2100,9 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         try {
           const queryOr = [];
           jobNumArray.forEach(n => {
-            queryOr.push({ jobNo: n }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` });
+            queryOr.push({ jobNo: n }, { jobNo: `JOB-${n}` }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` });
           });
-          const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo imageUrl1 imageUrl2 proofing.artworkUrl').lean();
+          const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo designNo designName imageUrl1 imageUrl2 proofing.artworkUrl').lean();
           foundJobCards.forEach(jc => {
             const nums = String(jc.jobNo).match(/\d+/g) || [];
             nums.forEach(n => { if (!jobCardMap[n]) jobCardMap[n] = jc; });
@@ -2111,23 +2110,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         } catch(e) {}
       }
 
-      const itemImages = items.map(item => {
-        let imgPath = resolveImagePath(item.imageUrl);
-        if (!imgPath && item.jobNo) {
-          const nums = String(item.jobNo).match(/\d+/g) || [];
-          for (const num of nums) {
-            const jd = jobCardMap[num];
-            if (jd) {
-              const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
-              if (url) {
-                imgPath = resolveImagePath(url);
-                if (imgPath) break;
-              }
-            }
-          }
-        }
-        return imgPath;
-      });
+      const itemImages = await resolveItemsImages(items, jobCardMap, imageCache);
 
       const taxType = invoice.taxType || (invoice.customer && invoice.customer.stateCode && String(invoice.customer.stateCode).trim() !== '24' ? 'IGST' : 'CGST_SGST');
       const isIgst = taxType === 'IGST';
@@ -2374,10 +2357,11 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             const imgPath = itemImages[idx];
             const imgMaxW = COL[1] - 6;
             const imgMaxH = Math.min(rowH - 10, 100);
+            const hasImage = imgPath && (Buffer.isBuffer(imgPath) || (typeof imgPath === 'string' && fs.existsSync(imgPath)));
 
-            if (imgPath && fs.existsSync(imgPath)) {
+            if (hasImage) {
               try {
-                doc.image(imgPath, colX[1] + 3, Y + 5, { width: imgMaxW, height: imgMaxH, fit: [imgMaxW, imgMaxH], align: 'center', valig: 'center' });
+                doc.image(imgPath, colX[1] + 3, Y + 5, { width: imgMaxW, height: imgMaxH, fit: [imgMaxW, imgMaxH], align: 'center', valign: 'center' });
               } catch(e) {
                 doc.fillColor(S500).fontSize(7).font('Helvetica')
                   .text('[Img Err]', colX[1] + 2, Y + 12, { width: COL[1] - 4, align: 'center' });
