@@ -50,6 +50,7 @@ async function setupCloudFront() {
     CallerReference: callerRef,
     Comment: 'Elite Edition ERP Global Edge CDN Distribution',
     Enabled: true,
+    WebACLId: 'arn:aws:wafv2:us-east-1:056885488683:global/webacl/EliteEdition-ProductionWebACL/68d56cf5-838f-4852-913f-7772f4b1d214',
     Origins: {
       Quantity: 1,
       Items: [
