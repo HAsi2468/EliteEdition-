@@ -11,6 +11,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const config = require('../config/config');
 const logger = require('../config/logger');
 const { uploadToR2, isR2Configured } = require('../utils/r2Storage');
+const { uploadToS3, isS3Configured } = require('../utils/s3Storage');
 
 const BACKUP_DIR = path.join(__dirname, '../../backups/mongodb');
 const RETENTION_DAYS = 30;
@@ -112,11 +113,13 @@ async function performBackup() {
     logger.warn(`[Backup Script] Retention cleanup warning: ${err.message}`);
   }
 
-  // 3. Multi-Destination Offsite Cloud Storage Sync (R2 / S3)
+  // 3. Multi-Destination Offsite Cloud Storage Sync (R2 & Amazon S3 / Glacier)
   let cloudUrl = null;
+  let s3Uri = null;
+
   if (isR2Configured()) {
     try {
-      logger.info('[Backup Script] Syncing backup archive to Cloud Storage...');
+      logger.info('[Backup Script] Syncing backup archive to Cloudflare R2...');
       const buffer = fs.readFileSync(localFilePath);
       cloudUrl = await uploadToR2({
         buffer,
@@ -124,12 +127,30 @@ async function performBackup() {
         mimeType: 'application/gzip',
         folder: 'backups/mongodb',
       });
-      logger.info(`[Backup Script] Offsite cloud backup sync complete: ${cloudUrl}`);
+      logger.info(`[Backup Script] Offsite R2 cloud backup sync complete: ${cloudUrl}`);
     } catch (err) {
-      logger.error(`[Backup Script] Cloud backup sync failed: ${err.message}`);
+      logger.error(`[Backup Script] R2 backup sync failed: ${err.message}`);
     }
   } else {
-    logger.info('[Backup Script] Cloud storage credentials not set; skipped offsite cloud sync.');
+    logger.info('[Backup Script] Cloudflare R2 credentials not set; skipped R2 sync.');
+  }
+
+  if (isS3Configured()) {
+    try {
+      logger.info('[Backup Script] Syncing backup archive to Amazon S3 & Glacier Flexible Archive...');
+      const buffer = fs.readFileSync(localFilePath);
+      s3Uri = await uploadToS3({
+        buffer,
+        fileName,
+        mimeType: 'application/gzip',
+        folder: 'mongodb-dumps',
+      });
+      logger.info(`[Backup Script] Offsite Amazon S3 backup sync complete: ${s3Uri}`);
+    } catch (err) {
+      logger.error(`[Backup Script] Amazon S3 backup sync failed: ${err.message}`);
+    }
+  } else {
+    logger.info('[Backup Script] Amazon S3 credentials not set; skipped S3 sync.');
   }
 
   return {
@@ -138,6 +159,7 @@ async function performBackup() {
     localPath: localFilePath,
     sizeMB,
     cloudUrl,
+    s3Uri,
     timestamp: now.toISOString(),
   };
 }

@@ -13,16 +13,16 @@
 | # | Component Name | Category / Tier | Priority | Current Status | Technical Implementation Details |
 |---|---|---|:---:|:---:|---|
 | **1** | **Cloudflare R2** | Zero-Egress Media Store | P0 | <span style="color:#16a34a; font-weight:800">✅ COMPLETED</span> | S3-compatible API integrated in `r2Storage.js`, chunked multipart uploader, presigned URLs, CSP allowed. |
-| **2** | **Amazon S3 (Standard)** | Object Storage | P1 | <span style="color:#d97706; font-weight:800">🔄 READY IN CODE</span> | `@aws-sdk/client-s3` installed & tested. Ready to link AWS S3 bucket for operational document archives. |
+| **2** | **Amazon S3 (Standard)** | Object Storage | P1 | <span style="color:#16a34a; font-weight:800">✅ COMPLETED</span> | Provisioned bucket `elite-edition-backups-056885488683` in `ap-south-1`, block public access active, live MongoDB dumps synced via `s3Storage.js`. |
 | **3** | **MongoDB Atlas (M10)** | Dedicated Managed DB | P1 | <span style="color:#d97706; font-weight:800">🟡 CONNECTED (M0)</span> | Live connected (`eliteedition.qq3aqjz.mongodb.net`). Ready for one-click cluster scale-up to dedicated M10 with continuous backups. |
-| **4** | **Amazon Route 53** | DNS, Failover & Health Checks | P1 | <span style="color:#2563eb; font-weight:800">🚀 IN PROGRESS</span> | High-speed DNS routing with automated health checks on `https://erp.eliteedition.in` and failover routing. |
-| **5** | **AWS Certificate Manager (ACM)** | Free Auto-Renewing SSL | P1 | <span style="color:#2563eb; font-weight:800">🚀 IN PROGRESS</span> | Request wildcard certificate (`*.eliteedition.in`, `eliteedition.in`) validated via Route 53 DNS. |
-| **6** | **Amazon CloudFront** | Global Edge CDN Distribution | P2 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | Edge distribution in front of EC2 & S3, terminating HTTPS with ACM SSL certificate. |
-| **7** | **AWS WAF** | Web Application Firewall & DDoS | P2 | <span style="color:#d97706; font-weight:800">🟡 PARTIAL (App Level)</span> | App-layer security active (Helmet, Mongo-Sanitize, Rate Limiting, CSRF tokens). AWS WAF attaches to CloudFront. |
-| **8** | **AWS Secrets Manager** | Centralized Credential Vault | P2 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | Replaces static server `.env` files with dynamic encrypted secret retrieval at app launch. |
+| **4** | **Amazon Route 53** | DNS, Failover & Health Checks | P1 | <span style="color:#16a34a; font-weight:800">✅ PROVISIONED</span> | Hosted Zone `Z05474651L1APGRBPMJ0H` active, A-Record `erp.eliteedition.in` -> `3.7.174.180`, 30s HTTPS health check `c4e9c21a` active and 100% HEALTHY. |
+| **5** | **AWS Certificate Manager (ACM)** | Free Auto-Renewing SSL | P1 | <span style="color:#d97706; font-weight:800">🟡 VALIDATING</span> | Wildcard certs requested in `ap-south-1` & `us-east-1` (`*.eliteedition.in`). Route 53 CNAMEs configured. Pending registrar NS delegation. |
+| **6** | **Amazon CloudFront** | Global Edge CDN Distribution | P2 | <span style="color:#2563eb; font-weight:800">⏳ AWS VERIFYING</span> | Script `setupCloudFront.js` ready. Awaiting AWS 1-click account verification ticket approval before distribution spin-up. |
+| **7** | **AWS WAF** | Web Application Firewall & DDoS | P2 | <span style="color:#d97706; font-weight:800">🟡 PARTIAL (App Level)</span> | App-layer security active (Helmet, Mongo-Sanitize, Rate Limiting, CSRF tokens). AWS WAF Web ACL attaches to CloudFront. |
+| **8** | **AWS Secrets Manager** | Centralized Credential Vault | P2 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | Centralized KMS-encrypted vault for credentials and database URIs. |
 | **9** | **AWS KMS** | Hardware Key Encryption | P2 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | Customer Master Key (CMK) envelope encryption for database backups, S3 data at rest, and secret keys. |
-| **10** | **AWS Backup Service** | Automated Snapshot Vault | P2 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | Automated daily scheduled backup plans and retention policies for EC2 EBS volumes and S3 storage. |
-| **11** | **Amazon S3 Glacier Flexible Archive** | Deep Cold Storage Archive | P3 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | S3 Lifecycle transition rules: auto-moves files >90/180 days to Glacier for ~80% storage cost reduction. |
+| **10** | **AWS Backup Service** | Automated Snapshot Vault | P2 | <span style="color:#64748b; font-weight:800">📋 NEXT STEP</span> | Automated daily scheduled backup plans and retention policies for EC2 EBS volumes and S3 storage. |
+| **11** | **Amazon S3 Glacier Flexible Archive** | Deep Cold Storage Archive | P3 | <span style="color:#16a34a; font-weight:800">✅ COMPLETED</span> | S3 Lifecycle transition rules active: auto-moves `mongodb-dumps/` >90 days and `system-logs/` >60 days into Glacier Flexible Archive (~80% cost reduction). |
 
 ---
 
