@@ -58,6 +58,22 @@ const infrastructureBillSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    paymentStatus: {
+      type: String,
+      enum: ['UNPAID', 'PAID'],
+      default: 'UNPAID',
+    },
+    paidAt: {
+      type: Date,
+    },
+    paymentMethod: {
+      type: String,
+      trim: true,
+    },
+    paymentRef: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,

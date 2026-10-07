@@ -7,6 +7,10 @@ const router = express.Router();
 router.get('/aws-live', infraBillController.getAwsLiveCost);
 router.post('/aws-sync', infraBillController.syncAwsCosts);
 
+// PDF Download and Payment actions
+router.get('/:id/invoice-pdf', infraBillController.downloadInvoicePdf);
+router.post('/:id/pay', infraBillController.recordPayment);
+
 router
   .route('/')
   .post(infraBillController.createBill)
@@ -18,3 +22,4 @@ router
   .delete(infraBillController.deleteBill);
 
 module.exports = router;
+
