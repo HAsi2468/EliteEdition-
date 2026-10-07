@@ -237,7 +237,20 @@ const syncAwsCosts = async (req, res) => {
 
     const syncedBills = [];
 
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const isPastCompletedMonth = (monthStr) => {
+      try {
+        const d = new Date(`1 ${monthStr}`);
+        return d < startOfCurrentMonth;
+      } catch (e) {
+        return false;
+      }
+    };
+
     for (const item of costData.results || []) {
+      const isPast = isPastCompletedMonth(item.month);
       let bill = await InfrastructureBill.findOne({ month: item.month });
 
       if (bill) {
@@ -247,8 +260,23 @@ const syncAwsCosts = async (req, res) => {
         bill.awsBreakdown = item.services;
         bill.isAutoSynced = true;
         bill.syncedAt = new Date();
+
+        // If it is a past completed month and never recorded as PAID, auto-mark as PAID
+        if (isPast && (!bill.paymentStatus || bill.paymentStatus === 'UNPAID')) {
+          bill.paymentStatus = 'PAID';
+          const paidDate = new Date(`1 ${item.month}`);
+          paidDate.setMonth(paidDate.getMonth() + 1, 3);
+          bill.paidAt = paidDate;
+          bill.paymentMethod = bill.paymentMethod || 'AWS Auto-Debit / Credit Card';
+          bill.paymentRef = bill.paymentRef || 'AWS Auto-Settled';
+        }
+
         await bill.save();
       } else {
+        const defaultStatus = isPast ? 'PAID' : 'UNPAID';
+        const paidDate = new Date(`1 ${item.month}`);
+        paidDate.setMonth(paidDate.getMonth() + 1, 3);
+
         bill = await InfrastructureBill.create({
           month: item.month,
           awsAmount: item.totalInr,
@@ -259,6 +287,10 @@ const syncAwsCosts = async (req, res) => {
           isAutoSynced: true,
           syncedAt: new Date(),
           notes: `Auto-synced from AWS Cost Explorer`,
+          paymentStatus: defaultStatus,
+          paidAt: isPast ? paidDate : undefined,
+          paymentMethod: isPast ? 'AWS Auto-Debit / Credit Card' : undefined,
+          paymentRef: isPast ? 'AWS Auto-Settled' : undefined,
         });
       }
 
