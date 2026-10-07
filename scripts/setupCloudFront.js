@@ -137,8 +137,13 @@ async function setupCloudFront() {
         },
       ],
     },
+    Aliases: {
+      Quantity: 1,
+      Items: ['erp.eliteedition.in'],
+    },
     ViewerCertificate: {
-      CloudFrontDefaultCertificate: true,
+      ACMCertificateArn: 'arn:aws:acm:us-east-1:056885488683:certificate/0b31dac8-abee-47f9-a780-611ededa4160',
+      SSLSupportMethod: 'sni-only',
       MinimumProtocolVersion: 'TLSv1.2_2021',
     },
     HttpVersion: 'http2and3',
