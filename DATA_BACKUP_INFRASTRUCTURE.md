@@ -21,7 +21,7 @@
 | **7** | **AWS WAF** | Web Application Firewall & DDoS | P2 | <span style="color:#d97706; font-weight:800">🟡 PARTIAL (App Level)</span> | App-layer security active (Helmet, Mongo-Sanitize, Rate Limiting, CSRF tokens). AWS WAF Web ACL attaches to CloudFront. |
 | **8** | **AWS Secrets Manager** | Centralized Credential Vault | P2 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | Centralized KMS-encrypted vault for credentials and database URIs. |
 | **9** | **AWS KMS** | Hardware Key Encryption | P2 | <span style="color:#64748b; font-weight:800">📋 PLANNED</span> | Customer Master Key (CMK) envelope encryption for database backups, S3 data at rest, and secret keys. |
-| **10** | **AWS Backup Service** | Automated Snapshot Vault | P2 | <span style="color:#64748b; font-weight:800">📋 NEXT STEP</span> | Automated daily scheduled backup plans and retention policies for EC2 EBS volumes and S3 storage. |
+| **10** | **AWS Backup Service** | Automated Snapshot Vault | P2 | <span style="color:#2563eb; font-weight:800">🚀 SCRIPT READY</span> | Automation script `setupAWSBackup.js` ready. Creates `EliteEdition-ProductionVault`, 35-day daily backup plan (03:00 AM IST) + 365-day monthly archive, backing up EC2 instance `i-07e04075b693c42e6` and S3 bucket `elite-edition-backups-056885488683`. Requires IAM policy `AWSBackupFullAccess`. |
 | **11** | **Amazon S3 Glacier Flexible Archive** | Deep Cold Storage Archive | P3 | <span style="color:#16a34a; font-weight:800">✅ COMPLETED</span> | S3 Lifecycle transition rules active: auto-moves `mongodb-dumps/` >90 days and `system-logs/` >60 days into Glacier Flexible Archive (~80% cost reduction). |
 
 ---
