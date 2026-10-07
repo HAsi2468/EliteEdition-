@@ -144,6 +144,57 @@ const getBillingDashboardStats = async (req, res) => {
   }
 };
 
+// Helper to enrich invoice line items with design images from JobCards if missing
+const enrichInvoiceItemsWithImages = async (invoices) => {
+  if (!invoices) return;
+  const list = Array.isArray(invoices) ? invoices : [invoices];
+  const missingJobs = [];
+
+  list.forEach(inv => {
+    (inv.items || []).forEach(it => {
+      if (!it.imageUrl && it.jobNo) {
+        const c = String(it.jobNo).replace(/[^0-9]/g, '');
+        if (c) missingJobs.push(c);
+      }
+    });
+  });
+
+  if (missingJobs.length === 0) return;
+
+  try {
+    const JobCard = require('../db/models/jobCard.model');
+    const uniqueClean = [...new Set(missingJobs)];
+    const orQueries = [];
+    uniqueClean.forEach(c => {
+      orQueries.push({ jobNo: `JOB-${c}` });
+      orQueries.push({ jobNo: `JOB NO.- ${c}` });
+      orQueries.push({ jobNo: c });
+      orQueries.push({ jobNo: Number(c) });
+    });
+
+    const foundJobs = await JobCard.find({ $or: orQueries }).select('jobNo imageUrl1 imageUrl2 image').lean();
+    const map = new Map();
+    foundJobs.forEach(j => {
+      const img = j.imageUrl1 || j.imageUrl2 || j.image || '';
+      const c = String(j.jobNo || '').replace(/[^0-9]/g, '');
+      if (img && c) map.set(c, img);
+    });
+
+    list.forEach(inv => {
+      (inv.items || []).forEach(it => {
+        if (!it.imageUrl && it.jobNo) {
+          const c = String(it.jobNo).replace(/[^0-9]/g, '');
+          if (map.has(c)) {
+            it.imageUrl = map.get(c);
+          }
+        }
+      });
+    });
+  } catch (err) {
+    console.warn('enrichInvoiceItemsWithImages error:', err.message);
+  }
+};
+
 // ── 2. GET INVOICES LIST ───────────────────────────────────────────────────────
 const getInvoices = async (req, res) => {
   try {
@@ -191,6 +242,8 @@ const getInvoices = async (req, res) => {
 
     const total = await BillingInvoice.countDocuments(filter);
 
+    await enrichInvoiceItemsWithImages(invoices);
+
     res.json({
       success: true,
       data: invoices,
@@ -210,6 +263,9 @@ const getInvoiceById = async (req, res) => {
     if (!invoice) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
+
+    await enrichInvoiceItemsWithImages(invoice);
+
     res.json({ success: true, data: invoice });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -436,6 +492,8 @@ const createInvoice = async (req, res) => {
     } else {
       invoiceData.paymentStatus = 'UNPAID';
     }
+
+    await enrichInvoiceItemsWithImages(invoiceData);
 
     const invoice = await BillingInvoice.create(invoiceData);
 
@@ -763,6 +821,7 @@ const updateInvoice = async (req, res) => {
 
     const clientVersion = req.body.version ?? req.body.clientVersion ?? req.headers['if-match-version'] ?? req.headers['if-match'];
     let invoice;
+    await enrichInvoiceItemsWithImages(invoiceData);
     if (clientVersion !== undefined && clientVersion !== null && clientVersion !== '') {
       invoice = await updateWithOCC(BillingInvoice, req.params.id, clientVersion, invoiceData);
     } else {
@@ -881,6 +940,34 @@ const mergeChallans = async (req, res) => {
     const linkedChallanNos = [];
     const catalogItems = await BillingItem.find().lean();
 
+    // Preload JobCards for all challan job numbers & design numbers
+    const JobCard = require('../db/models/jobCard.model');
+    const allChallanJobs = allChallans.map(ch => ch.jobNo).filter(Boolean);
+    const allDesignNos = allChallans.map(ch => ch.designNo).filter(Boolean);
+    const cleanJobNums = allChallanJobs.map(j => String(j).replace(/[^0-9]/g, '')).filter(Boolean);
+
+    const jobOrQuery = [
+      { jobNo: { $in: allChallanJobs } },
+      { jobNo: { $in: cleanJobNums.map(n => `JOB-${n}`) } },
+      { jobNo: { $in: cleanJobNums.map(n => `JOB NO.- ${n}`) } },
+      { designNo: { $in: allDesignNos } },
+    ];
+    if (cleanJobNums.length > 0) {
+      jobOrQuery.push({ jobNo: { $in: cleanJobNums } });
+    }
+
+    const foundJobCards = await JobCard.find({ $or: jobOrQuery }).select('jobNo designNo imageUrl1 imageUrl2 image').lean();
+    const jobCardImgMap = new Map();
+    foundJobCards.forEach(jc => {
+      const img = jc.imageUrl1 || jc.imageUrl2 || jc.image || '';
+      if (img) {
+        if (jc.jobNo) jobCardImgMap.set(String(jc.jobNo).trim().toUpperCase(), img);
+        const c = String(jc.jobNo || '').replace(/[^0-9]/g, '');
+        if (c) jobCardImgMap.set(c, img);
+        if (jc.designNo) jobCardImgMap.set(`DESIGN_${String(jc.designNo).trim().toUpperCase()}`, img);
+      }
+    });
+
     allChallans.forEach(ch => {
       const chNoStr = ch.challanNo
         ? (String(ch.challanNo).startsWith('PCH') || String(ch.challanNo).startsWith('EDP')
@@ -890,6 +977,12 @@ const mergeChallans = async (req, res) => {
 
       linkedChallanIds.push(String(ch._id));
       linkedChallanNos.push(chNoStr);
+
+      const cleanChJob = String(ch.jobNo || '').replace(/[^0-9]/g, '');
+      const defaultJobImg = ch.designImage || ch.imageUrl ||
+        jobCardImgMap.get(String(ch.jobNo || '').trim().toUpperCase()) ||
+        jobCardImgMap.get(cleanChJob) ||
+        (ch.designNo ? jobCardImgMap.get(`DESIGN_${String(ch.designNo).trim().toUpperCase()}`) : '') || '';
 
       if (Array.isArray(ch.items) && ch.items.length > 0) {
         // Stitching Challan or Multi-item Challan
@@ -901,6 +994,12 @@ const mergeChallans = async (req, res) => {
           const unitPrice = matched?.unitPrice != null ? matched.unitPrice : rate;
           const taxRate = matched?.taxRate != null ? matched.taxRate : 5;
 
+          const cleanItJob = String(it.jobNo || ch.jobNo || '').replace(/[^0-9]/g, '');
+          const itemImg = it.imageUrl || defaultJobImg ||
+            jobCardImgMap.get(String(it.jobNo || '').trim().toUpperCase()) ||
+            jobCardImgMap.get(cleanItJob) ||
+            (it.designNo ? jobCardImgMap.get(`DESIGN_${String(it.designNo).trim().toUpperCase()}`) : '') || '';
+
           items.push({
             itemName,
             description: `Challan ${chNoStr} | ${it.particulars || 'Stitching Work'}`,
@@ -910,7 +1009,7 @@ const mergeChallans = async (req, res) => {
             ourChallanNo: chNoStr,
             challanId: String(ch._id),
             isLocked: true, // MTR / PCS LOCKED
-            imageUrl: it.imageUrl || ch.imageUrl || '',
+            imageUrl: itemImg,
             hsnCode: it.hsnCode || matched?.hsnCode || '6204',
             qty: pcs,
             unit: matched?.unit || 'Pcs',
@@ -946,7 +1045,7 @@ const mergeChallans = async (req, res) => {
           ourChallanNo: chNoStr,
           challanId: String(ch._id),
           isLocked: true, // MTR LOCKED
-          imageUrl: ch.designImage || ch.imageUrl || '',
+          imageUrl: defaultJobImg,
           hsnCode,
           qty: mtr,
           unit,
@@ -1043,6 +1142,7 @@ const downloadInvoicePdf = async (req, res) => {
   try {
     const invoice = await BillingInvoice.findById(req.params.id).lean();
     if (!invoice) return res.status(404).send('Invoice not found');
+    await enrichInvoiceItemsWithImages(invoice);
 
     const includeDuplicate = req.query.duplicate === 'true';
 
