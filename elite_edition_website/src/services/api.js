@@ -77,11 +77,12 @@ export const generateIdempotencyKey = () => {
 
 /**
  * Calculates exponential backoff with full randomized jitter
- * Attempt 1: 500ms, Attempt 2: 1500ms, Attempt 3: 4000ms
+ * Fast Exponential Backoff with Jitter for Transient Network/Server Reloads:
+ * Attempt 1: 250ms, Attempt 2: 750ms, Attempt 3: 2000ms
  */
 const getBackoffDelay = (attempt) => {
-  const baseDelays = [500, 1500, 4000];
-  const base = baseDelays[attempt - 1] || 4000;
+  const baseDelays = [250, 750, 2000];
+  const base = baseDelays[attempt - 1] || 2000;
   const jitter = Math.floor(Math.random() * (base * 0.2)); // 20% random jitter
   return base + jitter;
 };
@@ -112,9 +113,8 @@ const request = async (path, options = {}) => {
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token');
 
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      throw new Error('Network offline. Please check your internet connection.');
-    }
+    // Note: Do not prematurely block on navigator.onLine if retrying; browsers frequently report
+    // false negatives on wake-from-sleep or WiFi reconnect handoffs. Let fetch attempt or retry handle it.
     
     const userStr = localStorage.getItem('elite_user');
     let currUser = null;
@@ -179,7 +179,10 @@ const request = async (path, options = {}) => {
       const isTransient = err.message && (
         err.message.includes('Failed to fetch') ||
         err.message.includes('NetworkError') ||
-        err.message.includes('Load failed')
+        err.message.includes('Load failed') ||
+        err.message.includes('offline') ||
+        err.message.includes('fetch failed') ||
+        err.message.includes('Network request failed')
       );
 
       if (isTransient && attempt <= maxRetries && canRetry) {

@@ -3134,31 +3134,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Minimal Offline / Reconnecting Status (Zero decorative icons, hidden when connected) */}
-      {connectionStatus !== 'connected' && (
-        <div
-          data-testid="connection-status-banner"
-          style={{
-            position: 'fixed',
-            bottom: 12,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: '#0f172a',
-            color: '#94a3b8',
-            border: '1px solid #334155',
-            padding: '4px 12px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: 500,
-            letterSpacing: '0.02em',
-            zIndex: 99999,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-            pointerEvents: 'none'
-          }}
-        >
-          {connectionStatus === 'offline' ? 'Offline' : 'Reconnecting...'}
-        </div>
-      )}
 
       {/* Minimal Record Conflict Notice (No overwrite of unsaved form inputs) */}
       {conflictRecord && (

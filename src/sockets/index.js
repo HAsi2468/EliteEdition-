@@ -138,6 +138,13 @@ const setupSockets = (io) => {
       }
     });
 
+    // Fast zero-overhead health ping for instant client liveness verification
+    socket.on('ping-health', (callback) => {
+      if (typeof callback === 'function') {
+        callback({ status: 'ok', serverTime: Date.now() });
+      }
+    });
+
     // 5. Join room with security enforcement (prevent joining arbitrary company rooms)
     socket.on('join-room', (roomId) => {
       if (typeof roomId !== 'string') return;

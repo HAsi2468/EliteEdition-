@@ -14,10 +14,11 @@ const server = http.Server(app);
 
 const eventBus = require('./services/eventBus.service');
 
-// Initialize Socket.io with high-resilience mobile & desktop heartbeat and compression
+// Initialize Socket.io with high-resilience mobile & desktop heartbeat, fast reconnection, and compression
 const io = new Server(server, {
-  pingTimeout: 20000,   // Resilient timeout against cellular handover and background tabs
-  pingInterval: 25000,  // Heartbeat check every 25s
+  pingTimeout: 8000,    // Detect dropped connection in 8s instead of 20s
+  pingInterval: 12000,  // Heartbeat check every 12s instead of 25s
+  connectTimeout: 8000,
   transports: ['websocket', 'polling'],
   perMessageDeflate: {
     threshold: 1024     // Enable compression for payloads above 1KB

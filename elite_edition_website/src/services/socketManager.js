@@ -5,22 +5,20 @@
  * multiple browser tabs, mobile devices, background tabs, and sister companies.
  *
  * Features:
- * 1. Single socket connection per app session with exponential backoff & jitter.
- * 2. Strict company isolation via authenticated handshake and room subscription.
- * 3. Sequence tracking (eventId) to drop duplicates and reorder out-of-sequence events.
- * 4. Automatic resync on:
- *    - Connect / Reconnect
- *    - Document visibility change (tab foregrounded)
- *    - Window focus
- *    - Network 'online' event
- *    - PWA resume ('pageshow')
- *    - Company / workspace switch
- * 5. Automatic fallback polling if socket remains down for > 15 seconds.
- * 6. Connection state management ('connected' | 'reconnecting' | 'offline').
+ * 1. Ultra-fast reconnection with 250ms initial retry and 2s max backoff cap.
+ * 2. Instant manual & proactive reset bypassing internal backoff timers.
+ * 3. Proactive half-open / zombie TCP socket detection via zero-overhead 'ping-health'.
+ * 4. Anti-flicker debounced state transitions (prevents UI flashing on micro-hops).
+ * 5. Integrated with ResilientLifecycleManager (W3C Page Lifecycle & unthrottled Web Worker).
+ * 6. User interaction recovery watchdog (resumes connection on pointer/key events).
+ * 7. Sequence tracking (eventId) to drop duplicates and reorder out-of-sequence events.
+ * 8. Automatic resync on connect, visibilitychange, focus, online, pageshow, and company switch.
+ * 9. Automatic fallback polling if socket remains down for > 15 seconds.
  */
 
 import { io } from 'socket.io-client';
 import { getBaseUrl } from './api';
+import { lifecycleManager } from './resilientLifecycleManager';
 
 class SocketManager {
   constructor() {
@@ -42,6 +40,8 @@ class SocketManager {
     this.fallbackPollTimer = null;
     this.isPollingFallbackActive = false;
 
+    this._reconnectingDebounceTimer = null;
+    this._isVerifyingAlive = false;
     this.hasBoundGlobalLifecycle = false;
   }
 
@@ -93,10 +93,12 @@ class SocketManager {
       },
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      randomizationFactor: 0.5, // Exponential backoff with jitter
-      timeout: 20000,
+      reconnectionDelay: 250,        // Super fast 250ms initial retry (was 1000ms)
+      reconnectionDelayMax: 2000,    // Cap backoff ceiling at 2s (was 10000ms)
+      randomizationFactor: 0.3,      // Smooth jitter to avoid server contention
+      timeout: 4000,                 // Fast 4s connection timeout (was 20000ms)
+      upgrade: true,
+      rememberUpgrade: true,
     });
 
     this.socket.on('connect', () => {
@@ -292,18 +294,73 @@ class SocketManager {
   }
 
   /**
-   * Bind lifecycle triggers (focus, visibility, online, pageshow)
+   * Fast proactive watchdog for zombie/half-open socket detection.
+   * Sends zero-overhead ping-health. If server does not ACK within 1500ms, forces reconnect.
+   */
+  _verifySocketAlive() {
+    if (!this.socket || !this.socket.connected) {
+      this.reconnect(true);
+      return;
+    }
+
+    if (this._isVerifyingAlive) return;
+    this._isVerifyingAlive = true;
+
+    let hasAcked = false;
+    const timeout = setTimeout(() => {
+      this._isVerifyingAlive = false;
+      if (!hasAcked) {
+        console.warn('[SocketManager] Proactive ping timed out (zombie socket). Cycling connection now.');
+        try {
+          this.socket.disconnect();
+        } catch (e) { }
+        this.reconnect(true);
+      }
+    }, 1500);
+
+    try {
+      this.socket.emit('ping-health', () => {
+        hasAcked = true;
+        clearTimeout(timeout);
+        this._isVerifyingAlive = false;
+      });
+    } catch (e) {
+      clearTimeout(timeout);
+      this._isVerifyingAlive = false;
+      this.reconnect(true);
+    }
+  }
+
+  /**
+   * Bind lifecycle triggers (focus, visibility, online, pageshow, and user activity)
    */
   _bindLifecycleEvents() {
     if (this.hasBoundGlobalLifecycle || typeof window === 'undefined') return;
     this.hasBoundGlobalLifecycle = true;
 
-    // 1. Tab visibility change (browser switched back to tab)
+    // Initialize resilient lifecycle manager if available
+    try {
+      lifecycleManager.init();
+      lifecycleManager.onStateChange((state) => {
+        if (state === 'CONNECTED') {
+          if (!this.isConnected()) {
+            this.reconnect(true);
+          }
+        } else if (state === 'OFFLINE') {
+          this._setStatus('offline');
+        }
+      });
+    } catch (e) {
+      console.warn('[SocketManager] LifecycleManager integration warning:', e?.message || e);
+    }
+
+    // 1. Tab visibility change (browser switched back to tab or screen unlocked)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         if (!this.socket || !this.socket.connected) {
-          this.reconnect();
+          this.reconnect(true);
         } else {
+          this._verifySocketAlive();
           this.resync('visibility-visible');
         }
       }
@@ -311,17 +368,18 @@ class SocketManager {
 
     // 2. Window focus
     window.addEventListener('focus', () => {
-      if (this.socket && this.socket.connected) {
-        this.resync('window-focus');
+      if (!this.socket || !this.socket.connected) {
+        this.reconnect(true);
       } else {
-        this.reconnect();
+        this._verifySocketAlive();
+        this.resync('window-focus');
       }
     });
 
     // 3. Network online event
     window.addEventListener('online', () => {
-      this._setStatus('reconnecting');
-      this.reconnect();
+      this._clearOfflineTimers();
+      this.reconnect(true);
       this.resync('network-online');
     });
 
@@ -334,10 +392,29 @@ class SocketManager {
     // 5. PWA resume from background / cache restore
     window.addEventListener('pageshow', (event) => {
       if (event.persisted || !this.socket || !this.socket.connected) {
-        this.reconnect();
+        this.reconnect(true);
+      } else {
+        this._verifySocketAlive();
       }
       this.resync('pageshow');
     });
+
+    // 6. User interaction recovery watchdog:
+    // When workstation user clicks or types after dormancy, verify connection
+    let lastUserCheck = 0;
+    const handleUserInteraction = () => {
+      const now = Date.now();
+      if (now - lastUserCheck > 10000) {
+        lastUserCheck = now;
+        if (!this.socket || !this.socket.connected) {
+          this.reconnect(true);
+        } else {
+          this._verifySocketAlive();
+        }
+      }
+    };
+    window.addEventListener('pointerdown', handleUserInteraction, { passive: true });
+    window.addEventListener('keydown', handleUserInteraction, { passive: true });
   }
 
   /**
@@ -406,13 +483,26 @@ class SocketManager {
   }
 
   /**
-   * Cleanly reconnect socket
+   * Cleanly and immediately reconnect socket, canceling any backoff pauses
    */
-  reconnect() {
+  reconnect(forceImmediate = true) {
     if (this.socket) {
       try {
+        if (this.socket.connected) {
+          this.resync('already-connected');
+          return;
+        }
+
+        if (forceImmediate && this.socket.io) {
+          this.socket.io.skipReconnect = false;
+          if (this.socket.io.backoff && typeof this.socket.io.backoff.reset === 'function') {
+            this.socket.io.backoff.reset();
+          }
+        }
         this.socket.connect();
-      } catch (e) { }
+      } catch (e) {
+        console.warn('[SocketManager] Reconnect warning:', e?.message || e);
+      }
     } else {
       this._connect();
     }
@@ -423,6 +513,10 @@ class SocketManager {
    */
   disconnect() {
     this._clearOfflineTimers();
+    if (this._reconnectingDebounceTimer) {
+      clearTimeout(this._reconnectingDebounceTimer);
+      this._reconnectingDebounceTimer = null;
+    }
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -461,9 +555,60 @@ class SocketManager {
     return () => this.conflictListeners.delete(fn);
   }
 
-  _setStatus(status) {
-    if (this.status === status) return;
-    this.status = status;
+  /**
+   * Internal status broadcaster with anti-flicker debounce.
+   * Sub-second network drops will not cause UI badges to flash.
+   */
+  _setStatus(newStatus) {
+    if (this.status === newStatus && !this._reconnectingDebounceTimer) return;
+
+    // When connection succeeds, clear any pending debounce and notify immediately
+    if (newStatus === 'connected') {
+      if (this._reconnectingDebounceTimer) {
+        clearTimeout(this._reconnectingDebounceTimer);
+        this._reconnectingDebounceTimer = null;
+      }
+      this.status = 'connected';
+      this._notifyStatus('connected');
+      return;
+    }
+
+    // When offline, immediately set offline
+    if (newStatus === 'offline' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      if (this._reconnectingDebounceTimer) {
+        clearTimeout(this._reconnectingDebounceTimer);
+        this._reconnectingDebounceTimer = null;
+      }
+      this.status = 'offline';
+      this._notifyStatus('offline');
+      return;
+    }
+
+    // When reconnecting from a connected state, debounce by 650ms to suppress micro-blips
+    if (newStatus === 'reconnecting') {
+      if (this.status === 'connected') {
+        if (!this._reconnectingDebounceTimer) {
+          this._reconnectingDebounceTimer = setTimeout(() => {
+            this._reconnectingDebounceTimer = null;
+            if (this.status !== 'connected') {
+              this.status = 'reconnecting';
+              this._notifyStatus('reconnecting');
+            }
+          }, 650);
+        }
+        return;
+      }
+
+      this.status = 'reconnecting';
+      this._notifyStatus('reconnecting');
+      return;
+    }
+
+    this.status = newStatus;
+    this._notifyStatus(newStatus);
+  }
+
+  _notifyStatus(status) {
     this.statusListeners.forEach((fn) => {
       try { fn(status); } catch (e) { }
     });

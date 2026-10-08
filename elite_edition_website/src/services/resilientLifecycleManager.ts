@@ -64,12 +64,12 @@ class ResilientLifecycleManager {
   constructor(customConfig: HeartbeatConfig = {}) {
     this.config = {
       pingEndpoint: customConfig.pingEndpoint || '/v1/auth/ping',
-      activeIntervalMs: customConfig.activeIntervalMs || 15000,
-      backgroundIntervalMs: customConfig.backgroundIntervalMs || 30000,
-      probeTimeoutMs: customConfig.probeTimeoutMs || 4000,
-      baseReconnectDelayMs: customConfig.baseReconnectDelayMs || 1000,
-      maxReconnectDelayMs: customConfig.maxReconnectDelayMs || 15000,
-      jitterFactor: customConfig.jitterFactor || 0.3,
+      activeIntervalMs: customConfig.activeIntervalMs || 10000,
+      backgroundIntervalMs: customConfig.backgroundIntervalMs || 25000,
+      probeTimeoutMs: customConfig.probeTimeoutMs || 2500,
+      baseReconnectDelayMs: customConfig.baseReconnectDelayMs || 300,
+      maxReconnectDelayMs: customConfig.maxReconnectDelayMs || 3000,
+      jitterFactor: customConfig.jitterFactor || 0.2,
     };
   }
 
