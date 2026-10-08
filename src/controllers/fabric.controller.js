@@ -1847,10 +1847,12 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const JobCard = require('../db/models/jobCard.model');
     const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
     const PrintConfig = require('../db/models/printConfig.model');
+    const Expense = require('../db/models/expense.model');
+    const BillingInvoice = require('../db/models/billingInvoice.model');
 
     const selectedReports = reports
       ? reports.split(',').map(s => s.trim().toLowerCase())
-      : ['challan', 'inward', 'outward', 'lotwise', 'stock', 'machine'];
+      : ['challan', 'inward', 'outward', 'lotwise', 'stock', 'machine', 'expense', 'invoice'];
 
     const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
     const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
@@ -2349,6 +2351,113 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       grandTotPaperRolls = Math.ceil(totalMachinePrintedMtr / 910);
     }
 
+    // ── EXPENSES & FUNDS SUMMARY (OPENING, INWARD, USED, CLOSING) ──
+    const compEntityFilter = {
+      $or: [
+        { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+        { companyEntity: { $exists: false } },
+        { companyEntity: null },
+        { companyEntity: '' }
+      ]
+    };
+
+    let expPrior = [];
+    if (dsStr) {
+      expPrior = await Expense.find({
+        date: { $lt: dsStr },
+        ...compEntityFilter
+      }).lean();
+    }
+    let cashOpening = 0, bankOpening = 0;
+    expPrior.forEach(e => {
+      const mode = (e.paymentMode || '').trim().toLowerCase();
+      const isCash = mode === 'cash' || mode.includes('cash');
+      const net = e.type === 'IN' ? (Number(e.amount) || 0) : -(Number(e.amount) || 0);
+      if (isCash) cashOpening += net;
+      else bankOpening += net;
+    });
+
+    let expPeriodQuery = { ...compEntityFilter };
+    if (dsStr && deStr) {
+      expPeriodQuery.date = { $gte: dsStr, $lte: deStr };
+    } else if (dsStr) {
+      expPeriodQuery.date = { $gte: dsStr };
+    } else if (deStr) {
+      expPeriodQuery.date = { $lte: deStr };
+    }
+
+    const periodExpenses = await Expense.find(expPeriodQuery).sort({ date: -1, voucherNo: -1 }).lean();
+    let cashInward = 0, cashUsed = 0, bankInward = 0, bankUsed = 0;
+    periodExpenses.forEach(e => {
+      const mode = (e.paymentMode || '').trim().toLowerCase();
+      const isCash = mode === 'cash' || mode.includes('cash');
+      const amt = Number(e.amount) || 0;
+      if (isCash) {
+        if (e.type === 'IN') cashInward += amt;
+        else cashUsed += amt;
+      } else {
+        if (e.type === 'IN') bankInward += amt;
+        else bankUsed += amt;
+      }
+    });
+
+    const cashClosing = cashOpening + cashInward - cashUsed;
+    const bankClosing = bankOpening + bankInward - bankUsed;
+    const totalFundsOpening = cashOpening + bankOpening;
+    const totalFundsInward = cashInward + bankInward;
+    const totalFundsUsed = cashUsed + bankUsed;
+    const totalFundsClosing = cashClosing + bankClosing;
+
+    // ── SALES & BILLING INVOICES SUMMARY ──
+    let invDateFilter = {};
+    if (dsStr || deStr) {
+      const dsLocal = dsStr ? new Date(`${dsStr}T00:00:00.000Z`) : null;
+      const deLocal = deStr ? new Date(`${deStr}T23:59:59.999Z`) : null;
+      invDateFilter.invoiceDate = {};
+      if (dsLocal) invDateFilter.invoiceDate.$gte = dsLocal;
+      if (deLocal) invDateFilter.invoiceDate.$lte = deLocal;
+    }
+
+    const periodInvoices = await BillingInvoice.find({
+      ...invDateFilter,
+      invoiceStatus: { $ne: 'CANCELLED' }
+    }).sort({ invoiceDate: -1, invoiceNo: -1 }).lean();
+
+    let totalInvTaxable = 0, totalInvTax = 0, totalInvBilled = 0, totalInvPaid = 0, totalInvDue = 0;
+    const debtorMap = {};
+    periodInvoices.forEach(i => {
+      const sub = Number(i.subtotal) || 0;
+      const tax = Number(i.totalTax) || 0;
+      const billed = Number(i.grandTotal) || 0;
+      const paid = Number(i.paidAmount) || 0;
+      const due = Number(i.balanceDue) || 0;
+
+      totalInvTaxable += sub;
+      totalInvTax += tax;
+      totalInvBilled += billed;
+      totalInvPaid += paid;
+      totalInvDue += due;
+
+      const pName = (i.customer?.businessName || i.customer?.name || 'Unknown Client').trim();
+      if (due > 0) {
+        debtorMap[pName] = (debtorMap[pName] || 0) + due;
+      }
+    });
+
+    const topDebtors = Object.entries(debtorMap)
+      .map(([name, due]) => ({ name, due }))
+      .sort((a, b) => b.due - a.due)
+      .slice(0, 3);
+
+    // Production & Material Efficiency Metrics
+    const fabricIssuedToPrintMtr = totalOutwardMtr;
+    const prodShortageMtr = Math.max(0, fabricIssuedToPrintMtr - totalMachinePrintedMtr);
+    const prodWastagePct = fabricIssuedToPrintMtr > 0 ? ((prodShortageMtr / fabricIssuedToPrintMtr) * 100) : 0;
+    const prodEfficiencyPct = fabricIssuedToPrintMtr > 0 ? ((totalMachinePrintedMtr / fabricIssuedToPrintMtr) * 100) : 100;
+
+    const fmtRs = (val) => `Rs. ${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtRsCompact = (val) => `Rs. ${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
     const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true, bufferPages: true });
     doc.page.margins.bottom = 10;
     doc.on('pageAdded', () => {
@@ -2690,11 +2799,160 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     doc.fillColor('#1e40af').text(`${totalMachinePrintedMtr.toFixed(2)} mtr`, ML + 125 + 320 + 2, currentY + 2.5, { width: 90 - 4, align: 'right', lineBreak: false });
     currentY += 18;
 
-    // Footnote Bar
+    // ── TABLE 5: EXPENSE & CASH / BANK LIQUIDITY SUMMARY ──
+    doc.rect(ML, currentY, contentWidth, 14).fill('#f0fdf4').stroke('#bbf7d0');
+    doc.fillColor('#166534').fontSize(7.5).font('Helvetica-Bold')
+      .text('5. EXPENSE & CASH / BANK LIQUIDITY (OPENING, INWARD, USED, CLOSING)', ML + 6, currentY + 3, { lineBreak: false });
+    currentY += 15;
+
+    const expCols = [
+      { title: 'ACCOUNT / FUND MODE', w: 145, align: 'left' },
+      { title: 'OPENING (RS.)', w: 78, align: 'right' },
+      { title: 'INWARD / REC (RS.)', w: 78, align: 'right' },
+      { title: 'USED / EXP (RS.)', w: 78, align: 'right' },
+      { title: 'CLOSING (RS.)', w: 80, align: 'right' },
+      { title: 'NET FLOW (RS.)', w: 76, align: 'right' }
+    ];
+
+    let curExpX = ML;
+    doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
+    expCols.forEach(col => {
+      doc.fillColor('#334155').fontSize(6.5).font('Helvetica-Bold')
+        .text(col.title, curExpX + 2, currentY + 3, { width: col.w - 4, align: col.align, lineBreak: false });
+      curExpX += col.w;
+    });
+    currentY += 13;
+
+    const expRows = [
+      {
+        mode: 'CASH IN HAND',
+        op: cashOpening,
+        inw: cashInward,
+        out: cashUsed,
+        cl: cashClosing,
+        net: cashInward - cashUsed
+      },
+      {
+        mode: 'BANK ACCOUNTS (KOTAK / ONLINE)',
+        op: bankOpening,
+        inw: bankInward,
+        out: bankUsed,
+        cl: bankClosing,
+        net: bankInward - bankUsed
+      }
+    ];
+
+    expRows.forEach((r, idx) => {
+      const bg = idx % 2 === 0 ? '#ffffff' : '#f0fdf4';
+      doc.rect(ML, currentY, contentWidth, 12).fill(bg).stroke('#e2e8f0');
+      let x = ML;
+      doc.fillColor('#0f172a').fontSize(6.5).font('Helvetica').text(r.mode, x + 2, currentY + 2.5, { width: 145 - 4, lineBreak: false });
+      x += 145;
+      doc.fillColor('#475569').text(fmtRs(r.op), x + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+      x += 78;
+      doc.fillColor('#047857').font('Helvetica-Bold').text(`+${fmtRs(r.inw)}`, x + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+      x += 78;
+      doc.fillColor('#b91c1c').text(`-${fmtRs(r.out)}`, x + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+      x += 78;
+      doc.fillColor('#1e40af').text(fmtRs(r.cl), x + 2, currentY + 2.5, { width: 80 - 4, align: 'right', lineBreak: false });
+      x += 80;
+      const netColor = r.net >= 0 ? '#047857' : '#b91c1c';
+      const netPrefix = r.net >= 0 ? '+' : '';
+      doc.fillColor(netColor).text(`${netPrefix}${fmtRs(r.net)}`, x + 2, currentY + 2.5, { width: 76 - 4, align: 'right', lineBreak: false });
+      currentY += 12;
+    });
+
+    // Total Funds Row
+    doc.rect(ML, currentY, contentWidth, 13).fill('#dcfce7').stroke('#86efac');
+    doc.fillColor('#000000').fontSize(6.8).font('Helvetica-Bold').text('TOTAL LIQUID FUNDS', ML + 2, currentY + 2.5, { width: 145 - 4, lineBreak: false });
+    doc.fillColor('#475569').text(fmtRs(totalFundsOpening), ML + 145 + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    doc.fillColor('#047857').text(`+${fmtRs(totalFundsInward)}`, ML + 145 + 78 + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    doc.fillColor('#b91c1c').text(`-${fmtRs(totalFundsUsed)}`, ML + 145 + 156 + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    doc.fillColor('#1e40af').text(fmtRs(totalFundsClosing), ML + 145 + 234 + 2, currentY + 2.5, { width: 80 - 4, align: 'right', lineBreak: false });
+    const totNet = totalFundsInward - totalFundsUsed;
+    const totNetColor = totNet >= 0 ? '#047857' : '#b91c1c';
+    const totNetPrefix = totNet >= 0 ? '+' : '';
+    doc.fillColor(totNetColor).text(`${totNetPrefix}${fmtRs(totNet)}`, ML + 145 + 314 + 2, currentY + 2.5, { width: 76 - 4, align: 'right', lineBreak: false });
+    currentY += 18;
+
+    // ── TABLE 6: SALES & BILLING INVOICES SUMMARY ──
+    doc.rect(ML, currentY, contentWidth, 14).fill('#fef3c7').stroke('#fde68a');
+    doc.fillColor('#92400e').fontSize(7.5).font('Helvetica-Bold')
+      .text('6. SALES & BILLING INVOICES SUMMARY (REVENUE, TAX & OUTSTANDING DUE)', ML + 6, currentY + 3, { lineBreak: false });
+    currentY += 15;
+
+    const invCols = [
+      { title: 'REVENUE & INVOICE METRICS', w: 145, align: 'left' },
+      { title: 'TAXABLE VALUE (RS.)', w: 78, align: 'right' },
+      { title: 'GST TAX (RS.)', w: 78, align: 'right' },
+      { title: 'TOTAL BILLED (RS.)', w: 78, align: 'right' },
+      { title: 'COLLECTED (RS.)', w: 80, align: 'right' },
+      { title: 'BALANCE DUE (RS.)', w: 76, align: 'right' }
+    ];
+
+    let curInvX = ML;
+    doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
+    invCols.forEach(col => {
+      doc.fillColor('#334155').fontSize(6.5).font('Helvetica-Bold')
+        .text(col.title, curInvX + 2, currentY + 3, { width: col.w - 4, align: col.align, lineBreak: false });
+      curInvX += col.w;
+    });
+    currentY += 13;
+
+    doc.rect(ML, currentY, contentWidth, 12).fill('#ffffff').stroke('#e2e8f0');
+    let xInv = ML;
+    doc.fillColor('#0f172a').fontSize(6.5).font('Helvetica').text(`SALES INVOICES (${periodInvoices.length} INVS)`, xInv + 2, currentY + 2.5, { width: 145 - 4, lineBreak: false });
+    xInv += 145;
+    doc.fillColor('#475569').text(fmtRs(totalInvTaxable), xInv + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    xInv += 78;
+    doc.fillColor('#475569').text(fmtRs(totalInvTax), xInv + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    xInv += 78;
+    doc.fillColor('#0f172a').font('Helvetica-Bold').text(fmtRs(totalInvBilled), xInv + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    xInv += 78;
+    doc.fillColor('#047857').text(fmtRs(totalInvPaid), xInv + 2, currentY + 2.5, { width: 80 - 4, align: 'right', lineBreak: false });
+    xInv += 80;
+    doc.fillColor('#b91c1c').text(fmtRs(totalInvDue), xInv + 2, currentY + 2.5, { width: 76 - 4, align: 'right', lineBreak: false });
+    currentY += 12;
+
+    // Total Invoices Row
+    doc.rect(ML, currentY, contentWidth, 13).fill('#fef3c7').stroke('#fde68a');
+    doc.fillColor('#000000').fontSize(6.8).font('Helvetica-Bold').text('NET RECEIVABLES TOTAL', ML + 2, currentY + 2.5, { width: 145 - 4, lineBreak: false });
+    doc.fillColor('#475569').text(fmtRs(totalInvTaxable), ML + 145 + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    doc.fillColor('#475569').text(fmtRs(totalInvTax), ML + 145 + 78 + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    doc.fillColor('#0f172a').text(fmtRs(totalInvBilled), ML + 145 + 156 + 2, currentY + 2.5, { width: 78 - 4, align: 'right', lineBreak: false });
+    doc.fillColor('#047857').text(fmtRs(totalInvPaid), ML + 145 + 234 + 2, currentY + 2.5, { width: 80 - 4, align: 'right', lineBreak: false });
+    doc.fillColor('#b91c1c').text(fmtRs(totalInvDue), ML + 145 + 314 + 2, currentY + 2.5, { width: 76 - 4, align: 'right', lineBreak: false });
+    currentY += 18;
+
+    // ── TABLE 7: PRODUCTION EFFICIENCY, WASTAGE & TOP RECEIVABLES ──
     const pendingDispatches = Math.max(0, totalMachinePrintedMtr - totalChallanMtr);
-    doc.rect(ML, currentY, contentWidth, 14).fill('#f1f5f9').stroke('#cbd5e1');
-    doc.fillColor('#334155').fontSize(6.5).font('Helvetica-Bold')
-      .text(`PRODUCTION & DISPATCH BALANCE: Machine Printed: ${totalMachinePrintedMtr.toFixed(2)} mtr | Challans Dispatched: ${totalChallanMtr.toFixed(2)} mtr | In Production / Pending: ${pendingDispatches.toFixed(2)} mtr`, ML + 4, currentY + 3.5, { width: contentWidth - 8, align: 'center', lineBreak: false });
+    const cardGap = 6;
+    const halfW = (contentWidth - cardGap) / 2;
+
+    // Left Card: Production Efficiency & Shortage
+    doc.rect(ML, currentY, halfW, 34).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#1e40af').fontSize(6.8).font('Helvetica-Bold')
+      .text('PRODUCTION EFFICIENCY & MATERIAL SHORTAGE', ML + 5, currentY + 3.5, { width: halfW - 10, lineBreak: false });
+    doc.fillColor('#334155').fontSize(6.2).font('Helvetica')
+      .text(`Issued: ${fabricIssuedToPrintMtr.toFixed(1)} m | Machine Printed: ${totalMachinePrintedMtr.toFixed(1)} m | Dispatch Pending: ${pendingDispatches.toFixed(1)} m`, ML + 5, currentY + 14, { width: halfW - 10, lineBreak: false });
+    doc.fillColor(prodShortageMtr > 0 ? '#b91c1c' : '#047857').fontSize(6.2).font('Helvetica-Bold')
+      .text(`Shortage / Wastage: ${prodShortageMtr.toFixed(1)} m (${prodWastagePct.toFixed(2)}%) | Job Efficiency: ${prodEfficiencyPct.toFixed(1)}%`, ML + 5, currentY + 23.5, { width: halfW - 10, lineBreak: false });
+
+    // Right Card: Top Outstanding Receivables
+    const rightX = ML + halfW + cardGap;
+    doc.rect(rightX, currentY, halfW, 34).fill('#fff1f2').stroke('#fecdd3');
+    doc.fillColor('#9f1239').fontSize(6.8).font('Helvetica-Bold')
+      .text('TOP OUTSTANDING RECEIVABLES (CLIENTS DUE)', rightX + 5, currentY + 3.5, { width: halfW - 10, lineBreak: false });
+
+    let debtorLine1 = topDebtors[0] ? `1. ${topDebtors[0].name}: ${fmtRs(topDebtors[0].due)}` : 'All invoices cleared — Zero pending dues';
+    let debtorLine2 = '';
+    if (topDebtors[1]) debtorLine2 += `2. ${topDebtors[1].name}: ${fmtRs(topDebtors[1].due)}`;
+    if (topDebtors[2]) debtorLine2 += ` | 3. ${topDebtors[2].name}: ${fmtRs(topDebtors[2].due)}`;
+
+    doc.fillColor('#881337').fontSize(6.2).font('Helvetica-Bold')
+      .text(debtorLine1, rightX + 5, currentY + 14, { width: halfW - 10, lineBreak: false });
+    doc.fillColor('#475569').fontSize(6.2).font('Helvetica')
+      .text(debtorLine2 || ('Total Due: ' + fmtRs(totalInvDue)), rightX + 5, currentY + 23.5, { width: halfW - 10, lineBreak: false });
 
     // ── TRANSITION TO PAGE 2 FOR ITEMISED TRANSACTION HISTORIES ──
     doc.addPage();
@@ -3018,6 +3276,155 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.text(statusLabel, ML + 455, currentY + 4.5, { width: 73, align: 'center', lineBreak: false });
         currentY += 18;
       });
+    }
+
+    // ── 6. EXPENSES & CASH / BANK VOUCHERS REGISTER (COMPLETE DATA) ──
+    if (selectedReports.includes('expense') && periodExpenses.length > 0) {
+      checkAddPage(60);
+
+      const netExp = totalFundsInward - totalFundsUsed;
+      doc.rect(ML, currentY, contentWidth, 20).fill('#f0fdf4').stroke('#bbf7d0');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('6. EXPENSES & CASH / BANK VOUCHERS REGISTER', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#166534').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${periodExpenses.length} Vouchers (In: ${fmtRs(totalFundsInward)} | Out: ${fmtRs(totalFundsUsed)})`, ML + contentWidth - 300, currentY + 5, { width: 290, align: 'right', lineBreak: false });
+
+      currentY += 24;
+
+      const drawExpHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+        doc.text('VOUCHER NO', ML + 4, currentY + 5, { width: 68, lineBreak: false });
+        doc.text('DATE', ML + 72, currentY + 5, { width: 48, lineBreak: false });
+        doc.text('TYPE', ML + 120, currentY + 5, { width: 32, align: 'center', lineBreak: false });
+        doc.text('CATEGORY', ML + 152, currentY + 5, { width: 95, lineBreak: false });
+        doc.text('PARTICULARS / PAID TO', ML + 247, currentY + 5, { width: 158, lineBreak: false });
+        doc.text('MODE', ML + 405, currentY + 5, { width: 65, lineBreak: false });
+        doc.text('AMOUNT (RS.)', ML + 470, currentY + 5, { width: 61, align: 'right', lineBreak: false });
+        currentY += 18;
+      };
+
+      drawExpHeaders();
+
+      periodExpenses.forEach((e, idx) => {
+        if (checkAddPage(20)) {
+          drawExpHeaders();
+        }
+        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
+
+        const dStr = e.date ? e.date : '—';
+        const isTypeIn = e.type === 'IN';
+        const typeColor = isTypeIn ? '#047857' : '#b91c1c';
+        const particulars = e.paidToOrReceivedFrom ? `${e.title || ''} (${e.paidToOrReceivedFrom})` : (e.title || '—');
+
+        doc.fillColor('#000000').fontSize(7).font('Helvetica');
+        doc.text(e.voucherNo || '—', ML + 4, currentY + 4.5, { width: 68, lineBreak: false });
+        doc.text(dStr, ML + 72, currentY + 4.5, { width: 48, lineBreak: false });
+        doc.fillColor(typeColor).font('Helvetica-Bold');
+        doc.text(e.type || 'OUT', ML + 120, currentY + 4.5, { width: 32, align: 'center', lineBreak: false });
+        doc.fillColor('#000000').font('Helvetica');
+        doc.text(e.category || 'Miscellaneous', ML + 152, currentY + 4.5, { width: 95, lineBreak: false });
+        doc.text(particulars, ML + 247, currentY + 4.5, { width: 158, lineBreak: false });
+        doc.text(e.paymentMode || 'Cash', ML + 405, currentY + 4.5, { width: 65, lineBreak: false });
+        doc.fillColor(typeColor).font('Helvetica-Bold');
+        doc.text(fmtRs(e.amount), ML + 470, currentY + 4.5, { width: 61, align: 'right', lineBreak: false });
+        currentY += 18;
+      });
+
+      // Total Row for Expense Vouchers
+      if (checkAddPage(20)) {
+        drawExpHeaders();
+      }
+      doc.rect(ML, currentY, contentWidth, 18).fill('#f0fdf4').stroke('#bbf7d0');
+      doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+      doc.text(`TOTAL EXPENSE TRANSACTIONS (${periodExpenses.length} VOUCHERS):`, ML + 4, currentY + 4.5, { width: 280, lineBreak: false });
+      doc.fillColor('#047857').font('Helvetica-Bold');
+      doc.text(`IN: ${fmtRs(totalFundsInward)}`, ML + 285, currentY + 4.5, { width: 90, align: 'right', lineBreak: false });
+      doc.fillColor('#b91c1c');
+      doc.text(`OUT: ${fmtRs(totalFundsUsed)}`, ML + 375, currentY + 4.5, { width: 85, align: 'right', lineBreak: false });
+      doc.fillColor('#1e40af');
+      doc.text(`NET: ${fmtRs(netExp)}`, ML + 460, currentY + 4.5, { width: 71, align: 'right', lineBreak: false });
+      currentY += 18;
+
+      currentY += 12;
+    }
+
+    // ── 7. SALES & BILLING INVOICES REGISTER (COMPLETE DATA) ──
+    if (selectedReports.includes('invoice') && periodInvoices.length > 0) {
+      checkAddPage(60);
+
+      doc.rect(ML, currentY, contentWidth, 20).fill('#fef3c7').stroke('#fde68a');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('7. SALES & BILLING INVOICES REGISTER', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#92400e').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${periodInvoices.length} Invoices (Billed: ${fmtRs(totalInvBilled)} | Due: ${fmtRs(totalInvDue)})`, ML + contentWidth - 320, currentY + 5, { width: 310, align: 'right', lineBreak: false });
+
+      currentY += 24;
+
+      const drawInvoiceHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+        doc.text('INVOICE NO', ML + 4, currentY + 5, { width: 72, lineBreak: false });
+        doc.text('DATE', ML + 76, currentY + 5, { width: 46, lineBreak: false });
+        doc.text('CUSTOMER / PARTY NAME', ML + 122, currentY + 5, { width: 147, lineBreak: false });
+        doc.text('TAXABLE (RS.)', ML + 269, currentY + 5, { width: 60, align: 'right', lineBreak: false });
+        doc.text('GST (RS.)', ML + 329, currentY + 5, { width: 45, align: 'right', lineBreak: false });
+        doc.text('TOTAL (RS.)', ML + 374, currentY + 5, { width: 56, align: 'right', lineBreak: false });
+        doc.text('PAID (RS.)', ML + 430, currentY + 5, { width: 50, align: 'right', lineBreak: false });
+        doc.text('DUE (RS.)', ML + 480, currentY + 5, { width: 51, align: 'right', lineBreak: false });
+        currentY += 18;
+      };
+
+      drawInvoiceHeaders();
+
+      periodInvoices.forEach((inv, idx) => {
+        if (checkAddPage(20)) {
+          drawInvoiceHeaders();
+        }
+        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
+
+        const dStr = inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
+        const partyName = (inv.customer?.businessName || inv.customer?.name || '—').trim();
+        const dueVal = Number(inv.balanceDue) || 0;
+        const dueColor = dueVal > 0 ? '#b91c1c' : '#047857';
+
+        doc.fillColor('#000000').fontSize(7).font('Helvetica');
+        doc.text(inv.invoiceNo || '—', ML + 4, currentY + 4.5, { width: 72, lineBreak: false });
+        doc.text(dStr, ML + 76, currentY + 4.5, { width: 46, lineBreak: false });
+        doc.text(partyName, ML + 122, currentY + 4.5, { width: 147, lineBreak: false });
+        doc.text(`${Number(inv.subtotal || 0).toFixed(0)}`, ML + 269, currentY + 4.5, { width: 60, align: 'right', lineBreak: false });
+        doc.text(`${Number(inv.totalTax || 0).toFixed(0)}`, ML + 329, currentY + 4.5, { width: 45, align: 'right', lineBreak: false });
+        doc.fillColor('#0f172a').font('Helvetica-Bold');
+        doc.text(`${Number(inv.grandTotal || 0).toFixed(0)}`, ML + 374, currentY + 4.5, { width: 56, align: 'right', lineBreak: false });
+        doc.fillColor('#047857').font('Helvetica');
+        doc.text(`${Number(inv.paidAmount || 0).toFixed(0)}`, ML + 430, currentY + 4.5, { width: 50, align: 'right', lineBreak: false });
+        doc.fillColor(dueColor).font('Helvetica-Bold');
+        doc.text(`${dueVal.toFixed(0)}`, ML + 480, currentY + 4.5, { width: 51, align: 'right', lineBreak: false });
+        currentY += 18;
+      });
+
+      // Total Row for Invoices
+      if (checkAddPage(20)) {
+        drawInvoiceHeaders();
+      }
+      doc.rect(ML, currentY, contentWidth, 18).fill('#fef3c7').stroke('#fde68a');
+      doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+      doc.text(`TOTAL BILLED REVENUE (${periodInvoices.length} INVOICES):`, ML + 4, currentY + 4.5, { width: 265, lineBreak: false });
+      doc.text(`${totalInvTaxable.toFixed(0)}`, ML + 269, currentY + 4.5, { width: 60, align: 'right', lineBreak: false });
+      doc.text(`${totalInvTax.toFixed(0)}`, ML + 329, currentY + 4.5, { width: 45, align: 'right', lineBreak: false });
+      doc.fillColor('#0f172a');
+      doc.text(`${totalInvBilled.toFixed(0)}`, ML + 374, currentY + 4.5, { width: 56, align: 'right', lineBreak: false });
+      doc.fillColor('#047857');
+      doc.text(`${totalInvPaid.toFixed(0)}`, ML + 430, currentY + 4.5, { width: 50, align: 'right', lineBreak: false });
+      doc.fillColor('#b91c1c');
+      doc.text(`${totalInvDue.toFixed(0)}`, ML + 480, currentY + 4.5, { width: 51, align: 'right', lineBreak: false });
+      currentY += 18;
+
+      currentY += 12;
     }
 
     // Dynamic Footer Page Stamping on All Pages

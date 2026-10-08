@@ -693,7 +693,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
   const [combinedDateStart, setCombinedDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [combinedDateEnd, setCombinedDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
-  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'lotwise', 'stock', 'machine']);
+  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'lotwise', 'stock', 'machine', 'expense', 'invoice']);
   const [combinedLoading, setCombinedLoading] = useState(false);
 
   // Delete confirmation
@@ -7011,7 +7011,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     { id: 'lotTransfer', label: 'Lot Transfer Logs', desc: 'Lot-to-lot transfer transactions & fabric quality movements' },
                     { id: 'stockAdjustment', label: 'Stock Adjustment (SA)', desc: 'Physical audit adjustments, stock (+/-) entries & SA vouchers' },
                     { id: 'requirement', label: 'Fabric Requirements', desc: 'Required vs available fabric meters & shortage alerts' },
-                    { id: 'challan', label: 'Delivery Challans Register', desc: 'Dispatched challans, party names, billing & TP rolls' }
+                    { id: 'challan', label: 'Delivery Challans Register', desc: 'Dispatched challans, party names, billing & TP rolls' },
+                    { id: 'expense', label: 'Expenses & Cash/Bank Register', desc: 'Cash in hand, bank accounts, vouchers & expense disbursements' },
+                    { id: 'invoice', label: 'Sales & Invoices Register', desc: 'Billed sales invoices, GST taxes, customer collections & receivables due' }
                   ].map(rep => {
                     const isSelected = selectedCombinedReports.includes(rep.id);
                     return (
