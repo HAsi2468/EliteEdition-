@@ -90,29 +90,34 @@ const getBills = async (req, res) => {
       const isPaid = String(obj.paymentStatus || '').toUpperCase() === 'PAID';
       const effectivePaidDate = obj.paidAt || obj.paymentDate;
 
-      if (!obj.platformPayments || !obj.platformPayments.aws) {
-        obj.platformPayments = {
-          aws: {
-            status: isPaid ? 'PAID' : 'UNPAID',
-            paidAt: effectivePaidDate,
-            paymentMethod: obj.paymentMethod || (isPaid ? 'AWS Auto-Debit / Credit Card' : undefined),
-            paymentRef: obj.paymentRef || (isPaid ? 'AWS Auto-Settled' : undefined),
-            notes: obj.notes,
-          },
-          mongodb: {
-            status: isPaid ? 'PAID' : 'UNPAID',
-            paidAt: effectivePaidDate,
-            paymentMethod: obj.paymentMethod || (isPaid ? 'Corporate Card' : undefined),
-            paymentRef: obj.paymentRef || (isPaid ? 'Atlas-INV-PAID' : undefined),
-            notes: obj.notes,
-          },
-          cloudflare: {
-            status: 'PAID',
-            paidAt: effectivePaidDate || new Date(),
-            paymentMethod: 'Free Allowance / Zero-Egress Tier',
-            paymentRef: 'CF-R2-FREE',
-            notes: 'Free Tier Allowance',
-          },
+      if (!obj.platformPayments) {
+        obj.platformPayments = {};
+      }
+      if (!obj.platformPayments.aws || (isPaid && obj.platformPayments.aws.status !== 'PAID')) {
+        obj.platformPayments.aws = {
+          status: isPaid ? 'PAID' : (obj.platformPayments.aws?.status || 'UNPAID'),
+          paidAt: effectivePaidDate || obj.platformPayments.aws?.paidAt,
+          paymentMethod: obj.paymentMethod || obj.platformPayments.aws?.paymentMethod || (isPaid ? 'AWS Auto-Debit / Credit Card' : undefined),
+          paymentRef: obj.paymentRef || obj.platformPayments.aws?.paymentRef || (isPaid ? 'AWS Auto-Settled' : undefined),
+          notes: obj.platformPayments.aws?.notes || obj.notes,
+        };
+      }
+      if (!obj.platformPayments.mongodb || (isPaid && obj.mongoDbAmount > 0 && obj.platformPayments.mongodb.status !== 'PAID')) {
+        obj.platformPayments.mongodb = {
+          status: isPaid ? 'PAID' : (obj.platformPayments.mongodb?.status || 'UNPAID'),
+          paidAt: effectivePaidDate || obj.platformPayments.mongodb?.paidAt,
+          paymentMethod: obj.paymentMethod || obj.platformPayments.mongodb?.paymentMethod || (isPaid ? 'Corporate Card' : undefined),
+          paymentRef: obj.paymentRef || obj.platformPayments.mongodb?.paymentRef || (isPaid ? 'Atlas-INV-PAID' : undefined),
+          notes: obj.platformPayments.mongodb?.notes || obj.notes,
+        };
+      }
+      if (!obj.platformPayments.cloudflare) {
+        obj.platformPayments.cloudflare = {
+          status: 'PAID',
+          paidAt: effectivePaidDate || new Date(),
+          paymentMethod: 'Free Allowance / Zero-Egress Tier',
+          paymentRef: 'CF-R2-FREE',
+          notes: 'Free Tier Allowance',
         };
       }
       return obj;

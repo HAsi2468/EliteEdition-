@@ -153,6 +153,74 @@ async function updateBills() {
   );
   console.log('Updated August 2026 bill');
 
+  // July 2026
+  await InfrastructureBill.findOneAndUpdate(
+    { month: 'July 2026' },
+    {
+      $set: {
+        paymentStatus: 'PAID',
+        paidAt: new Date('2026-08-03T10:00:00.000Z'),
+        paymentMethod: 'AWS Auto-Debit / Credit Card',
+        paymentRef: 'AWS-INV-JUL2026',
+        platformPayments: {
+          aws: {
+            status: 'PAID',
+            paidAt: new Date('2026-08-03T10:00:00.000Z'),
+            paymentMethod: 'AWS Auto-Debit / Credit Card',
+            paymentRef: 'AWS-INV-JUL2026',
+            notes: 'AWS Compute & Route53 settled via Auto-Debit',
+          },
+          mongodb: {
+            status: 'PAID',
+            notes: 'Not provisioned',
+          },
+          cloudflare: {
+            status: 'PAID',
+            paidAt: new Date('2026-08-01T00:00:00.000Z'),
+            paymentMethod: 'Free Allowance / Zero-Egress Tier',
+            paymentRef: 'CF-R2-FREE',
+            notes: 'Free Allowance',
+          },
+        },
+      }
+    }
+  );
+  console.log('Updated July 2026 bill');
+
+  // June 2026
+  await InfrastructureBill.findOneAndUpdate(
+    { month: 'June 2026' },
+    {
+      $set: {
+        paymentStatus: 'PAID',
+        paidAt: new Date('2026-07-03T10:00:00.000Z'),
+        paymentMethod: 'AWS Auto-Debit / Credit Card',
+        paymentRef: 'AWS-INV-JUN2026',
+        platformPayments: {
+          aws: {
+            status: 'PAID',
+            paidAt: new Date('2026-07-03T10:00:00.000Z'),
+            paymentMethod: 'AWS Auto-Debit / Credit Card',
+            paymentRef: 'AWS-INV-JUN2026',
+            notes: 'AWS Compute settled via Auto-Debit',
+          },
+          mongodb: {
+            status: 'PAID',
+            notes: 'Not provisioned',
+          },
+          cloudflare: {
+            status: 'PAID',
+            paidAt: new Date('2026-07-01T00:00:00.000Z'),
+            paymentMethod: 'Free Allowance / Zero-Egress Tier',
+            paymentRef: 'CF-R2-FREE',
+            notes: 'Free Allowance',
+          },
+        },
+      }
+    }
+  );
+  console.log('Updated June 2026 bill');
+
   const all = await InfrastructureBill.find({}).sort({ createdAt: -1 });
   console.log('\n--- Current Infrastructure Bills ---');
   all.forEach(b => {
