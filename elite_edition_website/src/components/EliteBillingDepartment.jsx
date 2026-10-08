@@ -108,7 +108,16 @@ import { cloneDocumentPayload, focusPrimaryQuantityInput } from '../utils/docume
 import { ValidationDock } from './common/ValidationDock';
 import { useValidationDock } from '../hooks/useValidationDock';
 import { EntityBrandBadge } from './common/EntityBrandBadge';
+import { ScrollSpyMiniMap } from './common/ScrollSpyMiniMap';
 import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
+
+const INVOICE_FORM_SECTIONS = [
+  { id: 'inv-sec-meta', label: 'Metadata & Taxes' },
+  { id: 'inv-sec-customer', label: 'Customer / Party' },
+  { id: 'inv-sec-items', label: 'Line Items' },
+  { id: 'inv-sec-notes', label: 'Notes & Terms' },
+  { id: 'inv-sec-totals', label: 'Summary & Total' }
+];
 
 // Helper for Indian Currency formatting
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -3838,7 +3847,8 @@ export default function EliteBillingDepartment({
 
       {/* ── TAB 2: INVOICE GENERATOR / EDITOR (myBillBook style) ────────────── */}
       {activeTab === 'create' && (
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', position: 'relative' }}>
+          <ScrollSpyMiniMap sections={INVOICE_FORM_SECTIONS} />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -3856,7 +3866,7 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* Core Metadata */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          <div id="inv-sec-meta" data-form-section="true" data-section-title="Metadata & Taxes" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             <div>
               <label style={{ ...labelStyle, color: '#60a5fa', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
               <select
@@ -3931,7 +3941,7 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* Customer Selection */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
+          <div id="inv-sec-customer" data-form-section="true" data-section-title="Customer / Party" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>🏢 Billed To (Customer Details)</div>
               <button type="button" onClick={() => setShowCustomerModal(true)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}>
@@ -3958,6 +3968,7 @@ export default function EliteBillingDepartment({
                 <input
                   id="invoice-customer-name"
                   type="text"
+                  required
                   value={invoiceForm.customer.name}
                   onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, name: e.target.value } }))}
                   style={inputStyle}
@@ -3990,7 +4001,7 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* Dynamic Products / Line Items Table */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem', overflowX: 'auto' }}>
+          <div id="inv-sec-items" data-form-section="true" data-section-title="Line Items" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem', overflowX: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>📦 Invoice Line Items</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
@@ -4237,7 +4248,7 @@ export default function EliteBillingDepartment({
 
           {/* Financial Summary & Tax Breakdown Box */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '0.5rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <div id="inv-sec-notes" data-form-section="true" data-section-title="Notes & Terms" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               <div>
                 <label style={labelStyle}>Notes for Customer</label>
                 <textarea
@@ -4258,7 +4269,7 @@ export default function EliteBillingDepartment({
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.1rem', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div id="inv-sec-totals" data-form-section="true" data-section-title="Summary & Total" className="glass-panel" style={{ padding: '1.1rem', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Subtotal:</span>
                 <span style={{ fontWeight: 700 }}>₹ {calculatedInvoice.subtotal.toFixed(2)}</span>

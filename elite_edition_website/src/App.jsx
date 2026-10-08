@@ -105,6 +105,9 @@ import OfflineBanner from './components/common/OfflineBanner';
 import PullToRefresh from './components/common/PullToRefresh';
 import { DashboardSkeleton } from './components/common/Skeleton';
 import BarcodeSnifferHUD from './components/common/BarcodeSnifferHUD';
+import { ZenFocusModeController } from './components/common/ZenFocusModeController';
+import { TableContextMenu } from './components/common/TableContextMenu';
+import { KeyboardShortcutModal } from './components/common/KeyboardShortcutModal';
 
 
 
@@ -3541,6 +3544,15 @@ export default function App() {
 
       {/* Global Ambient Hardware Barcode Sniffer HUD */}
       <BarcodeSnifferHUD onGlobalSearch={(q) => setShowGlobalSearch(true)} />
+
+      {/* Zen / Focus Mode Controller & Floating Exit Pill (Alt + Z) */}
+      <ZenFocusModeController />
+
+      {/* Global Data Table Context Menu */}
+      <TableContextMenu />
+
+      {/* Keyboard Shortcuts Reference Dialog (? Drawer) */}
+      <KeyboardShortcutModal />
 
       {/* Undo Toast Container */}
       <UndoToastContainer />

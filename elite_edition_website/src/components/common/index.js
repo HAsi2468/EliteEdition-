@@ -6,3 +6,7 @@ export { BarcodeSnifferHUD } from './BarcodeSnifferHUD';
 export { EntitySwitcher } from './EntitySwitcher';
 export { EntityBrandBadge } from './EntityBrandBadge';
 export { ValidationDock } from './ValidationDock';
+export { ZenFocusModeController } from './ZenFocusModeController';
+export { TableContextMenu } from './TableContextMenu';
+export { ScrollSpyMiniMap } from './ScrollSpyMiniMap';
+export { KeyboardShortcutModal } from './KeyboardShortcutModal';

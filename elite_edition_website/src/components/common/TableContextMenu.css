@@ -1,0 +1,128 @@
+/* ==========================================================================
+   CUSTOM DATA TABLE CONTEXT MENU STYLES
+   Cursor-Anchored Micro-Action Surface for High-Density Data Grids
+   ========================================================================== */
+
+.table-context-menu-portal {
+  position: fixed;
+  z-index: 9999999;
+  min-width: 200px;
+  max-width: 260px;
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5), 
+              0 6px 14px -2px rgba(0, 0, 0, 0.25),
+              0 0 1px 1px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  user-select: none;
+  animation: contextMenuFadeIn 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: auto;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.context-menu-header {
+  padding: 6px 10px 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.context-menu-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-menu-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #f1f5f9;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+  outline: none;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.context-menu-item:active {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(0.99);
+}
+
+.context-menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.context-menu-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  transition: color 0.12s ease;
+}
+
+.context-menu-item:hover .context-menu-item-icon {
+  color: #38bdf8;
+}
+
+.context-menu-shortcut {
+  font-size: 0.66rem;
+  color: #64748b;
+  font-weight: 500;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
