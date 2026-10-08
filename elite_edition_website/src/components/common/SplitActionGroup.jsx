@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronDown, MoreHorizontal, X, Loader2 } from 'lucide-react';
 import { useDeviceContext } from '../../hooks/useDeviceContext';
 import './SplitActionGroup.css';
@@ -18,23 +18,20 @@ import './SplitActionGroup.css';
  *    Sticky bottom dock (or inline compact button) with dominant Primary CTA + (...) button triggering
  *    a native gesture swipeable bottom sheet.
  * 
- * @param {Object} props
- * @param {Object} props.primaryAction - Main CTA { label, icon: Icon, onClick, loading, disabled, shortcut }
- * @param {Array} props.secondaryActions - Array of { id, label, icon: Icon, onClick, disabled, isDestructive, shortcut, dividerAfter, subtext, hidden }
- * @param {string} [props.variant='primary'] - 'primary' | 'secondary' | 'danger' | 'success'
- * @param {string} [props.align='right'] - 'left' | 'right' dropdown alignment
- * @param {string} [props.mobilePlacement='dock'] - 'dock' (sticky bottom) | 'inline'
- * @param {string} [props.className='']
- * @param {Object} [props.style={}]
+ * Supports both interfaces:
+ *  - actions: [{ id, label, icon, isPrimary, isDanger, shortcut, handler, loading, disabled }]
+ *  - primaryAction: { label, icon, onClick, loading, disabled, shortcut } + secondaryActions: [...]
  */
 export function SplitActionGroup({
-  primaryAction,
-  secondaryActions = [],
+  actions,
+  primaryAction: propPrimary,
+  secondaryActions: propSecondary = [],
   variant = 'primary',
   align = 'right',
   mobilePlacement = 'dock',
   className = '',
   style = {},
+  confirmDestructive = true
 }) {
   const { isMobile, isTablet, isDesktop } = useDeviceContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -42,8 +39,36 @@ export function SplitActionGroup({
   const groupRef = useRef(null);
   const menuRef = useRef(null);
 
-  // Filter out hidden secondary actions
-  const visibleSecondary = secondaryActions.filter((a) => !a?.hidden);
+  // Normalize actions array input vs primaryAction/secondaryActions input
+  const primaryAction = useMemo(() => {
+    if (propPrimary) return propPrimary;
+    if (Array.isArray(actions) && actions.length > 0) {
+      const primary = actions.find((a) => a.isPrimary) || actions[0];
+      return {
+        ...primary,
+        onClick: primary.handler || primary.onClick
+      };
+    }
+    return { label: 'Submit', onClick: () => {} };
+  }, [actions, propPrimary]);
+
+  const visibleSecondary = useMemo(() => {
+    if (propSecondary && propSecondary.length > 0) {
+      return propSecondary.filter((a) => !a?.hidden);
+    }
+    if (Array.isArray(actions) && actions.length > 0) {
+      const primary = actions.find((a) => a.isPrimary) || actions[0];
+      return actions
+        .filter((a) => a !== primary && !a?.hidden)
+        .map((a) => ({
+          ...a,
+          isDestructive: a.isDanger || a.isDestructive,
+          onClick: a.handler || a.onClick
+        }));
+    }
+    return [];
+  }, [actions, propSecondary]);
+
   const hasSecondary = visibleSecondary.length > 0;
 
   // Touch gesture state for mobile bottom sheet
@@ -57,6 +82,21 @@ export function SplitActionGroup({
     setActiveItemIndex(-1);
     setTouchOffset(0);
   }, []);
+
+  // Safe execution with destructive action confirmation prompt
+  const handleItemClick = useCallback((action, e) => {
+    if (action.disabled || action.loading) return;
+
+    if ((action.isDestructive || action.isDanger) && confirmDestructive) {
+      const confirmed = window.confirm(
+        action.confirmMessage || `Are you sure you want to perform "${action.label}"? This action cannot be undone.`
+      );
+      if (!confirmed) return;
+    }
+
+    action.onClick?.(e);
+    handleClose();
+  }, [confirmDestructive, handleClose]);
 
   // Keyboard shortcut listener (Ctrl/Cmd + key)
   useEffect(() => {
@@ -81,9 +121,8 @@ export function SplitActionGroup({
           const key = item.shortcut.toLowerCase().replace('mod+', '').replace('ctrl+', '').replace('cmd+', '');
           if (isMod && e.key.toLowerCase() === key) {
             e.preventDefault();
-            if (!item.disabled) {
-              item.onClick?.(e);
-              handleClose();
+            if (!item.disabled && !item.loading) {
+              handleItemClick(item, e);
             }
             return;
           }
@@ -105,8 +144,7 @@ export function SplitActionGroup({
           e.preventDefault();
           const target = visibleSecondary[activeItemIndex];
           if (target && !target.disabled) {
-            target.onClick?.(e);
-            handleClose();
+            handleItemClick(target, e);
           }
         }
       }
@@ -114,27 +152,27 @@ export function SplitActionGroup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [primaryAction, visibleSecondary, isOpen, activeItemIndex, handleClose]);
+  }, [primaryAction, visibleSecondary, isOpen, activeItemIndex, handleClose, handleItemClick]);
 
   // Click outside listener for desktop/tablet dropdown
   useEffect(() => {
     if (!isOpen || isMobile) return;
 
-    const handlePointerDown = (e) => {
+    const handleClickOutside = (e) => {
       if (groupRef.current && !groupRef.current.contains(e.target)) {
         handleClose();
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isOpen, isMobile, handleClose]);
 
-  // Mobile Bottom Sheet Gesture Tracking
+  // Mobile touch swipe gesture handlers for bottom sheet
   const handleTouchStart = (e) => {
     touchStartYRef.current = e.touches[0].clientY;
     isDraggingRef.current = true;
@@ -142,14 +180,14 @@ export function SplitActionGroup({
 
   const handleTouchMove = (e) => {
     if (!isDraggingRef.current) return;
-    const diff = e.touches[0].clientY - touchStartYRef.current;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartYRef.current;
     if (diff > 0) {
       setTouchOffset(diff);
     }
   };
 
   const handleTouchEnd = () => {
-    if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
     if (touchOffset > 80) {
       handleClose();
@@ -158,40 +196,45 @@ export function SplitActionGroup({
     }
   };
 
-  if (!primaryAction) return null;
-
   const PrimaryIcon = primaryAction.icon;
 
-  // =========================================================================
-  // MOBILE RENDER (<768px): Sticky Bottom Dock or Compact Inline + Bottom Sheet
-  // =========================================================================
-  if (isMobile && mobilePlacement === 'dock') {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 3. RENDERERS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Mobile Bottom Dock / Inline Placement (<768px)
+  if (isMobile) {
+    const isDock = mobilePlacement === 'dock';
+
     return (
-      <>
-        <div className={`split-mobile-dock ${className}`} style={style}>
+      <div
+        ref={groupRef}
+        className={`split-action-group is-mobile ${isDock ? 'is-docked' : ''} ${className}`}
+        style={style}
+      >
+        <div className="split-mobile-bar">
+          {/* Dominant Primary CTA */}
           <button
             type="button"
-            className="split-mobile-primary-btn"
-            onClick={primaryAction.onClick}
+            className={`split-btn-primary ${variant}`}
             disabled={primaryAction.disabled || primaryAction.loading}
-            aria-label={primaryAction.label}
+            onClick={primaryAction.onClick}
           >
             {primaryAction.loading ? (
-              <Loader2 size={18} className="spin-loader" />
-            ) : PrimaryIcon ? (
-              <PrimaryIcon size={18} />
-            ) : null}
+              <Loader2 size={16} className="spin-loader" />
+            ) : (
+              PrimaryIcon && <PrimaryIcon size={16} />
+            )}
             <span>{primaryAction.label}</span>
           </button>
 
+          {/* Overflow (...) trigger */}
           {hasSecondary && (
             <button
               type="button"
-              className="split-mobile-more-btn"
+              className="split-btn-mobile-more"
               onClick={() => setIsOpen(true)}
               aria-label="More actions"
-              aria-haspopup="dialog"
-              aria-expanded={isOpen}
             >
               <MoreHorizontal size={20} />
             </button>
@@ -237,26 +280,26 @@ export function SplitActionGroup({
                       <button
                         type="button"
                         className={`split-sheet-item ${action.isDestructive ? 'is-destructive' : ''}`}
-                        disabled={action.disabled}
-                        onClick={(e) => {
-                          action.onClick?.(e);
-                          handleClose();
-                        }}
+                        disabled={action.disabled || action.loading}
+                        onClick={(e) => handleItemClick(action, e)}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          {ItemIcon && <ItemIcon size={18} />}
+                          {action.loading ? (
+                            <Loader2 size={18} className="spin-loader" />
+                          ) : (
+                            ItemIcon && <ItemIcon size={18} />
+                          )}
                           <div>
                             <div>{action.label}</div>
                             {action.subtext && (
-                              <div className="split-sheet-item-subtext">{action.subtext}</div>
+                              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px' }}>
+                                {action.subtext}
+                              </div>
                             )}
                           </div>
                         </div>
-                        {action.shortcut && (
-                          <span className="split-item-shortcut">{action.shortcut}</span>
-                        )}
                       </button>
-                      {action.dividerAfter && <div className="split-dropdown-divider" />}
+                      {action.dividerAfter && <div className="split-sheet-divider" />}
                     </React.Fragment>
                   );
                 })}
@@ -264,38 +307,117 @@ export function SplitActionGroup({
             </div>
           </div>
         )}
-      </>
+      </div>
     );
   }
 
-  // =========================================================================
-  // DESKTOP (>=1200px) & TABLET (768px-1199px) / INLINE MOBILE RENDER
-  // =========================================================================
-  const isTabletMode = isTablet;
+  // Tablet View (768px - 1199px): Condensed Icon-Text + Popover
+  if (isTablet) {
+    return (
+      <div
+        ref={groupRef}
+        className={`split-action-group is-tablet ${className}`}
+        style={style}
+      >
+        <button
+          type="button"
+          className={`split-btn-primary ${variant}`}
+          disabled={primaryAction.disabled || primaryAction.loading}
+          onClick={primaryAction.onClick}
+        >
+          {primaryAction.loading ? (
+            <Loader2 size={15} className="spin-loader" />
+          ) : (
+            PrimaryIcon && <PrimaryIcon size={15} />
+          )}
+          <span>{primaryAction.label}</span>
+        </button>
 
+        {hasSecondary && (
+          <button
+            type="button"
+            className="split-btn-toggle"
+            onClick={() => setIsOpen((prev) => !prev)}
+            disabled={primaryAction.disabled}
+            aria-haspopup="menu"
+            aria-expanded={isOpen}
+            aria-label="Additional actions"
+          >
+            <ChevronDown
+              size={14}
+              style={{
+                transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.15s ease',
+              }}
+            />
+          </button>
+        )}
+
+        {/* Dropdown Popover */}
+        {isOpen && hasSecondary && (
+          <div
+            ref={menuRef}
+            role="menu"
+            className={`split-dropdown-menu ${align === 'left' ? 'align-left' : ''}`}
+            aria-orientation="vertical"
+          >
+            {visibleSecondary.map((action, idx) => {
+              const ItemIcon = action.icon;
+              return (
+                <React.Fragment key={action.id || action.label || idx}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`split-dropdown-item ${action.isDestructive ? 'is-destructive' : ''}`}
+                    disabled={action.disabled || action.loading}
+                    onClick={(e) => handleItemClick(action, e)}
+                  >
+                    <span className="split-item-content">
+                      {action.loading ? (
+                        <Loader2 size={14} className="spin-loader" />
+                      ) : (
+                        ItemIcon && <ItemIcon size={14} />
+                      )}
+                      <span>{action.label}</span>
+                    </span>
+                  </button>
+                  {action.dividerAfter && <div className="split-dropdown-divider" />}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop View (>=1200px): Fused Split Button + Hotkey Dropdown
   return (
     <div
       ref={groupRef}
-      className={`split-action-group variant-${variant} ${isTabletMode ? 'is-tablet' : ''} ${className}`}
+      className={`split-action-group is-desktop ${className}`}
       style={style}
     >
       {/* Primary Action Button */}
       <button
         type="button"
-        className={`split-btn-primary ${!hasSecondary ? 'is-solo' : ''}`}
-        onClick={primaryAction.onClick}
+        className={`split-btn-primary ${variant}`}
         disabled={primaryAction.disabled || primaryAction.loading}
+        onClick={primaryAction.onClick}
         title={primaryAction.shortcut ? `${primaryAction.label} (${primaryAction.shortcut})` : primaryAction.label}
       >
         {primaryAction.loading ? (
-          <Loader2 size={16} className="spin-loader" />
-        ) : PrimaryIcon ? (
-          <PrimaryIcon size={16} />
-        ) : null}
+          <Loader2 size={15} className="spin-loader" />
+        ) : (
+          PrimaryIcon && <PrimaryIcon size={15} />
+        )}
         <span>{primaryAction.label}</span>
+        {primaryAction.shortcut && (
+          <span className="split-btn-shortcut">{primaryAction.shortcut}</span>
+        )}
       </button>
 
-      {/* Split Arrow Toggle Trigger */}
+      {/* Split Chevron Trigger */}
       {hasSecondary && (
         <button
           type="button"
@@ -334,14 +456,15 @@ export function SplitActionGroup({
                   type="button"
                   role="menuitem"
                   className={`split-dropdown-item ${action.isDestructive ? 'is-destructive' : ''} ${isFocused ? 'is-focused' : ''}`}
-                  disabled={action.disabled}
-                  onClick={(e) => {
-                    action.onClick?.(e);
-                    handleClose();
-                  }}
+                  disabled={action.disabled || action.loading}
+                  onClick={(e) => handleItemClick(action, e)}
                 >
                   <span className="split-item-content">
-                    {ItemIcon && <ItemIcon size={15} />}
+                    {action.loading ? (
+                      <Loader2 size={15} className="spin-loader" />
+                    ) : (
+                      ItemIcon && <ItemIcon size={15} />
+                    )}
                     <span>{action.label}</span>
                   </span>
                   {action.shortcut && (
