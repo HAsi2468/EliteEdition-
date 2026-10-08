@@ -2981,6 +2981,32 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               ))}
             </div>
 
+            {/* Customers Button */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('customers')}
+              className="ent-tab-btn"
+              title="View & Manage All Customers"
+              style={{
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                border: '1px solid var(--border-light, #cbd5e1)',
+                background: '#ffffff',
+                color: '#475569',
+                borderRadius: '8px',
+                height: '34px',
+                padding: '0 0.95rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <span>Customers ({customers.length})</span>
+            </button>
+
             {/* Signed Copy Filter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginLeft: 'auto' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Signed:</span>
