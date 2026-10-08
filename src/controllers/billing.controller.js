@@ -2841,6 +2841,12 @@ const createPurchase = async (req, res) => {
     if (purchaseData.date) {
       purchaseData.date = new Date(purchaseData.date);
     }
+    if (purchaseData.dueDate) {
+      purchaseData.dueDate = new Date(purchaseData.dueDate);
+    }
+    if (!purchaseData.vendorName && purchaseData.vendor) {
+      purchaseData.vendorName = purchaseData.vendor.businessName || purchaseData.vendor.name || '';
+    }
     if (purchaseData._id && !mongoose.Types.ObjectId.isValid(purchaseData._id)) {
       delete purchaseData._id;
     }
@@ -2856,6 +2862,12 @@ const updatePurchase = async (req, res) => {
     const purchaseData = { ...req.body };
     if (purchaseData.date) {
       purchaseData.date = new Date(purchaseData.date);
+    }
+    if (purchaseData.dueDate) {
+      purchaseData.dueDate = new Date(purchaseData.dueDate);
+    }
+    if (!purchaseData.vendorName && purchaseData.vendor) {
+      purchaseData.vendorName = purchaseData.vendor.businessName || purchaseData.vendor.name || '';
     }
     delete purchaseData._id;
     const purchase = await BillingPurchase.findByIdAndUpdate(req.params.id, purchaseData, { new: true });
@@ -2899,21 +2911,14 @@ const bulkSyncPurchases = async (req, res) => {
 
       if (!existing) {
         const created = await BillingPurchase.create({
+          ...p,
           companyEntity,
           purchaseNo: purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
           date: p.date ? new Date(p.date) : new Date(),
-          vendorName,
+          dueDate: p.dueDate ? new Date(p.dueDate) : undefined,
+          vendor: p.vendor || undefined,
+          vendorName: p.vendorName || (p.vendor ? (p.vendor.businessName || p.vendor.name) : '') || vendorName,
           items: Array.isArray(p.items) ? p.items : [],
-          itemName: p.itemName || '',
-          quantity: Number(p.quantity) || 0,
-          unit: p.unit || 'Mtr',
-          rate: p.rate || 0,
-          subtotalAmount: Number(p.subtotalAmount) || 0,
-          taxableAmount: Number(p.taxableAmount) || 0,
-          gstRate: Number(p.gstRate) || 0,
-          gstType: p.gstType || 'CGST_SGST',
-          gstAmount: Number(p.gstAmount) || 0,
-          totalAmount: Number(p.totalAmount) || 0,
           notes: p.notes || ''
         });
         syncedRecords.push(created);

@@ -367,40 +367,197 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const createEmptyPurchaseItem = () => ({
     id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     itemName: '',
-    quantity: '',
-    unit: 'Mtr',
-    rate: '',
-    amount: ''
+    hsnCode: '998821',
+    qty: 1,
+    quantity: 1,
+    unit: 'Meters',
+    unitPrice: 0,
+    rate: 0,
+    discountPct: 0,
+    taxRate: 5,
+    amount: 0,
+    totalAmount: 0,
+    jobNo: '',
+    lotNo: '',
+    partyChallan: '',
+    ourChallanNo: ''
   });
 
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
     purchaseNo: 'PUR-2026-001',
+    ourChallanNo: '',
     date: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    vendor: {
+      vendorId: '',
+      name: '',
+      businessName: '',
+      phone: '',
+      email: '',
+      gstin: '',
+      billingAddress: '',
+      shippingAddress: '',
+      state: 'Gujarat',
+      stateCode: '24'
+    },
     vendorName: '',
     items: [createEmptyPurchaseItem()],
-    gstRate: 0,
-    gstType: 'CGST_SGST',
-    gstAmount: '0.00',
-    totalAmount: '',
-    notes: ''
+    enableRoundOff: true,
+    manualRoundOff: undefined,
+    discountType: 'flat',
+    discountValue: 0,
+    taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
+    gstRate: 5,
+    paidAmount: 0,
+    notes: 'Vendor purchase bill recorded in ERP.',
+    terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
   });
 
-  const handleGstRateChange = (newRate) => {
-    setPurchaseForm(prev => {
-      const items = prev.items || [];
-      const subtotal = items.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
-      const rateNum = Math.max(0, parseFloat(newRate) || 0);
-      const gstAmt = (subtotal * rateNum) / 100;
-      const total = subtotal + gstAmt;
-
+  // ── REAL-TIME PURCHASE CALCULATIONS (mirroring calculatedInvoice) ─────────────
+  const calculatedPurchase = useMemo(() => {
+    let subtotal = 0;
+    const items = purchaseForm.items || [];
+    const updatedItems = items.map(it => {
+      const q = parseFloat(it.qty !== undefined && it.qty !== '' ? it.qty : (it.quantity !== undefined && it.quantity !== '' ? it.quantity : 0)) || 0;
+      const basePrice = parseFloat(it.unitPrice !== undefined && it.unitPrice !== '' ? it.unitPrice : (it.rate !== undefined && it.rate !== '' ? it.rate : 0)) || 0;
+      const discPct = parseFloat(it.discountPct) || 0;
+      const baseTotal = q * basePrice;
+      const discAmt = (baseTotal * discPct) / 100;
+      const itemTotal = Math.max(0, baseTotal - discAmt);
+      subtotal += itemTotal;
       return {
-        ...prev,
-        gstRate: newRate,
-        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
-        totalAmount: total > 0 ? total.toFixed(2) : ''
+        ...it,
+        qty: q,
+        quantity: q,
+        unitPrice: basePrice,
+        rate: basePrice,
+        discountAmt: discAmt,
+        totalAmount: itemTotal,
+        amount: itemTotal
       };
     });
+
+    const discVal = parseFloat(purchaseForm.discountValue) || 0;
+    let discountTotal = 0;
+    if (purchaseForm.discountType === 'percentage') {
+      discountTotal = (subtotal * discVal) / 100;
+    } else {
+      discountTotal = discVal;
+    }
+
+    const netSubtotal = Math.max(0, subtotal - discountTotal);
+
+    // Calculate Tax based on items individual tax rates or default to purchaseForm.gstRate or 5%
+    const totalTax = updatedItems.reduce((sum, i) => {
+      const taxable = i.totalAmount || 0;
+      const rate = parseFloat(i.taxRate !== undefined && i.taxRate !== null && i.taxRate !== '' ? i.taxRate : (purchaseForm.gstRate || 5));
+      return sum + (taxable * rate / 100);
+    }, 0);
+
+    let cgstAmount = 0;
+    let sgstAmount = 0;
+    let igstAmount = 0;
+
+    if (purchaseForm.taxType === 'IGST') {
+      igstAmount = totalTax;
+    } else {
+      cgstAmount = totalTax / 2;
+      sgstAmount = totalTax / 2;
+    }
+
+    const rawGrandTotal = netSubtotal + totalTax;
+    let grandTotal = rawGrandTotal;
+    let roundOff = 0;
+
+    if (purchaseForm.enableRoundOff !== false) {
+      if (purchaseForm.manualRoundOff !== undefined && purchaseForm.manualRoundOff !== '') {
+        roundOff = parseFloat(purchaseForm.manualRoundOff);
+        grandTotal = parseFloat((rawGrandTotal + roundOff).toFixed(2));
+      } else {
+        grandTotal = Math.round(rawGrandTotal);
+        roundOff = parseFloat((grandTotal - rawGrandTotal).toFixed(2));
+      }
+    } else {
+      grandTotal = parseFloat(rawGrandTotal.toFixed(2));
+      roundOff = 0;
+    }
+
+    const paid = parseFloat(purchaseForm.paidAmount) || 0;
+    const balanceDue = Math.max(0, grandTotal - paid);
+
+    return {
+      items: updatedItems,
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      discountTotal: parseFloat(discountTotal.toFixed(2)),
+      netSubtotal: parseFloat(netSubtotal.toFixed(2)),
+      cgstAmount: parseFloat(cgstAmount.toFixed(2)),
+      sgstAmount: parseFloat(sgstAmount.toFixed(2)),
+      igstAmount: parseFloat(igstAmount.toFixed(2)),
+      totalTax: parseFloat(totalTax.toFixed(2)),
+      roundOff,
+      rawGrandTotal: parseFloat(rawGrandTotal.toFixed(2)),
+      grandTotal,
+      balanceDue: parseFloat(balanceDue.toFixed(2))
+    };
+  }, [purchaseForm.items, purchaseForm.enableRoundOff, purchaseForm.manualRoundOff, purchaseForm.discountType, purchaseForm.discountValue, purchaseForm.taxType, purchaseForm.gstRate, purchaseForm.paidAmount]);
+
+  const handlePurchaseVendorSelect = (selectedName) => {
+    if (!selectedName) {
+      setPurchaseForm(prev => ({
+        ...prev,
+        vendorName: '',
+        vendor: {
+          vendorId: '',
+          name: '',
+          businessName: '',
+          phone: '',
+          email: '',
+          gstin: '',
+          billingAddress: '',
+          shippingAddress: '',
+          state: 'Gujarat',
+          stateCode: '24'
+        }
+      }));
+      return;
+    }
+
+    const matched = (fabricVendors || []).find(v => {
+      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
+      return vName && String(vName).trim().toLowerCase() === selectedName.trim().toLowerCase();
+    });
+
+    if (matched && typeof matched === 'object') {
+      const resolvedName = matched.name || matched.vendorName || selectedName;
+      const resolvedBiz = matched.businessName || matched.firmName || matched.company || resolvedName;
+      setPurchaseForm(prev => ({
+        ...prev,
+        vendorName: resolvedBiz || resolvedName,
+        vendor: {
+          vendorId: matched._id || matched.id || '',
+          name: resolvedName,
+          businessName: resolvedBiz,
+          phone: matched.phone || matched.mobile || '',
+          email: matched.email || '',
+          gstin: matched.gstin || matched.gstNo || '',
+          billingAddress: matched.address || matched.billingAddress || '',
+          shippingAddress: matched.shippingAddress || matched.address || '',
+          state: matched.state || 'Gujarat',
+          stateCode: matched.stateCode || '24'
+        }
+      }));
+    } else {
+      setPurchaseForm(prev => ({
+        ...prev,
+        vendorName: selectedName,
+        vendor: {
+          ...prev.vendor,
+          name: selectedName,
+          businessName: selectedName
+        }
+      }));
+    }
   };
 
   const handleAddPurchaseItem = () => {
@@ -414,81 +571,130 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     setPurchaseForm(prev => {
       const items = prev.items || [];
       if (items.length <= 1) return prev;
-      const newItems = items.filter((_, idx) => idx !== index);
-      const subtotal = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-      const rateNum = Math.max(0, parseFloat(prev.gstRate) || 0);
-      const gstAmt = (subtotal * rateNum) / 100;
-      const total = subtotal + gstAmt;
       return {
         ...prev,
-        items: newItems,
-        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
-        totalAmount: total > 0 ? total.toFixed(2) : ''
+        items: items.filter((_, idx) => idx !== index)
       };
     });
   };
 
-  const handleUpdatePurchaseItem = (index, field, value) => {
+  const handlePurchaseItemChange = (index, field, value) => {
     setPurchaseForm(prev => {
-      const items = prev.items || [];
-      const newItems = items.map((item, idx) => {
-        if (idx !== index) return item;
-        const updated = { ...item, [field]: value };
-        if (field === 'quantity' || field === 'rate') {
-          const q = parseFloat(field === 'quantity' ? value : updated.quantity);
-          const r = parseFloat(field === 'rate' ? value : updated.rate);
-          if (!isNaN(q) && !isNaN(r)) {
-            updated.amount = (q * r).toFixed(2);
-          }
-        }
-        return updated;
-      });
-      const subtotal = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-      const rateNum = Math.max(0, parseFloat(prev.gstRate) || 0);
-      const gstAmt = (subtotal * rateNum) / 100;
-      const total = subtotal + gstAmt;
+      const items = [...(prev.items || [])];
+      if (!items[index]) return prev;
+      const updatedItem = { ...items[index], [field]: value };
 
+      if (field === 'qty') {
+        updatedItem.quantity = value;
+      } else if (field === 'quantity') {
+        updatedItem.qty = value;
+      } else if (field === 'unitPrice') {
+        updatedItem.rate = value;
+      } else if (field === 'rate') {
+        updatedItem.unitPrice = value;
+      }
+
+      // Catalog sync if selecting or typing itemName
+      if (field === 'itemName') {
+        const matched = itemsList.find(i => i.itemName.trim().toLowerCase() === String(value).trim().toLowerCase());
+        if (matched) {
+          updatedItem.hsnCode = matched.hsnCode || '998821';
+          if (matched.unitPrice != null) {
+            updatedItem.unitPrice = matched.unitPrice;
+            updatedItem.rate = matched.unitPrice;
+          }
+          if (matched.unit) updatedItem.unit = matched.unit;
+          if (matched.taxRate != null) updatedItem.taxRate = matched.taxRate;
+        }
+      }
+
+      items[index] = updatedItem;
       return {
         ...prev,
-        items: newItems,
-        gstAmount: gstAmt > 0 ? gstAmt.toFixed(2) : '0.00',
-        totalAmount: total > 0 ? total.toFixed(2) : prev.totalAmount
+        items
       };
     });
+  };
+
+  const handleGstRateChange = (newRate) => {
+    const rateNum = Math.max(0, parseFloat(newRate) || 0);
+    setPurchaseForm(prev => ({
+      ...prev,
+      gstRate: rateNum,
+      items: (prev.items || []).map(it => ({ ...it, taxRate: rateNum }))
+    }));
   };
 
   const handleEditPurchase = (p) => {
     setEditingPurchaseId(p._id || p.id);
-    const pGstRate = p.gstRate != null ? p.gstRate : 0;
+    const pGstRate = p.gstRate != null ? p.gstRate : 5;
     const pItems = Array.isArray(p.items) && p.items.length > 0
       ? p.items.map(it => ({
           id: it.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           itemName: it.itemName || '',
-          quantity: it.quantity || '',
-          unit: it.unit || 'Mtr',
-          rate: it.rate || '',
-          amount: it.amount || (it.quantity && it.rate ? (it.quantity * it.rate).toFixed(2) : '')
+          hsnCode: it.hsnCode || '998821',
+          qty: it.qty != null ? it.qty : (it.quantity != null ? it.quantity : 1),
+          quantity: it.quantity != null ? it.quantity : (it.qty != null ? it.qty : 1),
+          unit: it.unit || 'Meters',
+          unitPrice: it.unitPrice != null ? it.unitPrice : (it.rate != null ? it.rate : 0),
+          rate: it.rate != null ? it.rate : (it.unitPrice != null ? it.unitPrice : 0),
+          discountPct: it.discountPct || 0,
+          taxRate: it.taxRate != null ? it.taxRate : (pGstRate || 5),
+          amount: it.amount || 0,
+          totalAmount: it.totalAmount || it.amount || 0,
+          jobNo: it.jobNo || '',
+          lotNo: it.lotNo || '',
+          partyChallan: it.partyChallan || '',
+          ourChallanNo: it.ourChallanNo || ''
         }))
       : [{
           id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           itemName: p.itemName || '',
-          quantity: p.quantity || '',
-          unit: p.unit || 'Mtr',
-          rate: p.rate !== '-' ? p.rate : '',
-          amount: p.totalAmount || ''
+          hsnCode: '998821',
+          qty: p.quantity != null ? p.quantity : 1,
+          quantity: p.quantity != null ? p.quantity : 1,
+          unit: p.unit || 'Meters',
+          unitPrice: p.rate !== '-' && p.rate != null ? p.rate : 0,
+          rate: p.rate !== '-' && p.rate != null ? p.rate : 0,
+          discountPct: 0,
+          taxRate: pGstRate || 5,
+          amount: p.totalAmount || 0,
+          totalAmount: p.totalAmount || 0,
+          jobNo: '',
+          lotNo: '',
+          partyChallan: '',
+          ourChallanNo: ''
         }];
 
     setPurchaseForm({
       purchaseNo: p.purchaseNo || '',
-      date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : p.date) : new Date().toISOString().split('T')[0],
-      vendorName: p.vendorName || '',
+      ourChallanNo: p.ourChallanNo || '',
+      date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : new Date().toISOString().split('T')[0],
+      dueDate: p.dueDate ? (typeof p.dueDate === 'string' && p.dueDate.includes('T') ? p.dueDate.split('T')[0] : (p.dueDate instanceof Date ? p.dueDate.toISOString().split('T')[0] : p.dueDate)) : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      vendor: {
+        vendorId: p.vendor?.vendorId || '',
+        name: p.vendor?.name || p.vendorName || '',
+        businessName: p.vendor?.businessName || p.vendorName || '',
+        phone: p.vendor?.phone || '',
+        email: p.vendor?.email || '',
+        gstin: p.vendor?.gstin || '',
+        billingAddress: p.vendor?.billingAddress || '',
+        shippingAddress: p.vendor?.shippingAddress || '',
+        state: p.vendor?.state || 'Gujarat',
+        stateCode: p.vendor?.stateCode || '24'
+      },
+      vendorName: p.vendorName || p.vendor?.businessName || p.vendor?.name || '',
       items: pItems,
+      enableRoundOff: p.enableRoundOff !== false,
+      manualRoundOff: p.roundOff !== undefined ? p.roundOff : undefined,
+      discountType: p.discountType || 'flat',
+      discountValue: p.discountValue || 0,
+      taxType: p.taxType || p.gstType || 'CGST_SGST',
       gstRate: pGstRate,
-      gstType: p.gstType || 'CGST_SGST',
-      taxableAmount: p.taxableAmount || '',
-      gstAmount: p.gstAmount || '0.00',
-      totalAmount: p.totalAmount || '',
-      notes: p.notes || ''
+      paidAmount: p.paidAmount || 0,
+      totalAmount: p.grandTotal || p.totalAmount || '',
+      notes: p.notes || '',
+      terms: p.terms || 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
     });
     setShowPurchaseModal(true);
   };
@@ -570,56 +776,87 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   const handleCreatePurchase = async (e) => {
     e.preventDefault();
-    if (!purchaseForm.vendorName) {
-      alert('Please select Vendor Name.');
+    const vendorFinalName = purchaseForm.vendor?.businessName || purchaseForm.vendor?.name || purchaseForm.vendorName;
+    if (!vendorFinalName || !vendorFinalName.trim()) {
+      alert('Please select or enter Vendor Name.');
       return;
     }
 
-    const validItems = (purchaseForm.items || []).filter(i => i.itemName && i.itemName.trim() !== '');
+    const validItems = (calculatedPurchase.items || []).filter(i => i.itemName && i.itemName.trim() !== '');
     if (validItems.length === 0) {
       alert('Please add at least one item description.');
       return;
     }
 
-    const calculatedSubtotal = validItems.reduce((acc, item) => {
-      const q = parseFloat(item.quantity) || 0;
-      const r = parseFloat(item.rate) || 0;
-      const amt = parseFloat(item.amount) || (q * r);
-      return acc + amt;
-    }, 0);
-
-    const rateNum = Math.max(0, parseFloat(purchaseForm.gstRate) || 0);
-    const calculatedGstAmt = (calculatedSubtotal * rateNum) / 100;
-    const finalTotal = parseFloat(purchaseForm.totalAmount) || (calculatedSubtotal + calculatedGstAmt);
-
     const payload = {
       purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
+      ourChallanNo: purchaseForm.ourChallanNo || '',
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
-      vendorName: purchaseForm.vendorName,
+      dueDate: purchaseForm.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      vendor: {
+        vendorId: purchaseForm.vendor?.vendorId || undefined,
+        name: purchaseForm.vendor?.name || vendorFinalName.trim(),
+        businessName: purchaseForm.vendor?.businessName || vendorFinalName.trim(),
+        phone: purchaseForm.vendor?.phone || '',
+        email: purchaseForm.vendor?.email || '',
+        gstin: purchaseForm.vendor?.gstin || '',
+        billingAddress: purchaseForm.vendor?.billingAddress || '',
+        shippingAddress: purchaseForm.vendor?.shippingAddress || '',
+        state: purchaseForm.vendor?.state || 'Gujarat',
+        stateCode: purchaseForm.vendor?.stateCode || '24'
+      },
+      vendorName: vendorFinalName.trim(),
       companyEntity: companyEntity || 'Elite Digital Prints',
-      items: validItems.map(item => {
-        const q = parseFloat(item.quantity) || 0;
-        const r = parseFloat(item.rate) || 0;
-        const amt = parseFloat(item.amount) || (q * r);
-        return {
-          itemName: item.itemName.trim(),
-          quantity: q,
-          unit: item.unit || 'Mtr',
-          rate: r,
-          amount: amt
-        };
-      }),
+      items: validItems.map(item => ({
+        itemName: item.itemName.trim(),
+        description: item.description || '',
+        fabric: item.fabric || '',
+        fabricName: item.fabricName || '',
+        jobNo: item.jobNo || '',
+        lotNo: item.lotNo || '',
+        partyChallan: item.partyChallan || '',
+        ourChallanNo: item.ourChallanNo || '',
+        hsnCode: item.hsnCode || '998821',
+        qty: parseFloat(item.qty) || 0,
+        quantity: parseFloat(item.qty) || 0,
+        unit: item.unit || 'Meters',
+        unitPrice: parseFloat(item.unitPrice) || 0,
+        rate: parseFloat(item.unitPrice) || 0,
+        discountPct: parseFloat(item.discountPct) || 0,
+        taxRate: parseFloat(item.taxRate) || 0,
+        amount: parseFloat(item.totalAmount) || 0,
+        totalAmount: parseFloat(item.totalAmount) || 0
+      })),
       itemName: validItems.map(i => i.itemName.trim()).join(', '),
-      quantity: validItems.reduce((acc, i) => acc + (parseFloat(i.quantity) || 0), 0),
-      unit: validItems[0]?.unit || 'Mtr',
-      rate: validItems.length === 1 ? (parseFloat(validItems[0].rate) || 0) : (validItems.every(i => parseFloat(i.rate) === parseFloat(validItems[0].rate)) ? parseFloat(validItems[0].rate) : '-'),
-      subtotalAmount: calculatedSubtotal,
-      taxableAmount: calculatedSubtotal,
-      gstRate: rateNum,
-      gstType: purchaseForm.gstType || 'CGST_SGST',
-      gstAmount: parseFloat(purchaseForm.gstAmount) || calculatedGstAmt,
-      totalAmount: finalTotal,
-      notes: purchaseForm.notes || ''
+      quantity: validItems.reduce((acc, i) => acc + (parseFloat(i.qty) || 0), 0),
+      unit: validItems[0]?.unit || 'Meters',
+      rate: validItems.length === 1 ? (parseFloat(validItems[0].unitPrice) || 0) : '-',
+      subtotal: calculatedPurchase.subtotal,
+      subtotalAmount: calculatedPurchase.subtotal,
+      taxableAmount: calculatedPurchase.netSubtotal,
+      discountType: purchaseForm.discountType || 'flat',
+      discountValue: parseFloat(purchaseForm.discountValue) || 0,
+      discountTotal: calculatedPurchase.discountTotal,
+      taxType: purchaseForm.taxType || 'CGST_SGST',
+      gstRate: parseFloat(purchaseForm.gstRate) || 0,
+      cgstAmount: calculatedPurchase.cgstAmount,
+      sgstAmount: calculatedPurchase.sgstAmount,
+      igstAmount: calculatedPurchase.igstAmount,
+      totalTax: calculatedPurchase.totalTax,
+      gstAmount: calculatedPurchase.totalTax,
+      enableRoundOff: purchaseForm.enableRoundOff !== false,
+      roundOff: calculatedPurchase.roundOff,
+      totalAmount: calculatedPurchase.grandTotal,
+      grandTotal: calculatedPurchase.grandTotal,
+      paidAmount: parseFloat(purchaseForm.paidAmount) || 0,
+      balanceDue: calculatedPurchase.balanceDue,
+      paymentStatus: (parseFloat(purchaseForm.paidAmount) || 0) >= calculatedPurchase.grandTotal && calculatedPurchase.grandTotal > 0
+        ? 'PAID'
+        : (parseFloat(purchaseForm.paidAmount) || 0) > 0
+          ? 'PARTIALLY_PAID'
+          : 'UNPAID',
+      notes: purchaseForm.notes || '',
+      terms: purchaseForm.terms || ''
     };
 
     try {
@@ -660,14 +897,32 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     setShowPurchaseModal(false);
     setPurchaseForm({
       purchaseNo: `PUR-2026-00${purchases.length + 2}`,
+      ourChallanNo: '',
       date: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      vendor: {
+        vendorId: '',
+        name: '',
+        businessName: '',
+        phone: '',
+        email: '',
+        gstin: '',
+        billingAddress: '',
+        shippingAddress: '',
+        state: 'Gujarat',
+        stateCode: '24'
+      },
       vendorName: '',
       items: [createEmptyPurchaseItem()],
-      gstRate: 0,
-      gstType: 'CGST_SGST',
-      gstAmount: '0.00',
-      totalAmount: '',
-      notes: ''
+      enableRoundOff: true,
+      manualRoundOff: undefined,
+      discountType: 'flat',
+      discountValue: 0,
+      taxType: 'CGST_SGST',
+      gstRate: 5,
+      paidAmount: 0,
+      notes: 'Vendor purchase bill recorded in ERP.',
+      terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
     });
   };
 
@@ -4270,14 +4525,32 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 setEditingPurchaseId(null);
                 setPurchaseForm({
                   purchaseNo: `PUR-2026-00${purchases.length + 1}`,
+                  ourChallanNo: '',
                   date: new Date().toISOString().split('T')[0],
+                  dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+                  vendor: {
+                    vendorId: '',
+                    name: '',
+                    businessName: '',
+                    phone: '',
+                    email: '',
+                    gstin: '',
+                    billingAddress: '',
+                    shippingAddress: '',
+                    state: 'Gujarat',
+                    stateCode: '24'
+                  },
                   vendorName: '',
                   items: [createEmptyPurchaseItem()],
-                  gstRate: 0,
-                  gstType: 'CGST_SGST',
-                  gstAmount: '0.00',
-                  totalAmount: '',
-                  notes: ''
+                  enableRoundOff: true,
+                  manualRoundOff: undefined,
+                  discountType: 'flat',
+                  discountValue: 0,
+                  taxType: 'CGST_SGST',
+                  gstRate: 5,
+                  paidAmount: 0,
+                  notes: 'Vendor purchase bill recorded in ERP.',
+                  terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
                 });
                 setShowPurchaseModal(true);
               }}
@@ -4297,20 +4570,22 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.72rem' }}>
-                  <th style={{ padding: '0.85rem 1rem' }}>Bill / Invoice No</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Date</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Vendor / Supplier</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Item Description</th>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Qty / Mtr</th>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Rate (₹)</th>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Total Amount (₹)</th>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Actions</th>
+                  <th style={{ padding: '0.85rem 0.8rem' }}>Bill / Invoice No</th>
+                  <th style={{ padding: '0.85rem 0.8rem' }}>Date & Due</th>
+                  <th style={{ padding: '0.85rem 0.8rem' }}>Vendor / Supplier</th>
+                  <th style={{ padding: '0.85rem 0.8rem' }}>Items Breakdown</th>
+                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Qty / Mtr</th>
+                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Grand Total (₹)</th>
+                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Paid (₹)</th>
+                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>Balance Due (₹)</th>
+                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '0.85rem 0.8rem', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPurchases.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={10} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
                       {hasActivePurchaseFilters ? (
                         <div>
                           <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#64748b' }}>
@@ -4337,109 +4612,139 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                     </td>
                   </tr>
                 ) : (
-                  filteredPurchases.map((p) => (
-                    <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: '#4f46e5', verticalAlign: 'top' }}>{p.purchaseNo}</td>
-                      <td style={{ padding: '0.85rem 1rem', color: '#64748b', verticalAlign: 'top' }}>
-                        {p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : ''}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: 700, verticalAlign: 'top' }}>{p.vendorName}</td>
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'top' }}>
-                        {Array.isArray(p.items) && p.items.length > 0 ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            {p.items.map((it, idx) => (
-                              <div key={idx} style={{ fontSize: '0.85rem' }}>
-                                <span style={{ fontWeight: 700 }}>• {it.itemName}</span>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '6px' }}>
-                                  ({it.quantity} {it.unit} @ ₹{it.rate} = ₹{Number(it.amount || (it.quantity * it.rate)).toLocaleString('en-IN')})
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ fontWeight: 700 }}>{p.itemName}</span>
-                        )}
-                        {p.notes && <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>{p.notes}</div>}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
-                        {(() => {
-                          if (Array.isArray(p.items) && p.items.length > 0) {
-                            const totalQty = p.items.reduce((acc, it) => acc + (parseFloat(it.quantity) || 0), 0);
-                            const units = [...new Set(p.items.map(it => it.unit).filter(Boolean))];
-                            const unitStr = units.length === 1 ? units[0] : 'Units';
-                            if (p.items.length > 1) {
+                  filteredPurchases.map((p) => {
+                    const billTotal = Number(p.grandTotal || p.totalAmount || 0);
+                    const paidAmt = Number(p.paidAmount || 0);
+                    const balDue = p.balanceDue != null ? Number(p.balanceDue) : (p.paymentStatus === 'PAID' ? 0 : Math.max(0, billTotal - paidAmt));
+                    const isPaid = p.paymentStatus === 'PAID' || (paidAmt >= billTotal && billTotal > 0);
+                    const isPartial = p.paymentStatus === 'PARTIALLY_PAID' || p.paymentStatus === 'PARTIAL' || (paidAmt > 0 && balDue > 0);
+
+                    return (
+                      <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
+                        <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
+                          <span style={{ fontWeight: 800, color: '#4f46e5' }}>{p.purchaseNo}</span>
+                          {p.ourChallanNo && (
+                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
+                              Challan: <strong style={{ color: '#0284c7' }}>{p.ourChallanNo}</strong>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', color: '#64748b', verticalAlign: 'top', fontSize: '0.78rem' }}>
+                          <div>{p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : ''}</div>
+                          {p.dueDate && (
+                            <div style={{ fontSize: '0.68rem', color: '#d97706', marginTop: 2 }}>
+                              Due: {typeof p.dueDate === 'string' && p.dueDate.includes('T') ? p.dueDate.split('T')[0] : (p.dueDate instanceof Date ? p.dueDate.toISOString().split('T')[0] : p.dueDate)}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{p.vendor?.businessName || p.vendorName}</div>
+                          {p.vendor?.name && p.vendor?.name !== p.vendor?.businessName && (
+                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Contact: {p.vendor.name}</div>
+                          )}
+                          {p.vendor?.gstin && (
+                            <div style={{ fontSize: '0.68rem', color: '#4f46e5', fontWeight: 700, marginTop: 2 }}>
+                              GSTIN: {p.vendor.gstin}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
+                          {Array.isArray(p.items) && p.items.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              {p.items.slice(0, 3).map((it, idx) => (
+                                <div key={idx} style={{ fontSize: '0.8rem' }}>
+                                  <span style={{ fontWeight: 700 }}>• {it.itemName}</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '5px' }}>
+                                    ({it.qty || it.quantity || 1} {it.unit || 'Mtr'} @ ₹{it.unitPrice || it.rate || 0})
+                                  </span>
+                                </div>
+                              ))}
+                              {p.items.length > 3 && (
+                                <div style={{ fontSize: '0.7rem', color: '#6366f1', fontWeight: 700 }}>
+                                  +{p.items.length - 3} more items
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ fontWeight: 700 }}>{p.itemName || 'Material Purchase'}</span>
+                          )}
+                          {p.notes && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '3px' }}>{p.notes}</div>}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
+                          {(() => {
+                            if (Array.isArray(p.items) && p.items.length > 0) {
+                              const totalQty = p.items.reduce((acc, it) => acc + (parseFloat(it.qty || it.quantity) || 0), 0);
+                              const units = [...new Set(p.items.map(it => it.unit).filter(Boolean))];
+                              const unitStr = units.length === 1 ? units[0] : 'Units';
                               return (
                                 <div>
                                   <span style={{ fontWeight: 800, color: '#1e293b' }}>{totalQty > 0 ? `${totalQty} ${unitStr}` : `${p.items.length} Items`}</span>
-                                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>({p.items.length} Items)</div>
+                                  {p.items.length > 1 && (
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>({p.items.length} items)</div>
+                                  )}
                                 </div>
                               );
                             }
-                            return `${p.items[0].quantity || p.quantity || 0} ${p.items[0].unit || p.unit || 'Mtr'}`;
-                          }
-                          return `${p.quantity || 0} ${p.unit || 'Mtr'}`;
-                        })()}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
-                        {(() => {
-                          if (Array.isArray(p.items) && p.items.length > 0) {
-                            const rates = p.items.map(it => parseFloat(it.rate) || 0).filter(r => r > 0);
-                            const uniqueRates = [...new Set(rates)];
-                            if (uniqueRates.length === 0) return '-';
-                            if (uniqueRates.length === 1) return `₹${uniqueRates[0]}`;
-                            if (uniqueRates.length === 2) return `₹${uniqueRates[0]}, ₹${uniqueRates[1]}`;
-                            const minR = Math.min(...uniqueRates);
-                            const maxR = Math.max(...uniqueRates);
-                            return `₹${minR} - ₹${maxR}`;
-                          }
-                          return p.rate && p.rate !== '-' ? `₹${p.rate}` : '-';
-                        })()}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>
-                        <div>₹{Number(p.totalAmount).toLocaleString('en-IN')}</div>
-                        {p.gstRate > 0 && (
-                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4f46e5', marginTop: 2 }}>
-                            ({p.gstRate}% GST)
+                            return `${p.quantity || 0} ${p.unit || 'Mtr'}`;
+                          })()}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>
+                          <div>₹{billTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          {(p.taxType === 'IGST' ? p.igstAmount > 0 : p.totalTax > 0) && (
+                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4f46e5', marginTop: 2 }}>
+                              Tax: ₹{Number(p.totalTax || p.gstAmount || 0).toFixed(2)}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', verticalAlign: 'top' }}>
+                          ₹{paidAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 800, color: balDue > 0 ? '#ef4444' : '#16a34a', verticalAlign: 'top' }}>
+                          ₹{balDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center', verticalAlign: 'top' }}>
+                          {isPaid ? (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: 'rgba(16,185,129,0.15)', color: '#16a34a', display: 'inline-block' }}>
+                              PAID
+                            </span>
+                          ) : isPartial ? (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: 'rgba(234,179,8,0.15)', color: '#ca8a04', display: 'inline-block' }}>
+                              PARTIAL
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', display: 'inline-block' }}>
+                              UNPAID
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center', verticalAlign: 'top' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                            <button
+                              onClick={() => setViewPurchaseModal(p)}
+                              style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#2563eb', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
+                              title="View Purchase Details"
+                            >
+                              <Eye size={12} /> View
+                            </button>
+                            <button
+                              onClick={() => handleEditPurchase(p)}
+                              style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#d97706', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
+                              title="Edit Purchase Entry"
+                            >
+                              <Edit2 size={12} /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeletePurchase(p._id || p.id)}
+                              style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
+                              title="Delete Purchase Entry"
+                            >
+                              <Trash2 size={12} /> Delete
+                            </button>
                           </div>
-                        )}
-                        {p.paymentStatus === 'PAID' && (
-                          <div style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: 'rgba(16,185,129,0.15)', color: '#16a34a', display: 'inline-block', marginTop: 3 }}>
-                            PAID
-                          </div>
-                        )}
-                        {p.paymentStatus === 'PARTIAL' && (
-                          <div style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: 'rgba(234,179,8,0.15)', color: '#ca8a04', display: 'inline-block', marginTop: 3 }}>
-                            PARTIAL (Due: ₹{Number(p.balanceDue || 0).toLocaleString('en-IN')})
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'top' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-                          <button
-                            onClick={() => setViewPurchaseModal(p)}
-                            style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#2563eb', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
-                            title="View Purchase Details"
-                          >
-                            <Eye size={13} /> View
-                          </button>
-                          <button
-                            onClick={() => handleEditPurchase(p)}
-                            style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#d97706', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
-                            title="Edit Purchase Entry"
-                          >
-                            <Edit2 size={13} /> Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeletePurchase(p._id || p.id)}
-                            style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
-                            title="Delete Purchase Entry"
-                          >
-                            <Trash2 size={13} /> Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -4447,329 +4752,529 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         </div>
       )}
 
-      {/* ── NEW PURCHASE ENTRY MODAL ────────────────────────────────────────── */}
+      {/* ── NEW / EDIT PURCHASE ENTRY GENERATOR MODAL (MIRRORING INVOICE WITH VENDOR DETAILS) ── */}
       {showPurchaseModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
-            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShoppingBag size={20} /> {editingPurchaseId ? 'Edit Vendor Purchase Entry' : 'New Vendor Purchase Entry'}
-              </h3>
-              <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '1080px', maxHeight: '92vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-light, #cbd5e1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', color: 'var(--text-primary, #1e293b)' }}>
+            
+            {/* Header */}
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid var(--border-light, #e2e8f0)', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <ShoppingBag size={22} />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
+                    {editingPurchaseId ? `Edit Vendor Purchase Bill — ${purchaseForm.purchaseNo}` : 'New Vendor Purchase Inward Generator'}
+                  </h3>
+                  <div style={{ fontSize: '0.72rem', opacity: 0.9, marginTop: 2 }}>
+                    Comprehensive GST Inward Bill Entry & Vendor Accounting System
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
 
-            <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Top Metadata Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', background: 'rgba(79, 70, 229, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(79, 70, 229, 0.15)' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Bill / Invoice No *</label>
+                  <label style={labelStyle}>Purchasing Entity</label>
+                  <select
+                    disabled
+                    value={companyEntity || 'Elite Digital Prints'}
+                    style={{
+                      ...inputStyle,
+                      fontWeight: 700,
+                      color: '#4f46e5',
+                      background: 'rgba(79, 70, 229, 0.08)',
+                      border: '1px solid rgba(79, 70, 229, 0.3)',
+                      cursor: 'not-allowed'
+                    }}
+                  >
+                    <option value={companyEntity || 'Elite Digital Prints'}>🏢 {companyEntity || 'Elite Digital Prints'}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Bill / Invoice No. *</label>
                   <input
                     type="text"
                     required
                     value={purchaseForm.purchaseNo}
-                    onChange={e => setPurchaseForm({ ...purchaseForm, purchaseNo: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={e => setPurchaseForm(f => ({ ...f, purchaseNo: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="e.g. PUR-2026-001"
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Inward Date *</label>
+                  <label style={labelStyle}>Challan No. / Ref</label>
+                  <input
+                    type="text"
+                    value={purchaseForm.ourChallanNo || ''}
+                    onChange={e => setPurchaseForm(f => ({ ...f, ourChallanNo: e.target.value }))}
+                    placeholder="e.g. EDP-101 / VEN-44"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Inward / Bill Date *</label>
                   <input
                     type="date"
                     required
-                    value={purchaseForm.date}
-                    onChange={e => setPurchaseForm({ ...purchaseForm, date: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    value={formatForInputDate(purchaseForm.date)}
+                    onChange={e => setPurchaseForm(f => ({ ...f, date: e.target.value }))}
+                    style={inputStyle}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Vendor / Supplier Name *</label>
-                <select
-                  required
-                  value={purchaseForm.vendorName}
-                  onChange={e => setPurchaseForm({ ...purchaseForm, vendorName: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', fontWeight: 700 }}
-                >
-                  <option value="">-- Select Vendor --</option>
-                  {vendorOptions.map((v, idx) => (
-                    <option key={idx} value={v}>{v}</option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label style={labelStyle}>Due Date</label>
+                  <input
+                    type="date"
+                    value={formatForInputDate(purchaseForm.dueDate)}
+                    onChange={e => setPurchaseForm(f => ({ ...f, dueDate: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
 
-              {/* ── MULTIPLE ITEMS SECTION ── */}
-              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: 0 }}>
-                    📦 Item / Fabric List ({(purchaseForm.items || []).length})
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleAddPurchaseItem}
-                    style={{ background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', border: '1px solid rgba(79, 70, 229, 0.3)', padding: '0.35rem 0.75rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                <div>
+                  <label style={{ ...labelStyle, color: '#6366f1', fontWeight: 800 }}>⚡ GST Tax Type (Dynamic)</label>
+                  <select
+                    value={purchaseForm.taxType}
+                    onChange={e => setPurchaseForm(f => ({ ...f, taxType: e.target.value }))}
+                    style={{
+                      ...inputStyle,
+                      fontWeight: '700',
+                      color: '#4f46e5',
+                      background: 'rgba(79, 70, 229, 0.12)',
+                      border: '1px solid rgba(79, 70, 229, 0.4)'
+                    }}
                   >
-                    <Plus size={14} /> Add Another Item
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  {(purchaseForm.items || []).map((item, idx) => (
-                    <div key={item.id || idx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.85rem', position: 'relative' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5' }}>Item #{idx + 1}</span>
-                        {(purchaseForm.items || []).length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePurchaseItem(idx)}
-                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
-                            title="Remove this item"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Item / Fabric Description *</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. Cotton 60x60 / Cyan Sublimation Ink / Butter Paper"
-                            value={item.itemName}
-                            onChange={e => handleUpdatePurchaseItem(idx, 'itemName', e.target.value)}
-                            style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                          />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.9fr 1fr 1fr', gap: '0.6rem' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Quantity</label>
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="0"
-                              value={item.quantity}
-                              onChange={e => handleUpdatePurchaseItem(idx, 'quantity', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Unit</label>
-                            <select
-                              value={item.unit}
-                              onChange={e => handleUpdatePurchaseItem(idx, 'unit', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                            >
-                              <option value="Mtr">Mtr</option>
-                              <option value="Pcs">Pcs</option>
-                              <option value="Kg">Kg</option>
-                              <option value="Ltr">Ltr</option>
-                              <option value="Rolls">Rolls</option>
-                              <option value="Boxes">Boxes</option>
-                              <option value="Bags">Bags</option>
-                              <option value="Set">Set</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Rate (₹)</label>
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="0"
-                              value={item.rate}
-                              onChange={e => handleUpdatePurchaseItem(idx, 'rate', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#0284c7', marginBottom: 2 }}>Amount (₹)</label>
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="0"
-                              value={item.amount}
-                              onChange={e => handleUpdatePurchaseItem(idx, 'amount', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 700, color: '#0284c7', borderRadius: '6px', border: '1px solid #93c5fd' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    <option value="CGST_SGST">Intra-State (CGST + SGST)</option>
+                    <option value="IGST">Inter-State (IGST)</option>
+                  </select>
                 </div>
               </div>
 
-              {/* ── GST RATE SELECTION & BILL SUMMARY ── */}
-              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                    🏷️ GST Percentage Selection *
-                  </label>
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Tax Type:</label>
+              {/* Vendor Details (Supplied By) - Mirrors Customer Details */}
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    🏢 Supplied By (Vendor / Supplier Details)
+                  </div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    {vendorOptions.length} Saved Vendors Available
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.8rem' }}>
+                  <div>
+                    <label style={labelStyle}>Select Saved Vendor</label>
                     <select
-                      value={purchaseForm.gstType}
-                      onChange={e => setPurchaseForm(prev => ({ ...prev, gstType: e.target.value }))}
-                      style={{ padding: '3px 8px', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', color: '#1e293b' }}
+                      value={purchaseForm.vendorName}
+                      onChange={e => handlePurchaseVendorSelect(e.target.value)}
+                      style={{ ...inputStyle, fontWeight: 700 }}
                     >
-                      <option value="CGST_SGST">CGST + SGST (Intra-State)</option>
-                      <option value="IGST">IGST (Inter-State)</option>
+                      <option value="">-- Choose or Enter Vendor --</option>
+                      {vendorOptions.map((v, idx) => (
+                        <option key={idx} value={v}>{v}</option>
+                      ))}
                     </select>
                   </div>
+
+                  <div>
+                    <label style={labelStyle}>Vendor / Contact Person *</label>
+                    <input
+                      type="text"
+                      required
+                      value={purchaseForm.vendor.name}
+                      onChange={e => setPurchaseForm(f => ({
+                        ...f,
+                        vendorName: f.vendor.businessName || e.target.value,
+                        vendor: { ...f.vendor, name: e.target.value }
+                      }))}
+                      style={inputStyle}
+                      placeholder="e.g. Ramesh Bhai"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Business / Firm Name</label>
+                    <input
+                      type="text"
+                      value={purchaseForm.vendor.businessName}
+                      onChange={e => setPurchaseForm(f => ({
+                        ...f,
+                        vendorName: e.target.value || f.vendor.name,
+                        vendor: { ...f.vendor, businessName: e.target.value }
+                      }))}
+                      style={inputStyle}
+                      placeholder="e.g. Shree Ram Textiles Pvt Ltd"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>GSTIN Number</label>
+                    <input
+                      type="text"
+                      value={purchaseForm.vendor.gstin}
+                      onChange={e => setPurchaseForm(f => ({
+                        ...f,
+                        vendor: { ...f.vendor, gstin: e.target.value }
+                      }))}
+                      style={inputStyle}
+                      placeholder="e.g. 24AAAFE1234F1Z5"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Phone / Mobile</label>
+                    <input
+                      type="text"
+                      value={purchaseForm.vendor.phone}
+                      onChange={e => setPurchaseForm(f => ({
+                        ...f,
+                        vendor: { ...f.vendor, phone: e.target.value }
+                      }))}
+                      style={inputStyle}
+                      placeholder="e.g. +91 9876543210"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Email Address</label>
+                    <input
+                      type="email"
+                      value={purchaseForm.vendor.email}
+                      onChange={e => setPurchaseForm(f => ({
+                        ...f,
+                        vendor: { ...f.vendor, email: e.target.value }
+                      }))}
+                      style={inputStyle}
+                      placeholder="e.g. supplier@domain.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Billing / Supplier Address</label>
+                    <input
+                      type="text"
+                      value={purchaseForm.vendor.billingAddress}
+                      onChange={e => setPurchaseForm(f => ({
+                        ...f,
+                        vendor: { ...f.vendor, billingAddress: e.target.value }
+                      }))}
+                      style={inputStyle}
+                      placeholder="Street / Mill Complex / Ring Road"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>State</label>
+                    <input
+                      type="text"
+                      value={purchaseForm.vendor.state}
+                      onChange={e => setPurchaseForm(f => ({
+                        ...f,
+                        vendor: { ...f.vendor, state: e.target.value }
+                      }))}
+                      style={inputStyle}
+                      placeholder="e.g. Gujarat"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Purchase Line Items Table */}
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem', overflowX: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase' }}>
+                    📦 Purchase Line Items ({(purchaseForm.items || []).length})
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleAddPurchaseItem}
+                      className="btn-secondary"
+                      style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#eff6ff', color: '#4f46e5', border: '1px solid #bfdbfe' }}
+                    >
+                      <Plus size={13} /> Add Item Row
+                    </button>
+                  </div>
                 </div>
 
-                {/* Quick Selection Buttons */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.45rem' }}>
-                  {[
-                    { rate: 0, label: '0%', desc: 'None / Exempt' },
-                    { rate: 5, label: '5%', desc: 'Fabric / Yarn' },
-                    { rate: 12, label: '12%', desc: 'Paper / Bags' },
-                    { rate: 18, label: '18%', desc: 'Ink / Spares' },
-                    { rate: 28, label: '28%', desc: 'Machinery' },
-                    { rate: 'custom', label: 'Custom', desc: 'Other %' }
-                  ].map((g) => {
-                    const isCustom = g.rate === 'custom';
-                    const isSelected = isCustom
-                      ? ![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate))
-                      : Number(purchaseForm.gstRate) === g.rate;
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '880px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #cbd5e1', fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '0.5rem' }}>Item Description & Details</th>
+                      <th style={{ padding: '0.5rem', width: '90px' }}>HSN</th>
+                      <th style={{ padding: '0.5rem', width: '80px' }}>Qty</th>
+                      <th style={{ padding: '0.5rem', width: '95px' }}>Unit</th>
+                      <th style={{ padding: '0.5rem', width: '100px' }}>Price (₹)</th>
+                      <th style={{ padding: '0.5rem', width: '75px' }}>Disc %</th>
+                      <th style={{ padding: '0.5rem', width: '75px' }}>GST %</th>
+                      <th style={{ padding: '0.5rem', width: '105px', textAlign: 'right' }}>Total (₹)</th>
+                      <th style={{ padding: '0.5rem', width: '40px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calculatedPurchase.items.map((it, idx) => (
+                      <tr key={it.id || idx} style={{ borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                          <input
+                            type="text"
+                            list={`purchase-items-list-${idx}`}
+                            value={it.itemName}
+                            onChange={e => handlePurchaseItemChange(idx, 'itemName', e.target.value)}
+                            placeholder="Type item or select from catalog..."
+                            style={inputStyle}
+                            required
+                          />
+                          <datalist id={`purchase-items-list-${idx}`}>
+                            {itemsList.map(item => <option key={item._id} value={item.itemName} />)}
+                          </datalist>
 
-                    return (
-                      <button
-                        key={g.label}
-                        type="button"
-                        onClick={() => {
-                          if (isCustom) {
-                            const currentVal = ![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate)) ? purchaseForm.gstRate : '';
-                            handleGstRateChange(currentVal || '');
-                          } else {
-                            handleGstRateChange(g.rate);
-                          }
-                        }}
-                        style={{
-                          padding: '0.5rem 0.25rem', borderRadius: '7px', textAlign: 'center', cursor: 'pointer',
-                          border: isSelected ? '2px solid #4f46e5' : '1px solid #cbd5e1',
-                          background: isSelected ? 'rgba(79, 70, 229, 0.12)' : '#ffffff',
-                          color: isSelected ? '#4f46e5' : '#475569',
-                          boxShadow: isSelected ? '0 0 8px rgba(79, 70, 229, 0.2)' : 'none',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <span style={{ fontSize: '0.88rem', fontWeight: 900 }}>{g.label}</span>
-                        <span style={{ fontSize: '0.62rem', opacity: 0.8, whiteSpace: 'nowrap' }}>{g.desc}</span>
-                      </button>
-                    );
-                  })}
+                          {/* Sub-inputs: Job No, Lot No, Vendor/Party Challan, Our Challan */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.3rem' }}>
+                            <input
+                              type="text"
+                              value={it.jobNo || ''}
+                              onChange={e => handlePurchaseItemChange(idx, 'jobNo', e.target.value)}
+                              placeholder="Job Card"
+                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                            />
+                            <input
+                              type="text"
+                              value={it.lotNo || ''}
+                              onChange={e => handlePurchaseItemChange(idx, 'lotNo', e.target.value)}
+                              placeholder="Lot No"
+                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                            />
+                            <input
+                              type="text"
+                              value={it.partyChallan || ''}
+                              onChange={e => handlePurchaseItemChange(idx, 'partyChallan', e.target.value)}
+                              placeholder="Vendor Challan"
+                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                            />
+                            <input
+                              type="text"
+                              value={it.ourChallanNo || ''}
+                              onChange={e => handlePurchaseItemChange(idx, 'ourChallanNo', e.target.value)}
+                              placeholder="Inward Challan"
+                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.4rem' }}>
+                          <input
+                            type="text"
+                            value={it.hsnCode}
+                            onChange={e => handlePurchaseItemChange(idx, 'hsnCode', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </td>
+                        <td style={{ padding: '0.4rem' }}>
+                          <input
+                            type="number"
+                            step="any"
+                            value={it.qty}
+                            onChange={e => handlePurchaseItemChange(idx, 'qty', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </td>
+                        <td style={{ padding: '0.4rem' }}>
+                          <select
+                            value={it.unit}
+                            onChange={e => handlePurchaseItemChange(idx, 'unit', e.target.value)}
+                            style={inputStyle}
+                          >
+                            <option value="Meters">Meters</option>
+                            <option value="Mtr">Mtr</option>
+                            <option value="Pcs">Pcs</option>
+                            <option value="Rolls">Rolls</option>
+                            <option value="Kg">Kg</option>
+                            <option value="Ltr">Ltr</option>
+                            <option value="Boxes">Boxes</option>
+                            <option value="Bags">Bags</option>
+                            <option value="Set">Set</option>
+                            <option value="Hours">Hours</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '0.4rem' }}>
+                          <input
+                            type="number"
+                            step="any"
+                            value={it.unitPrice}
+                            onChange={e => handlePurchaseItemChange(idx, 'unitPrice', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </td>
+                        <td style={{ padding: '0.4rem' }}>
+                          <input
+                            type="number"
+                            step="any"
+                            value={it.discountPct}
+                            onChange={e => handlePurchaseItemChange(idx, 'discountPct', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </td>
+                        <td style={{ padding: '0.4rem' }}>
+                          <select
+                            value={it.taxRate}
+                            onChange={e => handlePurchaseItemChange(idx, 'taxRate', e.target.value)}
+                            style={inputStyle}
+                          >
+                            <option value={0}>0%</option>
+                            <option value={5}>5%</option>
+                            <option value={12}>12%</option>
+                            <option value={18}>18%</option>
+                            <option value={28}>28%</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '0.4rem', textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
+                          ₹ {(it.totalAmount || 0).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.4rem', textAlign: 'center' }}>
+                          {(purchaseForm.items || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePurchaseItem(idx)}
+                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
+                              title="Remove Row"
+                            >
+                              <X size={15} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Financial Summary & Tax Breakdown Box (mirroring Invoice) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '0.2rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  <div>
+                    <label style={labelStyle}>Notes for Vendor / Inward Remarks</label>
+                    <textarea
+                      rows={2}
+                      value={purchaseForm.notes}
+                      onChange={e => setPurchaseForm(f => ({ ...f, notes: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="e.g. Delivery challan verified, fabric quality approved, transporter: XYZ Logistics"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Terms & Conditions</label>
+                    <textarea
+                      rows={2}
+                      value={purchaseForm.terms}
+                      onChange={e => setPurchaseForm(f => ({ ...f, terms: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="Payment terms, rejection policy, jurisdiction..."
+                    />
+                  </div>
                 </div>
 
-                {/* If custom is selected, show custom rate input */}
-                {![0, 5, 12, 18, 28].includes(Number(purchaseForm.gstRate)) && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5' }}>Enter Custom GST %:</label>
+                <div style={{ padding: '1.1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: '#64748b' }}>Subtotal:</span>
+                    <span style={{ fontWeight: 700 }}>₹ {calculatedPurchase.subtotal.toFixed(2)}</span>
+                  </div>
+
+                  {calculatedPurchase.discountTotal > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#16a34a' }}>
+                      <span>Discount:</span>
+                      <span>- ₹ {calculatedPurchase.discountTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {purchaseForm.taxType === 'IGST' ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span style={{ color: '#64748b' }}>
+                        IGST Tax ({calculatedPurchase.netSubtotal > 0 ? ((calculatedPurchase.totalTax / calculatedPurchase.netSubtotal) * 100).toFixed(1) : 5}%):
+                      </span>
+                      <span style={{ fontWeight: 700, color: '#4f46e5' }}>₹ {calculatedPurchase.igstAmount.toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <span style={{ color: '#64748b' }}>
+                          CGST Tax ({calculatedPurchase.netSubtotal > 0 ? ((calculatedPurchase.totalTax / calculatedPurchase.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                        </span>
+                        <span style={{ fontWeight: 700, color: '#4f46e5' }}>₹ {calculatedPurchase.cgstAmount.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <span style={{ color: '#64748b' }}>
+                          SGST Tax ({calculatedPurchase.netSubtotal > 0 ? ((calculatedPurchase.totalTax / calculatedPurchase.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                        </span>
+                        <span style={{ fontWeight: 700, color: '#4f46e5' }}>₹ {calculatedPurchase.sgstAmount.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Round Off Checkbox & Value */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#4f46e5', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dashed #cbd5e1' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600 }}>
+                      <input
+                        type="checkbox"
+                        checked={purchaseForm.enableRoundOff !== false}
+                        onChange={e => setPurchaseForm(f => ({ ...f, enableRoundOff: e.target.checked, manualRoundOff: undefined }))}
+                      />
+                      Round Off Total
+                    </label>
                     <input
                       type="number"
-                      step="any"
-                      min="0"
-                      max="100"
-                      placeholder="e.g. 7.5"
-                      value={purchaseForm.gstRate}
-                      onChange={e => handleGstRateChange(e.target.value)}
-                      style={{ width: '90px', padding: '0.3rem 0.5rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: '4px', border: '1px solid #4f46e5' }}
+                      step="0.01"
+                      disabled={purchaseForm.enableRoundOff === false}
+                      value={purchaseForm.manualRoundOff !== undefined ? purchaseForm.manualRoundOff : calculatedPurchase.roundOff}
+                      onChange={e => setPurchaseForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
+                      onBlur={e => { if (e.target.value === '') setPurchaseForm(f => ({ ...f, manualRoundOff: undefined })); }}
+                      style={{ width: '90px', padding: '0.25rem 0.5rem', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.3)', borderRadius: '5px', color: '#4f46e5', textAlign: 'right' }}
+                      title="Auto-calculated. Edit to set manually."
                     />
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>%</span>
                   </div>
-                )}
 
-                {/* Calculated Breakdown Line */}
-                {(() => {
-                  const validItems = purchaseForm.items || [];
-                  const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
-                  const gstPct = parseFloat(purchaseForm.gstRate) || 0;
-                  const gstAmt = (subtotal * gstPct) / 100;
-                  const isInterstate = purchaseForm.gstType === 'IGST';
+                  <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.15rem', fontWeight: 900, color: '#4f46e5' }}>
+                    <span>Grand Total:</span>
+                    <span>₹ {calculatedPurchase.grandTotal.toFixed(2)}</span>
+                  </div>
 
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
-                      <div>
-                        <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>Subtotal (Taxable):</span>
-                        <strong style={{ fontSize: '0.9rem', color: '#1e293b' }}>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
-                          GST ({gstPct}%){gstPct > 0 && !isInterstate ? ' [CGST+SGST]' : gstPct > 0 ? ' [IGST]' : ''}:
-                        </span>
-                        <strong style={{ fontSize: '0.9rem', color: gstAmt > 0 ? '#4f46e5' : '#64748b' }}>
-                          + ₹{gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </strong>
-                        {gstPct > 0 && !isInterstate && (
-                          <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 1 }}>
-                            (CGST: ₹{(gstAmt / 2).toFixed(2)} | SGST: ₹{(gstAmt / 2).toFixed(2)})
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ color: '#0284c7', fontSize: '0.7rem', fontWeight: 800, display: 'block' }}>Calculated Total:</span>
-                        <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7' }}>
-                          ₹{(subtotal + gstAmt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </strong>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', marginTop: '0.1rem' }}>
+                    Amount in Words: {numToWords(calculatedPurchase.grandTotal)}
+                  </div>
+
+                  <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>Advance / Paid Amount (₹)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={purchaseForm.paidAmount}
+                        onChange={e => setPurchaseForm(f => ({ ...f, paidAmount: e.target.value }))}
+                        style={inputStyle}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>BALANCE DUE</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: calculatedPurchase.balanceDue > 0 ? '#ef4444' : '#16a34a' }}>
+                        ₹ {calculatedPurchase.balanceDue.toFixed(2)}
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', margin: 0 }}>
-                    Total Bill Amount (₹) *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const validItems = purchaseForm.items || [];
-                      const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || ((parseFloat(curr.quantity) || 0) * (parseFloat(curr.rate) || 0))), 0);
-                      const rateNum = Math.max(0, parseFloat(purchaseForm.gstRate) || 0);
-                      const total = subtotal + (subtotal * rateNum) / 100;
-                      setPurchaseForm(prev => ({
-                        ...prev,
-                        totalAmount: total > 0 ? total.toFixed(2) : ''
-                      }));
-                    }}
-                    style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', border: '1px solid #93c5fd', background: '#eff6ff', color: '#0284c7', cursor: 'pointer' }}
-                    title="Recalculate exact total from Items & GST"
-                  >
-                    Sync with Calculated Total
-                  </button>
+                  </div>
                 </div>
-                <input
-                  type="number"
-                  required
-                  step="any"
-                  value={purchaseForm.totalAmount}
-                  onChange={e => setPurchaseForm({ ...purchaseForm, totalAmount: e.target.value })}
-                  style={{ width: '100%', padding: '0.6rem', fontSize: '0.95rem', fontWeight: 900, borderRadius: '6px', border: '1.5px solid #0284c7', color: '#0284c7', background: '#f0f9ff' }}
-                />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Notes / Remarks</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Batch no, Delivery Challan reference, Transport details"
-                  value={purchaseForm.notes}
-                  onChange={e => setPurchaseForm({ ...purchaseForm, notes: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.5rem 1.1rem', background: 'none', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '0.55rem 1.4rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem' }}>
+                <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.55rem 1.2rem', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button type="submit" style={{ padding: '0.6rem 1.6rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}>
                   Save Purchase Inward Entry
                 </button>
               </div>
@@ -4790,36 +5295,86 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </div>
 
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              {/* Metadata & Vendor Info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bill / Invoice No</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#4f46e5', marginTop: 2 }}>{viewPurchaseModal.purchaseNo}</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>SUPPLIED BY VENDOR</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>{viewPurchaseModal.vendor?.businessName || viewPurchaseModal.vendorName}</div>
+                  {viewPurchaseModal.vendor?.name && viewPurchaseModal.vendor?.name !== viewPurchaseModal.vendor?.businessName && (
+                    <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: 2 }}>Contact: <strong>{viewPurchaseModal.vendor.name}</strong></div>
+                  )}
+                  {viewPurchaseModal.vendor?.gstin && (
+                    <div style={{ fontSize: '0.78rem', color: '#4f46e5', fontWeight: 700, marginTop: 3 }}>
+                      GSTIN: {viewPurchaseModal.vendor.gstin}
+                    </div>
+                  )}
+                  {viewPurchaseModal.vendor?.billingAddress && (
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 3 }}>
+                      {viewPurchaseModal.vendor.billingAddress}
+                      {viewPurchaseModal.vendor?.state ? `, ${viewPurchaseModal.vendor.state}` : ''}
+                    </div>
+                  )}
+                  {viewPurchaseModal.vendor?.phone && (
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
+                      Phone: {viewPurchaseModal.vendor.phone}
+                    </div>
+                  )}
+                  {viewPurchaseModal.vendor?.email && (
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
+                      Email: {viewPurchaseModal.vendor.email}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Inward Date</div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155', marginTop: 2 }}>
-                    {viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE BILL DETAILS</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#4f46e5' }}>{viewPurchaseModal.purchaseNo}</div>
+                  {viewPurchaseModal.ourChallanNo && (
+                    <div style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
+                      Challan / Ref: {viewPurchaseModal.ourChallanNo}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: 4 }}>
+                    Inward Date: <strong>{viewPurchaseModal.date ? (typeof viewPurchaseModal.date === 'string' && viewPurchaseModal.date.includes('T') ? viewPurchaseModal.date.split('T')[0] : (viewPurchaseModal.date instanceof Date ? viewPurchaseModal.date.toISOString().split('T')[0] : viewPurchaseModal.date)) : ''}</strong>
                   </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vendor / Supplier</div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{viewPurchaseModal.vendorName}</div>
+                  {viewPurchaseModal.dueDate && (
+                    <div style={{ fontSize: '0.78rem', color: '#d97706', marginTop: 2 }}>
+                      Due Date: {typeof viewPurchaseModal.dueDate === 'string' && viewPurchaseModal.dueDate.includes('T') ? viewPurchaseModal.dueDate.split('T')[0] : (viewPurchaseModal.dueDate instanceof Date ? viewPurchaseModal.dueDate.toISOString().split('T')[0] : viewPurchaseModal.dueDate)}
+                    </div>
+                  )}
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <span style={{
+                      padding: '3px 10px',
+                      borderRadius: 6,
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      display: 'inline-block',
+                      background: viewPurchaseModal.paymentStatus === 'PAID' ? '#ecfdf5' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? '#fffbeb' : '#fef2f2',
+                      color: viewPurchaseModal.paymentStatus === 'PAID' ? '#059669' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? '#d97706' : '#dc2626',
+                      border: `1px solid ${viewPurchaseModal.paymentStatus === 'PAID' ? '#6ee7b7' : (viewPurchaseModal.paymentStatus === 'PARTIALLY_PAID' || viewPurchaseModal.paymentStatus === 'PARTIAL') ? '#fcd34d' : '#fca5a5'}`
+                    }}>
+                      {viewPurchaseModal.paymentStatus || 'UNPAID'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
+              {/* Items Breakdown Table */}
               <div>
                 <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '0.88rem', fontWeight: 800, color: '#334155' }}>
-                  📦 Purchased Items Breakdown
+                  📦 Purchased Items Breakdown ({Array.isArray(viewPurchaseModal.items) ? viewPurchaseModal.items.length : 1})
                 </h4>
-                <div style={{ borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                <div style={{ borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left', minWidth: '600px' }}>
                     <thead>
                       <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase' }}>
                         <th style={{ padding: '0.6rem 0.8rem', width: '30px' }}>#</th>
                         <th style={{ padding: '0.6rem 0.8rem' }}>Item Description</th>
+                        <th style={{ padding: '0.6rem 0.8rem' }}>HSN</th>
                         <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Qty</th>
                         <th style={{ padding: '0.6rem 0.8rem' }}>Unit</th>
                         <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Rate (₹)</th>
+                        <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>GST %</th>
                         <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Amount (₹)</th>
                       </tr>
                     </thead>
@@ -4828,21 +5383,35 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         viewPurchaseModal.items.map((it, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                             <td style={{ padding: '0.6rem 0.8rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>{it.itemName}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{it.quantity}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{it.unit}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>₹{it.rate}</td>
-                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(it.amount || (it.quantity * it.rate)).toLocaleString('en-IN')}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>
+                              <div>{it.itemName}</div>
+                              {(it.jobNo || it.lotNo || it.partyChallan || it.ourChallanNo) && (
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', gap: '0.4rem', marginTop: 2, flexWrap: 'wrap' }}>
+                                  {it.jobNo && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Job: {it.jobNo}</span>}
+                                  {it.lotNo && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Lot: {it.lotNo}</span>}
+                                  {it.partyChallan && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Vendor Ch: {it.partyChallan}</span>}
+                                  {it.ourChallanNo && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Challan: {it.ourChallanNo}</span>}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{it.hsnCode || '998821'}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{it.qty || it.quantity}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{it.unit || 'Meters'}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>₹{it.unitPrice || it.rate}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{it.taxRate != null ? `${it.taxRate}%` : `${viewPurchaseModal.gstRate || 0}%`}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(it.totalAmount || it.amount || ((it.qty || it.quantity || 1) * (it.unitPrice || it.rate || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
                           <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>1</td>
                           <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>{viewPurchaseModal.itemName}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>998821</td>
                           <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{viewPurchaseModal.quantity}</td>
                           <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{viewPurchaseModal.unit}</td>
                           <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{viewPurchaseModal.rate !== '-' ? `₹${viewPurchaseModal.rate}` : '-'}</td>
-                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN')}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{viewPurchaseModal.gstRate || 0}%</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                       )}
                     </tbody>
@@ -4850,47 +5419,72 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </div>
               </div>
 
+              {/* Financial Calculation Breakdown */}
               <div style={{ background: '#f8fafc', border: '1.5px solid #93c5fd', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span style={{ color: '#64748b' }}>Subtotal (Taxable Value):</span>
+                  <span style={{ color: '#64748b' }}>Subtotal:</span>
                   <strong style={{ color: '#1e293b' }}>
-                    ₹{Number(viewPurchaseModal.subtotalAmount || (viewPurchaseModal.totalAmount - (viewPurchaseModal.gstAmount || 0)) || viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹{Number(viewPurchaseModal.subtotal || viewPurchaseModal.subtotalAmount || (viewPurchaseModal.totalAmount - (viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </strong>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span style={{ color: '#64748b' }}>
-                    GST ({viewPurchaseModal.gstRate || 0}%) {viewPurchaseModal.gstType === 'IGST' ? '[IGST]' : '[CGST + SGST]'}:
-                  </span>
-                  <strong style={{ color: (viewPurchaseModal.gstAmount > 0 || viewPurchaseModal.gstRate > 0) ? '#4f46e5' : '#64748b' }}>
-                    + ₹{Number(viewPurchaseModal.gstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </strong>
-                </div>
+                {viewPurchaseModal.discountTotal > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#16a34a' }}>
+                    <span>Discount:</span>
+                    <strong>- ₹{Number(viewPurchaseModal.discountTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                  </div>
+                )}
+
+                {viewPurchaseModal.taxType === 'IGST' ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: '#64748b' }}>IGST Tax ({viewPurchaseModal.gstRate || 5}%):</span>
+                    <strong style={{ color: '#4f46e5' }}>
+                      + ₹{Number(viewPurchaseModal.igstAmount || viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span style={{ color: '#64748b' }}>CGST Tax:</span>
+                      <strong style={{ color: '#4f46e5' }}>
+                        + ₹{Number(viewPurchaseModal.cgstAmount || ((viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0) / 2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span style={{ color: '#64748b' }}>SGST Tax:</span>
+                      <strong style={{ color: '#4f46e5' }}>
+                        + ₹{Number(viewPurchaseModal.sgstAmount || ((viewPurchaseModal.totalTax || viewPurchaseModal.gstAmount || 0) / 2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                  </>
+                )}
+
+                {viewPurchaseModal.roundOff !== 0 && viewPurchaseModal.roundOff != null && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: '#64748b' }}>Round Off:</span>
+                    <strong style={{ color: '#4f46e5' }}>
+                      {viewPurchaseModal.roundOff > 0 ? `+ ₹${Number(viewPurchaseModal.roundOff).toFixed(2)}` : `- ₹${Math.abs(Number(viewPurchaseModal.roundOff)).toFixed(2)}`}
+                    </strong>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1.5px solid #cbd5e1', paddingTop: '0.6rem', marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1' }}>Total Bill Amount:</span>
-                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1' }}>Grand Total:</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
+                  <span style={{ color: '#16a34a', fontWeight: 700 }}>Advance / Paid Amount:</span>
+                  <strong style={{ color: '#16a34a' }}>₹{Number(viewPurchaseModal.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                  <span style={{ color: '#dc2626', fontWeight: 800 }}>Balance Due:</span>
+                  <strong style={{ color: (viewPurchaseModal.balanceDue > 0 || (viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount) > (viewPurchaseModal.paidAmount || 0)) ? '#dc2626' : '#16a34a' }}>
+                    ₹{Number(viewPurchaseModal.balanceDue != null ? viewPurchaseModal.balanceDue : Math.max(0, (viewPurchaseModal.grandTotal || viewPurchaseModal.totalAmount || 0) - (viewPurchaseModal.paidAmount || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
                 </div>
               </div>
-
-              {viewPurchaseModal.paymentStatus && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)', padding: '0.75rem 1rem', borderRadius: '8px', border: `1px solid ${viewPurchaseModal.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}` }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: viewPurchaseModal.paymentStatus === 'PAID' ? '#16a34a' : '#d97706' }}>
-                      Payment Status: {viewPurchaseModal.paymentStatus}
-                    </span>
-                    {viewPurchaseModal.lastPaymentDate && (
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>Last Payment: {viewPurchaseModal.lastPaymentDate} {viewPurchaseModal.lastPaymentVoucher ? `(${viewPurchaseModal.lastPaymentVoucher})` : ''}</div>
-                    )}
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Paid: ₹{Number(viewPurchaseModal.paidAmount || 0).toLocaleString('en-IN')}</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: (viewPurchaseModal.balanceDue > 0) ? '#ef4444' : '#16a34a', marginTop: 2 }}>
-                      Due: ₹{Number(viewPurchaseModal.balanceDue != null ? viewPurchaseModal.balanceDue : (viewPurchaseModal.paymentStatus === 'PAID' ? 0 : viewPurchaseModal.totalAmount)).toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {viewPurchaseModal.notes && (
                 <div>
