@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layers,
   FileText,
@@ -18,7 +18,8 @@ import {
   Download,
   Trash2,
   Copy,
-  Plus
+  Plus,
+  ChevronLeft
 } from 'lucide-react';
 import { useDeviceContext } from '../../hooks/useDeviceContext';
 import { SplitActionGroup } from '../common/SplitActionGroup';
@@ -30,12 +31,10 @@ import './ErpLayoutShell.css';
  * AppLayout
  * 
  * Principal Responsive Layout Shell for Enterprise ERP
- * Automatically adapts across 10 platform variants (Desktop, Tablet, Mobile across Web Browser & PWA Standalone).
- * 
- * Layout Strategies:
- * 1. Desktop (>=1200px): Persistent collapsible sidebar + multi-tab workspace + high-density grid.
- * 2. Tablet (768px - 1199px): Master-detail split pane or compact drawer navigation.
- * 3. Mobile (<768px): Touch-friendly stacked cards + bottom tab bar + gesture ActionSheets.
+ * Targets:
+ * - Desktop/PC: Web & Installed PWA / Standalone Web App (>= 1200px)
+ * - iPad & Android Tablets: Web & Installed PWA (768px - 1199px)
+ * - iPhone & Android Phones: Web & Installed PWA (< 768px)
  */
 export function AppLayout({
   children,
@@ -54,10 +53,27 @@ export function AppLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
+  // Global Keyboard Shortcuts (Cmd/Ctrl + K for Search, Cmd/Ctrl + B for Sidebar)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+      if (isMod && e.key.toLowerCase() === 'b' && isDesktop) {
+        e.preventDefault();
+        setSidebarCollapsed((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDesktop]);
+
   const defaultNavigationItems = [
-    { name: 'Production', icon: Layers },
-    { name: 'Job Cards', icon: FileText },
-    { name: 'Inventory', icon: Package },
+    { name: 'Production', icon: Layers, count: 18 },
+    { name: 'Job Cards', icon: FileText, count: 42 },
+    { name: 'Inventory', icon: Package, count: 5 },
     { name: 'Billing', icon: Receipt },
     { name: 'Analytics', icon: BarChart3 },
     { name: 'Settings', icon: Settings }
@@ -68,12 +84,26 @@ export function AppLayout({
       {/* ── 1. Unified Enterprise Header ── */}
       <header className="erp-header">
         <div className="erp-header-left">
-          {isDesktop && (
+          {/* PWA In-App Back Navigation */}
+          {isPWA && (
+            <button
+              type="button"
+              className="split-sheet-close"
+              onClick={() => window.history.back()}
+              title="Go Back"
+              style={{ width: 32, height: 32, marginRight: 4 }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
+
+          {/* Desktop & Tablet Sidebar Toggle */}
+          {!isMobile && (
             <button
               type="button"
               className="split-sheet-close"
               onClick={() => setSidebarCollapsed((p) => !p)}
-              title="Toggle Sidebar (Ctrl+B)"
+              title="Toggle Sidebar (Ctrl+B / ⌘B)"
               style={{ width: 32, height: 32 }}
             >
               <Menu size={16} />
@@ -82,17 +112,17 @@ export function AppLayout({
 
           <div className="erp-brand-badge">
             <span style={{ color: 'var(--erp-primary, #2563eb)', fontWeight: 800 }}>ELITE</span>
-            <span>ERP</span>
+            <span>EDITION ERP</span>
           </div>
 
           {/* Form Factor & Breakpoint Indicator Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: isMobile ? 'none' : 'flex', alignItems: 'center', gap: '6px' }}>
             <span className={`erp-mode-pill ${isPWA ? 'pwa' : 'browser'}`}>
               {isPWA ? 'PWA Standalone' : 'Web Browser'}
             </span>
             <span
               style={{
-                fontSize: '0.68rem',
+                fontSize: '11px',
                 background: '#f1f5f9',
                 color: '#475569',
                 padding: '2px 6px',
@@ -110,7 +140,7 @@ export function AppLayout({
             </span>
           </div>
 
-          {/* Global Command Palette Trigger */}
+          {/* Global Command Palette Trigger (Cmd+K) */}
           <button
             type="button"
             onClick={() => setIsCommandPaletteOpen(true)}
@@ -138,7 +168,7 @@ export function AppLayout({
           </button>
         </div>
 
-        {/* Header Right Actions */}
+        {/* Header Right Actions (Desktop & Tablet) */}
         <div className="erp-header-right">
           {!isMobile && primaryAction && (
             <SplitActionGroup
@@ -162,9 +192,9 @@ export function AppLayout({
         />
       )}
 
-      {/* ── 3. Main Body Structure ── */}
+      {/* ── 3. Main Body Structure (Dark Sidebar + Viewport) ── */}
       <div className="erp-body">
-        {/* Desktop Sidebar */}
+        {/* Desktop Permanent Collapsible Dark-Themed Left Sidebar */}
         {isDesktop && (
           <aside className={`erp-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
             <nav className="erp-sidebar-nav">
@@ -177,10 +207,15 @@ export function AppLayout({
                     type="button"
                     className={`erp-nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => onModuleChange?.(item.name)}
-                    title={item.name}
+                    title={sidebarCollapsed ? item.name : undefined}
                   >
                     <ItemIcon size={18} />
                     {!sidebarCollapsed && <span>{item.name}</span>}
+                    {!sidebarCollapsed && item.count && (
+                      <span className="erp-nav-badge">
+                        {item.count}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -203,10 +238,10 @@ export function AppLayout({
         </main>
       </div>
 
-      {/* ── 4. Mobile Bottom Navigation Bar (< 768px) ── */}
+      {/* ── 4. Mobile Bottom Navigation Bar (< 768px, >= 44x44px touch targets) ── */}
       {isMobile && (
         <nav className="erp-mobile-bottom-nav">
-          {defaultNavigationItems.slice(0, 4).map((tab) => {
+          {defaultNavigationItems.slice(0, 5).map((tab) => {
             const TabIcon = tab.icon;
             const isActive = activeModule === tab.name;
             return (
