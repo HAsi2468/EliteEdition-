@@ -203,12 +203,93 @@ html[data-pointer-mode="touch"] .smart-icon-btn {
   min-height: var(--erp-btn-min-height);
 }
 
-/* Compact Table Density */
+/* High-Density Data Grid Enhancements (Compact vs Comfortable) */
 .density-compact th,
-.density-compact td {
+.density-compact td,
+.erp-density-compact th,
+.erp-density-compact td,
+html[data-user-density="compact"] .erp-dense-table th,
+html[data-user-density="compact"] .erp-dense-table td {
   padding: 4px 8px !important;
-  font-size: 13px !important;
-  height: 32px !important;
+  font-size: 12px !important;
+  height: 28px !important;
+}
+
+.density-comfortable th,
+.density-comfortable td,
+.erp-density-comfortable th,
+.erp-density-comfortable td,
+html[data-user-density="comfortable"] .erp-dense-table th,
+html[data-user-density="comfortable"] .erp-dense-table td {
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+  height: 44px !important;
+}
+
+/* Sticky Headers */
+.sticky-header th,
+.table-sticky-header th,
+.erp-dense-table thead th {
+  position: sticky !important;
+  top: 0;
+  z-index: 10;
+  background: #f8fafc !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Column Freezing Capabilities */
+.freeze-col-left {
+  position: sticky !important;
+  left: 0;
+  z-index: 5;
+  background: inherit;
+  box-shadow: 2px 0 6px -1px rgba(0, 0, 0, 0.08);
+}
+
+.freeze-col-left-2 {
+  position: sticky !important;
+  left: 80px;
+  z-index: 5;
+  background: inherit;
+  box-shadow: 2px 0 6px -1px rgba(0, 0, 0, 0.08);
+}
+
+.freeze-col-right {
+  position: sticky !important;
+  right: 0;
+  z-index: 5;
+  background: inherit;
+  box-shadow: -2px 0 6px -1px rgba(0, 0, 0, 0.08);
+}
+
+th.freeze-col-left,
+th.freeze-col-left-2,
+th.freeze-col-right {
+  z-index: 15 !important;
+  background: #f8fafc !important;
+}
+
+/* Tabular Numeric Formatting (Financial & Metrics Alignment) */
+.tabular-nums,
+td.tabular-nums,
+th.tabular-nums,
+span.tabular-nums {
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: 'tnum' !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  text-align: right;
+  letter-spacing: -0.01em;
+}
+
+/* Peek Drawer Slide-Over & Fade Animations */
+@keyframes erpDrawerFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes erpDrawerSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 #root {

@@ -62,22 +62,27 @@ html[data-pointer-mode="touch"] {
 }
 
 /* ── 5. MANUAL USER-CONTROLLED DENSITY OVERRIDES ── */
-html[data-user-density="dense"] {
-  --erp-row-height: 30px !important;
+html[data-user-density="dense"],
+html[data-user-density="compact"],
+.erp-density-compact {
+  --erp-row-height: 28px !important;
   --erp-input-height: 28px !important;
   --erp-cell-padding-y: 0.3rem !important;
   --erp-cell-padding-x: 0.5rem !important;
   --erp-btn-min-height: 28px !important;
-  --erp-touch-target: 30px !important;
+  --erp-touch-target: 28px !important;
+  --erp-font-table: 0.75rem !important;
 }
 
-html[data-user-density="comfortable"] {
+html[data-user-density="comfortable"],
+.erp-density-comfortable {
   --erp-row-height: 44px !important;
   --erp-input-height: 40px !important;
   --erp-cell-padding-y: 0.65rem !important;
   --erp-cell-padding-x: 0.8rem !important;
   --erp-btn-min-height: 40px !important;
   --erp-touch-target: 44px !important;
+  --erp-font-table: 0.875rem !important;
 }
 
 /* ── 6. ACCESSIBILITY: REDUCED MOTION SAFEGUARD ── */

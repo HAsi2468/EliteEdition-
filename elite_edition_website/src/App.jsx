@@ -328,6 +328,16 @@ export default function App() {
       if (typeof window !== 'undefined' && window.showToast) {
         window.showToast('Data refreshed successfully', 'success');
       }
+    } else if (item.action === 'nav_approvals') {
+      setActiveTab('admin');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('elite-switch-admin-tab', { detail: { tab: 'approvals' } }));
+      }, 100);
+    } else if (item.action === 'nav_backup') {
+      setActiveTab('admin');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('elite-switch-admin-tab', { detail: { tab: 'backup' } }));
+      }, 100);
     } else if (item.tab) {
       setActiveTab(item.tab);
     } else if (item.type === 'jobcard') {

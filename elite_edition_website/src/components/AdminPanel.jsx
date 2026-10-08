@@ -160,6 +160,16 @@ export default function AdminPanel() {
 
   // Sub Tab Navigation
   const [activeSubTab, setActiveSubTab] = useState('users'); // 'users', 'billing', 'backup', 'approvals'
+
+  useEffect(() => {
+    const handleSwitchTab = (e) => {
+      if (e.detail?.tab) {
+        setActiveSubTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('elite-switch-admin-tab', handleSwitchTab);
+    return () => window.removeEventListener('elite-switch-admin-tab', handleSwitchTab);
+  }, []);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [bills, setBills] = useState([]);
   const [billsLoading, setBillsLoading] = useState(false);

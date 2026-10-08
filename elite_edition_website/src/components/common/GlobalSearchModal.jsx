@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, 
   X, 
@@ -17,111 +17,166 @@ import {
   CheckSquare, 
   Settings,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  SlidersHorizontal,
+  Database,
+  ShieldCheck,
+  Zap,
+  CornerDownLeft
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { triggerAIMeasurementModal } from './AIMeasurementAgentModal';
+import { AVAILABLE_SCREENS } from '../../config/screensConfig';
 
 /**
- * Enterprise Command Palette (Search & Quick Navigation)
- * Triggered by Ctrl+K / Cmd+K on desktop or search button in header.
- * Allows searching across modules, challans, orders, parties, and triggering frequent shortcuts.
+ * Intelligent Fuzzy Matching Algorithm
+ * Returns a score > 0 if query fuzzy-matches target string.
  */
+function fuzzyScore(target, query) {
+  if (!query) return 1;
+  if (!target) return 0;
+  const t = target.toLowerCase();
+  const q = query.toLowerCase();
 
-const FREQUENT_SHORTCUTS = [
+  if (t === q) return 100;
+  if (t.startsWith(q)) return 85 + (q.length / t.length) * 10;
+  if (t.includes(q)) return 70 + (q.length / t.length) * 10;
+
+  // Acronym match (e.g. "jc" -> "Job Card", "eo" -> "Elite Online")
+  const words = t.split(/[\s-_/]+/);
+  const initials = words.map(w => w[0]).join('');
+  if (initials.includes(q)) return 60;
+
+  // Subsequence matching
+  let ti = 0;
+  let qi = 0;
+  let score = 0;
+  let consecutive = 0;
+  while (ti < t.length && qi < q.length) {
+    if (t[ti] === q[qi]) {
+      score += 8 + (consecutive * 4);
+      consecutive++;
+      qi++;
+    } else {
+      consecutive = 0;
+    }
+    ti++;
+  }
+
+  return qi === q.length ? score : 0;
+}
+
+/**
+ * Instant Module Actions Registry
+ */
+const INSTANT_ACTIONS = [
   {
-    id: 'shortcut_ai_measurement',
+    id: 'act_ai_measurement',
     title: 'AI Textile Measurement & Yield Agent',
     subtitle: 'Calibrate fabric shrinkage %, net fresh output meters & piece yield',
-    category: 'Shortcut',
+    category: 'Actions',
     badge: 'AI Tool',
     icon: Sparkles,
     color: '#2563eb',
-    action: 'ai_measurement'
+    action: 'ai_measurement',
+    shortcut: '⌘ M'
   },
   {
-    id: 'shortcut_new_jobcard',
-    title: 'New Job Card',
-    subtitle: 'Create a new garment or digital print production job card',
-    category: 'Shortcut',
-    badge: 'Action',
+    id: 'act_new_jobcard',
+    title: 'Create New Job Card',
+    subtitle: 'Initiate a new production lot, cutting, or digital print job card',
+    category: 'Actions',
+    badge: 'Quick Action',
     icon: PlusCircle,
     color: '#2563eb',
     action: 'new_jobcard',
-    tab: 'jobcards'
+    tab: 'jobcards',
+    shortcut: 'N J'
   },
   {
-    id: 'shortcut_new_inward',
-    title: 'New Inward Entry',
-    subtitle: 'Log roll or fabric inward lot arrival with challan & invoice details',
-    category: 'Shortcut',
-    badge: 'Action',
+    id: 'act_new_inward',
+    title: 'New Fabric Inward Entry',
+    subtitle: 'Log raw lot arrivals, roll meterages, and supplier delivery challans',
+    category: 'Actions',
+    badge: 'Quick Action',
     icon: Layers,
     color: '#059669',
-    action: 'new_inward'
+    action: 'new_inward',
+    shortcut: 'N I'
   },
   {
-    id: 'shortcut_view_stock',
-    title: 'View Stock & Fabric Rolls',
-    subtitle: 'Inspect available fabric meters, lots, and warehouse inventory',
-    category: 'Shortcut',
-    badge: 'Navigate',
-    icon: Package,
-    color: '#d97706',
-    action: 'view_stock',
-    tab: 'fabric_inventory'
-  },
-  {
-    id: 'shortcut_new_invoice',
-    title: 'Create New Invoice',
+    id: 'act_new_invoice',
+    title: 'Create GST Tax Invoice',
     subtitle: 'Generate GST-compliant tax invoice in Billing Department',
-    category: 'Shortcut',
-    badge: 'Action',
+    category: 'Actions',
+    badge: 'Quick Action',
     icon: Receipt,
     color: '#7c3aed',
     action: 'new_invoice',
-    tab: 'billing'
+    shortcut: 'N B'
   },
   {
-    id: 'shortcut_stitching_challan',
+    id: 'act_stitching_challan',
     title: 'New Stitching Challan',
     subtitle: 'Issue lots or cut pieces to stitching master/contractor',
-    category: 'Shortcut',
-    badge: 'Action',
+    category: 'Actions',
+    badge: 'Quick Action',
     icon: Scissors,
     color: '#0891b2',
     action: 'stitching_challan',
-    tab: 'stitching_challan'
+    tab: 'stitching_challan',
+    shortcut: 'N S'
   },
   {
-    id: 'shortcut_refresh_data',
-    title: 'Refresh Live Data',
+    id: 'act_toggle_density',
+    title: 'Toggle Table Grid Density',
+    subtitle: 'Switch between Compact (dense 28px) and Comfortable (spacious 44px) views',
+    category: 'Actions',
+    badge: 'Smart UI',
+    icon: SlidersHorizontal,
+    color: '#0284c7',
+    action: 'toggle_density',
+    shortcut: '⌘ D'
+  },
+  {
+    id: 'act_approvals_queue',
+    title: 'Review & Approvals Queue',
+    subtitle: 'Inspect pending cross-department edits, updates, and deletion requests',
+    category: 'Actions',
+    badge: 'Approvals',
+    icon: ShieldCheck,
+    color: '#f59e0b',
+    action: 'nav_approvals',
+    tab: 'admin',
+    shortcut: 'G A'
+  },
+  {
+    id: 'act_backup_center',
+    title: 'Backup & Cloud Sync Center',
+    subtitle: 'Export master database, AWS S3/Cloudflare R2 archives, and system restore',
+    category: 'Actions',
+    badge: 'Infrastructure',
+    icon: Database,
+    color: '#6366f1',
+    action: 'nav_backup',
+    tab: 'admin'
+  },
+  {
+    id: 'act_refresh_data',
+    title: 'Refresh Realtime Data',
     subtitle: 'Resync real-time tables, inventory tallies, and notifications',
-    category: 'Shortcut',
-    badge: 'System',
+    category: 'Actions',
+    badge: 'Sync',
     icon: RefreshCw,
     color: '#475569',
-    action: 'refresh_data'
+    action: 'refresh_data',
+    shortcut: 'R'
   }
-];
-
-const MODULE_NAVIGATION = [
-  { id: 'nav_jobcards', title: 'Job Cards Dashboard', subtitle: 'Production tracking, stages & QA cards', category: 'Navigation', tab: 'jobcards', icon: FileText, color: '#2563eb' },
-  { id: 'nav_printing_log', title: 'Digital Print Operations', subtitle: 'Live print queue, meters run & machine status', category: 'Navigation', tab: 'job_printing_log', icon: Layers, color: '#0284c7' },
-  { id: 'nav_fabric_inv', title: 'Fabric & Lot Inventory', subtitle: 'Roll stock, lot transfers & meters ledger', category: 'Navigation', tab: 'fabric_inventory', icon: Package, color: '#16a34a' },
-  { id: 'nav_billing', title: 'Elite Billing & Invoicing', subtitle: 'GST invoices, payment ledgers & sales register', category: 'Navigation', tab: 'billing', icon: Receipt, color: '#9333ea' },
-  { id: 'nav_stitching', title: 'Stitching Department', subtitle: 'Vendor job work, lot dispatches & piece receipts', category: 'Navigation', tab: 'stitching_challan', icon: Scissors, color: '#ea580c' },
-  { id: 'nav_catalog', title: 'Design Catalogue', subtitle: 'Master sample gallery, artwork tags & SKU lookup', category: 'Navigation', tab: 'catalog', icon: Sparkles, color: '#db2777' },
-  { id: 'nav_parties', title: 'Customer & Vendor Profiles', subtitle: 'Client directory, GST numbers & payment history', category: 'Navigation', tab: 'customer_profiles', icon: Users, color: '#4f46e5' },
-  { id: 'nav_reports', title: 'Reports & Analytics Center', subtitle: 'Executive revenue charts, stock tallies & audit exports', category: 'Navigation', tab: 'reports', icon: BarChart3, color: '#059669' },
-  { id: 'nav_communication', title: 'Workforce Communication', subtitle: 'Inter-department team chat, announcements & files', category: 'Navigation', tab: 'communication', icon: MessageSquare, color: '#2563eb' },
-  { id: 'nav_tasks', title: 'Task Manager', subtitle: 'Shift duties, production checklists & reminders', category: 'Navigation', tab: 'task_management', icon: CheckSquare, color: '#0891b2' },
-  { id: 'nav_admin', title: 'Admin & System Settings', subtitle: 'User roles, facility configurations & master backup', category: 'Navigation', tab: 'admin', icon: Settings, color: '#64748b' }
 ];
 
 export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompanyId = 'digital_print' }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'shortcuts' | 'navigation' | 'database'
+  const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'actions' | 'navigation' | 'database'
   const [dbResults, setDbResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -153,7 +208,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => inputRef.current?.focus(), 40);
       setSelectedIndex(0);
       setDragOffset(0);
     } else {
@@ -161,6 +216,45 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
       setDbResults([]);
     }
   }, [isOpen]);
+
+  // Dynamically map AVAILABLE_SCREENS to Navigation Registry
+  const screenNavItems = useMemo(() => {
+    return (AVAILABLE_SCREENS || []).map((scr) => {
+      let icon = FileText;
+      let color = '#2563eb';
+
+      if (scr.category === 'Elite Digital Print') {
+        icon = Layers;
+        color = '#0284c7';
+      } else if (scr.category === 'Elite Stitching') {
+        icon = Scissors;
+        color = '#ea580c';
+      } else if (scr.category === 'Elite Online') {
+        icon = Package;
+        color = '#16a34a';
+      } else if (scr.id.includes('billing') || scr.id.includes('invoices')) {
+        icon = Receipt;
+        color = '#9333ea';
+      } else if (scr.id === 'admin') {
+        icon = Settings;
+        color = '#64748b';
+      } else if (scr.id.includes('report')) {
+        icon = BarChart3;
+        color = '#059669';
+      }
+
+      return {
+        id: `nav_${scr.id}`,
+        title: scr.label,
+        subtitle: `${scr.category} Department Module`,
+        category: 'Navigation',
+        tab: scr.id,
+        badge: scr.category,
+        icon,
+        color
+      };
+    });
+  }, []);
 
   // Debounced database search query
   useEffect(() => {
@@ -194,7 +288,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
           setLoading(false);
         }
       }
-    }, 280);
+    }, 250);
 
     return () => {
       clearTimeout(timer);
@@ -202,34 +296,56 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
     };
   }, [searchTerm, activeCompanyId]);
 
-  // Compute combined list based on search term & category filter
-  const query = searchTerm.toLowerCase().trim();
-
-  const filteredShortcuts = FREQUENT_SHORTCUTS.filter(s => 
-    !query || s.title.toLowerCase().includes(query) || s.subtitle.toLowerCase().includes(query)
-  );
-
-  const filteredNavigation = MODULE_NAVIGATION.filter(m =>
-    !query || m.title.toLowerCase().includes(query) || m.subtitle.toLowerCase().includes(query)
-  );
-
-  let displayedItems = [];
-  if (activeCategory === 'shortcuts') {
-    displayedItems = filteredShortcuts;
-  } else if (activeCategory === 'navigation') {
-    displayedItems = filteredNavigation;
-  } else if (activeCategory === 'database') {
-    displayedItems = dbResults;
-  } else {
-    // 'all'
-    if (!query) {
-      displayedItems = [...filteredShortcuts, ...filteredNavigation];
-    } else {
-      displayedItems = [...filteredShortcuts, ...filteredNavigation, ...dbResults];
+  // Compute fuzzy matches for Actions & Navigation
+  const { filteredActions, filteredNavigation } = useMemo(() => {
+    const q = searchTerm.trim();
+    if (!q) {
+      return {
+        filteredActions: INSTANT_ACTIONS,
+        filteredNavigation: screenNavItems.slice(0, 12)
+      };
     }
-  }
 
-  // Keep selected index in bounds
+    const scoredActions = INSTANT_ACTIONS.map(item => {
+      const s1 = fuzzyScore(item.title, q);
+      const s2 = fuzzyScore(item.subtitle, q);
+      const s3 = fuzzyScore(item.badge, q);
+      const score = Math.max(s1, s2 * 0.7, s3 * 0.6);
+      return { item, score };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).map(x => x.item);
+
+    const scoredNav = screenNavItems.map(item => {
+      const s1 = fuzzyScore(item.title, q);
+      const s2 = fuzzyScore(item.subtitle, q);
+      const s3 = fuzzyScore(item.badge, q);
+      const score = Math.max(s1, s2 * 0.7, s3 * 0.6);
+      return { item, score };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).map(x => x.item);
+
+    return {
+      filteredActions: scoredActions,
+      filteredNavigation: scoredNav
+    };
+  }, [searchTerm, screenNavItems]);
+
+  // Combine items by category tab
+  const displayedItems = useMemo(() => {
+    if (activeCategory === 'actions') {
+      return filteredActions;
+    } else if (activeCategory === 'navigation') {
+      return filteredNavigation;
+    } else if (activeCategory === 'database') {
+      return dbResults;
+    }
+
+    // 'all': Interleave Actions, Navigation, and DB Records
+    if (!searchTerm.trim()) {
+      return [...filteredActions, ...filteredNavigation];
+    }
+    return [...filteredActions, ...filteredNavigation, ...dbResults];
+  }, [activeCategory, filteredActions, filteredNavigation, dbResults, searchTerm]);
+
+  // Reset selected index when results change
   useEffect(() => {
     setSelectedIndex(0);
   }, [searchTerm, activeCategory]);
@@ -250,6 +366,20 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
 
     if (item.action === 'ai_measurement') {
       triggerAIMeasurementModal();
+      return;
+    }
+
+    if (item.action === 'toggle_density') {
+      if (typeof window !== 'undefined') {
+        const current = localStorage.getItem('elite_erp_table_density') || 'compact';
+        const next = current === 'compact' ? 'comfortable' : 'compact';
+        localStorage.setItem('elite_erp_table_density', next);
+        document.documentElement.setAttribute('data-user-density', next);
+        window.dispatchEvent(new CustomEvent('elite-density-change', { detail: { density: next } }));
+        if (window.showToast) {
+          window.showToast(`Grid density switched to ${next.toUpperCase()}`, 'info');
+        }
+      }
       return;
     }
 
@@ -275,6 +405,12 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
       if (displayedItems[selectedIndex]) {
         handleSelect(displayedItems[selectedIndex]);
       }
+    } else if (e.key === 'Tab') {
+      // Tab cycles through categories
+      e.preventDefault();
+      const categories = ['all', 'actions', 'navigation', 'database'];
+      const nextIdx = (categories.indexOf(activeCategory) + 1) % categories.length;
+      setActiveCategory(categories[nextIdx]);
     }
   };
 
@@ -315,24 +451,25 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.6)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(5px)',
+        WebkitBackdropFilter: 'blur(5px)',
         zIndex: 100000,
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'flex-start',
         justifyContent: 'center',
         padding: isMobile ? 0 : '16px',
-        paddingTop: isMobile ? 0 : 'min(10vh, 72px)'
+        paddingTop: isMobile ? 0 : 'min(10vh, 72px)',
+        animation: 'erpDrawerFadeIn 0.18s ease'
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: isMobile ? '560px' : '640px',
+          maxWidth: isMobile ? '560px' : '680px',
           backgroundColor: '#ffffff',
-          borderRadius: isMobile ? '20px 20px 0 0' : '14px',
+          borderRadius: isMobile ? '20px 20px 0 0' : '12px',
           border: isMobile ? 'none' : '1px solid #cbd5e1',
           boxShadow: isMobile ? '0 -10px 40px rgba(0,0,0,0.25)' : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 25px rgba(0, 0, 0, 0.05)',
           overflow: 'hidden',
@@ -371,25 +508,25 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
           </div>
         )}
 
-        {/* Search Input Bar */}
+        {/* Command Palette Search Input Bar */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            padding: '12px 16px',
+            padding: '13px 18px',
             borderBottom: '1px solid #e2e8f0',
-            gap: '10px',
+            gap: '12px',
             backgroundColor: '#f8fafc'
           }}
         >
-          <Search size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+          <Search size={19} color="#2563eb" style={{ flexShrink: 0 }} />
           <input
             ref={inputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command or search orders, challans, parties..."
+            placeholder="Type a command, screen name, job card, or party..."
             style={{
               flex: 1,
               border: 'none',
@@ -438,18 +575,18 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
         <div
           style={{
             display: 'flex',
-            gap: '4px',
-            padding: '6px 12px',
+            gap: '6px',
+            padding: '7px 14px',
             borderBottom: '1px solid #f1f5f9',
             backgroundColor: '#ffffff',
             overflowX: 'auto'
           }}
         >
           {[
-            { id: 'all', label: 'All' },
-            { id: 'shortcuts', label: 'Shortcuts' },
-            { id: 'navigation', label: 'Modules' },
-            { id: 'database', label: 'Data Search' }
+            { id: 'all', label: 'All', icon: Zap },
+            { id: 'actions', label: '⚡ Actions', count: filteredActions.length },
+            { id: 'navigation', label: '🧭 Screens', count: filteredNavigation.length },
+            { id: 'database', label: '📄 Database Records', count: dbResults.length }
           ].map((cat) => (
             <button
               key={cat.id}
@@ -464,10 +601,27 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                 cursor: 'pointer',
                 backgroundColor: activeCategory === cat.id ? '#eff6ff' : 'transparent',
                 color: activeCategory === cat.id ? '#2563eb' : '#64748b',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
               }}
             >
-              {cat.label}
+              <span>{cat.label}</span>
+              {typeof cat.count === 'number' && cat.count > 0 && (
+                <span
+                  style={{
+                    fontSize: '10px',
+                    backgroundColor: activeCategory === cat.id ? '#dbeafe' : '#f1f5f9',
+                    color: activeCategory === cat.id ? '#1d4ed8' : '#64748b',
+                    padding: '1px 5px',
+                    borderRadius: '999px',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}
+                >
+                  {cat.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -477,7 +631,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
           {loading && (
             <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
               <RefreshCw size={14} className="spin-loader" />
-              <span>Searching ERP database...</span>
+              <span>Querying ERP database...</span>
             </div>
           )}
 
@@ -512,10 +666,10 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
           {displayedItems.length === 0 && !loading && (
             <div style={{ padding: '36px 16px', textAlign: 'center', color: '#64748b' }}>
               <p style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 600, color: '#334155' }}>
-                No matching results
+                No matching results found
               </p>
               <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
-                Try searching for a job card #, challan, party name, or shortcut
+                Try searching for a job card #, challan, party name, or instant action
               </p>
             </div>
           )}
@@ -530,7 +684,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                 onClick={() => handleSelect(item)}
                 onMouseEnter={() => setSelectedIndex(index)}
                 style={{
-                  padding: '9px 14px',
+                  padding: '9px 16px',
                   backgroundColor: isSelected ? '#f8fafc' : 'transparent',
                   borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
                   cursor: 'pointer',
@@ -538,16 +692,16 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   borderBottom: '1px solid #f8fafc',
-                  minHeight: '42px',
+                  minHeight: '44px',
                   transition: 'background-color 0.1s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0, flex: 1 }}>
                   <div
                     style={{
-                      width: '30px',
-                      height: '30px',
-                      borderRadius: '6px',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '7px',
                       backgroundColor: isSelected ? '#eff6ff' : '#f1f5f9',
                       color: item.color || '#2563eb',
                       display: 'flex',
@@ -571,8 +725,8 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                             fontWeight: 700,
                             padding: '1px 5px',
                             borderRadius: '4px',
-                            backgroundColor: item.badge === 'Action' ? '#dcfce7' : '#eff6ff',
-                            color: item.badge === 'Action' ? '#15803d' : '#1d4ed8',
+                            backgroundColor: item.badge === 'Quick Action' ? '#dcfce7' : item.badge === 'AI Tool' ? '#eff6ff' : '#f1f5f9',
+                            color: item.badge === 'Quick Action' ? '#15803d' : item.badge === 'AI Tool' ? '#1d4ed8' : '#475569',
                             textTransform: 'uppercase'
                           }}
                         >
@@ -597,6 +751,21 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
+                  {item.shortcut && (
+                    <kbd
+                      style={{
+                        padding: '1px 5px',
+                        fontSize: '10px',
+                        fontFamily: 'monospace',
+                        color: '#64748b',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      {item.shortcut}
+                    </kbd>
+                  )}
                   <span
                     style={{
                       fontSize: '10px',
@@ -620,7 +789,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
         {/* Footer shortcuts hint */}
         <div
           style={{
-            padding: '8px 14px',
+            padding: '8px 16px',
             backgroundColor: '#f8fafc',
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
@@ -633,10 +802,11 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>↑↓</kbd> Navigate</span>
             <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>↵</kbd> Select</span>
+            <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>Tab</kbd> Switch Tab</span>
             <span><kbd style={{ padding: '1px 4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px' }}>esc</kbd> Dismiss</span>
           </div>
           <div>
-            <span>Elite Edition ERP</span>
+            <span style={{ fontWeight: 600, color: '#334155' }}>⌘K Palette</span>
           </div>
         </div>
       </div>

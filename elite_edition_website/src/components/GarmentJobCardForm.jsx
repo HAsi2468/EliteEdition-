@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Calculator, Layers, Scissors, DollarSign, Save } from 'lucide-react';
 import { api } from '../services/api';
-import { useFormDraft } from '../utils/useFormDraft';
+import { useFormDraft, DraftStatusBadge } from '../utils/useFormDraft';
+import { useKeyboardProgression } from '../hooks/useKeyboardProgression';
 
 const SIZES = [
   { key: 'xs_34', label: 'XS-34' },
@@ -44,8 +45,9 @@ export default function GarmentJobCardForm({ card, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Auto-recovery of unsaved form progress in sessionStorage
-  const { clearDraft } = useFormDraft('garment_job_card', form, setForm, !card);
+  // Auto-recovery of unsaved form progress via IndexedDB / LocalStorage
+  const { clearDraft, saveStatus, lastSavedAt } = useFormDraft('garment_job_card', form, setForm, !card);
+  const { containerRef: formRef, handleKeyDown: handleEnterProgression } = useKeyboardProgression();
 
   useEffect(() => {
     if (card) {
@@ -231,13 +233,21 @@ export default function GarmentJobCardForm({ card, onSave, onClose }) {
               Elite Stitching Department — Dynamic Size Ratios, Material Consumption & Vendor Cost Breakdown
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}>
-            <X size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <DraftStatusBadge saveStatus={saveStatus} lastSavedAt={lastSavedAt} onClear={clearDraft} />
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}>
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        {/* Modal Body Form */}
-        <form onSubmit={handleSubmit} style={{ overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Modal Body Form with Keyboard-First Progression */}
+        <form
+          ref={formRef}
+          onKeyDown={handleEnterProgression}
+          onSubmit={handleSubmit}
+          style={{ overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
+        >
           {error && (
             <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem' }}>
               ⚠️ {error}
