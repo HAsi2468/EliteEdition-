@@ -11,6 +11,7 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import { triggerGlobalDataRefresh } from './NotificationToast';
+import { SmartThumbnail } from './common/SmartThumbnail';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -1664,8 +1665,29 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                             </span>
                           </td>
                           <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {item.title}
-                            {item.billNo && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Bill No: {item.billNo}</span>}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {item.receiptUrls && item.receiptUrls.length > 0 && (
+                                <SmartThumbnail
+                                  src={getBaseUrl() + item.receiptUrls[0]}
+                                  alt={item.title || 'Receipt'}
+                                  title={item.title || 'Receipt Proof'}
+                                  size="sm"
+                                  aspectRatio="1:1"
+                                  category="invoice"
+                                  metadata={{
+                                    Voucher: item.voucherNo,
+                                    BillNo: item.billNo || 'N/A',
+                                    Amount: `₹${(item.amount || 0).toLocaleString('en-IN')}`,
+                                    Party: item.paidToOrReceivedFrom || 'N/A'
+                                  }}
+                                  onClick={() => setZoomImg(getBaseUrl() + item.receiptUrls[0])}
+                                />
+                              )}
+                              <div>
+                                <div>{item.title}</div>
+                                {item.billNo && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Bill No: {item.billNo}</span>}
+                              </div>
+                            </div>
                           </td>
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
                             {item.category}
@@ -2503,14 +2525,23 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
               {showViewModal.receiptUrls && showViewModal.receiptUrls.length > 0 && (
                 <div>
                   <strong>Bill / Receipt Proof:</strong>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: 6, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: 8, flexWrap: 'wrap' }}>
                     {showViewModal.receiptUrls.map((url, idx) => (
-                      <img
+                      <SmartThumbnail
                         key={idx}
                         src={getBaseUrl() + url}
-                        alt="Proof"
+                        alt={`Receipt #${idx + 1}`}
+                        title={`Receipt #${idx + 1}`}
+                        size="lg"
+                        aspectRatio="3:4"
+                        category="invoice"
+                        metadata={{
+                          Voucher: showViewModal.voucherNo,
+                          BillNo: showViewModal.billNo || 'N/A',
+                          Amount: `₹${(showViewModal.amount || 0).toLocaleString('en-IN')}`,
+                          Party: showViewModal.paidToOrReceivedFrom || 'N/A'
+                        }}
                         onClick={() => setZoomImg(getBaseUrl() + url)}
-                        style={{ width: 80, height: 80, borderRadius: 6, objectFit: 'cover', cursor: 'zoom-in', border: '1px solid var(--border-light)' }}
                       />
                     ))}
                   </div>

@@ -15,6 +15,7 @@ import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import AIMeasurementAgentModal from './common/AIMeasurementAgentModal';
+import { SmartThumbnail } from './common/SmartThumbnail';
 import '../styles/fusingEnterprise.css';
 
 function getAutoShift() {
@@ -3054,34 +3055,21 @@ export default function FusingDepartment() {
                     <div className="fusing-card-body">
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                         {(c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo) && (
-                          <div
-                            style={{
-                              width: '56px',
-                              height: '56px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              flexShrink: 0,
-                              background: '#f8fafc',
-                              border: '1px solid var(--ee-fusing-border)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
+                          <SmartThumbnail
+                            src={c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo}
+                            alt={c.designName || 'Design'}
+                            title={c.designName || c.challanNo || 'Fabrication Run'}
+                            size="lg"
+                            aspectRatio="1:1"
+                            category="fabric"
+                            metadata={{
+                              Party: c.party || c.clientName || '—',
+                              Challan: c.challanNo || '—',
+                              Design: c.designName || '—',
+                              Fabric: c.fabric || '—',
+                              Meters: c.meters || c.meterage || '—'
                             }}
-                          >
-                            <img
-                              src={c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo}
-                              alt={c.designName || 'Design'}
-                              loading="lazy"
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                aspectRatio: '1 / 1',
-                                display: 'block'
-                              }}
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                          </div>
+                          />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>
@@ -3349,34 +3337,21 @@ export default function FusingDepartment() {
                       <div className="fusing-card-body">
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                           {(c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo) && (
-                            <div
-                              style={{
-                                width: '56px',
-                                height: '56px',
-                                borderRadius: '8px',
-                                overflow: 'hidden',
-                                flexShrink: 0,
-                                background: '#f8fafc',
-                                border: '1px solid var(--ee-fusing-border)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
+                            <SmartThumbnail
+                              src={c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo}
+                              alt={c.designName || 'Design'}
+                              title={c.designName || c.challanNo || 'Fabrication Run'}
+                              size="lg"
+                              aspectRatio="1:1"
+                              category="fabric"
+                              metadata={{
+                                Party: c.party || c.clientName || '—',
+                                Challan: c.challanNo || '—',
+                                Design: c.designName || '—',
+                                Fabric: c.fabric || '—',
+                                Meters: c.meters || c.meterage || '—'
                               }}
-                            >
-                              <img
-                                src={c.imageUrl || c.designImage || c.image1 || c.sampleImage || c.photo}
-                                alt={c.designName || 'Design'}
-                                loading="lazy"
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                  aspectRatio: '1 / 1',
-                                  display: 'block'
-                                }}
-                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                              />
-                            </div>
+                            />
                           )}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <h4 className="fusing-card-party-title">{c.party || c.clientName || 'Unnamed Party'}</h4>

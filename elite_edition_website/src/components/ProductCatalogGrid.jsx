@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer, Building2 } from 'lucide-react';
 import BrandManagerModal from './BrandManagerModal';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { SmartThumbnail } from './common/SmartThumbnail';
 
 export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync, onOpenManager }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -666,19 +667,19 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                   <tr key={item._id}>
                     <td>
                       <div style={styles.itemCell}>
-                        <div style={styles.itemImgWrapper}>
-                          {item.imageUrl ? (
-                            <img 
-                              src={item.imageUrl} 
-                              alt={item.description} 
-                              style={styles.itemImg}
-                              onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                            />
-                          ) : null}
-                          <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex' }}>
-                            {item.description ? item.description[0].toUpperCase() : 'P'}
-                          </div>
-                        </div>
+                        <SmartThumbnail
+                          src={item.imageUrl}
+                          alt={item.description || 'Product'}
+                          title={item.description || 'Product'}
+                          size="md"
+                          aspectRatio="1:1"
+                          category="catalog"
+                          metadata={{
+                            SKU: item.skuCode,
+                            Category: item.categoryName || 'KURTA SET',
+                            Stock: stockLabel
+                          }}
+                        />
                         <div>
                           <div style={styles.itemName}>{item.description || 'Unnamed Product'}</div>
                           <div style={styles.itemMeta}>Category: {item.categoryName || 'KURTA SET'}</div>

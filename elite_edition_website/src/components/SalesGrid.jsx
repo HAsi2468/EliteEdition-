@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, RefreshCw, Shoppi
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
+import { SmartThumbnail } from './common/SmartThumbnail';
 
 export default function SalesGrid() {
   const [orders, setOrders] = useState([]);
@@ -304,14 +305,20 @@ export default function SalesGrid() {
                     </td>
                     <td>
                       <div style={styles.skuCell}>
-                        {order.productImage ? (
-                          <img 
-                            src={order.productImage} 
-                            alt={order.itemSKUCode} 
-                            style={styles.productThumbnail}
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
-                        ) : null}
+                        <SmartThumbnail
+                          src={order.productImage}
+                          alt={order.itemSKUCode || 'SKU'}
+                          title={order.itemSKUCode || 'Product'}
+                          size="sm"
+                          aspectRatio="1:1"
+                          category="catalog"
+                          metadata={{
+                            SKU: order.itemSKUCode,
+                            Category: order.category || 'N/A',
+                            OrderNo: order.saleOrderCode || order.id || 'N/A',
+                            City: order.shippingAddressCity || 'N/A'
+                          }}
+                        />
                         <span style={styles.skuText}>{order.itemSKUCode}</span>
                       </div>
                     </td>

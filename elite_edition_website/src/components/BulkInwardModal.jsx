@@ -6,6 +6,7 @@ import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
+import { SmartThumbnail } from './common/SmartThumbnail';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -705,28 +706,19 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                     {/* Card Top: Thumbnail + SKU input + Size badge + Delete button */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                        {row.imageUrl ? (
-                          <img
-                            src={convertDriveUrl(row.imageUrl, row.skuCode)}
-                            alt={row.skuCode || 'Item'}
-                            style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                            onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
-                          />
-                        ) : null}
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '8px',
-                          background: isJustScanned ? '#bbf7d0' : '#f0fdf4',
-                          color: '#059669',
-                          border: '1px solid #bbf7d0',
-                          display: row.imageUrl ? 'none' : 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          <Package size={18} />
-                        </div>
+                        <SmartThumbnail
+                          src={convertDriveUrl(row.imageUrl, row.skuCode)}
+                          alt={row.skuCode || 'Item'}
+                          title={row.skuCode || 'Inward Item'}
+                          size="lg"
+                          aspectRatio="1:1"
+                          category="fabric"
+                          metadata={{
+                            SKU: row.skuCode || '—',
+                            Size: row.size || '—',
+                            Quantity: row.quantity || 1
+                          }}
+                        />
 
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
@@ -920,27 +912,20 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
                       {/* Image Thumbnail */}
                       <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
-                        {row.imageUrl ? (
-                          <img
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                          <SmartThumbnail
                             src={convertDriveUrl(row.imageUrl, row.skuCode)}
                             alt={row.skuCode || 'Item'}
-                            style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'inline-block' }}
-                            onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
+                            title={row.skuCode || 'Inward Item'}
+                            size="md"
+                            aspectRatio="1:1"
+                            category="fabric"
+                            metadata={{
+                              SKU: row.skuCode || '—',
+                              Size: row.size || '—',
+                              Quantity: row.quantity || 1
+                            }}
                           />
-                        ) : null}
-                        <div style={{
-                          width: '38px',
-                          height: '38px',
-                          borderRadius: '6px',
-                          background: '#f1f5f9',
-                          border: '1px solid #e2e8f0',
-                          display: row.imageUrl ? 'none' : 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          margin: '0 auto',
-                          color: '#94a3b8'
-                        }}>
-                          <ImageIcon size={16} />
                         </div>
                       </td>
 
