@@ -82,6 +82,86 @@ export function getDisplayImageUrl(url) {
  * 3. Extension swap variations on filename (.jpg, .jpeg, .png, .webp).
  * 4. Variations based on designName (.jpg, .jpeg, .png).
  * 5. Stripped designName (removing suffixes like ' D', ' F', '(1)', 'jpg', etc.).
+ */
+
+// ─── High-Speed In-Memory & Session Winning Image URL Cache ──────────────────
+const imageWinnerMap = new Map();
+const deadUrlsSet = new Set();
+
+function getCacheKey(rawUrl, designName, isThumb) {
+  const r = (rawUrl || '').trim();
+  const d = (designName || '').trim().toUpperCase();
+  return `${d}::${r}::${isThumb ? 'thumb' : 'full'}`;
+}
+
+export function recordWinningUrl(rawUrl, designName, winningUrl, isThumb = true) {
+  if (!winningUrl || typeof winningUrl !== 'string') return;
+  const key = getCacheKey(rawUrl, designName, isThumb);
+  imageWinnerMap.set(key, winningUrl);
+  // Also cache for generic designName without rawUrl if available
+  const dName = (designName || '').trim().toUpperCase();
+  if (dName) {
+    imageWinnerMap.set(`${dName}::::${isThumb ? 'thumb' : 'full'}`, winningUrl);
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(`img_win_${key}`, winningUrl);
+    }
+  } catch (e) {}
+}
+
+export function getWinningUrl(rawUrl, designName, isThumb = true) {
+  const key = getCacheKey(rawUrl, designName, isThumb);
+  if (imageWinnerMap.has(key)) return imageWinnerMap.get(key);
+  const dName = (designName || '').trim().toUpperCase();
+  if (dName && imageWinnerMap.has(`${dName}::::${isThumb ? 'thumb' : 'full'}`)) {
+    return imageWinnerMap.get(`${dName}::::${isThumb ? 'thumb' : 'full'}`);
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      const val = sessionStorage.getItem(`img_win_${key}`);
+      if (val) {
+        imageWinnerMap.set(key, val);
+        return val;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+export function recordDeadUrl(url) {
+  if (!url || typeof url !== 'string') return;
+  // Keep set bounded to prevent unbounded memory growth
+  if (deadUrlsSet.size > 2000) deadUrlsSet.clear();
+  deadUrlsSet.add(url.trim());
+}
+
+export function isDeadUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  return deadUrlsSet.has(url.trim());
+}
+
+/**
+ * Pre-fetches an image in the background with low priority so that subsequent
+ * views or zoom dialogs display the image instantly (0ms).
+ */
+export function prefetchImage(url) {
+  if (!url || typeof window === 'undefined' || isDeadUrl(url)) return;
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = url;
+}
+
+/**
+ * Generates an ordered list of candidate URLs to load for a design.
+ * The browser tries these sequentially on error until one succeeds.
+ * 
+ * Order of candidates:
+ * 1. Cached winning URL (if previously resolved, instant 0ms hit).
+ * 2. For TIFF files: on-the-fly backend JPEG conversion preview (/v1/upload/preview?url=...).
+ * 3. High-efficiency WebP/JPEG backend thumbnail (for thumbnail mode) or direct Cloudflare R2 link (for HD).
+ * 4. Extension swap variations on filename (.jpg, .jpeg, .png, .webp).
+ * 5. Variations based on designName (.jpg, .jpeg, .png).
  * 6. Backend smart fallback route `/v1/designs/${cleanName}.jpg?fallback=1` which guarantees an SVG badge.
  */
 export function getImageCandidates(rawUrl, designName, options = {}) {
@@ -95,11 +175,17 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   const add = (u) => {
     if (!u || typeof u !== 'string') return;
     const clean = u.trim();
-    if (clean && !seen.has(clean)) {
+    if (clean && !seen.has(clean) && !deadUrlsSet.has(clean)) {
       seen.add(clean);
       candidates.push(clean);
     }
   };
+
+  // 0. Instant Cache Hit: If we already know the working URL for this design, prioritize it immediately!
+  const knownWinner = getWinningUrl(rawUrl, designName, isThumb);
+  if (knownWinner) {
+    add(knownWinner);
+  }
 
   const raw = (rawUrl || '').trim();
   const dName = (designName || '').trim();
@@ -140,15 +226,23 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
     }
   }
 
-  // 4. Direct absolute HTTP/HTTPS URL (prioritize original uploaded Cloudflare R2 / CDN link)
+  const rawFilename = extractCleanFilename(raw);
+  const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif|tiff?)$/i, '').trim();
+
+  // 4. For thumbnails, prioritize backend thumbnail endpoint to avoid downloading 10MB+ raw originals
+  if (isThumb && cleanDesign) {
+    add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg${thumbQuery}`);
+  }
+  if (isThumb && rawFilename && !rawFilename.startsWith('http')) {
+    add(`/v1/designs/${encodeURIComponent(rawFilename)}${thumbQuery}`);
+  }
+
+  // 5. Direct absolute HTTP/HTTPS URL (Cloudflare R2 / CDN link)
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     add(raw);
   }
 
-  const rawFilename = extractCleanFilename(raw);
-  const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif|tiff?)$/i, '').trim();
-
-  // 5. Direct Cloudflare R2 links (and master fallbacks)
+  // 6. Direct Cloudflare R2 links (and master fallbacks)
   if (rawFilename) {
     if (isTiffFile(rawFilename)) {
       add(`/v1/upload/preview?url=${encodeURIComponent(rawFilename)}`);

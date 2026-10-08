@@ -1,11 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
-import { getImageCandidates } from '../utils/imageUrlHelper';
+import {
+  getImageCandidates,
+  recordWinningUrl,
+  recordDeadUrl,
+  prefetchImage
+} from '../utils/imageUrlHelper';
 
 /**
- * Resilient, self-healing Design Image Component.
- * Automatically tries all candidate extensions (.jpg, .jpeg, .png, etc.) and CDN endpoints.
- * Never leaves a broken image icon on screen.
+ * Ultra-Fast Enterprise Design Image Component.
+ * Features:
+ * 1. Winning Candidate URL Caching: Remembers working CDN/R2 endpoints in RAM & SessionStorage for 0ms loads.
+ * 2. Negative Dead URL Caching: Prevents repetitive 404 network storms.
+ * 3. Viewport Intersection Observer: Defers offscreen image loading until 250px before entering viewport.
+ * 4. Hover-Intent HD Master Prefetching: Pre-fetches high-res assets on hover for instantaneous modal zoom.
+ * 5. Smooth Hardware-Accelerated Shimmer: Zero layout-shift placeholder.
  */
 export default function DesignImage({
   rawUrl,
@@ -19,17 +28,54 @@ export default function DesignImage({
   category = '',
   showPlaceholderBadge = true,
   thumbnail = true,
-  width = 360
+  width = 360,
+  priority = false
 }) {
+  const containerRef = useRef(null);
+  const hoverTimerRef = useRef(null);
+
+  // Viewport intersection state: priority images render immediately; others defer until near viewport
+  const [isInView, setIsInView] = useState(priority);
+
   const candidates = useMemo(
     () => getImageCandidates(rawUrl, designName, { thumbnail, width }),
     [rawUrl, designName, thumbnail, width]
   );
+
   const [candidateIdx, setCandidateIdx] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [allFailed, setAllFailed] = useState(false);
 
-  // Reset state when candidates change
+  // Viewport Intersection Observer (250px rootMargin for butter-smooth scrolling)
+  useEffect(() => {
+    if (priority || isInView) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry && (entry.isIntersecting || entry.intersectionRatio > 0)) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '250px 0px 250px 0px', threshold: 0 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [priority, isInView]);
+
+  // Reset state when candidate source changes
   useEffect(() => {
     setCandidateIdx(0);
     setHasLoaded(false);
@@ -39,6 +85,9 @@ export default function DesignImage({
   const currentSrc = candidates[candidateIdx] || '';
 
   const handleError = () => {
+    if (currentSrc) {
+      recordDeadUrl(currentSrc);
+    }
     if (candidateIdx + 1 < candidates.length) {
       setCandidateIdx(prev => prev + 1);
       setHasLoaded(false);
@@ -49,6 +98,27 @@ export default function DesignImage({
 
   const handleLoad = () => {
     setHasLoaded(true);
+    if (currentSrc) {
+      recordWinningUrl(rawUrl, designName, currentSrc, thumbnail);
+    }
+  };
+
+  // Hover-intent HD prefetch
+  const handleMouseEnter = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      const hdCandidates = getImageCandidates(rawUrl, designName, { thumbnail: false });
+      if (hdCandidates[0]) {
+        prefetchImage(hdCandidates[0]);
+      }
+    }, 80);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
   };
 
   const handleClick = (e) => {
@@ -66,6 +136,7 @@ export default function DesignImage({
     if (!showPlaceholderBadge) return null;
     return (
       <div
+        ref={containerRef}
         className={className}
         style={{
           width: '100%',
@@ -76,7 +147,7 @@ export default function DesignImage({
           alignItems: 'center',
           justifyContent: 'center',
           background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
-          color: 'var(--text-muted)',
+          color: 'var(--text-muted, #94a3b8)',
           gap: '0.45rem',
           padding: '1rem',
           textAlign: 'center',
@@ -99,7 +170,7 @@ export default function DesignImage({
         }}>
           <ImageIcon size={20} />
         </div>
-        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary, #ffffff)', letterSpacing: '0.02em' }}>
           {designName || 'DESIGN'}
         </span>
         <span style={{ fontSize: '0.68rem', color: '#94a3b8', opacity: 0.8, fontWeight: 500 }}>
@@ -111,6 +182,7 @@ export default function DesignImage({
 
   return (
     <div
+      ref={containerRef}
       className={className}
       style={{
         position: 'relative',
@@ -121,9 +193,12 @@ export default function DesignImage({
         alignItems: 'center',
         justifyContent: 'center',
         background: '#f8fafc',
+        contain: 'layout paint',
         ...style
       }}
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Subtle loader shimmer until image successfully loads */}
       {!hasLoaded && (
@@ -139,26 +214,30 @@ export default function DesignImage({
         />
       )}
 
-      <img
-        src={currentSrc}
-        alt={alt || designName || 'Design'}
-        width={width || 360}
-        height={width || 360}
-        loading="lazy"
-        decoding="async"
-        onError={handleError}
-        onLoad={handleLoad}
-        style={{
-          width: '100%',
-          height: '100%',
-          aspectRatio: '1 / 1',
-          objectFit: 'cover',
-          cursor: onZoom ? 'zoom-in' : (onClick ? 'pointer' : 'default'),
-          opacity: hasLoaded ? 1 : 0,
-          transition: 'opacity 0.2s ease-in-out',
-          ...imgStyle
-        }}
-      />
+      {isInView ? (
+        <img
+          src={currentSrc}
+          alt={alt || designName || 'Design'}
+          width={width || 360}
+          height={width || 360}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchpriority={priority ? 'high' : 'auto'}
+          decoding="async"
+          onError={handleError}
+          onLoad={handleLoad}
+          style={{
+            width: '100%',
+            height: '100%',
+            aspectRatio: '1 / 1',
+            objectFit: 'cover',
+            cursor: onZoom ? 'zoom-in' : (onClick ? 'pointer' : 'default'),
+            opacity: hasLoaded ? 1 : 0,
+            transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: 'translateZ(0)', // Force GPU layer
+            ...imgStyle
+          }}
+        />
+      ) : null}
     </div>
   );
 }

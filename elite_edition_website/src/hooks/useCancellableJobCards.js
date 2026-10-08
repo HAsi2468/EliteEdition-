@@ -1,16 +1,20 @@
 /**
  * Technical Specification: "Job Card & Lot Status Race Condition Engine" (Phase 4)
- * Tab Navigation & Search AbortController Hook
+ * Tab Navigation & Search AbortController Hook with Sub-Millisecond Local-First SWR Caching
  * 
  * Directives:
  * 1. Implement request cancellation via AbortController bound to component mount and tab switching.
  * 2. Debounce search input (300ms leading-edge / debounced) and cancel active in-flight GET requests
  *    when new filters trigger.
  * 3. Guarantee that read operations (GET) are cancellable, but mutation operations (POST/PATCH) run to completion.
+ * 4. Local-First SWR Caching: Instant 0ms paint from memory cache upon tab switching, silent background revalidation.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
+
+// In-memory tab cache store for sub-millisecond tab switching
+const jobCardsTabCache = new Map();
 
 /**
  * Custom hook managing cancellable read operations across tab navigation and search filtering.
@@ -28,8 +32,12 @@ export function useCancellableJobCards({
   const [activeTab, setActiveTabState] = useState(initialTab);
   const [searchTerm, setSearchTermState] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [cards, setCards] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const cacheKey = `${department}_${activeTab}_${debouncedSearch}_${JSON.stringify(filters)}`;
+  const initialCached = jobCardsTabCache.get(cacheKey);
+
+  const [cards, setCards] = useState(initialCached || []);
+  const [loading, setLoading] = useState(!initialCached);
   const [error, setError] = useState(null);
 
   // References for AbortControllers
@@ -58,7 +66,7 @@ export function useCancellableJobCards({
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 2. Tab Switch Handler: Immediately cancels in-flight requests
+  // 2. Tab Switch Handler: Immediately cancels in-flight requests & loads cache
   // ─────────────────────────────────────────────────────────────────────────────
   const setActiveTab = useCallback((nextTab) => {
     if (activeReadControllerRef.current) {
@@ -66,10 +74,20 @@ export function useCancellableJobCards({
       activeReadControllerRef.current.abort();
     }
     setActiveTabState(nextTab);
-  }, []);
+
+    // Instant SWR: Check if next tab's data is already cached in RAM
+    const nextKey = `${department}_${nextTab}_${debouncedSearch}_${JSON.stringify(filters)}`;
+    const cachedNext = jobCardsTabCache.get(nextKey);
+    if (cachedNext) {
+      setCards(cachedNext);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }, [department, debouncedSearch, filters]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 3. Core Fetch Routine with Guaranteed Cancellation
+  // 3. Core Fetch Routine with Guaranteed Cancellation and SWR Update
   // ─────────────────────────────────────────────────────────────────────────────
   const fetchJobCards = useCallback(async () => {
     // Cancel any previous read query
@@ -81,7 +99,13 @@ export function useCancellableJobCards({
     const controller = new AbortController();
     activeReadControllerRef.current = controller;
 
-    setLoading(true);
+    const currentKey = `${department}_${activeTab}_${debouncedSearch}_${JSON.stringify(filters)}`;
+    const existingCache = jobCardsTabCache.get(currentKey);
+
+    // If no existing cache, show loader; otherwise stay seamless while revalidating
+    if (!existingCache) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -101,7 +125,9 @@ export function useCancellableJobCards({
         return; // Discard stale response if unmounted or aborted
       }
 
-      setCards(response?.data || response || []);
+      const freshCards = response?.data || response || [];
+      jobCardsTabCache.set(currentKey, freshCards);
+      setCards(freshCards);
       setLoading(false);
 
     } catch (err) {
@@ -112,7 +138,10 @@ export function useCancellableJobCards({
       }
 
       if (isMountedRef.current) {
-        setError(err.message || 'Failed to fetch job cards');
+        // If we already had cached cards, do not wipe them on transient error
+        if (!existingCache) {
+          setError(err.message || 'Failed to fetch job cards');
+        }
         setLoading(false);
       }
     }
@@ -145,6 +174,8 @@ export function useCancellableJobCards({
     // They run to completion even if the user switches tabs or changes search filters.
     try {
       const result = await mutationFn();
+      // On success, clear tab cache so fresh state is fetched
+      jobCardsTabCache.clear();
       // On success, refetch active data
       fetchJobCards();
       return result;

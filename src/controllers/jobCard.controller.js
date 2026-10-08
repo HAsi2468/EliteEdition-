@@ -386,17 +386,22 @@ const getAllJobCards = async (req, res) => {
       ]);
     } else if (!sortBy || sortBy === 'jobNo' || sortBy === 'created_date_time' || sortBy === 'createdAt') {
       const order = sortOrder === 'asc' ? 1 : -1;
-      cards = await db.JobCard.find(filter)
+      const selectFields = req.query.select || req.query.fields;
+      let query = db.JobCard.find(filter)
         .sort({ created_date_time: order, _id: order })
         .skip(skip)
-        .limit(Number(limit))
-        .lean();
+        .limit(Number(limit));
+      if (selectFields) query = query.select(selectFields);
+      cards = await query.lean();
     } else {
       const order = sortOrder === 'asc' ? 1 : -1;
       const sortObj = { [sortBy]: order };
-      cards = await db.JobCard.find(filter)
+      const selectFields = req.query.select || req.query.fields;
+      let query = db.JobCard.find(filter)
         .collation({ locale:'en', numericOrdering:true })
-        .sort(sortObj).skip(skip).limit(Number(limit)).lean();
+        .sort(sortObj).skip(skip).limit(Number(limit));
+      if (selectFields) query = query.select(selectFields);
+      cards = await query.lean();
     }
 
     // Auto-fill any missing design catalogue parameters dynamically
