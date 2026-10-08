@@ -1,0 +1,116 @@
+.erp-multi-tab-bar {
+  display: flex;
+  align-items: center;
+  background: #f1f5f9;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 4px 6px 0;
+  gap: 4px;
+  overflow: hidden;
+  user-select: none;
+  min-height: 36px;
+}
+
+.erp-tabs-scroll-area {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+}
+
+.erp-tabs-scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
+.erp-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  white-space: nowrap;
+  max-width: 220px;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.erp-tab-item:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.erp-tab-item.active {
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 600;
+  border-color: #cbd5e1;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.erp-tab-icon {
+  flex-shrink: 0;
+  color: var(--erp-primary, #2563eb);
+}
+
+.erp-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-tab-draft-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.erp-tab-close-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #94a3b8;
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  transition: all 0.12s ease;
+}
+
+.erp-tab-close-btn:hover {
+  background: #e2e8f0;
+  color: #ef4444;
+}
+
+.erp-tab-scroll-btn,
+.erp-tab-add-btn {
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  color: #64748b;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+  transition: all 0.15s ease;
+}
+
+.erp-tab-scroll-btn:hover,
+.erp-tab-add-btn:hover {
+  background: #ffffff;
+  color: #1e293b;
+}
