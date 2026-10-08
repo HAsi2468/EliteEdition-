@@ -70,10 +70,13 @@ const infrastructureBillSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['UNPAID', 'PAID'],
+      enum: ['UNPAID', 'PAID', 'PARTIAL', 'pending', 'paid'],
       default: 'UNPAID',
     },
     paidAt: {
+      type: Date,
+    },
+    paymentDate: {
       type: Date,
     },
     paymentMethod: {
@@ -83,6 +86,29 @@ const infrastructureBillSchema = new mongoose.Schema(
     paymentRef: {
       type: String,
       trim: true,
+    },
+    platformPayments: {
+      aws: {
+        status: { type: String, default: 'UNPAID' },
+        paidAt: { type: Date },
+        paymentMethod: { type: String, trim: true },
+        paymentRef: { type: String, trim: true },
+        notes: { type: String, trim: true },
+      },
+      mongodb: {
+        status: { type: String, default: 'UNPAID' },
+        paidAt: { type: Date },
+        paymentMethod: { type: String, trim: true },
+        paymentRef: { type: String, trim: true },
+        notes: { type: String, trim: true },
+      },
+      cloudflare: {
+        status: { type: String, default: 'PAID' },
+        paidAt: { type: Date },
+        paymentMethod: { type: String, trim: true },
+        paymentRef: { type: String, trim: true },
+        notes: { type: String, trim: true },
+      },
     },
   },
   {

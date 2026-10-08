@@ -84,7 +84,39 @@ const createBill = async (req, res) => {
 
 const getBills = async (req, res) => {
   try {
-    const bills = await InfrastructureBill.find({}).sort({ createdAt: -1 });
+    const rawBills = await InfrastructureBill.find({}).sort({ createdAt: -1 });
+    const bills = rawBills.map((b) => {
+      const obj = b.toObject();
+      const isPaid = String(obj.paymentStatus || '').toUpperCase() === 'PAID';
+      const effectivePaidDate = obj.paidAt || obj.paymentDate;
+
+      if (!obj.platformPayments || !obj.platformPayments.aws) {
+        obj.platformPayments = {
+          aws: {
+            status: isPaid ? 'PAID' : 'UNPAID',
+            paidAt: effectivePaidDate,
+            paymentMethod: obj.paymentMethod || (isPaid ? 'AWS Auto-Debit / Credit Card' : undefined),
+            paymentRef: obj.paymentRef || (isPaid ? 'AWS Auto-Settled' : undefined),
+            notes: obj.notes,
+          },
+          mongodb: {
+            status: isPaid ? 'PAID' : 'UNPAID',
+            paidAt: effectivePaidDate,
+            paymentMethod: obj.paymentMethod || (isPaid ? 'Corporate Card' : undefined),
+            paymentRef: obj.paymentRef || (isPaid ? 'Atlas-INV-PAID' : undefined),
+            notes: obj.notes,
+          },
+          cloudflare: {
+            status: 'PAID',
+            paidAt: effectivePaidDate || new Date(),
+            paymentMethod: 'Free Allowance / Zero-Egress Tier',
+            paymentRef: 'CF-R2-FREE',
+            notes: 'Free Tier Allowance',
+          },
+        };
+      }
+      return obj;
+    });
     res.status(httpStatus.OK).json({ success: true, bills });
   } catch (error) {
     logger.error('getBills error: %o', error);
@@ -146,6 +178,12 @@ const updateBill = async (req, res) => {
     }
     if (paymentMethod !== undefined) bill.paymentMethod = paymentMethod;
     if (paymentRef !== undefined) bill.paymentRef = paymentRef;
+    if (req.body.platformPayments) {
+      bill.platformPayments = {
+        ...bill.platformPayments?.toObject?.(),
+        ...req.body.platformPayments,
+      };
+    }
 
     await bill.save();
     res.status(httpStatus.OK).json({ success: true, bill });
@@ -158,28 +196,105 @@ const updateBill = async (req, res) => {
 const recordPayment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { paymentStatus = 'PAID', paidAt, paymentMethod, paymentRef, notes } = req.body;
+    const {
+      platform, // 'aws' | 'mongodb' | 'cloudflare' | 'all'
+      paymentStatus = 'PAID',
+      paidAt,
+      paymentMethod,
+      paymentRef,
+      notes,
+    } = req.body;
 
     const bill = await InfrastructureBill.findById(id);
     if (!bill) {
       return res.status(httpStatus.NOT_FOUND).json({ success: false, error: 'Billing record not found.' });
     }
 
-    bill.paymentStatus = paymentStatus;
-    if (paymentStatus === 'PAID') {
-      bill.paidAt = paidAt ? new Date(paidAt) : new Date();
-    } else {
-      bill.paidAt = null;
+    const normStatus = String(paymentStatus).toUpperCase() === 'PAID' ? 'PAID' : 'UNPAID';
+    const effectivePaidAt = normStatus === 'PAID' ? (paidAt ? new Date(paidAt) : new Date()) : null;
+
+    if (!bill.platformPayments) {
+      bill.platformPayments = {
+        aws: { status: bill.paymentStatus === 'PAID' ? 'PAID' : 'UNPAID', paidAt: bill.paidAt, paymentMethod: bill.paymentMethod, paymentRef: bill.paymentRef },
+        mongodb: { status: bill.paymentStatus === 'PAID' ? 'PAID' : 'UNPAID', paidAt: bill.paidAt, paymentMethod: bill.paymentMethod, paymentRef: bill.paymentRef },
+        cloudflare: { status: 'PAID', paidAt: bill.paidAt, paymentMethod: 'Free Allowance / Auto-Settled', paymentRef: 'CF-R2-ZERO' },
+      };
     }
 
-    if (paymentMethod !== undefined) bill.paymentMethod = paymentMethod;
-    if (paymentRef !== undefined) bill.paymentRef = paymentRef;
+    if (platform === 'aws') {
+      bill.platformPayments.aws = {
+        status: normStatus,
+        paidAt: effectivePaidAt,
+        paymentMethod: paymentMethod || bill.platformPayments?.aws?.paymentMethod || 'AWS Auto-Debit / Credit Card',
+        paymentRef: paymentRef || bill.platformPayments?.aws?.paymentRef || 'AWS Auto-Settled',
+        notes: notes || bill.platformPayments?.aws?.notes,
+      };
+    } else if (platform === 'mongodb') {
+      bill.platformPayments.mongodb = {
+        status: normStatus,
+        paidAt: effectivePaidAt,
+        paymentMethod: paymentMethod || bill.platformPayments?.mongodb?.paymentMethod || 'Corporate Card',
+        paymentRef: paymentRef || bill.platformPayments?.mongodb?.paymentRef || 'Atlas-INV-PAID',
+        notes: notes || bill.platformPayments?.mongodb?.notes,
+      };
+    } else if (platform === 'cloudflare') {
+      bill.platformPayments.cloudflare = {
+        status: normStatus,
+        paidAt: effectivePaidAt,
+        paymentMethod: paymentMethod || bill.platformPayments?.cloudflare?.paymentMethod || 'Zero-Egress Tier',
+        paymentRef: paymentRef || bill.platformPayments?.cloudflare?.paymentRef || 'CF-R2-FREE',
+        notes: notes || bill.platformPayments?.cloudflare?.notes,
+      };
+    } else {
+      // Settle all platforms
+      bill.platformPayments.aws = {
+        status: normStatus,
+        paidAt: effectivePaidAt,
+        paymentMethod: paymentMethod || 'AWS Auto-Debit / Credit Card',
+        paymentRef: paymentRef || 'AWS Auto-Settled',
+        notes,
+      };
+      bill.platformPayments.mongodb = {
+        status: normStatus,
+        paidAt: effectivePaidAt,
+        paymentMethod: paymentMethod || 'Corporate Card',
+        paymentRef: paymentRef || 'Atlas-INV-PAID',
+        notes,
+      };
+      bill.platformPayments.cloudflare = {
+        status: normStatus,
+        paidAt: effectivePaidAt,
+        paymentMethod: paymentMethod || 'Zero-Egress Tier',
+        paymentRef: paymentRef || 'CF-R2-FREE',
+        notes,
+      };
+      bill.paymentStatus = normStatus;
+      bill.paidAt = effectivePaidAt;
+      if (paymentMethod !== undefined) bill.paymentMethod = paymentMethod;
+      if (paymentRef !== undefined) bill.paymentRef = paymentRef;
+    }
+
+    // Determine overall status
+    const awsPaid = bill.platformPayments.aws?.status === 'PAID';
+    const mongoPaid = bill.mongoDbAmount > 0 ? bill.platformPayments.mongodb?.status === 'PAID' : true;
+    const cfPaid = bill.cloudflareAmount > 0 ? bill.platformPayments.cloudflare?.status === 'PAID' : true;
+
+    if (awsPaid && mongoPaid && cfPaid) {
+      bill.paymentStatus = 'PAID';
+      bill.paidAt = effectivePaidAt || bill.paidAt || new Date();
+    } else if (!awsPaid && !mongoPaid) {
+      bill.paymentStatus = 'UNPAID';
+      bill.paidAt = null;
+    } else {
+      bill.paymentStatus = 'PARTIAL';
+    }
+
     if (notes !== undefined) bill.notes = notes;
 
     await bill.save();
     res.status(httpStatus.OK).json({
       success: true,
-      message: `Bill marked as ${paymentStatus}.`,
+      message: `Bill payment updated successfully${platform ? ` for ${platform.toUpperCase()}` : ''}.`,
       bill,
     });
   } catch (error) {

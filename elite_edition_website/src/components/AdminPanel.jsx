@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { matchSearchQuery } from '../utils/searchUtils';
@@ -168,7 +168,11 @@ export default function AdminPanel() {
   const [awsSyncLoading, setAwsSyncLoading] = useState(false);
   const [selectedBillBreakdown, setSelectedBillBreakdown] = useState(null);
   const [selectedServiceInfo, setSelectedServiceInfo] = useState(null); // 'aws', 'mongodb', 'cloudflare', 'all'
+  const [selectedPlatformFilter, setSelectedPlatformFilter] = useState('All'); // 'All', 'aws', 'mongodb', 'cloudflare'
+  const [selectedPaymentStatusFilter, setSelectedPaymentStatusFilter] = useState('All'); // 'All', 'UNPAID', 'PAID'
+  const [billSearchQuery, setBillSearchQuery] = useState('');
   const [paymentModalBill, setPaymentModalBill] = useState(null);
+  const [paymentModalPlatform, setPaymentModalPlatform] = useState('all'); // 'all', 'aws', 'mongodb', 'cloudflare'
   const [paymentFormData, setPaymentFormData] = useState({
     paymentStatus: 'PAID',
     paymentMethod: 'Credit Card',
@@ -395,20 +399,58 @@ export default function AdminPanel() {
     }
   };
 
-  const handleOpenPayModal = (bill) => {
+  const handleOpenPayModal = (bill, platform = 'all') => {
     setPaymentModalBill(bill);
+    setPaymentModalPlatform(platform);
+
+    let initialStatus = 'PAID';
+    let initialMethod = 'Credit Card';
+    let initialRef = '';
+    let initialDate = new Date().toISOString().split('T')[0];
+    let initialNotes = '';
+
+    if (platform === 'aws') {
+      const p = bill.platformPayments?.aws || {};
+      initialStatus = p.status ? String(p.status).toUpperCase() : (String(bill.paymentStatus || '').toUpperCase() === 'PAID' ? 'PAID' : 'UNPAID');
+      initialMethod = p.paymentMethod || 'AWS Auto-Debit / Credit Card';
+      initialRef = p.paymentRef || (initialStatus === 'PAID' ? 'AWS-Auto-Settled' : '');
+      initialDate = p.paidAt ? new Date(p.paidAt).toISOString().split('T')[0] : (bill.paidAt ? new Date(bill.paidAt).toISOString().split('T')[0] : initialDate);
+      initialNotes = p.notes || bill.notes || '';
+    } else if (platform === 'mongodb') {
+      const p = bill.platformPayments?.mongodb || {};
+      initialStatus = p.status ? String(p.status).toUpperCase() : (String(bill.paymentStatus || '').toUpperCase() === 'PAID' ? 'PAID' : 'UNPAID');
+      initialMethod = p.paymentMethod || 'Corporate Card';
+      initialRef = p.paymentRef || (initialStatus === 'PAID' ? 'ATLAS-INV-PAID' : '');
+      initialDate = p.paidAt ? new Date(p.paidAt).toISOString().split('T')[0] : (bill.paidAt ? new Date(bill.paidAt).toISOString().split('T')[0] : initialDate);
+      initialNotes = p.notes || '';
+    } else if (platform === 'cloudflare') {
+      const p = bill.platformPayments?.cloudflare || {};
+      initialStatus = p.status ? String(p.status).toUpperCase() : 'PAID';
+      initialMethod = p.paymentMethod || 'Free Allowance / Zero-Egress Tier';
+      initialRef = p.paymentRef || 'CF-R2-FREE';
+      initialDate = p.paidAt ? new Date(p.paidAt).toISOString().split('T')[0] : initialDate;
+      initialNotes = p.notes || 'Zero Billed / Free Allowance';
+    } else {
+      initialStatus = String(bill.paymentStatus || '').toUpperCase() === 'PAID' ? 'PAID' : 'UNPAID';
+      initialMethod = bill.paymentMethod || 'Credit Card';
+      initialRef = bill.paymentRef || '';
+      initialDate = bill.paidAt ? new Date(bill.paidAt).toISOString().split('T')[0] : initialDate;
+      initialNotes = bill.notes || '';
+    }
+
     setPaymentFormData({
-      paymentStatus: bill.paymentStatus || 'PAID',
-      paymentMethod: bill.paymentMethod || 'Credit Card',
-      paymentRef: bill.paymentRef || '',
-      paidAt: bill.paidAt ? new Date(bill.paidAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      notes: bill.notes || ''
+      paymentStatus: initialStatus,
+      paymentMethod: initialMethod,
+      paymentRef: initialRef,
+      paidAt: initialDate,
+      notes: initialNotes
     });
     setError('');
   };
 
   const handleClosePayModal = () => {
     setPaymentModalBill(null);
+    setPaymentModalPlatform('all');
   };
 
   const handleSavePayment = async (e) => {
@@ -419,13 +461,15 @@ export default function AdminPanel() {
     setSuccess('');
     try {
       await api.recordInfraBillPayment(paymentModalBill._id || paymentModalBill.id, {
+        platform: paymentModalPlatform,
         paymentStatus: paymentFormData.paymentStatus,
         paymentMethod: paymentFormData.paymentMethod,
         paymentRef: paymentFormData.paymentRef,
         paidAt: paymentFormData.paidAt,
         notes: paymentFormData.notes,
       });
-      setSuccess(`Payment details for "${paymentModalBill.month}" updated successfully.`);
+      const platformName = paymentModalPlatform === 'aws' ? 'AWS Cloud' : paymentModalPlatform === 'mongodb' ? 'MongoDB Atlas' : paymentModalPlatform === 'cloudflare' ? 'Cloudflare R2' : 'Infrastructure Bill';
+      setSuccess(`Payment details for ${platformName} (${paymentModalBill.month}) updated successfully.`);
       handleClosePayModal();
       await fetchBills();
     } catch (err) {
@@ -1014,6 +1058,162 @@ export default function AdminPanel() {
     const matchesStatus = selectedStatusFilter === 'All' || (u.status || 'Active') === selectedStatusFilter;
     return matchesSearch && matchesCompany && matchesDept && matchesStatus;
   });
+
+  const flattenedPlatformRows = useMemo(() => {
+    const rows = [];
+    bills.forEach((b) => {
+      const effectiveRate = b.exchangeRate || exchangeRateInput || 86.5;
+
+      // 1. AWS Platform Row
+      const awsAmountInr = Number(b.awsAmount || 0);
+      const awsAmountUsd = b.awsUsdAmount ? Number(b.awsUsdAmount) : awsAmountInr / effectiveRate;
+      const awsPayInfo = b.platformPayments?.aws || {};
+      const awsIsPaid = awsPayInfo.status
+        ? String(awsPayInfo.status).toUpperCase() === 'PAID'
+        : String(b.paymentStatus || '').toUpperCase() === 'PAID';
+      const awsPaidDate = awsPayInfo.paidAt || b.paidAt;
+
+      rows.push({
+        id: `${b._id || b.id}_aws`,
+        bill: b,
+        month: b.month,
+        platformKey: 'aws',
+        platformName: 'Amazon Web Services (AWS)',
+        platformShort: 'AWS Cloud',
+        platformProvider: 'AWS Cloud Infrastructure',
+        platformColor: '#d97706',
+        platformBg: '#fffbeb',
+        platformBorder: '#fde68a',
+        scope: 'EC2 Mumbai (t3.medium) • Route 53 • ALB • S3 • ACM • WAF',
+        amountInr: awsAmountInr,
+        amountUsd: awsAmountUsd,
+        isPaid: awsIsPaid,
+        paidAt: awsPaidDate,
+        paymentMethod: awsPayInfo.paymentMethod || (awsIsPaid ? (b.paymentMethod || 'AWS Auto-Debit / Card') : ''),
+        paymentRef: awsPayInfo.paymentRef || (awsIsPaid ? (b.paymentRef || 'AWS-Auto-Settled') : ''),
+        notes: awsPayInfo.notes || (b.isAutoSynced ? 'Auto-synced from AWS Cost Explorer' : b.notes),
+        hasBreakdown: Array.isArray(b.awsBreakdown) && b.awsBreakdown.length > 0,
+        breakdownList: b.awsBreakdown || [],
+        isAutoSynced: b.isAutoSynced,
+      });
+
+      // 2. MongoDB Atlas Platform Row (Show for months where MongoDB is configured or amount > 0)
+      const mongoAmountInr = Number(b.mongoDbAmount || 0);
+      const mongoAmountUsd = b.mongoDbUsdAmount ? Number(b.mongoDbUsdAmount) : mongoAmountInr / effectiveRate;
+      const mongoPayInfo = b.platformPayments?.mongodb || {};
+      const mongoIsPaid = mongoPayInfo.status
+        ? String(mongoPayInfo.status).toUpperCase() === 'PAID'
+        : String(b.paymentStatus || '').toUpperCase() === 'PAID';
+      const mongoPaidDate = mongoPayInfo.paidAt || b.paidAt;
+
+      if (mongoAmountInr > 0 || (b.platformPayments && b.platformPayments.mongodb)) {
+        rows.push({
+          id: `${b._id || b.id}_mongodb`,
+          bill: b,
+          month: b.month,
+          platformKey: 'mongodb',
+          platformName: 'MongoDB Atlas',
+          platformShort: 'MongoDB Atlas',
+          platformProvider: 'MongoDB Inc. Cloud',
+          platformColor: '#059669',
+          platformBg: '#ecfdf5',
+          platformBorder: '#a7f3d0',
+          scope: 'Dedicated M10 3-Node Cluster (ap-south-1) • PITR Backups',
+          amountInr: mongoAmountInr,
+          amountUsd: mongoAmountUsd,
+          isPaid: mongoIsPaid,
+          paidAt: mongoPaidDate,
+          paymentMethod: mongoPayInfo.paymentMethod || (mongoIsPaid ? (b.paymentMethod || 'Corporate Card') : ''),
+          paymentRef: mongoPayInfo.paymentRef || (mongoIsPaid ? (b.paymentRef || 'ATLAS-INV-PAID') : ''),
+          notes: mongoPayInfo.notes || 'Atlas Dedicated M10 Replica Set',
+          hasBreakdown: false,
+          isAutoSynced: false,
+        });
+      }
+
+      // 3. Cloudflare R2 Platform Row (Always present or active)
+      const cfAmountInr = Number(b.cloudflareAmount || 0);
+      const cfAmountUsd = b.cloudflareUsdAmount ? Number(b.cloudflareUsdAmount) : cfAmountInr / effectiveRate;
+      const cfPayInfo = b.platformPayments?.cloudflare || {};
+      const cfIsPaid = cfAmountInr === 0 ? true : (String(cfPayInfo.status || b.paymentStatus || '').toUpperCase() === 'PAID');
+      const cfPaidDate = cfPayInfo.paidAt || b.paidAt;
+
+      if (b.cloudflareAmount !== undefined) {
+        rows.push({
+          id: `${b._id || b.id}_cloudflare`,
+          bill: b,
+          month: b.month,
+          platformKey: 'cloudflare',
+          platformName: 'Cloudflare R2',
+          platformShort: 'Cloudflare R2',
+          platformProvider: 'Cloudflare Inc.',
+          platformColor: '#ea580c',
+          platformBg: '#fff7ed',
+          platformBorder: '#fed7aa',
+          scope: 'Zero-Egress Object Storage (Challans & PDFs • 10 GB Free)',
+          amountInr: cfAmountInr,
+          amountUsd: cfAmountUsd,
+          isPaid: cfIsPaid,
+          paidAt: cfPaidDate,
+          paymentMethod: cfPayInfo.paymentMethod || 'Free Allowance / Zero-Egress Tier',
+          paymentRef: cfPayInfo.paymentRef || 'CF-R2-FREE',
+          notes: cfPayInfo.notes || (cfAmountInr === 0 ? 'Zero Billed / 10 GB Free Allowance' : 'Cloudflare Media Store'),
+          hasBreakdown: false,
+          isAutoSynced: false,
+        });
+      }
+    });
+    return rows;
+  }, [bills, billingCurrency, exchangeRateInput]);
+
+  const filteredPlatformRows = useMemo(() => {
+    return flattenedPlatformRows.filter((row) => {
+      // Platform filter
+      if (selectedPlatformFilter !== 'All' && row.platformKey !== selectedPlatformFilter) {
+        return false;
+      }
+      // Status filter
+      if (selectedPaymentStatusFilter === 'PAID' && !row.isPaid) {
+        return false;
+      }
+      if (selectedPaymentStatusFilter === 'UNPAID' && row.isPaid) {
+        return false;
+      }
+      // Search
+      if (billSearchQuery.trim()) {
+        const q = billSearchQuery.toLowerCase();
+        const mMonth = row.month?.toLowerCase().includes(q);
+        const mPlatform = row.platformName?.toLowerCase().includes(q);
+        const mScope = row.scope?.toLowerCase().includes(q);
+        const mRef = row.paymentRef?.toLowerCase().includes(q);
+        const mNotes = row.notes?.toLowerCase().includes(q);
+        if (!mMonth && !mPlatform && !mScope && !mRef && !mNotes) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [flattenedPlatformRows, selectedPlatformFilter, selectedPaymentStatusFilter, billSearchQuery]);
+
+  const billingStats = useMemo(() => {
+    let totalItems = flattenedPlatformRows.length;
+    let paidCount = 0;
+    let unpaidCount = 0;
+    let unpaidAmountInr = 0;
+    let paidAmountInr = 0;
+
+    flattenedPlatformRows.forEach((r) => {
+      if (r.isPaid) {
+        paidCount++;
+        paidAmountInr += r.amountInr;
+      } else {
+        unpaidCount++;
+        unpaidAmountInr += r.amountInr;
+      }
+    });
+
+    return { totalItems, paidCount, unpaidCount, unpaidAmountInr, paidAmountInr };
+  }, [flattenedPlatformRows]);
 
   return (
     <div style={styles.container}>
@@ -3087,11 +3287,145 @@ export default function AdminPanel() {
           {/* Main Layout: Left Side List & Right Side Form */}
           <div style={styles.contentLayout}>
             {/* Left Side: Bills List */}
-            <div className="glass-panel" style={styles.tablePanel}>
+            {/* Left Side: Bills List */}
+            <div className="glass-panel" style={{ ...styles.tablePanel, flex: 1 }}>
               <div style={styles.panelHeader}>
                 <CreditCard size={16} color="var(--primary)" />
-                <h3 style={styles.panelTitle}>Monthly Bills History</h3>
+                <h3 style={styles.panelTitle}>Monthly Bills History — By Platform</h3>
                 {billsLoading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />}
+              </div>
+
+              {/* Filter & Search Toolbar */}
+              <div style={{
+                padding: '0.85rem 1rem',
+                borderBottom: '1px solid var(--border-color, #e2e8f0)',
+                background: 'rgba(248, 250, 252, 0.75)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.65rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {/* Platform Filter Buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginRight: '0.2rem' }}>Platform:</span>
+                    {[
+                      { key: 'All', label: `All Providers (${flattenedPlatformRows.length})` },
+                      { key: 'aws', label: `AWS Cloud (${flattenedPlatformRows.filter(r => r.platformKey === 'aws').length})`, icon: Cloud, color: '#d97706' },
+                      { key: 'mongodb', label: `MongoDB Atlas (${flattenedPlatformRows.filter(r => r.platformKey === 'mongodb').length})`, icon: Database, color: '#059669' },
+                      { key: 'cloudflare', label: `Cloudflare R2 (${flattenedPlatformRows.filter(r => r.platformKey === 'cloudflare').length})`, icon: HardDrive, color: '#ea580c' },
+                    ].map(p => {
+                      const active = selectedPlatformFilter === p.key;
+                      const IconComp = p.icon;
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => setSelectedPlatformFilter(p.key)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 9px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            borderRadius: '6px',
+                            border: active ? '1px solid var(--primary, #2563eb)' : '1px solid #cbd5e1',
+                            background: active ? '#eff6ff' : '#ffffff',
+                            color: active ? '#1d4ed8' : '#475569',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {IconComp && <IconComp size={12} color={p.color} />}
+                          <span>{p.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Payment Status Filter Buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginRight: '0.2rem' }}>Status:</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPaymentStatusFilter('All')}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: selectedPaymentStatusFilter === 'All' ? '1px solid #64748b' : '1px solid #cbd5e1',
+                        background: selectedPaymentStatusFilter === 'All' ? '#f1f5f9' : '#ffffff',
+                        color: selectedPaymentStatusFilter === 'All' ? '#0f172a' : '#64748b',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      All ({flattenedPlatformRows.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPaymentStatusFilter('UNPAID')}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: selectedPaymentStatusFilter === 'UNPAID' ? '1px solid #f87171' : '1px solid #fecaca',
+                        background: selectedPaymentStatusFilter === 'UNPAID' ? '#fee2e2' : '#ffffff',
+                        color: '#b91c1c',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔴 Unpaid ({billingStats.unpaidCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPaymentStatusFilter('PAID')}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: selectedPaymentStatusFilter === 'PAID' ? '1px solid #4ade80' : '1px solid #bbf7d0',
+                        background: selectedPaymentStatusFilter === 'PAID' ? '#dcfce7' : '#ffffff',
+                        color: '#15803d',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🟢 Paid ({billingStats.paidCount})
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search Bar & Summary Stats */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 8px', width: '260px' }}>
+                    <Search size={13} color="#94a3b8" />
+                    <input
+                      type="text"
+                      value={billSearchQuery}
+                      onChange={e => setBillSearchQuery(e.target.value)}
+                      placeholder="Search month, platform, ref ID..."
+                      style={{ border: 'none', outline: 'none', fontSize: '0.75rem', width: '100%', padding: '2px 6px', background: 'transparent' }}
+                    />
+                    {billSearchQuery && (
+                      <button type="button" onClick={() => setBillSearchQuery('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: '#94a3b8' }}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.74rem' }}>
+                    <span style={{ color: '#64748b' }}>
+                      Showing <strong>{filteredPlatformRows.length}</strong> platform rows
+                    </span>
+                    {billingStats.unpaidAmountInr > 0 && (
+                      <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                        Due Total: ₹{billingStats.unpaidAmountInr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="table-container" style={styles.tableWrap}>
@@ -3100,136 +3434,181 @@ export default function AdminPanel() {
                     <RotateCw size={24} className="spin-loader" color="var(--primary)" />
                     <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>Loading billing history...</p>
                   </div>
-                ) : bills.length === 0 ? (
+                ) : filteredPlatformRows.length === 0 ? (
                   <div style={styles.emptyState}>
                     <CreditCard size={28} color="var(--text-muted)" />
-                    <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>No billing records registered yet.</p>
-                    <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>Click "Sync from AWS Cost Explorer" above or enter a monthly bill manually.</p>
+                    <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>No platform bill records matching the selected filters.</p>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>Try clearing filters or search query.</p>
                   </div>
                 ) : (
                   <table>
                     <thead>
                       <tr>
-                        <th>Sr. No.</th>
-                        <th>Month</th>
-                        <th className="text-right">AWS Amount</th>
-                        <th className="text-right">MongoDB Amount</th>
-                        <th className="text-right">Cloudflare R2</th>
-                        <th className="text-right">Total Amount</th>
-                        <th className="text-center">Status</th>
-                        <th>Breakdown & Notes</th>
-                        <th className="text-center">Actions</th>
+                        <th style={{ width: '40px' }}>#</th>
+                        <th style={{ minWidth: '110px' }}>Month</th>
+                        <th style={{ minWidth: '175px' }}>Platform / Provider</th>
+                        <th style={{ minWidth: '220px' }}>Infrastructure Scope</th>
+                        <th className="text-right" style={{ minWidth: '120px' }}>Amount ({billingCurrency})</th>
+                        <th className="text-center" style={{ minWidth: '95px' }}>Status</th>
+                        <th style={{ minWidth: '185px' }}>Payment Details & Reference</th>
+                        <th style={{ minWidth: '160px' }}>Breakdown & Notes</th>
+                        <th className="text-center" style={{ minWidth: '120px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {bills.map((b, idx) => {
-                        const effectiveRate = b.exchangeRate || exchangeRateInput || 86.5;
-                        const awsDisplay = billingCurrency === 'USD'
-                          ? `$${(b.awsUsdAmount ? Number(b.awsUsdAmount) : Number(b.awsAmount || 0) / effectiveRate).toFixed(2)}`
-                          : `₹${Number(b.awsAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                      {filteredPlatformRows.map((row, idx) => {
+                        const mainDisplay = billingCurrency === 'USD'
+                          ? `$${Number(row.amountUsd || 0).toFixed(2)}`
+                          : `₹${Number(row.amountInr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-                        const mongoDisplay = billingCurrency === 'USD'
-                          ? `$${(Number(b.mongoDbAmount || 0) / effectiveRate).toFixed(2)}`
-                          : `₹${Number(b.mongoDbAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-                        const cfDisplay = billingCurrency === 'USD'
-                          ? `$${(b.cloudflareUsdAmount ? Number(b.cloudflareUsdAmount) : Number(b.cloudflareAmount || 0) / effectiveRate).toFixed(2)}`
-                          : `₹${Number(b.cloudflareAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-                        const totalDisplay = billingCurrency === 'USD'
-                          ? `$${((Number(b.totalAmount || 0)) / effectiveRate).toFixed(2)}`
-                          : `₹${Number(b.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-                        const isPaid = b.paymentStatus === 'PAID';
+                        const subDisplay = billingCurrency === 'USD'
+                          ? `₹${Number(row.amountInr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                          : `$${Number(row.amountUsd || 0).toFixed(2)}`;
 
                         return (
-                          <tr key={b._id || b.id}>
-                            <td>{idx + 1}</td>
+                          <tr key={row.id}>
+                            <td style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>{idx + 1}</td>
                             <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{b.month}</span>
-                                {b.isAutoSynced && (
-                                  <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: '#dcfce7', color: '#16a34a', fontWeight: 800 }} title="Auto-synced from AWS Cost Explorer">
-                                    ⚡ AWS
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.82rem' }}>{row.month}</span>
+                                {row.isAutoSynced && row.platformKey === 'aws' && (
+                                  <span style={{ fontSize: '0.62rem', padding: '1px 5px', borderRadius: '4px', background: '#dcfce7', color: '#16a34a', fontWeight: 800, width: 'fit-content' }}>
+                                    ⚡ AWS Sync
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="text-right" style={{ color: '#d97706', fontWeight: '700' }}>
-                              {awsDisplay}
-                              {billingCurrency === 'INR' && b.awsUsdAmount > 0 && (
-                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 400 }}>
-                                  (${Number(b.awsUsdAmount).toFixed(2)})
-                                </div>
-                              )}
-                            </td>
-                            <td className="text-right" style={{ color: '#059669', fontWeight: '600' }}>
-                              {mongoDisplay}
-                            </td>
-                            <td className="text-right" style={{ color: '#f97316', fontWeight: '600' }}>
-                              {cfDisplay}
-                            </td>
-                            <td className="text-right" style={{ fontWeight: '800', color: 'var(--primary)' }}>
-                              {totalDisplay}
-                            </td>
-                            <td className="text-center">
-                              {isPaid ? (
-                                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenPayModal(b)}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      background: '#dcfce7',
-                                      color: '#15803d',
-                                      border: '1px solid #86efac',
-                                      borderRadius: '999px',
-                                      padding: '2px 8px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer'
-                                    }}
-                                    title="Payment Settled — Click to view/edit payment record"
-                                  >
-                                    <Check size={11} /> PAID
-                                  </button>
-                                  {b.paidAt && (
-                                    <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
-                                      {new Date(b.paidAt).toLocaleDateString('en-GB')}
-                                    </span>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '6px',
+                                  background: row.platformBg,
+                                  border: `1px solid ${row.platformBorder}`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {row.platformKey === 'aws' ? (
+                                    <Cloud size={15} color={row.platformColor} />
+                                  ) : row.platformKey === 'mongodb' ? (
+                                    <Database size={15} color={row.platformColor} />
+                                  ) : (
+                                    <HardDrive size={15} color={row.platformColor} />
                                   )}
                                 </div>
-                              ) : (
+                                <div>
+                                  <div style={{ fontWeight: 800, color: row.platformColor, fontSize: '0.8rem' }}>
+                                    {row.platformShort}
+                                  </div>
+                                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                                    {row.platformProvider}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontSize: '0.75rem', color: '#334155', lineHeight: 1.35, maxWidth: '240px' }}>
+                                {row.scope}
+                              </div>
+                            </td>
+                            <td className="text-right">
+                              <div style={{ fontWeight: 800, color: row.amountInr === 0 ? '#64748b' : row.platformColor, fontSize: '0.86rem' }}>
+                                {row.amountInr === 0 && row.platformKey === 'cloudflare' ? '₹0.00' : mainDisplay}
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                                {row.amountInr === 0 && row.platformKey === 'cloudflare' ? (
+                                  <span style={{ color: '#16a34a', fontWeight: 700 }}>Free Allowance</span>
+                                ) : (
+                                  subDisplay
+                                )}
+                              </div>
+                            </td>
+                            <td className="text-center">
+                              {row.isPaid ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenPayModal(b)}
+                                  onClick={() => handleOpenPayModal(row.bill, row.platformKey)}
                                   style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '4px',
-                                    background: '#fee2e2',
-                                    color: '#b91c1c',
-                                    border: '1px solid #fca5a5',
+                                    gap: '3px',
+                                    background: '#dcfce7',
+                                    color: '#15803d',
+                                    border: '1px solid #86efac',
                                     borderRadius: '999px',
-                                    padding: '2px 8px',
+                                    padding: '3px 9px',
                                     fontSize: '0.72rem',
                                     fontWeight: 800,
                                     cursor: 'pointer'
                                   }}
-                                  title="Payment Due — Click to Pay or Record Settlement"
+                                  title={`Payment Settled for ${row.platformShort} — Click to view/edit payment record`}
+                                >
+                                  <Check size={11} /> PAID
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPayModal(row.bill, row.platformKey)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    background: '#fee2e2',
+                                    color: '#b91c1c',
+                                    border: '1px solid #fca5a5',
+                                    borderRadius: '999px',
+                                    padding: '3px 9px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer'
+                                  }}
+                                  title={`Payment Due for ${row.platformShort} — Click to Pay or Record Settlement`}
                                 >
                                   <CreditCard size={11} /> UNPAID
                                 </button>
                               )}
                             </td>
                             <td>
+                              {row.isPaid ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.73rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d', fontWeight: 700 }}>
+                                    <CheckCircle2 size={11} />
+                                    <span>Paid on {row.paidAt ? new Date(row.paidAt).toLocaleDateString('en-GB') : 'Verified'}</span>
+                                  </div>
+                                  <div style={{ color: '#475569', fontSize: '0.7rem' }}>
+                                    Mode: <strong style={{ color: '#0f172a' }}>{row.paymentMethod || 'Settled'}</strong>
+                                  </div>
+                                  {row.paymentRef && (
+                                    <div style={{ color: '#64748b', fontSize: '0.68rem', fontFamily: 'monospace' }}>
+                                      Ref: {row.paymentRef}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.73rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#b91c1c', fontWeight: 700 }}>
+                                    <AlertCircle size={11} />
+                                    <span>Pending Settlement</span>
+                                  </div>
+                                  <div style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                                    {row.platformKey === 'aws'
+                                      ? 'Payable in AWS Payments Console'
+                                      : row.platformKey === 'mongodb'
+                                      ? 'Payable in MongoDB Atlas Console'
+                                      : 'Payment Due'}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                            <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {b.awsBreakdown && b.awsBreakdown.length > 0 ? (
+                                {row.hasBreakdown ? (
                                   <button
                                     type="button"
-                                    onClick={() => setSelectedBillBreakdown(b)}
+                                    onClick={() => setSelectedBillBreakdown(row.bill)}
                                     style={{
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -3239,18 +3618,54 @@ export default function AdminPanel() {
                                       border: '1px solid #fde68a',
                                       borderRadius: '6px',
                                       padding: '2px 8px',
-                                      fontSize: '0.72rem',
+                                      fontSize: '0.7rem',
                                       fontWeight: 700,
                                       cursor: 'pointer',
                                       width: 'fit-content'
                                     }}
                                   >
                                     <Cloud size={11} />
-                                    <span>View {b.awsBreakdown.length} AWS Services</span>
+                                    <span>View {row.breakdownList.length} AWS Services</span>
                                   </button>
-                                ) : null}
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.notes}>
-                                  {b.notes || '—'}
+                                ) : row.platformKey === 'mongodb' ? (
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: '#ecfdf5',
+                                    color: '#047857',
+                                    border: '1px solid #a7f3d0',
+                                    fontWeight: 700,
+                                    width: 'fit-content'
+                                  }}>
+                                    M10 3-Node Dedicated Cluster
+                                  </span>
+                                ) : (
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: '#fff7ed',
+                                    color: '#c2410c',
+                                    border: '1px solid #fed7aa',
+                                    fontWeight: 700,
+                                    width: 'fit-content'
+                                  }}>
+                                    10 GB Free Storage Allowance
+                                  </span>
+                                )}
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    color: 'var(--text-muted)',
+                                    maxWidth: '160px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  title={row.notes}
+                                >
+                                  {row.notes || '—'}
                                 </span>
                               </div>
                             </td>
@@ -3258,13 +3673,26 @@ export default function AdminPanel() {
                               <div style={styles.actionsCell}>
                                 <button
                                   type="button"
-                                  onClick={() => handleDownloadInvoice(b)}
+                                  onClick={() => handleOpenPayModal(row.bill, row.platformKey)}
                                   className="btn-icon"
-                                  disabled={downloadingInvoiceId === (b._id || b.id)}
+                                  style={{
+                                    color: row.isPaid ? '#16a34a' : '#ea580c',
+                                    background: row.isPaid ? '#f0fdf4' : '#fff7ed',
+                                    borderColor: row.isPaid ? '#bbf7d0' : '#fed7aa'
+                                  }}
+                                  title={row.isPaid ? `View / Edit ${row.platformShort} Payment` : `Settle / Pay ${row.platformShort} Bill`}
+                                >
+                                  <CreditCard size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadInvoice(row.bill)}
+                                  className="btn-icon"
+                                  disabled={downloadingInvoiceId === (row.bill._id || row.bill.id)}
                                   style={{ color: '#0284c7', background: '#f0f9ff', borderColor: '#bae6fd' }}
                                   title="Download Official Invoice (PDF)"
                                 >
-                                  {downloadingInvoiceId === (b._id || b.id) ? (
+                                  {downloadingInvoiceId === (row.bill._id || row.bill.id) ? (
                                     <RotateCw size={14} className="spin-loader" />
                                   ) : (
                                     <Download size={14} />
@@ -3272,28 +3700,15 @@ export default function AdminPanel() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenPayModal(b)}
+                                  onClick={() => handleEditBillClick(row.bill)}
                                   className="btn-icon"
-                                  style={{
-                                    color: isPaid ? '#16a34a' : '#ea580c',
-                                    background: isPaid ? '#f0fdf4' : '#fff7ed',
-                                    borderColor: isPaid ? '#bbf7d0' : '#fed7aa'
-                                  }}
-                                  title={isPaid ? 'View / Update Payment' : 'Pay Bill'}
-                                >
-                                  <CreditCard size={14} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditBillClick(b)}
-                                  className="btn-icon"
-                                  title="Edit Bill"
+                                  title="Edit Month Bill"
                                 >
                                   <Edit2 size={14} />
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteBill(b)}
+                                  onClick={() => handleDeleteBill(row.bill)}
                                   className="btn-icon"
                                   style={styles.trashBtn}
                                   title="Delete Bill"
@@ -3589,16 +4004,36 @@ export default function AdminPanel() {
                   background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: 38, height: 38, borderRadius: '10px', background: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: '10px',
+                      background: paymentModalPlatform === 'aws' ? '#d97706' : paymentModalPlatform === 'mongodb' ? '#059669' : paymentModalPlatform === 'cloudflare' ? '#ea580c' : '#2563eb',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
                       <CreditCard size={20} />
                     </div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e3a8a' }}>
-                        Pay Infrastructure Bill
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e3a8a' }}>
+                        {paymentModalPlatform === 'aws'
+                          ? 'Pay Infrastructure Bill — AWS Cloud'
+                          : paymentModalPlatform === 'mongodb'
+                          ? 'Pay Infrastructure Bill — MongoDB Atlas'
+                          : paymentModalPlatform === 'cloudflare'
+                          ? 'Cloudflare R2 Settlement'
+                          : 'Pay Infrastructure Bill — All Providers'}
                       </h3>
                       <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: 600 }}>
-                        {paymentModalBill.month} • Total: ₹{Number(paymentModalBill.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        {paymentModalBill.awsUsdAmount > 0 && ` ($${Number(paymentModalBill.awsUsdAmount).toFixed(2)})`}
+                        {paymentModalBill.month} • {paymentModalPlatform === 'aws'
+                          ? `AWS Amount: ₹${Number(paymentModalBill.awsAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${paymentModalBill.awsUsdAmount > 0 ? `($${Number(paymentModalBill.awsUsdAmount).toFixed(2)})` : ''}`
+                          : paymentModalPlatform === 'mongodb'
+                          ? `MongoDB Amount: ₹${Number(paymentModalBill.mongoDbAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${paymentModalBill.mongoDbUsdAmount > 0 ? `($${Number(paymentModalBill.mongoDbUsdAmount).toFixed(2)})` : ''}`
+                          : paymentModalPlatform === 'cloudflare'
+                          ? `Cloudflare R2: ₹${Number(paymentModalBill.cloudflareAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (Free Tier)`
+                          : `Total: ₹${Number(paymentModalBill.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                       </div>
                     </div>
                   </div>
@@ -3613,26 +4048,71 @@ export default function AdminPanel() {
 
                 {/* Modal Body */}
                 <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Quick Action: Open AWS Payment Gateway */}
+                  {/* Target Platform Selector Tabs */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#f8fafc', padding: '4px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', padding: '0 6px' }}>Target:</span>
+                    {[
+                      { key: 'aws', label: 'AWS Cloud', color: '#d97706' },
+                      { key: 'mongodb', label: 'MongoDB Atlas', color: '#059669' },
+                      { key: 'cloudflare', label: 'Cloudflare R2', color: '#ea580c' },
+                      { key: 'all', label: 'All Providers', color: '#2563eb' }
+                    ].map(p => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => handleOpenPayModal(paymentModalBill, p.key)}
+                        style={{
+                          flex: 1,
+                          padding: '5px 8px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          borderRadius: '6px',
+                          border: paymentModalPlatform === p.key ? `1px solid ${p.color}` : '1px solid transparent',
+                          background: paymentModalPlatform === p.key ? '#ffffff' : 'transparent',
+                          color: paymentModalPlatform === p.key ? p.color : '#64748b',
+                          cursor: 'pointer',
+                          boxShadow: paymentModalPlatform === p.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Quick Action: Open Provider Payment Gateway */}
                   <div style={{
-                    background: '#fffbeb',
-                    border: '1px solid #fde68a',
+                    background: paymentModalPlatform === 'mongodb' ? '#ecfdf5' : '#fffbeb',
+                    border: paymentModalPlatform === 'mongodb' ? '1px solid #a7f3d0' : '1px solid #fde68a',
                     borderRadius: '12px',
                     padding: '1rem',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '0.6rem'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b45309', fontWeight: 700, fontSize: '0.88rem' }}>
-                      <Zap size={16} color="#d97706" />
-                      <span>Step 1: Settle Bill on AWS Console</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: paymentModalPlatform === 'mongodb' ? '#065f46' : '#b45309', fontWeight: 700, fontSize: '0.88rem' }}>
+                      <Zap size={16} color={paymentModalPlatform === 'mongodb' ? '#059669' : '#d97706'} />
+                      <span>
+                        {paymentModalPlatform === 'mongodb'
+                          ? 'Step 1: View / Pay on MongoDB Atlas Console'
+                          : paymentModalPlatform === 'cloudflare'
+                          ? 'Step 1: View Cloudflare R2 Account'
+                          : 'Step 1: Settle Bill on AWS Console'}
+                      </span>
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#78350f', lineHeight: 1.5 }}>
-                      Amazon Web Services charges cards directly inside your AWS Account console. Click below to open the official AWS Payments page directly and pay the pending invoice.
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: paymentModalPlatform === 'mongodb' ? '#047857' : '#78350f', lineHeight: 1.5 }}>
+                      {paymentModalPlatform === 'mongodb'
+                        ? 'MongoDB Atlas charges credit cards or invoices on cloud.mongodb.com. Click below to review your cluster billing details.'
+                        : paymentModalPlatform === 'cloudflare'
+                        ? 'Cloudflare R2 provides 10 GB free object storage each month with zero-egress data transfer fees.'
+                        : 'Amazon Web Services charges cards directly inside your AWS Account console. Click below to open official AWS Payments page.'}
                     </p>
                     <div>
                       <a
-                        href="https://us-east-1.console.aws.amazon.com/billing/home#/payments"
+                        href={paymentModalPlatform === 'mongodb'
+                          ? 'https://cloud.mongodb.com/v2#/billing'
+                          : paymentModalPlatform === 'cloudflare'
+                          ? 'https://dash.cloudflare.com'
+                          : 'https://us-east-1.console.aws.amazon.com/billing/home#/payments'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn-primary"
@@ -3643,13 +4123,23 @@ export default function AdminPanel() {
                           padding: '0.6rem 1.2rem',
                           fontSize: '0.85rem',
                           fontWeight: 700,
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          background: paymentModalPlatform === 'mongodb'
+                            ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                            : paymentModalPlatform === 'cloudflare'
+                            ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'
+                            : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                           textDecoration: 'none',
                           borderRadius: '8px'
                         }}
                       >
                         <ExternalLink size={15} />
-                        <span>Open AWS Payments Console ↗</span>
+                        <span>
+                          {paymentModalPlatform === 'mongodb'
+                            ? 'Open MongoDB Atlas Billing Console ↗'
+                            : paymentModalPlatform === 'cloudflare'
+                            ? 'Open Cloudflare Dashboard ↗'
+                            : 'Open AWS Payments Console ↗'}
+                        </span>
                       </a>
                     </div>
                   </div>
@@ -3657,7 +4147,7 @@ export default function AdminPanel() {
                   {/* Form: Step 2 Record Payment in ERP */}
                   <form onSubmit={handleSavePayment} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                     <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
-                      Step 2: Record Payment in ERP & Mark as Paid
+                      Step 2: Record Payment in ERP & Mark as Paid ({paymentModalPlatform === 'aws' ? 'AWS' : paymentModalPlatform === 'mongodb' ? 'MongoDB Atlas' : paymentModalPlatform === 'cloudflare' ? 'Cloudflare' : 'All Providers'})
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
