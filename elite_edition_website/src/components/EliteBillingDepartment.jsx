@@ -109,6 +109,8 @@ import { ValidationDock } from './common/ValidationDock';
 import { useValidationDock } from '../hooks/useValidationDock';
 import { EntityBrandBadge } from './common/EntityBrandBadge';
 import { ScrollSpyMiniMap } from './common/ScrollSpyMiniMap';
+import { FeatureCoachmark } from './common/FeatureCoachmark';
+import { CellHoverPeek } from './common/CellHoverPeek';
 import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 
 const INVOICE_FORM_SECTIONS = [
@@ -3852,9 +3854,15 @@ export default function EliteBillingDepartment({
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                {editingInvoiceId ? `Edit Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
-              </h3>
+              <FeatureCoachmark
+                id="zen-focus-mode-tip"
+                title="Zen Focus Mode"
+                content="Press Alt+Z anytime to hide headers and sidebars for 100% full-screen table focus."
+              >
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  {editingInvoiceId ? `Edit Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
+                </h3>
+              </FeatureCoachmark>
               <EntityBrandBadge entityId={companyEntity} />
             </div>
             <div style={{ display: 'flex', gap: '0.6rem' }}>
@@ -4330,7 +4338,9 @@ export default function EliteBillingDepartment({
 
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#a78bfa' }}>
                 <span>Grand Total:</span>
-                <span>₹ {calculatedInvoice.grandTotal.toFixed(2)}</span>
+                <span key={calculatedInvoice.grandTotal} className="reactive-value-pulse" style={{ padding: '0 4px', borderRadius: 4 }}>
+                  ₹ {calculatedInvoice.grandTotal.toFixed(2)}
+                </span>
               </div>
 
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
@@ -4349,7 +4359,18 @@ export default function EliteBillingDepartment({
                 </div>
                 <div style={{ flex: 1, textAlign: 'right' }}>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>BALANCE DUE</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: calculatedInvoice.balanceDue > 0 ? '#f87171' : '#34d399' }}>
+                  <div
+                    key={calculatedInvoice.balanceDue}
+                    className="reactive-value-pulse"
+                    style={{
+                      fontSize: '1.1rem',
+                      fontWeight: 800,
+                      color: calculatedInvoice.balanceDue > 0 ? '#f87171' : '#34d399',
+                      padding: '0 4px',
+                      borderRadius: 4,
+                      display: 'inline-block'
+                    }}
+                  >
                     ₹ {calculatedInvoice.balanceDue.toFixed(2)}
                   </div>
                 </div>

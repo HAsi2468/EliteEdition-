@@ -108,6 +108,11 @@ import BarcodeSnifferHUD from './components/common/BarcodeSnifferHUD';
 import { ZenFocusModeController } from './components/common/ZenFocusModeController';
 import { TableContextMenu } from './components/common/TableContextMenu';
 import { KeyboardShortcutModal } from './components/common/KeyboardShortcutModal';
+import { StickyScrollShadowTracker } from './components/common/StickyScrollShadowTracker';
+import { EnterpriseHUDThemeController } from './components/common/EnterpriseHUDThemeController';
+import { ChangelogDrawer } from './components/common/ChangelogDrawer';
+import { QuickTipPill } from './components/common/QuickTipPill';
+import { GuidedTourController } from './components/common/GuidedTourController';
 
 
 
@@ -2086,6 +2091,9 @@ export default function App() {
                 </button>
               )}
 
+              {/* What's New Feature Changelog Drawer */}
+              <ChangelogDrawer />
+
               <button
                 onClick={() => setShowNotificationDrawer(true)}
                 className="btn-secondary"
@@ -3553,6 +3561,18 @@ export default function App() {
 
       {/* Keyboard Shortcuts Reference Dialog (? Drawer) */}
       <KeyboardShortcutModal />
+
+      {/* Scroll-Triggered Sticky Drop-Shadows Tracker */}
+      <StickyScrollShadowTracker />
+
+      {/* Enterprise Industrial HUD Theme & UI Scale Controller */}
+      <EnterpriseHUDThemeController />
+
+      {/* Rotating Smart Tips Banner */}
+      <QuickTipPill />
+
+      {/* Guided Feature Tour Controller */}
+      <GuidedTourController />
 
       {/* Undo Toast Container */}
       <UndoToastContainer />

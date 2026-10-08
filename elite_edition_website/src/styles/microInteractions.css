@@ -1,0 +1,168 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELITE ENTERPRISE ERP — MICRO-INTERACTIONS & ADVANCED UI STYLING
+   Tactile feedback, dual-offset focus, scroll shadows, reactive pulse,
+   Industrial HUD high-contrast theme, and dynamic UI scale.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. PHYSICAL TACTILE RESPONSE (:active compression) ────────────────── */
+button:active,
+.btn-primary:active,
+.btn-secondary:active,
+.btn-icon:active,
+.action-btn:active,
+.phoenix-btn:active,
+.card-clickable:active,
+.table-action-btn:active,
+[role="button"]:active {
+  transform: scale(0.98) !important;
+  transition: transform 50ms ease-out !important;
+}
+
+/* ── 2. DUAL-OFFSET ACCESSIBLE FOCUS RINGS (Keyboard Tab Navigation) ───── */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--bg-card, #ffffff), 0 0 0 4px var(--primary, #2563eb) !important;
+  border-radius: inherit;
+  transition: box-shadow 120ms ease;
+}
+
+/* ── 3. SCROLL-TRIGGERED STICKY DROP-SHADOWS ───────────────────────────── */
+/* Vertical header drop shadow */
+.sticky-th-shadow,
+table thead.is-scrolled th,
+.table-container.is-scrolled-y thead th,
+.table-scroll-wrap.is-scrolled-y thead th,
+.erp-data-table.is-scrolled-y thead th {
+  box-shadow: 0 4px 10px -2px rgba(15, 23, 42, 0.12), 0 2px 4px -2px rgba(15, 23, 42, 0.08) !important;
+  transition: box-shadow 200ms ease;
+  z-index: 10;
+}
+
+/* Horizontal pinned left column drop shadow */
+.sticky-col-shadow,
+.table-container.is-scrolled-x th:first-child,
+.table-container.is-scrolled-x td:first-child,
+.table-scroll-wrap.is-scrolled-x th:first-child,
+.table-scroll-wrap.is-scrolled-x td:first-child,
+.erp-data-table.is-scrolled-x th:first-child,
+.erp-data-table.is-scrolled-x td:first-child {
+  box-shadow: 5px 0 10px -2px rgba(15, 23, 42, 0.12) !important;
+  transition: box-shadow 200ms ease;
+  z-index: 9;
+}
+
+/* Corner cell (top-left) joins both shadows */
+.table-container.is-scrolled-x.is-scrolled-y thead th:first-child,
+.table-scroll-wrap.is-scrolled-x.is-scrolled-y thead th:first-child {
+  box-shadow: 5px 4px 12px -2px rgba(15, 23, 42, 0.18) !important;
+  z-index: 11;
+}
+
+/* ── 4. REACTIVE VALUE PULSE ANIMATION ─────────────────────────────────── */
+@keyframes reactiveValuePulse {
+  0% {
+    background-color: rgba(37, 99, 235, 0.28);
+    color: #1d4ed8;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+    transform: scale(1.02);
+  }
+  40% {
+    background-color: rgba(37, 99, 235, 0.15);
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+    transform: scale(1);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+.reactive-value-pulse {
+  animation: reactiveValuePulse 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-radius: 4px;
+}
+
+/* Metric card / totals pulse */
+.metric-value-pulse {
+  animation: reactiveValuePulse 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── 5. INDUSTRIAL HIGH-CONTRAST SHOP FLOOR HUD THEME ─────────────────── */
+[data-hud-theme="industrial"],
+body.theme-industrial-hud {
+  --bg-main:        #050811 !important;
+  --bg-card:        #0b1329 !important;
+  --bg-card-hover:  #152244 !important;
+  --bg-surface:     #050811 !important;
+  --bg-input:       #030712 !important;
+  --bg-th:          #0f172a !important;
+  --bg-modal:       #0b1329 !important;
+
+  --text-primary:   #ffffff !important;
+  --text-secondary: #f1f5f9 !important;
+  --text-muted:     #cbd5e1 !important;
+  --text-table:     #ffffff !important;
+
+  --border-color:   #0284c7 !important;
+  --border-light:   #0369a1 !important;
+  --border-focus:   #38bdf8 !important;
+
+  --primary:        #0284c7 !important;
+  --primary-hover:  #0ea5e9 !important;
+  --primary-glow:   rgba(56, 189, 248, 0.4) !important;
+
+  --success:        #22c55e !important;
+  --success-bg:     #14532d !important;
+  --success-text:   #86efac !important;
+  --success-border: #22c55e !important;
+
+  --warning:        #f59e0b !important;
+  --warning-bg:     #78350f !important;
+  --warning-text:   #fde68a !important;
+  --warning-border: #f59e0b !important;
+
+  --danger:         #ef4444 !important;
+  --danger-bg:      #7f1d1d !important;
+  --danger-text:    #fca5a5 !important;
+  --danger-border:  #ef4444 !important;
+
+  /* Factory Shop Floor High Visibility 2px Outlines */
+  --hud-outline:    2px solid #0284c7 !important;
+}
+
+[data-hud-theme="industrial"] .glass-panel,
+[data-hud-theme="industrial"] .card,
+[data-hud-theme="industrial"] .panel,
+[data-hud-theme="industrial"] table,
+[data-hud-theme="industrial"] input,
+[data-hud-theme="industrial"] select,
+[data-hud-theme="industrial"] button {
+  border-width: 2px !important;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.2) !important;
+}
+
+[data-hud-theme="industrial"] .badge,
+[data-hud-theme="industrial"] [class*="status-pill"],
+[data-hud-theme="industrial"] [class*="StatusPill"] {
+  border-width: 2px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+/* ── 6. DYNAMIC UI SCALE CONTROLLER ────────────────────────────────────── */
+:root {
+  --erp-scale: 1;
+}
+
+.erp-scalable-root {
+  transform-origin: top center;
+  transition: font-size 150ms ease, padding 150ms ease;
+}

@@ -3,6 +3,7 @@
    Brand Accent: #0f172a | 8px Grid | Mobile First & Responsive
    ═══════════════════════════════════════════════════ */
 @import './styles/tokens.css';
+@import './styles/microInteractions.css';
 @import './styles/communication.css';
 
 /* Self-Hosted Inter WOFF2 Fonts (Weights 400, 500, 600) */

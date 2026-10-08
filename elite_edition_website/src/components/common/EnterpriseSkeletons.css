@@ -1,0 +1,116 @@
+/* Pixel-Perfect Enterprise Skeletons */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.5) 0%,
+    rgba(241, 245, 249, 0.9) 50%,
+    rgba(226, 232, 240, 0.5) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmerWave 1.6s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+[data-theme="dark"] .skeleton-shimmer,
+[data-hud-theme="industrial"] .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.6) 0%,
+    rgba(51, 65, 85, 0.8) 50%,
+    rgba(30, 41, 59, 0.6) 100%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes skeletonShimmerWave {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 1. Precision Table Rows (28px / 32px) */
+.skeleton-table-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+  padding: 0 0.5rem;
+  width: 100%;
+}
+
+.skeleton-table-row.height-28 {
+  height: 28px;
+}
+
+.skeleton-table-row.height-32 {
+  height: 32px;
+}
+
+.skeleton-table-cell {
+  padding: 0 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.skeleton-bar {
+  height: 12px;
+  border-radius: 4px;
+}
+
+.height-28 .skeleton-bar {
+  height: 10px;
+}
+
+/* 2. Mobile Card List Skeleton */
+.skeleton-mobile-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.85rem;
+  margin-bottom: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.skeleton-mobile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.skeleton-mobile-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.skeleton-mobile-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-light, #e2e8f0);
+}
+
+/* 3. Form Field Grid Skeleton */
+.skeleton-form-grid {
+  display: grid;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.skeleton-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.skeleton-form-label {
+  width: 90px;
+  height: 12px;
+}
+
+.skeleton-form-input {
+  width: 100%;
+  height: 36px;
+  border-radius: 6px;
+}

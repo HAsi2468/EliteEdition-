@@ -10,3 +10,16 @@ export { ZenFocusModeController } from './ZenFocusModeController';
 export { TableContextMenu } from './TableContextMenu';
 export { ScrollSpyMiniMap } from './ScrollSpyMiniMap';
 export { KeyboardShortcutModal } from './KeyboardShortcutModal';
+
+// Advanced Visual & Spatial Polish Components
+export { StickyScrollShadowTracker } from './StickyScrollShadowTracker';
+export { CellHoverPeek } from './CellHoverPeek';
+export { MorphingActionBar } from './MorphingActionBar';
+export { PrecisionTableSkeleton, MobileCardListSkeleton, FormFieldGridSkeleton } from './EnterpriseSkeletons';
+export { MultiPaneCanvas } from './MultiPaneCanvas';
+export { EntityCompareDock } from './EntityCompareDock';
+export { EnterpriseHUDThemeController } from './EnterpriseHUDThemeController';
+export { ChangelogDrawer } from './ChangelogDrawer';
+export { FeatureCoachmark } from './FeatureCoachmark';
+export { QuickTipPill } from './QuickTipPill';
+export { GuidedTourController } from './GuidedTourController';
