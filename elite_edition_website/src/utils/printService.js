@@ -125,6 +125,50 @@ export const buildPrintStyles = ({
 };
 
 /**
+ * Ensures all images inside a document are fully loaded before opening the print dialog.
+ * Prevents blank or missing images from appearing in printed PDFs and physical printouts.
+ */
+export const waitForImagesToLoad = (targetDoc, maxTimeoutMs = 12000) => {
+  return new Promise((resolve) => {
+    if (!targetDoc) return resolve();
+    const imgs = Array.from(targetDoc.querySelectorAll('img'));
+    if (imgs.length === 0) return resolve();
+
+    let pending = imgs.length;
+    let isSettled = false;
+
+    const onImageDone = () => {
+      if (isSettled) return;
+      pending--;
+      if (pending <= 0) {
+        isSettled = true;
+        resolve();
+      }
+    };
+
+    // Safety timeout prevents browser print dialog from blocking indefinitely if an image fails to load
+    const timeoutTimer = setTimeout(() => {
+      if (!isSettled) {
+        isSettled = true;
+        resolve();
+      }
+    }, maxTimeoutMs);
+
+    imgs.forEach((img) => {
+      if (img.complete && img.naturalWidth > 0) {
+        onImageDone();
+      } else {
+        img.addEventListener('load', onImageDone, { once: true });
+        img.addEventListener('error', onImageDone, { once: true });
+        if (typeof img.decode === 'function') {
+          img.decode().then(onImageDone).catch(onImageDone);
+        }
+      }
+    });
+  });
+};
+
+/**
  * Executes a clean isolated print job using an off-screen iframe.
  * If iframe printing is blocked, falls back to a standalone clean window.
  */
@@ -196,32 +240,36 @@ export const executeCleanPrint = ({
     iframeDoc.write(fullHtml);
     iframeDoc.close();
 
-    const triggerPrint = () => {
-      setTimeout(() => {
-        try {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        } catch (err) {
-          console.warn('Iframe print failed, falling back to window.open:', err);
-          const printWindow = window.open('', '_blank', 'toolbar=yes,location=no,status=no,menubar=yes,scrollbars=yes,resizable=yes,width=1024,height=800');
-          if (printWindow) {
+    const triggerPrint = async () => {
+      try {
+        // Guarantee all images inside iframe finish loading before print dialog is opened
+        await waitForImagesToLoad(iframeDoc);
+        await new Promise(r => setTimeout(r, 250));
+
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (err) {
+        console.warn('Iframe print failed, falling back to window.open:', err);
+        const printWindow = window.open('', '_blank', 'toolbar=yes,location=no,status=no,menubar=yes,scrollbars=yes,resizable=yes,width=1024,height=800');
+        if (printWindow) {
+          try {
             printWindow.document.open();
             printWindow.document.write(fullHtml);
             printWindow.document.close();
+            await waitForImagesToLoad(printWindow.document);
+            await new Promise(r => setTimeout(r, 250));
             printWindow.focus();
-            setTimeout(() => {
-              printWindow.print();
-            }, 400);
-          }
-        } finally {
-          setTimeout(() => {
-            if (iframe.parentNode) {
-              iframe.parentNode.removeChild(iframe);
-            }
-            resolve(true);
-          }, 1500);
+            printWindow.print();
+          } catch(e) {}
         }
-      }, 350);
+      } finally {
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+          }
+          resolve(true);
+        }, 1500);
+      }
     };
 
     if (iframe.contentWindow.document.readyState === 'complete') {

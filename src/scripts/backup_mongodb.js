@@ -153,6 +153,33 @@ async function performBackup() {
     logger.info('[Backup Script] Amazon S3 credentials not set; skipped S3 sync.');
   }
 
+  // 3b. Perform Full Images Archive Backup
+  let imagesBackup = null;
+  try {
+    imagesBackup = await performImagesBackup(dateStr);
+  } catch (imgErr) {
+    logger.warn(`[Backup Script] Images backup warning: ${imgErr.message}`);
+  }
+
+  // 4. Send automated midnight disaster recovery email to designated admin recipients
+  let emailResult = null;
+  try {
+    const { sendBackupReportEmail } = require('../services/email.service');
+    emailResult = await sendBackupReportEmail({
+      recipients: ['parth6070@gmail.com', 'harshtsidapara2468@gmail.com', 'pc.elitedigital@gmail.com'],
+      fileName,
+      filePath: localFilePath,
+      sizeMB,
+      publicUrl: cloudUrl,
+      s3Uri,
+      collectionsCount: collections.length,
+      imagesBackup,
+    });
+    logger.info(`[Backup Script] Automated backup email dispatched: ${JSON.stringify(emailResult)}`);
+  } catch (emailErr) {
+    logger.warn(`[Backup Script] Automated backup email notification warning: ${emailErr.message}`);
+  }
+
   return {
     success: true,
     fileName,
@@ -160,9 +187,117 @@ async function performBackup() {
     sizeMB,
     cloudUrl,
     s3Uri,
+    imagesBackup,
+    emailResult,
     timestamp: now.toISOString(),
   };
 }
+
+const child_process = require('child_process');
+const IMAGES_DIR = path.join(__dirname, '../../uploads');
+const IMAGES_BACKUP_DIR = path.join(__dirname, '../../backups/images');
+
+/**
+ * Creates a gzipped tarball backup of the uploads/ directory (all photos, media, thumbnails),
+ * syncs to Cloudflare R2 and Amazon S3, and enforces 30-day retention.
+ */
+async function performImagesBackup(dateStr = new Date().toISOString().replace(/[:.]/g, '-')) {
+  logger.info('[Backup Script] Starting full images and uploads backup archive...');
+  if (!fs.existsSync(IMAGES_BACKUP_DIR)) {
+    fs.mkdirSync(IMAGES_BACKUP_DIR, { recursive: true });
+  }
+
+  if (!fs.existsSync(IMAGES_DIR)) {
+    logger.info('[Backup Script] No uploads directory found to back up.');
+    return null;
+  }
+
+  const imagesFileName = `elite_images_backup_${dateStr}.tar.gz`;
+  const localImagesPath = path.join(IMAGES_BACKUP_DIR, imagesFileName);
+
+  // Tarball uploads directory
+  try {
+    child_process.execSync(`tar -czf "${localImagesPath}" -C "${path.dirname(IMAGES_DIR)}" uploads`, {
+      timeout: 120000,
+    });
+  } catch (tarErr) {
+    logger.error(`[Backup Script] Failed to create images archive: ${tarErr.message}`);
+    return null;
+  }
+
+  const stat = fs.statSync(localImagesPath);
+  const sizeMB = (stat.size / (1024 * 1024)).toFixed(2);
+
+  // Count files inside uploads
+  let imagesCount = 0;
+  try {
+    const countOut = child_process.execSync(`find "${IMAGES_DIR}" -type f | wc -l`, { encoding: 'utf-8' });
+    imagesCount = parseInt(countOut.trim(), 10) || 0;
+  } catch (e) {}
+
+  logger.info(`[Backup Script] Images archive created: ${imagesFileName} (${sizeMB} MB, ${imagesCount} files)`);
+
+  // Cloudflare R2 Upload
+  let cloudUrl = null;
+  if (isR2Configured()) {
+    try {
+      logger.info('[Backup Script] Syncing images archive to Cloudflare R2...');
+      const buffer = fs.readFileSync(localImagesPath);
+      cloudUrl = await uploadToR2({
+        buffer,
+        fileName: imagesFileName,
+        mimeType: 'application/gzip',
+        folder: 'backups/images',
+      });
+      logger.info(`[Backup Script] Images archive synced to Cloudflare R2: ${cloudUrl}`);
+    } catch (err) {
+      logger.error(`[Backup Script] R2 images sync failed: ${err.message}`);
+    }
+  }
+
+  // Amazon S3 Upload
+  let s3Uri = null;
+  if (isS3Configured()) {
+    try {
+      logger.info('[Backup Script] Syncing images archive to Amazon S3...');
+      const buffer = fs.readFileSync(localImagesPath);
+      s3Uri = await uploadToS3({
+        buffer,
+        fileName: imagesFileName,
+        mimeType: 'application/gzip',
+        folder: 'images-archives',
+      });
+      logger.info(`[Backup Script] Images archive synced to Amazon S3: ${s3Uri}`);
+    } catch (err) {
+      logger.error(`[Backup Script] Amazon S3 images sync failed: ${err.message}`);
+    }
+  }
+
+  // 30-day retention cleanup for images
+  try {
+    const files = fs.readdirSync(IMAGES_BACKUP_DIR);
+    const cutoffTime = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    for (const file of files) {
+      if (file.endsWith('.tar.gz') || file.endsWith('.gz')) {
+        const fp = path.join(IMAGES_BACKUP_DIR, file);
+        if (fs.statSync(fp).mtimeMs < cutoffTime) {
+          fs.unlinkSync(fp);
+          logger.info(`[Backup Script] Purged expired local images backup: ${file}`);
+        }
+      }
+    }
+  } catch (e) {}
+
+  return {
+    fileName: imagesFileName,
+    filePath: localImagesPath,
+    sizeMB,
+    cloudUrl,
+    s3Uri,
+    imagesCount,
+  };
+}
+
 
 // Allow direct CLI execution
 if (require.main === module) {
@@ -179,4 +314,5 @@ if (require.main === module) {
 
 module.exports = {
   performBackup,
+  performImagesBackup,
 };

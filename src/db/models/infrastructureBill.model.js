@@ -25,6 +25,16 @@ const infrastructureBillSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    cloudflareAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    cloudflareUsdAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     totalAmount: {
       type: Number,
       required: true,
@@ -83,7 +93,7 @@ const infrastructureBillSchema = new mongoose.Schema(
 
 // Pre-save hook to calculate totalAmount automatically
 infrastructureBillSchema.pre('save', function (next) {
-  this.totalAmount = (this.awsAmount || 0) + (this.mongoDbAmount || 0);
+  this.totalAmount = (this.awsAmount || 0) + (this.mongoDbAmount || 0) + (this.cloudflareAmount || 0);
   if (typeof next === 'function') {
     next();
   }

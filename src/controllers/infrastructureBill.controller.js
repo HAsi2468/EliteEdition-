@@ -35,6 +35,8 @@ const createBill = async (req, res) => {
       awsAmount,
       awsUsdAmount,
       mongoDbAmount,
+      cloudflareAmount,
+      cloudflareUsdAmount,
       exchangeRate,
       awsBreakdown,
       notes,
@@ -59,6 +61,8 @@ const createBill = async (req, res) => {
       awsAmount: Number(awsAmount || 0),
       awsUsdAmount: Number(awsUsdAmount || 0),
       mongoDbAmount: Number(mongoDbAmount || 0),
+      cloudflareAmount: Number(cloudflareAmount || 0),
+      cloudflareUsdAmount: Number(cloudflareUsdAmount || 0),
       exchangeRate: Number(exchangeRate || 86.5),
       awsBreakdown: Array.isArray(awsBreakdown) ? awsBreakdown : [],
       isAutoSynced: Boolean(isAutoSynced),
@@ -96,6 +100,8 @@ const updateBill = async (req, res) => {
       awsAmount,
       awsUsdAmount,
       mongoDbAmount,
+      cloudflareAmount,
+      cloudflareUsdAmount,
       exchangeRate,
       awsBreakdown,
       notes,
@@ -122,6 +128,8 @@ const updateBill = async (req, res) => {
     if (awsAmount !== undefined) bill.awsAmount = Number(awsAmount || 0);
     if (awsUsdAmount !== undefined) bill.awsUsdAmount = Number(awsUsdAmount || 0);
     if (mongoDbAmount !== undefined) bill.mongoDbAmount = Number(mongoDbAmount || 0);
+    if (cloudflareAmount !== undefined) bill.cloudflareAmount = Number(cloudflareAmount || 0);
+    if (cloudflareUsdAmount !== undefined) bill.cloudflareUsdAmount = Number(cloudflareUsdAmount || 0);
     if (exchangeRate !== undefined) bill.exchangeRate = Number(exchangeRate || 86.5);
     if (awsBreakdown !== undefined) bill.awsBreakdown = Array.isArray(awsBreakdown) ? awsBreakdown : [];
     if (isAutoSynced !== undefined) bill.isAutoSynced = Boolean(isAutoSynced);
@@ -482,6 +490,17 @@ const downloadInvoicePdf = async (req, res) => {
       });
     }
 
+    if (bill.cloudflareAmount > 0) {
+      const cfUsd = bill.cloudflareUsdAmount ? bill.cloudflareUsdAmount : bill.cloudflareAmount / rate;
+      rows.push({
+        desc: 'Cloudflare R2 Object Storage (Zero Egress Media & Challans)',
+        provider: 'Cloudflare Inc.',
+        curr: 'USD',
+        usd: Number(cfUsd || 0).toFixed(2),
+        inr: Number(bill.cloudflareAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      });
+    }
+
     // Render Rows
     rows.forEach((r, idx) => {
       // Check page overflow
@@ -514,8 +533,10 @@ const downloadInvoicePdf = async (req, res) => {
     // Totals Section
     const totalsBoxW = 240;
     const totalsBoxX = M + CW - totalsBoxW;
+    const hasCf = bill.cloudflareAmount > 0;
+    const boxH = hasCf ? 78 : 64;
 
-    doc.roundedRect(totalsBoxX, curY, totalsBoxW, 64, 4).fillAndStroke('#f8fafc', '#cbd5e1');
+    doc.roundedRect(totalsBoxX, curY, totalsBoxW, boxH, 4).fillAndStroke('#f8fafc', '#cbd5e1');
 
     doc.fillColor('#64748b').font('Helvetica').fontSize(8)
       .text('AWS Cloud Subtotal:', totalsBoxX + 12, curY + 8)
@@ -525,12 +546,18 @@ const downloadInvoicePdf = async (req, res) => {
       .text('MongoDB Database Subtotal:', totalsBoxX + 12, curY + 22)
       .text(`₹${Number(bill.mongoDbAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsBoxX, curY + 22, { width: totalsBoxW - 12, align: 'right' });
 
-    doc.rect(totalsBoxX + 10, curY + 36, totalsBoxW - 20, 1).fill('#cbd5e1');
+    if (hasCf) {
+      doc.fillColor('#64748b').font('Helvetica').fontSize(8)
+        .text('Cloudflare R2 Subtotal:', totalsBoxX + 12, curY + 36)
+        .text(`₹${Number(bill.cloudflareAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsBoxX, curY + 36, { width: totalsBoxW - 12, align: 'right' });
+    }
+
+    doc.rect(totalsBoxX + 10, curY + (hasCf ? 50 : 36), totalsBoxW - 20, 1).fill('#cbd5e1');
 
     doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(10)
-      .text('GRAND TOTAL (INR):', totalsBoxX + 12, curY + 44);
+      .text('GRAND TOTAL (INR):', totalsBoxX + 12, curY + (hasCf ? 58 : 44));
     doc.fillColor('#2563eb').font('Helvetica-Bold').fontSize(11)
-      .text(`₹${Number(bill.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsBoxX, curY + 43, { width: totalsBoxW - 12, align: 'right' });
+      .text(`₹${Number(bill.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsBoxX, curY + (hasCf ? 57 : 43), { width: totalsBoxW - 12, align: 'right' });
 
     // Amount in Words
     const wordsBoxW = CW - totalsBoxW - 16;

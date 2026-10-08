@@ -1415,19 +1415,53 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         XLSX.utils.book_append_sheet(wb, ws, 'Party Statement');
 
         // ── SHEET 2: TALLY PRIME / ACCOUNTING IMPORT FORMAT ──
+        const sortVouchersInSeries = (list) => {
+          return [...(list || [])].sort((a, b) => {
+            const parseSeq = (str) => {
+              if (!str) return null;
+              const m = String(str).match(/(\d+)(?!.*\d)/);
+              return m ? parseInt(m[1], 10) : null;
+            };
+            const seqA = parseSeq(a.voucherNo);
+            const seqB = parseSeq(b.voucherNo);
+            if (seqA !== null && seqB !== null && seqA !== seqB) {
+              return seqA - seqB;
+            }
+            const cmp = String(a.voucherNo || '').localeCompare(String(b.voucherNo || ''), undefined, { numeric: true, sensitivity: 'base' });
+            if (cmp !== 0) return cmp;
+            return (a.rawDate || 0) - (b.rawDate || 0);
+          });
+        };
+
+        const sortedPartyTransactions = sortVouchersInSeries(ledger.transactions);
+
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
-        ledger.transactions.forEach(t => {
+        sortedPartyTransactions.forEach(t => {
           const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
           const prodService = t.productService || t.opposingLedger || (vType === 'Sales' ? (t.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"') : 'Bank Account');
-          const totAmt = t.debit > 0 ? t.debit : t.credit;
+          const baseTot = Number(t.debit > 0 ? t.debit : t.credit) || 0;
 
           const rowPartyName = t.partyName || (selectedPartyId !== 'ALL' && partyName !== 'All Customers (Combined)' ? partyName : '') || 'Sundry Debtors';
           const rowGstin = (t.partyGstin || t.gstin || (selectedPartyId !== 'ALL' ? cleanPGst : '') || '').trim().toUpperCase();
           const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
           const rowState = t.state || pState || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : 'Gujarat (24)');
+
+          const rawTaxable = Number(t.taxableAmount) || 0;
+          const rawCgst = Number(t.cgstAmount) || 0;
+          const rawSgst = Number(t.sgstAmount) || 0;
+          const rawIgst = Number(t.igstAmount) || 0;
+
+          let rawTaxSum = parseFloat((rawTaxable + rawCgst + rawSgst + rawIgst).toFixed(2));
+          if (rawTaxSum === 0 && baseTot > 0) {
+            rawTaxSum = parseFloat(baseTot.toFixed(2));
+          }
+
+          // Round Off: decimals >= 0.50 adds the round off, < 0.50 decreases to result in an exact integer total
+          const roundedTotal = Math.round(rawTaxSum);
+          const roundOff = parseFloat((roundedTotal - rawTaxSum).toFixed(2));
 
           tallyRows.push([
             t.date,
@@ -1435,13 +1469,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             t.voucherNo,
             rowPartyName,
             prodService,
-            Number(t.taxableAmount) || 0,
-            Number(t.cgstAmount) || 0,
-            Number(t.sgstAmount) || 0,
-            Number(t.igstAmount) || 0,
-            Number(totAmt) || 0,
-            Number(t.debit) || 0,
-            Number(t.credit) || 0,
+            rawTaxable,
+            rawCgst,
+            rawSgst,
+            rawIgst,
+            roundOff,
+            roundedTotal,
             rowState,
             cleanRowGst
           ]);
@@ -1454,15 +1487,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           { wch: 20 }, // Voucher No
           { wch: 32 }, // Party Ledger Name
           { wch: 32 }, // Product / Service
-          { wch: 16 }, // Taxable Amount
-          { wch: 12 }, // CGST
-          { wch: 12 }, // SGST
-          { wch: 12 }, // IGST
-          { wch: 16 }, // Total Amount
-          { wch: 14 }, // Debit
-          { wch: 14 }, // Credit
-          { wch: 18 }, // POS
-          { wch: 18 }, // GSTIN
+          { wch: 18 }, // Taxable Amount (₹)
+          { wch: 12 }, // CGST (₹)
+          { wch: 12 }, // SGST (₹)
+          { wch: 12 }, // IGST (₹)
+          { wch: 14 }, // Round Off (₹)
+          { wch: 18 }, // Total Amount (₹)
+          { wch: 18 }, // Place of Supply
+          { wch: 18 }, // Party GSTIN
         ];
         XLSX.utils.book_append_sheet(wb, wsTally, 'Tally Import Format');
 
@@ -1750,22 +1782,50 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         ];
         XLSX.utils.book_append_sheet(wb, ws, 'Master Summary');
 
-        // ── SHEET 2: ALL VOUCHERS FOR TALLY IMPORT ──
-        allTransactions.sort((a, b) => (a.rawDate || 0) - (b.rawDate || 0));
+        // ── SHEET 2: ALL VOUCHERS FOR TALLY IMPORT (INVOICES IN SERIES) ──
+        allTransactions.sort((a, b) => {
+          const parseSeq = (str) => {
+            if (!str) return null;
+            const m = String(str).match(/(\d+)(?!.*\d)/);
+            return m ? parseInt(m[1], 10) : null;
+          };
+          const seqA = parseSeq(a.voucherNo);
+          const seqB = parseSeq(b.voucherNo);
+          if (seqA !== null && seqB !== null && seqA !== seqB) {
+            return seqA - seqB;
+          }
+          const cmp = String(a.voucherNo || '').localeCompare(String(b.voucherNo || ''), undefined, { numeric: true, sensitivity: 'base' });
+          if (cmp !== 0) return cmp;
+          return (a.rawDate || 0) - (b.rawDate || 0);
+        });
 
         const tallyRows = [
-          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total Amount (₹)', 'Debit (₹)', 'Credit (₹)', 'Place of Supply', 'Party GSTIN']
+          ['Date', 'Voucher Type', 'Voucher No', 'Party Ledger Name', 'Product / Service', 'Taxable Amount (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Round Off (₹)', 'Total Amount (₹)', 'Place of Supply', 'Party GSTIN']
         ];
 
         allTransactions.forEach(t => {
           const vType = t.voucherType || (t.debit > 0 ? 'Sales' : 'Receipt');
           const prodService = t.productService || t.opposingLedger || (vType === 'Sales' ? (t.department === 'Elite Stitching' ? 'GARMENT STITCHING JOB WORK' : 'DIGITAL PRINT JOB WORK 58"') : 'Bank Account');
-          const totAmt = t.debit > 0 ? t.debit : t.credit;
+          const baseTot = Number(t.debit > 0 ? t.debit : t.credit) || 0;
 
           const rowPartyName = t.partyName || 'Sundry Debtors';
           const rowGstin = (t.partyGstin || t.gstin || '').trim().toUpperCase();
           const cleanRowGst = (rowGstin === 'N/A' || rowGstin === 'UNDEFINED' || rowGstin === 'NULL') ? '' : rowGstin;
           const rowState = t.partyState || t.state || (cleanRowGst.startsWith('24') ? 'Gujarat (24)' : (cleanRowGst ? 'Inter-State' : 'Gujarat (24)'));
+
+          const rawTaxable = Number(t.taxableAmount) || 0;
+          const rawCgst = Number(t.cgstAmount) || 0;
+          const rawSgst = Number(t.sgstAmount) || 0;
+          const rawIgst = Number(t.igstAmount) || 0;
+
+          let rawTaxSum = parseFloat((rawTaxable + rawCgst + rawSgst + rawIgst).toFixed(2));
+          if (rawTaxSum === 0 && baseTot > 0) {
+            rawTaxSum = parseFloat(baseTot.toFixed(2));
+          }
+
+          // Round Off: decimals >= 0.50 adds the round off, < 0.50 decreases to result in an exact integer total
+          const roundedTotal = Math.round(rawTaxSum);
+          const roundOff = parseFloat((roundedTotal - rawTaxSum).toFixed(2));
 
           tallyRows.push([
             t.date,
@@ -1773,13 +1833,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             t.voucherNo,
             rowPartyName,
             prodService,
-            Number(t.taxableAmount) || 0,
-            Number(t.cgstAmount) || 0,
-            Number(t.sgstAmount) || 0,
-            Number(t.igstAmount) || 0,
-            Number(totAmt) || 0,
-            Number(t.debit) || 0,
-            Number(t.credit) || 0,
+            rawTaxable,
+            rawCgst,
+            rawSgst,
+            rawIgst,
+            roundOff,
+            roundedTotal,
             rowState,
             cleanRowGst
           ]);
@@ -1787,20 +1846,19 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
         const wsTally = XLSX.utils.aoa_to_sheet(tallyRows);
         wsTally['!cols'] = [
-          { wch: 13 },
-          { wch: 14 },
-          { wch: 20 },
-          { wch: 32 },
-          { wch: 32 },
-          { wch: 16 },
-          { wch: 12 },
-          { wch: 12 },
-          { wch: 12 },
-          { wch: 16 },
-          { wch: 14 },
-          { wch: 14 },
-          { wch: 18 },
-          { wch: 18 },
+          { wch: 13 }, // Date
+          { wch: 14 }, // Voucher Type
+          { wch: 20 }, // Voucher No
+          { wch: 32 }, // Party Ledger Name
+          { wch: 32 }, // Product / Service
+          { wch: 18 }, // Taxable Amount (₹)
+          { wch: 12 }, // CGST (₹)
+          { wch: 12 }, // SGST (₹)
+          { wch: 12 }, // IGST (₹)
+          { wch: 14 }, // Round Off (₹)
+          { wch: 18 }, // Total Amount (₹)
+          { wch: 18 }, // Place of Supply
+          { wch: 18 }, // Party GSTIN
         ];
         XLSX.utils.book_append_sheet(wb, wsTally, 'Tally All Vouchers');
 
@@ -1991,6 +2049,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [pdfDuplicateModal, setPdfDuplicateModal] = useState(null); // { inv } when open
   const [pdfDuplicateChecked, setPdfDuplicateChecked] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [printingInvoiceId, setPrintingInvoiceId] = useState(null);
+  const [previewImageModal, setPreviewImageModal] = useState(null);
 
   const openPdfDialog = (inv) => {
     setPdfDuplicateChecked(false);
@@ -3193,6 +3253,23 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                                     variant: 'purple',
                                     color: '#a78bfa',
                                     onClick: () => openPdfDialog(inv),
+                                    isPrimary: true
+                                  },
+                                  {
+                                    id: 'print-invoice',
+                                    icon: Printer,
+                                    label: 'Print Invoice',
+                                    tooltip: 'Print Tax Invoice (Auto-loads images)',
+                                    variant: 'blue',
+                                    color: '#38bdf8',
+                                    onClick: async () => {
+                                      try {
+                                        triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${inv.invoiceNo}...`, 'info');
+                                        await api.downloadInvoicePdf(inv._id, inv.invoiceNo, false);
+                                      } catch (err) {
+                                        alert('Failed to prepare invoice for printing: ' + err.message);
+                                      }
+                                    },
                                     isPrimary: true
                                   },
                                   {
@@ -4905,9 +4982,30 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         <td style={{ padding: '0.7rem 0.6rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
                         <td style={{ padding: '0.7rem 0.6rem' }}>
                           {it.imageUrl ? (
-                            <img src={convertDriveUrl(it.imageUrl, it.itemName)} alt="Item" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid #cbd5e1' }} onError={e => { e.target.style.display = 'none'; }} />
+                            <div
+                              style={{ position: 'relative', width: 44, height: 44, cursor: 'pointer', borderRadius: 8, overflow: 'hidden', border: '1.5px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', background: '#f8fafc' }}
+                              onClick={() => setPreviewImageModal({ url: convertDriveUrl(it.imageUrl, it.itemName), title: it.itemName, jobNo: it.jobNo, fabric: it.fabric })}
+                              title="Click to view full design preview"
+                            >
+                              <img
+                                src={convertDriveUrl(it.imageUrl, it.itemName)}
+                                alt="Item"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.18s ease' }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.12)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                onError={e => {
+                                  e.target.style.display = 'none';
+                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                              <div style={{ display: 'none', width: '100%', height: '100%', background: '#f1f5f9', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                                No Img
+                              </div>
+                            </div>
                           ) : (
-                            <div style={{ width: 38, height: 38, borderRadius: 6, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>No Img</div>
+                            <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f1f5f9', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
+                              No Img
+                            </div>
                           )}
                         </td>
                         <td style={{ padding: '0.7rem 0.6rem' }}>
@@ -5001,6 +5099,23 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             {/* Modal Actions */}
             <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
               <button style={{ padding: '0.5rem 1.1rem', background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => setViewInvoiceModal(null)}>Close</button>
+              <button
+                style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#ffffff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                disabled={printingInvoiceId === viewInvoiceModal._id}
+                onClick={async () => {
+                  setPrintingInvoiceId(viewInvoiceModal._id);
+                  try {
+                    triggerPushNotification('🖨️ Preparing Invoice', `Loading images & preparing print for #${viewInvoiceModal.invoiceNo}...`, 'info');
+                    await api.downloadInvoicePdf(viewInvoiceModal._id, viewInvoiceModal.invoiceNo, false);
+                  } catch (err) {
+                    alert('Failed to load invoice for printing: ' + err.message);
+                  } finally {
+                    setPrintingInvoiceId(null);
+                  }
+                }}
+              >
+                <Printer size={15} /> {printingInvoiceId === viewInvoiceModal._id ? 'Loading Images...' : 'Print Invoice'}
+              </button>
               <button style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#ffffff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => openPdfDialog(viewInvoiceModal)}>
                 <Download size={15} /> Download PDF
               </button>
@@ -5609,6 +5724,61 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             });
           }}
         />
+      )}
+
+      {previewImageModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.78)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100000,
+            padding: '1.5rem',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+          onClick={() => setPreviewImageModal(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 16,
+              padding: '1.25rem',
+              maxWidth: '92vw',
+              maxHeight: '92vh',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              position: 'relative'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{previewImageModal.title || 'Design Artwork Preview'}</h4>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: 4 }}>
+                  {previewImageModal.jobNo && <span style={{ fontSize: '0.75rem', color: '#7c3aed', background: '#f3e8ff', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>Job: {previewImageModal.jobNo}</span>}
+                  {previewImageModal.fabric && <span style={{ fontSize: '0.75rem', color: '#0284c7', background: '#e0f2fe', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>Fabric: {previewImageModal.fabric}</span>}
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewImageModal(null)}
+                style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.45rem 0.85rem', fontWeight: 700, cursor: 'pointer', color: '#475569' }}
+              >
+                ✕ Close
+              </button>
+            </div>
+            <img
+              src={previewImageModal.url}
+              alt="Design Preview"
+              style={{ maxWidth: '82vw', maxHeight: '70vh', objectFit: 'contain', borderRadius: 10, border: '1px solid #e2e8f0' }}
+            />
+          </div>
+        </div>
       )}
 
     </div>
