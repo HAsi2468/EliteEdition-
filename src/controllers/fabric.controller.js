@@ -654,30 +654,50 @@ const getStockByPanna = async (req, res) => {
 const getFabricRequirement = async (req, res) => {
   try {
     const JobCard = require('../db/models/jobCard.model');
+    const dept = req.query.department || 'digital_print';
+    const deptFilter = getDepartmentFilter(dept);
 
-    // Fetch all Pending and In Progress job cards that have fabric info and are not yet fully printed
-    const jobs = await JobCard.find({
+    // Fetch active job cards that have fabric requirements and are not finished
+    const jobFilter = {
       status: { $in: ['Pending', 'In Progress'] },
-      printStatus: { $ne: 'Printing Done' },
-      fabric: { $ne: '' }
-    }).lean();
+      printStatus: { $nin: ['Printing Done', 'Done', 'Completed'] },
+      fabric: { $exists: true, $nin: ['', null] }
+    };
+
+    // If a specific department is passed, apply it to jobs
+    if (dept) {
+      jobFilter.department = { $in: [dept, new RegExp(`^${dept}$`, 'i')] };
+    }
+
+    const jobs = await JobCard.find(jobFilter).sort({ jobNo: 1 }).lean();
 
     // Group requirement by fabric + panna
     const requirementMap = {};
     for (const job of jobs) {
-      const fabric = normalizeFabric(job.fabric);
-      const panna = normalizePanna(job.panna);
+      const panna = normalizePanna(job.panna, job.fabric);
+      const fabric = normalizeFabric(job.fabric, panna);
       if (!fabric) continue;
 
-      // Target fabric needed in meters
-      const targetStr = job.totalMtr || job.consumption || '0';
-      const targetMatch = String(targetStr).match(/[\d.]+/);
-      const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+      // Calculate target meters for this job card
+      let targetMtr = 0;
+      if (job.totalMtr) {
+        const targetMatch = String(job.totalMtr).match(/[\d.]+/);
+        if (targetMatch) targetMtr = parseFloat(targetMatch[0]) || 0;
+      }
+      if (targetMtr <= 0 && job.consumption) {
+        const consMatch = String(job.consumption).match(/[\d.]+/);
+        const consMtr = consMatch ? parseFloat(consMatch[0]) || 0 : 0;
+        const pcsNum = parseFloat(String(job.pcs || '1').replace(/[^\d.]/g, '')) || 1;
+        targetMtr = consMtr * pcsNum;
+      }
+      if (targetMtr <= 0) continue;
 
       // Already printed meters
-      const printedStr = job.printMtr || '0';
-      const printedMatch = String(printedStr).match(/[\d.]+/);
-      const printedMtr = printedMatch ? parseFloat(printedMatch[0]) : 0;
+      let printedMtr = 0;
+      if (job.printMtr) {
+        const printedMatch = String(job.printMtr).match(/[\d.]+/);
+        if (printedMatch) printedMtr = parseFloat(printedMatch[0]) || 0;
+      }
 
       // Net remaining meters required for this active job
       const mtrNeeded = Math.max(0, targetMtr - printedMtr);
@@ -692,20 +712,22 @@ const getFabricRequirement = async (req, res) => {
           jobs: []
         };
       }
-      requirementMap[key].totalMtrRequired += mtrNeeded;
+      requirementMap[key].totalMtrRequired = Math.round((requirementMap[key].totalMtrRequired + mtrNeeded) * 100) / 100;
       requirementMap[key].jobs.push({
         jobNo: job.jobNo,
-        party: job.party,
-        pcs: job.pcs,
-        totalMtr: targetMtr,
-        printedMtr,
-        remainingMtr: mtrNeeded,
-        date: job.date
+        party: job.party || '—',
+        pcs: job.pcs || '—',
+        designNo: job.designNo || job.designName || '',
+        totalMtr: Math.round(targetMtr * 100) / 100,
+        printedMtr: Math.round(printedMtr * 100) / 100,
+        remainingMtr: Math.round(mtrNeeded * 100) / 100,
+        date: job.date || ''
       });
     }
 
     // Now get current stock grouped by fabric+panna for comparison
     const stockPipeline = [
+      ...(deptFilter && Object.keys(deptFilter).length > 0 ? [{ $match: deptFilter }] : []),
       {
         $group: {
           _id: { fabricQuality: '$fabricQuality', panna: { $ifNull: ['$panna', 'Unknown'] } },
@@ -720,31 +742,52 @@ const getFabricRequirement = async (req, res) => {
           currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
           _id: 0
         }
-      }
+      },
+      { $sort: { fabricQuality: 1, panna: 1 } }
     ];
     const stockData = await FabricTransaction.aggregate(stockPipeline);
 
-    // Build stock lookup map (case-insensitive & normalized)
+    // Build stock lookup map (strictly accumulating so multiple records for same normalized fabric sum together)
     const stockMap = {};
+    const stockMapByFabricOnly = {};
     for (const s of stockData) {
-      const fabric = normalizeFabric(s.fabricQuality);
-      const panna = normalizePanna(s.panna);
+      const panna = normalizePanna(s.panna, s.fabricQuality);
+      const fabric = normalizeFabric(s.fabricQuality, panna);
       const key = `${fabric}|||${panna}`;
-      stockMap[key] = s.currentStock;
+      const stockVal = Number(s.currentStock) || 0;
+      stockMap[key] = Math.round(((stockMap[key] || 0) + stockVal) * 100) / 100;
+      stockMapByFabricOnly[fabric] = Math.round(((stockMapByFabricOnly[fabric] || 0) + stockVal) * 100) / 100;
     }
 
     // Enrich requirement with stock info
     const result = Object.values(requirementMap).map(req => {
       const key = `${req.fabricQuality}|||${req.panna}`;
-      const currentStock = stockMap[key] || 0;
+      // Match exact fabric + panna, or fallback to fabric match if panna unknown
+      let currentStock = stockMap[key];
+      if (currentStock === undefined || currentStock === null) {
+        currentStock = stockMapByFabricOnly[req.fabricQuality] || 0;
+      }
+      currentStock = Math.max(0, currentStock);
+
+      const shortfall = Math.round(Math.max(0, req.totalMtrRequired - currentStock) * 100) / 100;
+      const status = currentStock >= req.totalMtrRequired ? 'Sufficient' :
+                     currentStock > 0 ? 'Short' : 'No Stock';
+
+      // Deterministic sort of jobs inside this requirement
+      req.jobs.sort((a, b) => (b.remainingMtr - a.remainingMtr) || String(a.jobNo).localeCompare(String(b.jobNo)));
+
       return {
         ...req,
-        currentStock,
-        shortfall: Math.max(0, req.totalMtrRequired - currentStock),
-        status: currentStock >= req.totalMtrRequired ? 'Sufficient' :
-                currentStock > 0 ? 'Short' : 'No Stock'
+        totalMtrRequired: Math.round(req.totalMtrRequired * 100) / 100,
+        currentStock: Math.round(currentStock * 100) / 100,
+        shortfall,
+        status
       };
-    }).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
+    }).sort((a, b) => {
+      const cmp = a.fabricQuality.localeCompare(b.fabricQuality);
+      if (cmp !== 0) return cmp;
+      return String(a.panna).localeCompare(String(b.panna));
+    });
 
     res.status(200).json({ success: true, data: result, totalJobs: jobs.length });
   } catch (error) {

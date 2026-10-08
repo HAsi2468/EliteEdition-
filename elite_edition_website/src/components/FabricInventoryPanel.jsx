@@ -828,14 +828,24 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // fetch requirement from job cards
   const fetchRequirement = async (isSilent = false) => {
-    if (!isSilent) setReqLoading(true);
+    const silent = typeof isSilent === 'boolean' ? isSilent : false;
+    if (!silent) setReqLoading(true);
     try {
-      const res = await api.getFabricRequirement();
-      if (res && res.success) setRequirement(res.data || []);
+      const res = await api.getFabricRequirement({ department });
+      if (res && res.success) {
+        const nextData = res.data || [];
+        setRequirement(prev => {
+          // Avoid triggering unnecessary re-renders if payload is identical
+          if (JSON.stringify(prev) === JSON.stringify(nextData)) {
+            return prev;
+          }
+          return nextData;
+        });
+      }
     } catch (e) {
       console.warn('Failed to fetch requirement', e);
     } finally {
-      if (!isSilent) setReqLoading(false);
+      if (!silent) setReqLoading(false);
     }
   };
 
@@ -854,13 +864,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     fetchChallans();
     fetchStockAdjustments();
     const intervalId = setInterval(() => {
+      // Pause polling if browser tab is hidden
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       fetchData(true);
       fetchRequirement(true);
       // NOTE: fetchChallans is intentionally excluded here.
       // It has its own useEffect that fires on challanSearch/date changes.
-      // Including it here with a stale closure would reset search results every 5s.
       fetchStockAdjustments();
-    }, 5000); // 5s real-time auto-sync
+    }, 25000); // 25s auto-sync interval (prevents rapid continuous refresh/flicker)
 
     const handleDataRefresh = () => {
       fetchData(true);
@@ -874,7 +885,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       clearInterval(intervalId);
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
     };
-  }, []);
+  }, [department]);
+
+  // When user switches to requirement tab, trigger an immediate refresh
+  useEffect(() => {
+    if (activeTab === 'requirement') {
+      fetchRequirement(false);
+    }
+  }, [activeTab]);
 
   // ─── Fetch ALL lots (no filter) — client side will filter by fabric ───
   const fetchAllLots = async () => {
@@ -4155,7 +4173,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   Calculated from all <strong>In Progress</strong> job cards. Click a row to see job-wise breakdown.
                 </p>
               </div>
-              <button className="btn-secondary" onClick={fetchRequirement} disabled={reqLoading}>
+              <button className="btn-secondary" onClick={() => fetchRequirement(false)} disabled={reqLoading}>
                 <RefreshCw size={15} className={reqLoading ? 'spin-loader' : ''} />
                 {reqLoading ? 'Calculating...' : 'Refresh'}
               </button>
@@ -4202,17 +4220,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
             {!reqLoading && requirement.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {requirement.map((req, idx) => {
-                  const isExpanded = expandedFabric === `req_${idx}`;
+                {requirement.map((req) => {
+                  const reqKey = `${req.fabricQuality}_${req.panna}`;
+                  const isExpanded = expandedFabric === reqKey;
                   const statusColor = req.status === 'Sufficient' ? 'var(--success)' : req.status === 'Short' ? '#f59e0b' : 'var(--danger)';
                   const statusBg = req.status === 'Sufficient' ? 'rgba(34,197,94,0.08)' : req.status === 'Short' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
                   const StatusIcon = req.status === 'Sufficient' ? CheckCircle : req.status === 'Short' ? AlertCircle : AlertTriangle;
 
                   return (
-                    <div key={idx} style={{ background: statusBg, border: `1px solid ${statusColor}40`, borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    <div key={reqKey} style={{ background: statusBg, border: `1px solid ${statusColor}40`, borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                       {/* Main row */}
                       <div
-                        onClick={() => setExpandedFabric(isExpanded ? null : `req_${idx}`)}
+                        onClick={() => setExpandedFabric(isExpanded ? null : reqKey)}
                         style={{ display: 'flex', alignItems: 'center', padding: '1rem 1.2rem', cursor: 'pointer', gap: '1rem' }}
                       >
                         <StatusIcon size={20} style={{ color: statusColor, flexShrink: 0 }} />

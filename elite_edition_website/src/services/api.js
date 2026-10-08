@@ -1391,8 +1391,9 @@ export const api = {
     downloadOrPreviewPdf(blob, fileName || `Fabric_Lot_${lotNo}_Statement.pdf`, { title: `Fabric Lot ${lotNo} Statement` });
   },
 
-  async getFabricRequirement() {
-    return request('/fabric/requirement');
+  async getFabricRequirement(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/fabric/requirement${qs ? `?${qs}` : ''}`);
   },
 
   async deleteFabricTransaction(id) {
