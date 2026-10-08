@@ -1,0 +1,185 @@
+/* ==========================================================================
+   FieldAuditPopover - Enterprise Audit Trail & Field History Popover
+   Strict Typography: 14px body/values, 12px headers/timestamps, tabular nums
+   ========================================================================== */
+
+.field-audit-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Value Trigger with subtle dotted underline */
+.field-audit-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px dotted #94a3b8;
+  padding-bottom: 1px;
+  transition: all 0.15s ease;
+}
+
+.field-audit-trigger:hover {
+  border-bottom-color: #2563eb;
+  color: #2563eb;
+}
+
+.field-audit-icon {
+  color: #94a3b8;
+  transition: color 0.15s ease;
+}
+
+.field-audit-trigger:hover .field-audit-icon {
+  color: #2563eb;
+}
+
+/* Popover Floating Panel */
+.field-audit-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 99992;
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+  animation: auditPopIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+@keyframes auditPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Popover Header */
+.field-audit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 10px;
+}
+
+.field-audit-title {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-audit-badge {
+  font-size: 11px !important;
+  line-height: 14px !important;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+/* Audit History Timeline List */
+.field-audit-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.field-audit-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  position: relative;
+}
+
+.field-audit-entry:first-child {
+  border-color: #bfdbfe;
+  background: #f0f7ff;
+}
+
+.field-audit-entry-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-audit-user {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.field-audit-time {
+  font-size: 11px !important;
+  line-height: 14px !important;
+  color: #64748b;
+}
+
+/* Value Diff Visualizer */
+.field-audit-diff {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 600;
+}
+
+.field-audit-old-val {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.field-audit-new-val {
+  color: #0f172a;
+}
+
+.field-audit-delta-tag {
+  font-size: 11px !important;
+  line-height: 14px !important;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.field-audit-delta-tag.positive {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.field-audit-delta-tag.negative {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.field-audit-reason {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #475569;
+  margin: 0;
+  font-style: italic;
+}

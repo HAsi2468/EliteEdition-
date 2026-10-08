@@ -7,32 +7,52 @@
  */
 
 :root {
-  /* ── 1. MATHEMATICAL FLUID TYPOGRAPHY (360px - 1920px Baseline) ── */
-  --erp-font-2xs: clamp(0.625rem, 0.6rem + 0.12vw, 0.6875rem);   /* 10px - 11px */
-  --erp-font-xs:  clamp(0.6875rem, 0.65rem + 0.18vw, 0.75rem);   /* 11px - 12px */
-  --erp-font-sm:  clamp(0.75rem, 0.71rem + 0.25vw, 0.875rem);    /* 12px - 14px */
-  --erp-font-base: clamp(0.875rem, 0.83rem + 0.28vw, 1rem);      /* 14px - 16px */
-  --erp-font-lg:  clamp(1rem, 0.95rem + 0.35vw, 1.1875rem);      /* 16px - 19px */
-  --erp-font-xl:  clamp(1.125rem, 1.05rem + 0.5vw, 1.375rem);    /* 18px - 22px */
-  --erp-font-2xl: clamp(1.35rem, 1.22rem + 0.8vw, 1.75rem);      /* 21.6px - 28px */
-  --erp-font-3xl: clamp(1.65rem, 1.45rem + 1.2vw, 2.25rem);      /* 26px - 36px */
+  /* ── 1. LOCKED SYSTEM TYPOGRAPHY CONTRACT (Uniform across PC, Tablet & Mobile) ──
+   * Strict constraint: NO vw/vh text clamps. Maintain readability by altering padding, wrapping & stacking.
+   */
+  --erp-font-page-title: 20px;          /* Line-height: 28px, Font-weight: 700 */
+  --erp-font-section-title: 18px;       /* Line-height: 24px, Font-weight: 600 */
+  --erp-font-modal-header: 16px;        /* Line-height: 24px, Font-weight: 600 */
+  --erp-font-body: 14px;                /* Line-height: 20px, Font-weight: 400 / 500 */
+  --erp-font-table: 14px;               /* Line-height: 20px, Font-weight: 400 / 600 */
+  --erp-font-button: 14px;              /* Line-height: 20px, Font-weight: 600 */
+  --erp-font-header: 12px;              /* Line-height: 16px, Font-weight: 500 */
+  --erp-font-badge: 12px;               /* Line-height: 16px, Font-weight: 500 */
+  --erp-font-caption: 11px;             /* Line-height: 14px, Font-weight: 500 */
 
-  /* ── 2. MATHEMATICAL FLUID SPACING SYSTEM (clamp) ── */
-  --erp-space-1: clamp(0.25rem, 0.22rem + 0.15vw, 0.375rem);     /* 4px - 6px */
-  --erp-space-2: clamp(0.45rem, 0.4rem + 0.25vw, 0.625rem);      /* 7px - 10px */
-  --erp-space-3: clamp(0.75rem, 0.66rem + 0.45vw, 1rem);         /* 12px - 16px */
-  --erp-space-4: clamp(1rem, 0.88rem + 0.65vw, 1.5rem);          /* 16px - 24px */
-  --erp-space-5: clamp(1.25rem, 1.12rem + 0.85vw, 2rem);         /* 20px - 32px */
-  --erp-space-6: clamp(1.75rem, 1.55rem + 1.2vw, 3rem);          /* 28px - 48px */
+  /* Backward-compatible token aliases */
+  --erp-font-2xs: 11px;
+  --erp-font-xs: 12px;
+  --erp-font-sm: 12px;
+  --erp-font-base: 14px;
+  --erp-font-lg: 16px;
+  --erp-font-xl: 18px;
+  --erp-font-2xl: 20px;
+  --erp-font-3xl: 24px;
 
-  /* ── 3. DEFAULT PRECISION DENSITY (Mouse / Desktop Pointer Mode) ── */
-  --erp-row-height: 34px;
-  --erp-input-height: 32px;
-  --erp-cell-padding-y: 0.45rem;
-  --erp-cell-padding-x: 0.65rem;
-  --erp-btn-min-height: 32px;
-  --erp-touch-target: 34px;
-  --erp-icon-size: 15px;
+  /* Strict Line Heights */
+  --erp-line-tight: 16px;
+  --erp-line-normal: 20px;
+  --erp-line-snug: 24px;
+  --erp-line-title: 28px;
+
+  /* ── 2. STRICT 4PX BASE SPACING SCALE (4px, 8px, 12px, 16px, 24px, 32px) ── */
+  --erp-space-1: 4px;
+  --erp-space-2: 8px;
+  --erp-space-3: 12px;
+  --erp-space-4: 16px;
+  --erp-space-5: 24px;
+  --erp-space-6: 32px;
+  --erp-space-8: 48px;
+
+  /* ── 3. PRECISION COMPONENT SIZING ── */
+  --erp-row-height: 32px;
+  --erp-input-height: 36px;
+  --erp-cell-padding-y: 6px;
+  --erp-cell-padding-x: 10px;
+  --erp-btn-min-height: 36px;
+  --erp-touch-target: 44px; /* Minimum 44px tap target for tablet & mobile touch compliance */
+  --erp-icon-size: 16px;
 
   /* Border Radii */
   --erp-radius-xs: 4px;
@@ -71,7 +91,7 @@ html[data-user-density="compact"],
   --erp-cell-padding-x: 0.5rem !important;
   --erp-btn-min-height: 28px !important;
   --erp-touch-target: 28px !important;
-  --erp-font-table: 0.75rem !important;
+  --erp-font-table: 14px !important; /* Strict constraint: body & table text locked to 14px */
 }
 
 html[data-user-density="comfortable"],
@@ -82,7 +102,7 @@ html[data-user-density="comfortable"],
   --erp-cell-padding-x: 0.8rem !important;
   --erp-btn-min-height: 40px !important;
   --erp-touch-target: 44px !important;
-  --erp-font-table: 0.875rem !important;
+  --erp-font-table: 14px !important;
 }
 
 /* ── 6. ACCESSIBILITY: REDUCED MOTION SAFEGUARD ── */

@@ -22,6 +22,22 @@ const requireAuth = async (req, res, next) => {
       return next();
     }
 
+    // Allow internal approval execution replay triggered by Admin
+    if (
+      (req.headers['x-approval-execution'] === 'true' || req.headers['x-internal-service'] === 'approval-executor') &&
+      req.headers['x-is-admin'] === 'true'
+    ) {
+      req.user = {
+        _id: req.headers['x-user-id'] || 'admin',
+        id: req.headers['x-user-id'] || 'admin',
+        role: 'admin',
+        name: req.headers['x-user-name'] || 'Admin',
+        isAdmin: true
+      };
+      req.userId = String(req.user._id);
+      return next();
+    }
+
     if (!token) {
       return res.status(401).json({
         success: false,

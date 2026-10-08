@@ -205,13 +205,21 @@ html[data-pointer-mode="touch"] .smart-icon-btn {
 
 /* High-Density Data Grid Enhancements (Compact vs Comfortable) */
 .density-compact th,
-.density-compact td,
 .erp-density-compact th,
-.erp-density-compact td,
-html[data-user-density="compact"] .erp-dense-table th,
-html[data-user-density="compact"] .erp-dense-table td {
+html[data-user-density="compact"] .erp-dense-table th {
   padding: 4px 8px !important;
   font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 500 !important;
+  height: 28px !important;
+}
+
+.density-compact td,
+.erp-density-compact td,
+html[data-user-density="compact"] .erp-dense-table td {
+  padding: 4px 8px !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
   height: 28px !important;
 }
 
@@ -223,6 +231,7 @@ html[data-user-density="comfortable"] .erp-dense-table th,
 html[data-user-density="comfortable"] .erp-dense-table td {
   padding: 10px 14px !important;
   font-size: 14px !important;
+  line-height: 20px !important;
   height: 44px !important;
 }
 
@@ -1629,46 +1638,162 @@ tr:hover td {
 }
 
 /* ─────────────────────────────────────────────────
-   Print Styles (Invoices and Job Cards: Black on White)
+   Print & Thermal Media Optimization (A4 Job Cards & 4x2" Stickers)
 ───────────────────────────────────────────────── */
+/* Screen defaults: print-only elements are hidden on screen */
+.print-only,
+.print\:block,
+.print\:flex,
+.print\:inline,
+.thermal-only {
+  display: none !important;
+}
+
 @media print {
   body, main {
     background: #ffffff !important;
     color: #000000 !important;
     font-size: 12pt !important;
     padding: 0 !important;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
+  /* Universal Print Hidden Utilities */
   header,
   aside,
+  nav,
   .sidebar-wrap,
   .mobile-menu-toggle,
   .mobile-drawer-overlay,
+  .mobile-bottom-nav,
+  .split-mobile-dock,
+  .selection-aggregate-dock,
   .no-print,
-  button,
-  .btn,
+  .print-hidden,
+  .print\:hidden,
+  button:not(.print-keep),
+  .btn:not(.print-keep),
   .dept-switcher-header {
     display: none !important;
   }
 
-  .glass-panel,
-  .card,
-  table,
-  td,
-  th {
+  /* Universal Print Display Utilities */
+  .print-only,
+  .print\:block {
+    display: block !important;
+  }
+
+  .print\:inline {
+    display: inline !important;
+  }
+
+  .print\:flex {
+    display: flex !important;
+  }
+
+  /* Page Break Control Classes */
+  .page-break-before,
+  .print-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .page-break-after,
+  .print-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .page-break-avoid,
+  .print-avoid-break,
+  .avoid-break-inside {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  table tr,
+  table td,
+  table th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     border: 1px solid #000000 !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
   }
 
-  th {
+  table th {
     background: #f0f0f0 !important;
+    font-weight: 700 !important;
   }
 
   * {
     box-shadow: none !important;
     text-shadow: none !important;
+  }
+
+  /* ── Preset 1: Standard A4 Enterprise Job Card / Invoice Sheet ── */
+  @page a4-sheet {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  .print-a4-sheet,
+  .print-job-card-a4 {
+    page: a4-sheet;
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Preset 2: 4x2 Inch Thermal Barcode & Roll Sticker Labels ── */
+  @page thermal-4x2 {
+    size: 4in 2in;
+    margin: 2mm;
+  }
+
+  .print-thermal-4x2,
+  .thermal-sticker-label {
+    page: thermal-4x2;
+    width: 4in !important;
+    height: 2in !important;
+    max-width: 4in !important;
+    max-height: 2in !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .thermal-sticker-label * {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    color: #000000 !important;
+  }
+
+  .thermal-sticker-barcode {
+    image-rendering: pixelated !important;
+    image-rendering: crisp-edges !important;
+    text-align: center;
   }
 }
 

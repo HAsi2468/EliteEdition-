@@ -1,3 +1,6 @@
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
+const config = require('../config/config');
 const { ChangeApprovalRequest, ...models } = require('../db/models');
 const logger = require('../config/logger');
 const { getApprovalSettings, setApprovalSettings } = require('../middlewares/approvalInterceptor.middleware');
@@ -94,19 +97,36 @@ const executeApprovedAction = async (approval, adminUser) => {
   const port = process.env.PORT || 3001;
   const url = `http://127.0.0.1:${port}${approval.targetEndpoint}`;
 
+  // Generate short-lived Admin JWT for internal authenticated replay
+  let adminToken = '';
+  try {
+    adminToken = jwt.sign(
+      {
+        userId: String(adminUser?._id || adminUser?.id || 'admin'),
+        role: 'admin',
+        isAdmin: true,
+      },
+      config.jwt.secret,
+      { expiresIn: '5m' }
+    );
+  } catch (tokErr) {
+    logger.warn('[ChangeApprovalController] Could not sign internal JWT: %s', tokErr.message);
+  }
+
   // 1. Primary execution: Replay original HTTP request to API with Admin privileges
   try {
     const fetchOptions = {
       method: approval.httpMethod,
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': adminToken ? `Bearer ${adminToken}` : '',
+        'Cookie': adminToken ? `accessToken=${adminToken}` : '',
         'X-Approval-Execution': 'true',
         'X-User-Id': String(adminUser?._id || adminUser?.id || 'admin'),
         'X-User-Name': adminUser?.name || 'Admin',
         'X-User-Role': 'admin',
         'X-Is-Admin': 'true',
         'X-Operator-Override': 'true',
-        // Pass the admin's auth details so auth middleware recognizes the request
         'X-Internal-Service': 'approval-executor',
       },
     };
@@ -155,25 +175,36 @@ const executeApprovedAction = async (approval, adminUser) => {
       }
     }
 
-    if (targetModel && approval.targetId) {
-      const idQuery = mongoose.Types.ObjectId.isValid(approval.targetId)
-        ? { _id: approval.targetId }
-        : {
-            $or: [
-              { id: approval.targetId },
-              { jobNo: approval.targetId },
-              { invoiceNo: approval.targetId },
-              { challanNo: approval.targetId },
-              { lotNo: approval.targetId },
-              { code: approval.targetId },
-            ],
-          };
+    const targetKey = approval.targetId || approval.requestBody?.jobNo || approval.requestBody?.id || approval.requestBody?._id;
+    if (targetModel && (targetKey || approval.targetIdentifier)) {
+      let idQuery;
+      if (mongoose.Types.ObjectId.isValid(targetKey)) {
+        idQuery = { _id: targetKey };
+      } else {
+        const queryOr = [
+          { id: targetKey },
+          { jobNo: targetKey },
+          { invoiceNo: targetKey },
+          { challanNo: targetKey },
+          { lotNo: targetKey },
+          { code: targetKey },
+        ];
+        if (approval.targetIdentifier) {
+          const cleanIdent = String(approval.targetIdentifier).replace(/^Job #|^Lot #|^Invoice #|^Challan #/i, '').trim();
+          queryOr.push({ jobNo: cleanIdent }, { lotNo: cleanIdent });
+        }
+        idQuery = { $or: queryOr };
+      }
 
       if (approval.httpMethod === 'DELETE') {
         const deleted = await targetModel.findOneAndDelete(idQuery);
         return { success: true, method: 'DIRECT_MODEL_DELETE', data: deleted };
       } else {
         const payload = { ...approval.requestBody };
+        // Strip immutable Mongo fields that cause MongoServerError: Mod on _id not allowed
+        delete payload._id;
+        delete payload.__v;
+        delete payload.createdAt;
 
         // Special handling for tpDetails: sanitize before applying
         if (Array.isArray(payload.tpDetails)) {

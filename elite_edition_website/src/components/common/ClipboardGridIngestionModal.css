@@ -1,0 +1,302 @@
+/* ==========================================================================
+   ClipboardGridIngestionModal - Enterprise Operator Ingestion Design
+   Strict Typography: 14px body, 12px headers/badges, tabular numerals
+   ========================================================================== */
+
+.clipboard-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 99995;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  animation: clipModalFadeIn 0.15s ease-out;
+}
+
+@keyframes clipModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.clipboard-modal-container {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 960px;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Modal Header */
+.clipboard-modal-header {
+  padding: 14px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clipboard-modal-title {
+  margin: 0;
+  font-size: 18px !important;
+  line-height: 24px !important;
+  font-weight: 600;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clipboard-modal-close {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.clipboard-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Modal Body */
+.clipboard-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Paste Instruction Box */
+.clipboard-paste-box {
+  border: 2px dashed #cbd5e1;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clipboard-paste-box:hover,
+.clipboard-paste-box.has-focus {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.clipboard-paste-icon {
+  color: #2563eb;
+  margin-bottom: 6px;
+}
+
+.clipboard-paste-hint {
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.clipboard-paste-subhint {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #64748b;
+  margin: 0;
+}
+
+.clipboard-textarea {
+  width: 100%;
+  height: 80px;
+  padding: 8px 12px;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  resize: vertical;
+  background: #ffffff;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+/* Summary Ribbon */
+.clipboard-summary-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #475569;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clipboard-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+}
+
+.clipboard-stat-badge.valid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.clipboard-stat-badge.error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Preview Data Table */
+.clipboard-table-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 320px;
+}
+
+.clipboard-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+.clipboard-preview-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-bottom: 2px solid #cbd5e1;
+  border-right: 1px solid #e2e8f0;
+  text-align: left;
+  z-index: 2;
+}
+
+.clipboard-preview-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  color: #1e293b;
+}
+
+.clipboard-preview-table tr.has-error td {
+  background: #fff1f2;
+}
+
+.clipboard-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.clipboard-col-mapping-select {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  padding: 3px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  max-width: 140px;
+}
+
+/* Modal Footer */
+.clipboard-modal-footer {
+  padding: 12px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.clipboard-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #475569;
+}
+
+.clipboard-footer-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clipboard-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.clipboard-btn:hover {
+  background: #f1f5f9;
+}
+
+.clipboard-btn.primary {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.clipboard-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.clipboard-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

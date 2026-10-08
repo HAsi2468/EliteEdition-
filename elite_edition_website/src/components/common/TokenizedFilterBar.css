@@ -1,0 +1,252 @@
+/* ==========================================================================
+   TokenizedFilterBar - Enterprise Unified Syntax Filter Component
+   Strict Typography: 14px body/input, 12px chips/badges, tabular numerals
+   ========================================================================== */
+
+.tokenized-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Primary Input Wrapper */
+.tokenized-filter-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  min-height: 40px;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.tokenized-filter-box:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.tokenized-filter-search-icon {
+  color: #94a3b8;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+/* Dismissible Filter Chips */
+.tokenized-filter-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tokenized-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: 6px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 500;
+  user-select: none;
+  animation: chipAppear 0.12s ease-out;
+}
+
+@keyframes chipAppear {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.tokenized-chip-key {
+  font-weight: 600;
+  color: #1e3a8a;
+  text-transform: uppercase;
+  font-size: 11px !important;
+  letter-spacing: 0.03em;
+}
+
+.tokenized-chip-op {
+  color: #64748b;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.tokenized-chip-val {
+  color: #0f172a;
+}
+
+.tokenized-chip-remove {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  transition: color 0.12s ease;
+}
+
+.tokenized-chip-remove:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+/* Active Inline Input Field */
+.tokenized-input-field {
+  flex: 1;
+  min-width: 140px;
+  border: none;
+  outline: none;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  color: #0f172a;
+  background: transparent;
+  padding: 4px 6px;
+}
+
+.tokenized-input-field::placeholder {
+  color: #94a3b8;
+}
+
+/* Right Action Buttons in Filter Bar */
+.tokenized-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tokenized-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tokenized-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.tokenized-action-btn.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+/* Auto-Suggest Dropdown Panel */
+.tokenized-suggest-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 99990;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.tokenized-suggest-title {
+  font-size: 11px !important;
+  line-height: 14px !important;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 4px 8px;
+}
+
+.tokenized-suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px !important;
+  line-height: 18px !important;
+  color: #1e293b;
+  transition: background 0.12s ease;
+}
+
+.tokenized-suggest-item:hover,
+.tokenized-suggest-item.highlighted {
+  background: #f1f5f9;
+  color: #2563eb;
+}
+
+.tokenized-suggest-syntax {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.tokenized-suggest-desc {
+  font-size: 11px !important;
+  color: #64748b;
+}
+
+/* Preset Popover Menu */
+.tokenized-preset-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 99990;
+  width: 260px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tokenized-preset-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #1e293b;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.tokenized-preset-item:hover {
+  background: #f1f5f9;
+}

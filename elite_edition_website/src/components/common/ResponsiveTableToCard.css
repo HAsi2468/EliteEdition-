@@ -1,0 +1,286 @@
+/* ==========================================================================
+   ResponsiveTableToCard - Strict Locked Typography & Adaptive Rules
+   ========================================================================== */
+
+.table-to-card-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── 1. Toolbar Ribbon ── */
+.table-to-card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.table-to-card-title {
+  margin: 0;
+  font-size: 18px !important; /* Strict 18px section title */
+  line-height: 24px !important;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.table-to-card-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 12px !important; /* Strict 12px caption/subtitle */
+  line-height: 16px !important;
+  color: #64748b;
+}
+
+.table-to-card-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-to-card-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.table-to-card-search-icon {
+  position: absolute;
+  left: 9px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.table-to-card-search-input {
+  padding: 6px 12px 6px 30px;
+  font-size: 14px !important; /* Strict 14px input */
+  line-height: 20px !important;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  width: 190px;
+  background: #f8fafc;
+  color: #1e293b;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+
+.table-to-card-search-input:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.table-to-card-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 14px !important; /* Strict 14px button */
+  line-height: 20px !important;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  min-height: 36px;
+  transition: all 0.15s ease;
+}
+
+.table-to-card-action-btn:hover {
+  background: #f1f5f9;
+}
+
+.table-to-card-action-btn.primary {
+  background: var(--erp-primary, #2563eb);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+/* ── 2. Desktop Table Layout (>=768px) ── */
+.table-to-card-table-wrap {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100dvh - 250px);
+}
+
+.table-to-card-table-wrap table thead th {
+  font-size: 12px !important; /* Strict 12px header */
+  line-height: 16px !important;
+  font-weight: 500;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 12px;
+}
+
+.table-to-card-table-wrap table tbody td {
+  font-size: 14px !important; /* Strict 14px body & table data */
+  line-height: 20px !important;
+  color: #1e293b;
+  padding: 8px 12px;
+}
+
+.table-to-card-inspect-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.table-to-card-inspect-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+/* ── 3. Mobile Vertical Card Stack (<768px) ── */
+.table-to-card-mobile-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.table-to-card-summary-card {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.15s ease;
+  min-height: 44px; /* Touch-friendly target */
+}
+
+.table-to-card-summary-card:active {
+  background: #f8fafc;
+  border-color: #2563eb;
+  transform: scale(0.99);
+}
+
+.table-to-card-summary-card.selected {
+  border-color: #2563eb;
+  background: #f0f7ff;
+}
+
+.table-to-card-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.table-to-card-card-id {
+  font-size: 14px !important; /* Strict 14px primary ID */
+  line-height: 20px !important;
+  font-weight: 700;
+  color: var(--erp-primary, #2563eb);
+}
+
+.table-to-card-card-badge {
+  font-size: 12px !important; /* Strict 12px badge */
+  line-height: 16px !important;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  text-transform: uppercase;
+}
+
+.table-to-card-card-title {
+  font-size: 14px !important; /* Strict 14px title */
+  line-height: 20px !important;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.table-to-card-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 12px;
+  background: #f8fafc;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #f1f5f9;
+}
+
+.table-to-card-card-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.table-to-card-cell-label {
+  font-size: 12px !important; /* Strict 12px label */
+  line-height: 16px !important;
+  font-weight: 500;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-to-card-cell-value {
+  font-size: 14px !important; /* Strict 14px value */
+  line-height: 20px !important;
+  font-weight: 500;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-to-card-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #94a3b8;
+  padding-top: 4px;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* ── 4. Footer Bar ── */
+.table-to-card-footer {
+  padding: 6px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px !important; /* Strict 12px footer */
+  line-height: 16px !important;
+  color: #64748b;
+}
+
+.table-to-card-empty,
+.table-to-card-empty-cell {
+  padding: 32px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px !important;
+  line-height: 20px !important;
+}

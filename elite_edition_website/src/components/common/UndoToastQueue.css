@@ -1,0 +1,140 @@
+/* ==========================================================================
+   UndoToastQueue - Non-Blocking Optimistic Undo Action Queue
+   Strict Typography: 14px message, 12px countdown/button, tabular numerals
+   ========================================================================== */
+
+.undo-toast-stack {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  right: 24px;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  max-width: 420px;
+  width: calc(100vw - 48px);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .undo-toast-stack {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.undo-toast-card {
+  pointer-events: auto;
+  position: relative;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  animation: undoToastSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+@keyframes undoToastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Toast Message & Countdown */
+.undo-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.undo-toast-label {
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 500;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-toast-countdown {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* Actions */
+.undo-toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.undo-btn-trigger {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.undo-btn-trigger:hover {
+  background: #1d4ed8;
+}
+
+.undo-btn-trigger:active {
+  transform: scale(0.96);
+}
+
+.undo-btn-dismiss {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s ease;
+}
+
+.undo-btn-dismiss:hover {
+  color: #ffffff;
+  background: #1e293b;
+}
+
+/* 6-second Linear Progress Countdown Bar */
+.undo-toast-progressbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #3b82f6;
+  transition: width 0.1s linear;
+}

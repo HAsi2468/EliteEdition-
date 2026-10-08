@@ -1,0 +1,245 @@
+/* ==========================================================================
+   RecordPresenceConflictBanner - Presence & Optimistic Conflict Architecture
+   Strict Typography: 14px body/values, 12px badges/timestamps, tabular nums
+   ========================================================================== */
+
+.record-presence-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── 1. Presence Ribbon ── */
+.record-presence-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #475569;
+}
+
+.record-presence-users {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-presence-avatars {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.record-presence-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px !important;
+  font-weight: 700;
+  border: 2px solid #ffffff;
+  margin-left: -6px;
+  position: relative;
+  user-select: none;
+}
+
+.record-presence-avatar:first-child {
+  margin-left: 0;
+}
+
+.record-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  display: inline-block;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+  animation: presencePulse 2s infinite;
+}
+
+.record-presence-dot.editing {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+@keyframes presencePulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+/* ── 2. Conflict Alert Banner ── */
+.record-conflict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  animation: conflictSlideDown 0.2s ease-out;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@keyframes conflictSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.record-conflict-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.record-conflict-title {
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 600;
+  color: #991b1b;
+  margin: 0;
+}
+
+.record-conflict-desc {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: #b91c1c;
+  margin: 2px 0 0 0;
+}
+
+.record-conflict-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #b91c1c;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.record-conflict-btn:hover {
+  background: #991b1b;
+}
+
+/* ── 3. Compare & Merge Modal ── */
+.merge-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 99996;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.merge-modal-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 820px;
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);
+  border: 1px solid #cbd5e1;
+  overflow: hidden;
+}
+
+.merge-modal-header {
+  padding: 14px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.merge-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.merge-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+.merge-diff-table th {
+  background: #f8fafc;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-bottom: 2px solid #cbd5e1;
+  text-align: left;
+}
+
+.merge-diff-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  color: #0f172a;
+}
+
+.merge-choice-pill {
+  display: inline-flex;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.merge-choice-btn {
+  padding: 4px 10px;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  font-weight: 500;
+  border: none;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.merge-choice-btn.active {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.merge-modal-footer {
+  padding: 12px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

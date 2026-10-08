@@ -1,0 +1,80 @@
+/* ==========================================================================
+   MaskedInputField - Enterprise Smart Masking & Format Architecture
+   Strict Typography: 14px body/input, 12px status/error, tabular numerals
+   ========================================================================== */
+
+.masked-input-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.masked-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.masked-input-field {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 500;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  min-height: 36px;
+  outline: none;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: 'tnum' 1;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+html[data-pointer-mode="touch"] .masked-input-field {
+  min-height: 44px;
+}
+
+.masked-input-field:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.masked-input-field.is-invalid {
+  border-color: #ef4444;
+  background: #fffbfa;
+}
+
+.masked-input-field.is-valid {
+  border-color: #10b981;
+}
+
+/* Mask Format Tag / Status Icon */
+.masked-input-status-icon {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.masked-input-error-msg {
+  font-size: 11px !important;
+  line-height: 14px !important;
+  color: #dc2626;
+  margin: 0;
+}
+
+.masked-input-hint {
+  font-size: 11px !important;
+  line-height: 14px !important;
+  color: #64748b;
+  margin: 0;
+}
