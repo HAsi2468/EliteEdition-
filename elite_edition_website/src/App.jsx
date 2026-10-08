@@ -105,7 +105,6 @@ import OfflineBanner from './components/common/OfflineBanner';
 import PullToRefresh from './components/common/PullToRefresh';
 import { DashboardSkeleton } from './components/common/Skeleton';
 import BarcodeSnifferHUD from './components/common/BarcodeSnifferHUD';
-import EntitySwitcher from './components/common/EntitySwitcher';
 
 
 
@@ -294,6 +293,18 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowGlobalSearch((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Global Alt + E shortcut for Company Switcher
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.altKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        setShowCompanyQuickSheet((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -592,11 +603,11 @@ export default function App() {
           return l === 'eon' || l === 'elite online' || l === 'elite_online';
         });
       }
-      // Match EDP / Elite Digital Print
-      if (target === 'edp' || target === 'elite digital print' || target === 'digital_print') {
+      // Match EDP / Elite Digital Print / Elite Digital Prints
+      if (target === 'edp' || target === 'elite digital print' || target === 'elite digital prints' || target === 'digital_print' || target === 'digital_prints') {
         return currentUser.allowedCompanies.some(c => {
           const l = String(c).toLowerCase().trim();
-          return l === 'edp' || l === 'elite digital print' || l === 'digital_print';
+          return l === 'edp' || l === 'elite digital print' || l === 'elite digital prints' || l === 'digital_print' || l === 'digital_prints';
         });
       }
       // Match ES / Elite Stitching
@@ -1734,7 +1745,7 @@ export default function App() {
                 title="Switch company"
                 type="button"
               >
-                <span>{isCommActive ? 'Communication' : (activeComp?.name || 'EON')}</span>
+                <span>{isCommActive ? 'Communication' : (activeComp?.name || 'Elite Digital Prints')}</span>
                 <span style={{ fontSize: 'var(--font-size-meta, 0.75rem)', color: 'var(--text-muted)' }}>▾</span>
               </button>
             );
@@ -1755,24 +1766,17 @@ export default function App() {
 
               return (
                 <>
-                  <EntitySwitcher
-                    activeEntityId={activeDepartment}
-                    onSelectEntity={(deptId) => handleSwitchDepartment(deptId)}
-                    allowedCompanies={visibleCompanies.map(c => c.id)}
-                    compact={false}
-                  />
-                  <div className="dept-switcher-divider" />
                   {visibleCompanies.map(company => {
                     const isCommActive = ['communication', 'workspace', 'task_management'].includes(activeTab);
                     const isActive = activeDepartment === company.id && !isCommActive;
 
                     const renderCompanyIcon = () => {
                       switch (company.id) {
-                        case 'elite_online': return <Store size={13} style={{ flexShrink: 0 }} />;
                         case 'digital_print': return <Printer size={13} style={{ flexShrink: 0 }} />;
                         case 'stitching': return <Scissors size={13} style={{ flexShrink: 0 }} />;
                         case 'elite_edition': return <Building size={13} style={{ flexShrink: 0 }} />;
                         case 'elite_fabtex': return <Layers size={13} style={{ flexShrink: 0 }} />;
+                        case 'elite_online': return <Store size={13} style={{ flexShrink: 0 }} />;
                         default: return null;
                       }
                     };
@@ -1782,7 +1786,7 @@ export default function App() {
                         key={company.id}
                         onClick={() => handleSwitchDepartment(company.id)}
                         className={`dept-switcher-btn ${isActive ? 'active' : ''}`}
-                        title={`Switch to ${company.name}`}
+                        title={`Switch to ${company.name} (${company.code})`}
                         type="button"
                       >
                         {renderCompanyIcon()}
@@ -2188,7 +2192,7 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               <div>
                 <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', display: 'block' }}>
-                  {getCompanyById(activeDepartment)?.name || 'EON'}
+                  {getCompanyById(activeDepartment)?.name || 'Elite Digital Prints'}
                 </span>
                 <span style={{ fontSize: 'var(--size-meta, 0.75rem)', color: 'var(--text-muted)' }}>
                   Navigation & Company Switcher
@@ -3310,7 +3314,7 @@ export default function App() {
                 if (company.id === 'elite_fabtex' && !hasEliteFabtexAccess) return null;
 
                 const isActive = activeDepartment === company.id && activeTab !== 'workspace';
-                const CompIcon = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : Building;
+                const CompIcon = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : company.iconName === 'Layers' ? Layers : Building;
                 const brandColor = company.iconColor || '#6366f1';
 
                 return (

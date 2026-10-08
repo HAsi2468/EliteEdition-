@@ -11,11 +11,15 @@ import './EntitySwitcher.css';
  */
 export function EntityBrandBadge({ entityId, customLabel, style }) {
   const company = getCompanyById(entityId);
-  const color = company.badgeColor || company.iconColor || '#2563eb';
+  const color = company.badgeColor || company.iconColor || '#0284c7';
   const hex = color.replace('#', '');
-  const r = parseInt(hex.substring(0, 2), 16) || 37;
-  const g = parseInt(hex.substring(2, 4), 16) || 99;
-  const b = parseInt(hex.substring(4, 6), 16) || 235;
+  const r = parseInt(hex.substring(0, 2), 16) || 2;
+  const g = parseInt(hex.substring(2, 4), 16) || 132;
+  const b = parseInt(hex.substring(4, 6), 16) || 199;
+
+  const rawLabel = (customLabel || company.name || '').trim();
+  // Prevent duplicate repetition like "EON • EON" or "EDP • EDP"
+  const label = rawLabel.toUpperCase() === company.code.toUpperCase() ? company.name : rawLabel;
 
   return (
     <div 
@@ -28,9 +32,9 @@ export function EntityBrandBadge({ entityId, customLabel, style }) {
       title={`Active Legal Entity: ${company.name} (${company.type})`}
     >
       <span className="entity-switcher-dot" />
-      <span style={{ fontWeight: 800, color }}>{company.code}</span>
-      <span>•</span>
-      <span>{customLabel || company.name}</span>
+      <span style={{ fontWeight: 800, color, letterSpacing: '0.04em' }}>{company.code}</span>
+      <span style={{ opacity: 0.45 }}>•</span>
+      <span style={{ fontWeight: 600 }}>{label}</span>
     </div>
   );
 }

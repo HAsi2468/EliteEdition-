@@ -301,7 +301,12 @@ function getDatePresetRange(preset, customStart = '', customEnd = '') {
   return { start, end, labelText };
 }
 
-export default function EliteBillingDepartment({ initialChallanData = null, department = 'digital_print', companyEntity = 'Elite Edition', initialTab = null }) {
+export default function EliteBillingDepartment({ 
+  initialChallanData = null, 
+  department = 'digital_print', 
+  companyEntity = (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'elite_edition' ? 'Elite Edition' : 'Elite Digital Prints'), 
+  initialTab = null 
+}) {
   const [activeTab, setActiveTab] = useState(() => (initialTab && initialTab !== 'costing') || (companyEntity === 'Elite Edition' || companyEntity === 'Elite Fabtex' ? 'invoices' : 'challans')); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
