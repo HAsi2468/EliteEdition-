@@ -1,0 +1,170 @@
+/* ==========================================================================
+   StandardNumericInput.css - Enterprise Numeric Input Component
+   Design Principles:
+   - Strict Tabular Numerals: font-variant-numeric: tabular-nums
+   - Zero-Jumping Layout: Stable fixed line-height & padding
+   - High-contrast visual focus indicators for high-speed operator data entry
+   ========================================================================== */
+
+.standard-numeric-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  overflow: hidden;
+}
+
+/* Sizing Scale */
+.standard-numeric-size-sm {
+  min-height: 28px;
+  height: 28px;
+  font-size: 13px;
+}
+
+.standard-numeric-size-md {
+  min-height: 36px;
+  height: 36px;
+  font-size: 14px;
+}
+
+.standard-numeric-size-lg {
+  min-height: 44px;
+  height: 44px;
+  font-size: 15px;
+}
+
+/* Touch Pointer Target Minimum Compliance (44px on mobile) */
+html[data-pointer-mode="touch"] .standard-numeric-wrapper {
+  min-height: 44px !important;
+}
+
+/* Core Input Styling */
+.standard-numeric-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0 10px;
+  color: #0f172a;
+  font-family: inherit;
+  font-weight: 600;
+  line-height: normal;
+  box-sizing: border-box;
+
+  /* Strict Tabular Numerals Requirement */
+  font-variant-numeric: tabular-nums !important;
+  -webkit-font-feature-settings: 'tnum' 1;
+  -moz-font-feature-settings: 'tnum' 1;
+  font-feature-settings: 'tnum' 1;
+}
+
+.standard-numeric-size-sm .standard-numeric-input {
+  font-size: 12.5px !important;
+  padding: 0 8px;
+}
+
+.standard-numeric-size-md .standard-numeric-input {
+  font-size: 14px !important;
+  padding: 0 10px;
+}
+
+.standard-numeric-size-lg .standard-numeric-input {
+  font-size: 15.5px !important;
+  padding: 0 12px;
+}
+
+/* Alignments */
+.standard-numeric-align-right {
+  text-align: right !important;
+}
+
+.standard-numeric-align-left {
+  text-align: left !important;
+}
+
+.standard-numeric-align-center {
+  text-align: center !important;
+}
+
+/* Placeholder */
+.standard-numeric-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+/* Focus States */
+.standard-numeric-wrapper.is-focused {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.standard-numeric-wrapper:hover:not(.is-focused):not(.is-disabled) {
+  border-color: #94a3b8;
+}
+
+/* Disabled & ReadOnly States */
+.standard-numeric-wrapper.is-disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.standard-numeric-wrapper.is-disabled .standard-numeric-input {
+  color: #64748b;
+  cursor: not-allowed;
+  user-select: none;
+}
+
+.standard-numeric-wrapper.is-readonly {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.standard-numeric-wrapper.is-readonly .standard-numeric-input {
+  color: #334155;
+  cursor: default;
+}
+
+/* Prefix & Suffix Adornments */
+.standard-numeric-prefix,
+.standard-numeric-suffix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 12px;
+  background: #f8fafc;
+  user-select: none;
+  pointer-events: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.standard-numeric-prefix {
+  border-right: 1px solid #e2e8f0;
+}
+
+.standard-numeric-suffix {
+  border-left: 1px solid #e2e8f0;
+}
+
+.standard-numeric-wrapper.is-focused .standard-numeric-prefix,
+.standard-numeric-wrapper.is-focused .standard-numeric-suffix {
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}

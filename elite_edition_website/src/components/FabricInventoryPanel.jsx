@@ -21,6 +21,7 @@ import '../styles/fabricEnterprise.css';
 import { SmartActionGroup } from './common/SmartActionGroup';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
+import { StandardNumericInput } from './common/StandardNumericInput';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
@@ -5851,8 +5852,16 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     </datalist>
                   </div>
                   <div style={{ flex: '0.8 1 70px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>PCS</label>
-                    <input type="number" min="0" value={challanForm.pcs} onChange={e => setChallanForm({ ...challanForm, pcs: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Pcs" />
+                    <StandardNumericInput
+                      mode="integer"
+                      decimals={0}
+                      suffix="Pcs"
+                      placeholder="0"
+                      min={0}
+                      value={challanForm.pcs}
+                      onChange={e => setChallanForm({ ...challanForm, pcs: e.target.value })}
+                      style={{ width: '100%' }}
+                    />
                   </div>
                 </div>
 
@@ -6337,7 +6346,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
               <div>
                 <label style={labelStyle}>Quantity (mtr) *</label>
-                <input type="number" step="0.01" required min="0.1" value={inwardForm.qty} onChange={e => setInwardForm({ ...inwardForm, qty: e.target.value })} style={inputStyle} />
+                <StandardNumericInput
+                  mode="decimal"
+                  decimals={2}
+                  suffix="mtr"
+                  placeholder="0.00"
+                  required
+                  min={0.01}
+                  value={inwardForm.qty}
+                  onChange={e => setInwardForm({ ...inwardForm, qty: e.target.value })}
+                  style={inputStyle}
+                />
               </div>
 
 
@@ -6761,7 +6780,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
               <div>
                 <label style={labelStyle}>Quantity (mtr) *</label>
-                <input type="number" step="0.01" required min="0.1" value={outwardForm.qty} onChange={e => setOutwardForm({ ...outwardForm, qty: e.target.value })} style={inputStyle} />
+                <StandardNumericInput
+                  mode="decimal"
+                  decimals={2}
+                  suffix="mtr"
+                  placeholder="0.00"
+                  required
+                  min={0.01}
+                  value={outwardForm.qty}
+                  onChange={e => setOutwardForm({ ...outwardForm, qty: e.target.value })}
+                  style={inputStyle}
+                />
                 {(outwardForm.fabricQuality || '').toUpperCase().includes('CREPE') && (
                   <span style={{ fontSize: '0.75rem', color: '#8b5cf6', marginTop: '0.3rem', display: 'block', fontWeight: 600 }}>
                     💡 +2% Auto-Added for French Crepe {outwardForm.qty && !isNaN(outwardForm.qty) ? `(${outwardForm.qty} mtr → ${(parseFloat(outwardForm.qty) * 1.02).toFixed(2)} mtr outward)` : '(e.g. 100 mtr → 102.00 mtr)'}

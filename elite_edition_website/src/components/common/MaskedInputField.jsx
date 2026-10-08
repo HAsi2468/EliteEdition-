@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import './MaskedInputField.css';
+export { StandardNumericInput } from './StandardNumericInput';
 
 /**
  * Format string according to GSTIN mask: 24ABCDE1234F1Z5
@@ -162,6 +163,9 @@ export function MaskedInputField({
       // Strip formatting commas for easier inline editing
       const stripped = String(displayValue).replace(/,/g, '');
       setDisplayValue(stripped);
+      requestAnimationFrame(() => {
+        e.target?.select?.();
+      });
     }
   };
 

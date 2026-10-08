@@ -12,6 +12,7 @@ import DateRangePicker from './DateRangePicker';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import { triggerGlobalDataRefresh } from './NotificationToast';
 import { SmartThumbnail } from './common/SmartThumbnail';
+import { StandardNumericInput } from './common/StandardNumericInput';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -2005,15 +2006,19 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                   <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#1e40af', display: 'block', marginBottom: 2 }}>
                                     Paying (₹)
                                   </label>
-                                  <input
-                                    type="number"
-                                    step="any"
+                                  <StandardNumericInput
+                                    mode="currency"
+                                    decimals={2}
+                                    prefix="₹"
                                     disabled={!isSelected}
                                     value={payingAmt}
                                     onChange={e => handleInvoicePayingAmountChange(inv, e.target.value)}
                                     placeholder="0.00"
+                                    size="sm"
                                     style={{
-                                      width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.88rem', fontWeight: 800,
+                                      width: '100%',
+                                      fontSize: '0.88rem',
+                                      fontWeight: 800,
                                       color: isSelected ? '#1d4ed8' : '#64748b',
                                       border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
                                       background: '#ffffff',
@@ -2241,15 +2246,19 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                                   <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#1e40af', display: 'block', marginBottom: 2 }}>
                                     Paying (₹)
                                   </label>
-                                  <input
-                                    type="number"
-                                    step="any"
+                                  <StandardNumericInput
+                                    mode="currency"
+                                    decimals={2}
+                                    prefix="₹"
                                     disabled={!isSelected}
                                     value={payingAmt}
                                     onChange={e => handlePurchasePayingAmountChange(pur, e.target.value)}
                                     placeholder="0.00"
+                                    size="sm"
                                     style={{
-                                      width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.88rem', fontWeight: 800,
+                                      width: '100%',
+                                      fontSize: '0.88rem',
+                                      fontWeight: 800,
                                       color: isSelected ? '#1d4ed8' : '#64748b',
                                       border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
                                       background: '#ffffff',
@@ -2325,9 +2334,10 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   <label style={{ fontSize: '0.72rem', fontWeight: 800, color: formVal.type === 'IN' ? '#34d399' : '#f87171', textTransform: 'uppercase' }}>
                     Amount (₹) *
                   </label>
-                  <input
-                    type="number"
-                    step="any"
+                  <StandardNumericInput
+                    mode="currency"
+                    decimals={2}
+                    prefix="₹"
                     required
                     placeholder="0.00"
                     value={formVal.amount}
