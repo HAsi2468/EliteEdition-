@@ -3294,11 +3294,9 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* Main Layout: Left Side List & Right Side Form */}
-          <div style={styles.contentLayout}>
-            {/* Left Side: Bills List */}
-            {/* Left Side: Bills List */}
-            <div className="glass-panel" style={{ ...styles.tablePanel, flex: 1 }}>
+          {/* Main Layout: Bills Table */}
+          <div style={{ width: '100%' }}>
+            <div className="glass-panel" style={{ ...styles.tablePanel, width: '100%' }}>
               <div style={styles.panelHeader}>
                 <CreditCard size={16} color="var(--primary)" />
                 <h3 style={styles.panelTitle}>Monthly Bills History — By Platform</h3>
@@ -3736,104 +3734,141 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* Right Side: Add/Edit Bill Form */}
-            <div className="glass-panel" style={styles.formPanel}>
-              <div style={styles.panelHeader}>
-                <UserPlus size={16} color="var(--primary)" />
-                <h3 style={styles.panelTitle}>
-                  {editingBill ? `Edit Billing Record — ${editingBill.month}` : 'Manual Bill Entry'}
-                </h3>
-              </div>
+            {/* Right Side: Manual Bill Entry Form removed as requested */}
+          </div>
 
-              <form onSubmit={handleBillSubmit} style={styles.form}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Month *</label>
-                  <div style={styles.inputWrapper}>
-                    <input
-                      type="text"
-                      name="month"
-                      value={billFormData.month}
-                      onChange={e => setBillFormData(p => ({ ...p, month: e.target.value }))}
-                      placeholder="e.g. October 2026"
-                      required
-                      style={styles.formInputWithoutIcon}
+          {/* Edit Bill Modal (Only pops up if user explicitly clicks Edit on a bill row) */}
+          {editingBill && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(5px)',
+              zIndex: 99999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '480px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem 1.25rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: '#f8fafc'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Edit2 size={16} color="var(--primary, #2563eb)" />
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Edit Billing Record — {editingBill.month}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelBillEdit}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleBillSubmit} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Month *</label>
+                    <div style={styles.inputWrapper}>
+                      <input
+                        type="text"
+                        name="month"
+                        value={billFormData.month}
+                        onChange={e => setBillFormData(p => ({ ...p, month: e.target.value }))}
+                        placeholder="e.g. October 2026"
+                        required
+                        style={styles.formInputWithoutIcon}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>AWS Amount (₹ INR) *</label>
+                    <div style={styles.inputWrapper}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        name="awsAmount"
+                        value={billFormData.awsAmount}
+                        onChange={e => setBillFormData(p => ({ ...p, awsAmount: e.target.value }))}
+                        placeholder="e.g. 2169.78"
+                        required
+                        style={styles.formInputWithoutIcon}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>MongoDB Amount (₹ INR) *</label>
+                    <div style={styles.inputWrapper}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        name="mongoDbAmount"
+                        value={billFormData.mongoDbAmount}
+                        onChange={e => setBillFormData(p => ({ ...p, mongoDbAmount: e.target.value }))}
+                        placeholder="e.g. 0.00"
+                        required
+                        style={styles.formInputWithoutIcon}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Cloudflare R2 Amount (₹ INR)</label>
+                    <div style={styles.inputWrapper}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        name="cloudflareAmount"
+                        value={billFormData.cloudflareAmount}
+                        onChange={e => setBillFormData(p => ({ ...p, cloudflareAmount: e.target.value }))}
+                        placeholder="e.g. 0.00 (Zero Egress storage)"
+                        style={styles.formInputWithoutIcon}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Notes</label>
+                    <textarea
+                      name="notes"
+                      value={billFormData.notes}
+                      onChange={e => setBillFormData(p => ({ ...p, notes: e.target.value }))}
+                      placeholder="Add billing context, invoice number or notes..."
+                      style={{
+                        ...styles.formInputWithoutIcon,
+                        minHeight: '60px',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '0.65rem 0.75rem',
+                        outline: 'none',
+                        resize: 'vertical'
+                      }}
                     />
                   </div>
-                </div>
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>AWS Amount (₹ INR) *</label>
-                  <div style={styles.inputWrapper}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      name="awsAmount"
-                      value={billFormData.awsAmount}
-                      onChange={e => setBillFormData(p => ({ ...p, awsAmount: e.target.value }))}
-                      placeholder="e.g. 2169.78"
-                      required
-                      style={styles.formInputWithoutIcon}
-                    />
-                  </div>
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>MongoDB Amount (₹ INR) *</label>
-                  <div style={styles.inputWrapper}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      name="mongoDbAmount"
-                      value={billFormData.mongoDbAmount}
-                      onChange={e => setBillFormData(p => ({ ...p, mongoDbAmount: e.target.value }))}
-                      placeholder="e.g. 0.00"
-                      required
-                      style={styles.formInputWithoutIcon}
-                    />
-                  </div>
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Cloudflare R2 Amount (₹ INR)</label>
-                  <div style={styles.inputWrapper}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      name="cloudflareAmount"
-                      value={billFormData.cloudflareAmount}
-                      onChange={e => setBillFormData(p => ({ ...p, cloudflareAmount: e.target.value }))}
-                      placeholder="e.g. 0.00 (Zero Egress storage)"
-                      style={styles.formInputWithoutIcon}
-                    />
-                  </div>
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Notes</label>
-                  <textarea
-                    name="notes"
-                    value={billFormData.notes}
-                    onChange={e => setBillFormData(p => ({ ...p, notes: e.target.value }))}
-                    placeholder="Add billing context, invoice number or notes..."
-                    style={{
-                      ...styles.formInputWithoutIcon,
-                      minHeight: '70px',
-                      background: 'rgba(17, 24, 39, 0.7)',
-                      border: '1px solid var(--border-light)',
-                      color: 'var(--text-primary)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '0.65rem 0.75rem',
-                      outline: 'none',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-
-                <div style={styles.formActions}>
-                  {editingBill && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                     <button
                       type="button"
                       onClick={handleCancelBillEdit}
@@ -3843,24 +3878,24 @@ export default function AdminPanel() {
                       <X size={14} />
                       <span>Cancel</span>
                     </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="btn-success"
-                    style={{ ...styles.btn, ...styles.submitBtn }}
-                    disabled={submitLoading}
-                  >
-                    {submitLoading ? (
-                      <RotateCw size={14} className="spin-loader" />
-                    ) : (
-                      <Save size={14} />
-                    )}
-                    <span>{editingBill ? 'Save Changes' : 'Save Bill'}</span>
-                  </button>
-                </div>
-              </form>
+                    <button
+                      type="submit"
+                      className="btn-success"
+                      style={{ ...styles.btn, ...styles.submitBtn }}
+                      disabled={submitLoading}
+                    >
+                      {submitLoading ? (
+                        <RotateCw size={14} className="spin-loader" />
+                      ) : (
+                        <Save size={14} />
+                      )}
+                      <span>Save Changes</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* AWS Service Breakdown Modal */}
           {selectedBillBreakdown && (
