@@ -1,0 +1,167 @@
+/* Non-Blocking Validation Dock Stylesheet */
+
+.validation-dock-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999999;
+  max-width: 90vw;
+  width: auto;
+  pointer-events: none;
+  animation: validationDockSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes validationDockSlideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.validation-dock-card {
+  pointer-events: auto;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5), 0 0 24px rgba(239, 68, 68, 0.25);
+  border-radius: 14px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.validation-dock-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.validation-dock-count-badge {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  white-space: nowrap;
+}
+
+.validation-dock-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fca5a5;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* Scrollable Pills Tray */
+.validation-pills-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 4px;
+  max-width: 65vw;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.validation-pills-tray::-webkit-scrollbar {
+  height: 4px;
+}
+
+.validation-pills-tray::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.validation-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.validation-pill-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.validation-pill-label {
+  color: #fecaca;
+  font-weight: 700;
+}
+
+.validation-pill-msg {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.validation-dock-dismiss-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
+}
+
+.validation-dock-dismiss-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Visual Target Pulse when field is navigated to */
+@keyframes dockFieldHighlightPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8);
+    border-color: #ef4444 !important;
+    background-color: rgba(254, 226, 226, 0.35) !important;
+  }
+  40% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.25);
+    border-color: #dc2626 !important;
+    background-color: rgba(254, 226, 226, 0.5) !important;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.dock-field-highlight-pulse {
+  animation: dockFieldHighlightPulse 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}

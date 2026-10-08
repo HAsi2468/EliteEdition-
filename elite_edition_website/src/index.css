@@ -54,6 +54,13 @@
   --border-light:   #e2e8f0;
   --border-focus:   #2563eb;    /* Vibrant Royal Blue focus */
 
+  /* Multi-Entity Dynamic Visual Accent Tokens */
+  --entity-accent:     #2563eb;
+  --entity-accent-rgb: 37, 99, 235;
+  --entity-gradient:   linear-gradient(135deg, #2563eb, #1d4ed8);
+  --entity-code:       'EDP';
+  --entity-name:       'Elite Digital Print';
+
   /* Brand & Action Blues */
   --primary:        #2563eb;    /* Professional Royal Blue */
   --primary-hover:  #1d4ed8;    /* Deep Cobalt Blue 700 */
@@ -1501,11 +1508,11 @@ tr:hover td {
 }
 
 .dept-switcher-btn.active {
-  background: #2563eb !important;
-  border-color: #2563eb !important;
+  background: var(--entity-accent, #2563eb) !important;
+  border-color: var(--entity-accent, #2563eb) !important;
   color: #ffffff !important;
   font-weight: 700 !important;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.28) !important;
+  box-shadow: 0 1px 4px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.35) !important;
 }
 
 .dept-switcher-divider {

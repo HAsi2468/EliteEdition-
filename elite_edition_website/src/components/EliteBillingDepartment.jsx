@@ -100,8 +100,15 @@ import {
   FileCode,
   Filter,
   RotateCcw,
-  Percent
+  Percent,
+  Copy
 } from 'lucide-react';
+
+import { cloneDocumentPayload, focusPrimaryQuantityInput } from '../utils/documentCloneUtility';
+import { ValidationDock } from './common/ValidationDock';
+import { useValidationDock } from '../hooks/useValidationDock';
+import { EntityBrandBadge } from './common/EntityBrandBadge';
+import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 
 // Helper for Indian Currency formatting
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -363,6 +370,25 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [purchaseGstFilter, setPurchaseGstFilter] = useState('ALL');
   const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
+
+  // ── NON-BLOCKING VALIDATION DOCK & INDUSTRIAL SCANNER HOOKS ────────────────
+  const { errors: validationErrors, setErrors: setValidationErrors, clearErrors: clearValidationErrors } = useValidationDock();
+
+  // Ambient Barcode Sniffer: fast-filter search on current tab
+  useHardwareBarcodeSniffer((scanData) => {
+    if (!scanData?.code) return false;
+    const code = scanData.code.trim();
+    if (activeTab === 'invoices') {
+      setSearch(code);
+      triggerPushNotification('Barcode Sniffer 🔍', `Filtered invoices for: ${code}`, 'info');
+      return true;
+    } else if (activeTab === 'purchase') {
+      setPurchaseSearch(code);
+      triggerPushNotification('Barcode Sniffer 🔍', `Filtered purchases for: ${code}`, 'info');
+      return true;
+    }
+    return false;
+  });
 
   const createEmptyPurchaseItem = () => ({
     id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -699,6 +725,26 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     setShowPurchaseModal(true);
   };
 
+  // Standardized Purchase Clone Workflow (Line items duplicated, dates & status reset, quantity focused)
+  const handleClonePurchase = (purchaseToClone) => {
+    try {
+      const cloned = cloneDocumentPayload(purchaseToClone, 'purchase');
+      if (!cloned) return;
+
+      setEditingPurchaseId(null);
+      setPurchaseForm({
+        ...cloned,
+        purchaseNo: `PUR-DRAFT-${Date.now().toString().slice(-4)}`
+      });
+      setShowPurchaseModal(true);
+
+      triggerPushNotification('Purchase Entry Cloned 📋', 'Duplicated line items into draft. Quantity field focused for instant entry.', 'info');
+      focusPrimaryQuantityInput('[data-primary-qty="true"]', 200);
+    } catch (err) {
+      console.error('Failed to clone purchase:', err);
+    }
+  };
+
   const fetchPurchases = async () => {
     try {
       const res = await api.getBillingPurchases(companyEntity);
@@ -777,16 +823,63 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const handleCreatePurchase = async (e) => {
     e.preventDefault();
     const vendorFinalName = purchaseForm.vendor?.businessName || purchaseForm.vendor?.name || purchaseForm.vendorName;
+    const errs = [];
+
     if (!vendorFinalName || !vendorFinalName.trim()) {
-      alert('Please select or enter Vendor Name.');
-      return;
+      errs.push({
+        fieldId: 'purchase-vendor-name',
+        label: 'Vendor / Supplier',
+        message: 'Please select or enter Vendor Name'
+      });
     }
 
-    const validItems = (calculatedPurchase.items || []).filter(i => i.itemName && i.itemName.trim() !== '');
+    const items = calculatedPurchase.items || [];
+    const validItems = items.filter(i => i.itemName && i.itemName.trim() !== '');
     if (validItems.length === 0) {
-      alert('Please add at least one item description.');
+      errs.push({
+        fieldId: 'purchase-item-name-0',
+        label: 'Line Items',
+        message: 'Please add at least one item description'
+      });
+    } else {
+      items.forEach((it, idx) => {
+        if (!it.itemName || !it.itemName.trim()) {
+          errs.push({
+            fieldId: `purchase-item-name-${idx}`,
+            label: `Item #${idx + 1} Name`,
+            message: 'Item description cannot be empty'
+          });
+        }
+        if (!it.qty || Number(it.qty) <= 0) {
+          errs.push({
+            fieldId: `purchase-item-qty-${idx}`,
+            label: `Item #${idx + 1} Qty`,
+            message: 'Quantity must be greater than 0'
+          });
+        }
+        if (it.unitPrice == null || Number(it.unitPrice) < 0) {
+          errs.push({
+            fieldId: `purchase-item-price-${idx}`,
+            label: `Item #${idx + 1} Price`,
+            message: 'Unit price cannot be negative'
+          });
+        }
+      });
+    }
+
+    if (isNaN(calculatedPurchase.grandTotal) || calculatedPurchase.grandTotal <= 0) {
+      errs.push({
+        fieldId: 'purchase-item-price-0',
+        label: 'Grand Total',
+        message: 'Grand total is invalid. Please verify item quantities and prices.'
+      });
+    }
+
+    if (errs.length > 0) {
+      setValidationErrors(errs);
       return;
     }
+    clearValidationErrors();
 
     const payload = {
       purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
@@ -924,6 +1017,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       notes: 'Vendor purchase bill recorded in ERP.',
       terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
     });
+
+    triggerPushNotification('Purchase Recorded 📥', `Purchase Bill #${payload.purchaseNo} saved successfully!`, 'success');
   };
 
   const handleDeletePurchase = async (id) => {
@@ -2618,6 +2713,34 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     }
   };
 
+  // Standardized Invoice Clone Workflow (Line items duplicated, dates & status reset, quantity focused)
+  const handleCloneInvoice = async (invoiceToClone) => {
+    try {
+      const cloned = cloneDocumentPayload(invoiceToClone, 'invoice');
+      if (!cloned) return;
+
+      let nextNo = '';
+      try {
+        const nextRes = await api.getNextInvoiceNo(companyEntity);
+        if (nextRes?.invoiceNo) nextNo = nextRes.invoiceNo;
+      } catch (err) {}
+
+      if (!nextNo) {
+        nextNo = `DRAFT-INV-${Date.now().toString().slice(-4)}`;
+      }
+
+      cloned.invoiceNo = nextNo;
+      setEditingInvoiceId(null);
+      setInvoiceForm(cloned);
+      setActiveTab('create');
+
+      triggerPushNotification('Invoice Cloned 📋', `Cloned #${invoiceToClone.invoiceNo || 'original'} into new draft #${nextNo}. Quantity field focused.`, 'info');
+      focusPrimaryQuantityInput('[data-primary-qty="true"]', 200);
+    } catch (err) {
+      console.error('Failed to clone invoice:', err);
+    }
+  };
+
   // ── REAL-TIME INVOICE CALCULATIONS ──────────────────────────────────────
   const calculatedInvoice = useMemo(() => {
     let subtotal = 0;
@@ -2903,6 +3026,65 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   // Submit Invoice Handler
   const handleSaveInvoice = async () => {
+    const custName = invoiceForm.customer?.name || invoiceForm.customer?.businessName || invoiceForm.customerName;
+    const errs = [];
+
+    if (!custName || !custName.trim()) {
+      errs.push({
+        fieldId: 'invoice-customer-name',
+        label: 'Customer Selection',
+        message: 'Customer / Party name is required'
+      });
+    }
+
+    const invItems = calculatedInvoice.items || [];
+    const validInvItems = invItems.filter(it => it.itemName && it.itemName.trim() !== '');
+    if (validInvItems.length === 0) {
+      errs.push({
+        fieldId: 'invoice-item-name-0',
+        label: 'Line Items',
+        message: 'Please add at least one line item'
+      });
+    } else {
+      invItems.forEach((it, idx) => {
+        if (!it.itemName || !it.itemName.trim()) {
+          errs.push({
+            fieldId: `invoice-item-name-${idx}`,
+            label: `Item #${idx + 1} Name`,
+            message: 'Item description cannot be empty'
+          });
+        }
+        if (!it.qty || Number(it.qty) <= 0) {
+          errs.push({
+            fieldId: `invoice-item-qty-${idx}`,
+            label: `Item #${idx + 1} Qty`,
+            message: 'Quantity must be greater than 0'
+          });
+        }
+        if (it.unitPrice == null || Number(it.unitPrice) < 0) {
+          errs.push({
+            fieldId: `invoice-item-price-${idx}`,
+            label: `Item #${idx + 1} Price`,
+            message: 'Unit price cannot be negative'
+          });
+        }
+      });
+    }
+
+    if (!calculatedInvoice.grandTotal || isNaN(calculatedInvoice.grandTotal) || calculatedInvoice.grandTotal <= 0) {
+      errs.push({
+        fieldId: 'invoice-item-price-0',
+        label: 'Grand Total',
+        message: 'Grand Total is invalid. Please check item prices and quantities.'
+      });
+    }
+
+    if (errs.length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    clearValidationErrors();
+
     setLoading(true);
     try {
       // Strip UI-only fields and build clean payload
@@ -2922,13 +3104,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         balanceDue: calculatedInvoice.balanceDue
       };
 
-      // Guard against NaN values that would fail DB save
-      if (!payload.grandTotal || isNaN(payload.grandTotal)) {
-        alert('Grand Total is invalid. Please check item prices and quantities.');
-        setLoading(false);
-        return;
-      }
-
       if (editingInvoiceId) {
         await api.updateBillingInvoice(editingInvoiceId, payload);
       } else {
@@ -2938,11 +3113,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       }
 
       window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'billing', timestamp: Date.now() } }));
-      alert(`Invoice ${editingInvoiceId ? 'updated' : 'created'} successfully!`);
+      triggerPushNotification('Invoice Saved 🧾', `Invoice #${payload.invoiceNo || 'INV'} ${editingInvoiceId ? 'updated' : 'created'} successfully!`, 'success');
       await loadData();
       setActiveTab('invoices');
     } catch (err) {
-      alert(err.message || 'Failed to save invoice');
+      triggerEliteAlert('Save Error', err.message || 'Failed to save invoice', 'error');
     } finally {
       setLoading(false);
     }
@@ -3086,8 +3261,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             <div className="ent-header-icon-box" style={{ background: 'linear-gradient(135deg,#7c3aed,#3b82f6)' }}>
               <FileText size={18} color="#fff" />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
               <h2 className="ent-header-title">Billing & Invoicing</h2>
+              <EntityBrandBadge entityId={companyEntity} />
               <ScreenGroupRoster screenId="jobcards_billing" />
             </div>
           </div>
@@ -3595,6 +3771,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                                     isPrimary: false
                                   },
                                   {
+                                    id: 'clone',
+                                    icon: Copy,
+                                    label: 'Clone',
+                                    tooltip: 'Clone / Duplicate Invoice (Reset Dates/Status)',
+                                    variant: 'secondary',
+                                    color: '#8b5cf6',
+                                    onClick: () => handleCloneInvoice(inv),
+                                    isPrimary: false
+                                  },
+                                  {
                                     id: 'delete',
                                     icon: Trash2,
                                     label: 'Delete',
@@ -3649,10 +3835,13 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {activeTab === 'create' && (
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.8rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {editingInvoiceId ? `Edit Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
-            </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                {editingInvoiceId ? `Edit Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
+              </h3>
+              <EntityBrandBadge entityId={companyEntity} />
+            </div>
             <div style={{ display: 'flex', gap: '0.6rem' }}>
               <button className="btn-secondary" onClick={() => setActiveTab('invoices')}>Cancel</button>
               <button className="btn-primary" onClick={handleSaveInvoice} disabled={loading} style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)' }}>
@@ -3762,6 +3951,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               <div>
                 <label style={labelStyle}>Customer / Party Name *</label>
                 <input
+                  id="invoice-customer-name"
                   type="text"
                   value={invoiceForm.customer.name}
                   onChange={e => setInvoiceForm(f => ({ ...f, customer: { ...f.customer, name: e.target.value } }))}
@@ -3835,7 +4025,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   >
                     <RefreshCw size={13} /> 🔄 Re-sync Fabric & Meters
                   </button>
-                  <button type="button" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
+                  <button type="button" id="invoice-add-item-btn" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
                     <Plus size={13} /> Add Item Row
                   </button>
                 </div>
@@ -3866,6 +4056,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                           <img src={convertDriveUrl(it.imageUrl, it.itemName)} alt="Design" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} onError={e => { e.target.style.display = 'none'; }} />
                         )}
                         <input
+                          id={`invoice-item-name-${idx}`}
                           type="text"
                           list={`items-list-${idx}`}
                           value={it.itemName}
@@ -3941,6 +4132,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                     <td style={{ padding: '0.4rem' }}>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                         <input
+                          id={`invoice-item-qty-${idx}`}
+                          data-primary-qty={idx === 0 ? "true" : undefined}
                           type="number"
                           step="0.01"
                           value={it.qty}
@@ -3970,6 +4163,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                     </td>
                     <td style={{ padding: '0.4rem' }}>
                       <input
+                        id={`invoice-item-price-${idx}`}
                         type="number"
                         value={it.unitPrice}
                         onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
@@ -4734,6 +4928,13 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                               <Edit2 size={12} /> Edit
                             </button>
                             <button
+                              onClick={() => handleClonePurchase(p)}
+                              style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#7c3aed', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
+                              title="Clone / Duplicate Purchase Entry (Duplicate items & reset status)"
+                            >
+                              <Copy size={12} /> Clone
+                            </button>
+                            <button
                               onClick={() => handleDeletePurchase(p._id || p.id)}
                               style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
                               title="Delete Purchase Entry"
@@ -4762,9 +4963,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <ShoppingBag size={22} />
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
-                    {editingPurchaseId ? `Edit Vendor Purchase Bill — ${purchaseForm.purchaseNo}` : 'New Vendor Purchase Inward Generator'}
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
+                      {editingPurchaseId ? `Edit Vendor Purchase Bill — ${purchaseForm.purchaseNo}` : 'New Vendor Purchase Inward Generator'}
+                    </h3>
+                    <EntityBrandBadge entityId={companyEntity} />
+                  </div>
                   <div style={{ fontSize: '0.72rem', opacity: 0.9, marginTop: 2 }}>
                     Comprehensive GST Inward Bill Entry & Vendor Accounting System
                   </div>
@@ -4887,6 +5091,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   <div>
                     <label style={labelStyle}>Vendor / Contact Person *</label>
                     <input
+                      id="purchase-vendor-name"
                       type="text"
                       required
                       value={purchaseForm.vendor.name}
@@ -4996,6 +5201,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
                       type="button"
+                      id="purchase-add-item-btn"
                       onClick={handleAddPurchaseItem}
                       className="btn-secondary"
                       style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#eff6ff', color: '#4f46e5', border: '1px solid #bfdbfe' }}
@@ -5024,6 +5230,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                       <tr key={it.id || idx} style={{ borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
                         <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           <input
+                            id={`purchase-item-name-${idx}`}
                             type="text"
                             list={`purchase-items-list-${idx}`}
                             value={it.itemName}
@@ -5078,6 +5285,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         </td>
                         <td style={{ padding: '0.4rem' }}>
                           <input
+                            id={`purchase-item-qty-${idx}`}
+                            data-primary-qty={idx === 0 ? "true" : undefined}
                             type="number"
                             step="any"
                             value={it.qty}
@@ -5105,6 +5314,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         </td>
                         <td style={{ padding: '0.4rem' }}>
                           <input
+                            id={`purchase-item-price-${idx}`}
                             type="number"
                             step="any"
                             value={it.unitPrice}
@@ -5505,6 +5715,17 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 >
                   <Edit2 size={15} /> Edit Purchase Entry
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = viewPurchaseModal;
+                    setViewPurchaseModal(null);
+                    handleClonePurchase(p);
+                  }}
+                  style={{ padding: '0.5rem 1.1rem', background: 'rgba(139, 92, 246, 0.1)', color: '#7c3aed', border: '1px solid #c4b5fd', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Copy size={15} /> Clone Purchase
+                </button>
                 <button type="button" onClick={() => setViewPurchaseModal(null)} style={{ padding: '0.5rem 1.2rem', background: '#475569', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
                   Close
                 </button>
@@ -5746,6 +5967,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               )}
               <button style={{ padding: '0.5rem 1.1rem', background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleOpenCreateTab(inv); }}>
                 <Edit2 size={15} /> Edit Invoice
+              </button>
+              <button style={{ padding: '0.5rem 1.1rem', background: 'rgba(139, 92, 246, 0.1)', color: '#7c3aed', border: '1px solid #c4b5fd', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleCloneInvoice(inv); }}>
+                <Copy size={15} /> Clone Invoice
               </button>
             </div>
           </div>
@@ -6400,6 +6624,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           </div>
         </div>
       )}
+
+      {/* ── NON-BLOCKING VALIDATION PILL DOCK ── */}
+      <ValidationDock errors={validationErrors} onDismiss={clearValidationErrors} />
 
     </div>
   );

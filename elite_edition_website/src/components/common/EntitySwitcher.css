@@ -1,0 +1,214 @@
+.entity-switcher-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.entity-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #0f172a);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  min-height: 32px;
+}
+
+.entity-switcher-trigger:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.entity-switcher-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--entity-accent, #2563eb);
+  box-shadow: 0 0 6px var(--entity-accent, #2563eb);
+  flex-shrink: 0;
+  animation: entityPulse 2s infinite ease-in-out;
+}
+
+@keyframes entityPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.75;
+  }
+}
+
+.entity-switcher-code {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.12);
+  color: var(--entity-accent, #2563eb);
+  letter-spacing: 0.04em;
+}
+
+.entity-switcher-name {
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entity-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 290px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.18), 0 4px 10px -2px rgba(15, 23, 42, 0.08);
+  padding: 6px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: entityDropdownFade 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes entityDropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.entity-dropdown-header {
+  padding: 8px 10px 6px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 2px;
+}
+
+.entity-dropdown-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.entity-dropdown-shortcut {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.entity-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+}
+
+.entity-option-btn:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.entity-option-btn.active {
+  background: rgba(var(--active-entity-rgb, 37, 99, 235), 0.08);
+  border-color: var(--active-entity-color, #2563eb);
+}
+
+.entity-option-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.entity-option-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.entity-option-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.entity-option-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.entity-option-type {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.entity-option-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  letter-spacing: 0.04em;
+}
+
+/* Dynamic Top Perimeter Accent Line */
+.entity-accent-perimeter {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  background: var(--entity-gradient, var(--entity-accent, #2563eb));
+  box-shadow: 0 0 12px var(--entity-accent, #2563eb);
+  z-index: 999999;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ambient Entity Brand Badge */
+.entity-brand-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(var(--entity-accent-rgb, 37, 99, 235), 0.1);
+  border: 1px solid var(--entity-accent, #2563eb);
+  color: var(--text-primary, #0f172a);
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(var(--entity-accent-rgb, 37, 99, 235), 0.15);
+  user-select: none;
+  white-space: nowrap;
+}

@@ -104,6 +104,8 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import OfflineBanner from './components/common/OfflineBanner';
 import PullToRefresh from './components/common/PullToRefresh';
 import { DashboardSkeleton } from './components/common/Skeleton';
+import BarcodeSnifferHUD from './components/common/BarcodeSnifferHUD';
+import EntitySwitcher from './components/common/EntitySwitcher';
 
 
 
@@ -296,6 +298,33 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Dynamically bind Multi-Entity Visual Accents to document :root
+  useEffect(() => {
+    const comp = getCompanyById(activeDepartment);
+    if (!comp || typeof document === 'undefined') return;
+    const root = document.documentElement;
+    const color = comp.badgeColor || comp.iconColor || '#2563eb';
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16) || 37;
+    const g = parseInt(hex.substring(2, 4), 16) || 99;
+    const b = parseInt(hex.substring(4, 6), 16) || 235;
+
+    root.style.setProperty('--entity-accent', color);
+    root.style.setProperty('--entity-accent-rgb', `${r}, ${g}, ${b}`);
+    root.style.setProperty('--entity-gradient', comp.gradient || `linear-gradient(135deg, ${color}, #1d4ed8)`);
+    root.style.setProperty('--entity-code', comp.code);
+    root.style.setProperty('--entity-name', comp.name);
+  }, [activeDepartment]);
+
+  // Global listener for opening search from Barcode Sniffer HUD or external actions
+  useEffect(() => {
+    const handleOpenSearchEvent = () => {
+      setShowGlobalSearch(true);
+    };
+    window.addEventListener('elite:open-global-search', handleOpenSearchEvent);
+    return () => window.removeEventListener('elite:open-global-search', handleOpenSearchEvent);
   }, []);
 
   const handleSelectSearchResult = (item) => {
@@ -1726,6 +1755,13 @@ export default function App() {
 
               return (
                 <>
+                  <EntitySwitcher
+                    activeEntityId={activeDepartment}
+                    onSelectEntity={(deptId) => handleSwitchDepartment(deptId)}
+                    allowedCompanies={visibleCompanies.map(c => c.id)}
+                    compact={false}
+                  />
+                  <div className="dept-switcher-divider" />
                   {visibleCompanies.map(company => {
                     const isCommActive = ['communication', 'workspace', 'task_management'].includes(activeTab);
                     const isActive = activeDepartment === company.id && !isCommActive;
@@ -3520,6 +3556,12 @@ export default function App() {
         onSelectResult={handleSelectSearchResult}
         activeCompanyId={activeDepartment}
       />
+
+      {/* Dynamic Multi-Entity Luminous Accent Perimeter */}
+      <div className="entity-accent-perimeter" />
+
+      {/* Global Ambient Hardware Barcode Sniffer HUD */}
+      <BarcodeSnifferHUD onGlobalSearch={(q) => setShowGlobalSearch(true)} />
 
       {/* Undo Toast Container */}
       <UndoToastContainer />
