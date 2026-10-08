@@ -28,7 +28,8 @@ export default function JobCardTracking({ onPreview }) {
     const jNo = String(card.jobNo || '').trim().toUpperCase();
     return !jNo.startsWith('JOB NO.-') && !jNo.startsWith('JOB NO-');
   };
-  const canEditCard = (card) => isAdmin || isExternalCard(card);
+  // Every user has access to action buttons & editing; non-admin updates route through Review & Approvals Queue
+  const canEditCard = () => true;
 
   const defaultThisMonth = getDatePresetRange('this_month');
   const [cards, setCards] = useState([]);

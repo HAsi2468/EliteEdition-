@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { ChangeApprovalRequest, ...models } = require('../db/models');
 const logger = require('../config/logger');
 
@@ -9,7 +10,7 @@ let approvalSettings = {
   interceptEdit: true,
 };
 
-// Route prefixes explicitly excluded from approval interception (e.g. Tasks, Chat/Communication as requested by user)
+// Route prefixes explicitly excluded from approval interception (e.g. Chat/Communication, Tasks, Auth, Uploads)
 const EXCLUDED_PREFIXES = [
   '/v1/auth',
   '/v1/upload',
@@ -19,7 +20,6 @@ const EXCLUDED_PREFIXES = [
   '/v1/communication',
   '/v1/chatTask',
   '/v1/change-approvals',
-  '/v1/signed-documents',
   '/v1/backup',
   '/v1/telemetry',
   '/v1/search',
@@ -33,11 +33,14 @@ const EXCLUDED_PREFIXES = [
 const getModuleAndModel = (urlPath) => {
   const lower = urlPath.toLowerCase();
 
-  if (lower.includes('/jobcards') || lower.includes('/job-cards')) {
+  if (lower.includes('/jobcards') || lower.includes('/job-cards') || lower.includes('/jobcard')) {
     return { name: 'JobCard', model: models.JobCard };
   }
-  if (lower.includes('/garment-jobcards')) {
+  if (lower.includes('/garment-jobcards') || lower.includes('/garment-jobcard')) {
     return { name: 'GarmentJobCard', model: models.GarmentJobCard };
+  }
+  if (lower.includes('/jobprintlogs') || lower.includes('/job-print-logs')) {
+    return { name: 'JobPrintLog', model: models.JobPrintLog };
   }
   if (lower.includes('/billing')) {
     if (lower.includes('/customers')) return { name: 'BillingCustomer', model: models.BillingCustomer };
@@ -48,6 +51,9 @@ const getModuleAndModel = (urlPath) => {
   if (lower.includes('/expenses')) {
     return { name: 'Expense', model: models.Expense };
   }
+  if (lower.includes('/costing')) {
+    return { name: 'MonthlyCosting', model: models.MonthlyCosting };
+  }
   if (lower.includes('/fabric-challan')) {
     return { name: 'FabricChallan', model: models.FabricChallan };
   }
@@ -56,6 +62,9 @@ const getModuleAndModel = (urlPath) => {
   }
   if (lower.includes('/fabric-stock-adjustment') || lower.includes('/fabric-adjustment')) {
     return { name: 'FabricStockAdjustment', model: models.FabricStockAdjustment };
+  }
+  if (lower.includes('/fabric/white-qa-logs') || lower.includes('/white-qa-logs')) {
+    return { name: 'WhiteFabricLog', model: models.WhiteFabricLog };
   }
   if (lower.includes('/fabric')) {
     return { name: 'Fabric', model: models.FabricTransaction || models.Fabric };
@@ -72,14 +81,23 @@ const getModuleAndModel = (urlPath) => {
   if (lower.includes('/designs')) {
     return { name: 'Design', model: models.Design };
   }
+  if (lower.includes('/designer-tasks')) {
+    return { name: 'DesignerTask', model: models.DesignerTask };
+  }
   if (lower.includes('/stitching-challan')) {
-    return { name: 'Stitching', model: models.StitchingChallan };
+    return { name: 'StitchingChallan', model: models.StitchingChallan };
+  }
+  if (lower.includes('/stitching-config')) {
+    return { name: 'StitchingConfig', model: models.StitchingConfig };
+  }
+  if (lower.includes('/print-config')) {
+    return { name: 'PrintConfig', model: models.PrintConfig };
   }
   if (lower.includes('/complaints')) {
     return { name: 'Complaint', model: models.Complaint };
   }
-  if (lower.includes('/vendor') || lower.includes('/fabric-vendors')) {
-    return { name: 'Vendor', model: models.Vendor || models.FabricVendor };
+  if (lower.includes('/vendor')) {
+    return { name: 'Vendor', model: models.Vendor };
   }
   if (lower.includes('/party')) {
     return { name: 'Party', model: models.Party };
@@ -93,107 +111,33 @@ const getModuleAndModel = (urlPath) => {
   if (lower.includes('/leads')) {
     return { name: 'Lead', model: models.Lead };
   }
+  if (lower.includes('/facilities')) {
+    return { name: 'Facility', model: models.Facility };
+  }
+  if (lower.includes('/infra-bills')) {
+    return { name: 'InfrastructureBill', model: models.InfrastructureBill };
+  }
+  if (lower.includes('/returns')) {
+    return { name: 'ReturnRecord', model: models.ReturnRecord };
+  }
+  if (lower.includes('/myntra')) {
+    return { name: 'MyntraConfig', model: models.MyntraConfig };
+  }
+  if (lower.includes('/stockout') || lower.includes('/stock-out')) {
+    return { name: 'StockOut', model: models.StockOut };
+  }
+  if (lower.includes('/saleslist') || lower.includes('/sale-orders') || lower.includes('/oms')) {
+    return { name: 'SaleOrder', model: models.SaleOrder || models.SalesList };
+  }
+  if (lower.includes('/signed-documents')) {
+    return { name: 'SignedDocument', model: null };
+  }
 
   // Fallback module name from first path segment
-  const segments = urlPath.replace(/^\/v1\//, '').split('/');
+  const segments = urlPath.replace(/^\/(?:api\/)?v1\//, '').split('/');
   const rawSegment = segments[0] || 'General';
   const cleanName = rawSegment.charAt(0).toUpperCase() + rawSegment.slice(1);
-  return { name: cleanName, model: null };
-};
-
-// Core Job Card fields that DO require approval if modified (order specs, customer, fabric, billing quantities, rates)
-const CORE_JOBCARD_SPEC_FIELDS = new Set([
-  'partyname',
-  'party',
-  'clientname',
-  'client',
-  'clientcode',
-  'designno',
-  'designname',
-  'catalogno',
-  'fabricname',
-  'fabrictype',
-  'fabric',
-  'totalmtr',
-  'orderedmtr',
-  'ordermtr',
-  'rate',
-  'amount',
-  'totalamount',
-  'unitprice',
-  'jobno',
-  'orderdate',
-  'expecteddeliverydate',
-]);
-
-/**
- * Checks whether an incoming JobCard update is routine operational department data entry
- * (such as fusing entry, printing progress, machine parameters, fault logs, QA check, delivery status).
- * These are daily operational workflows and do NOT require admin approval.
- */
-const isRoutineJobCardDataEntry = (moduleName, body) => {
-  if (moduleName !== 'JobCard' && moduleName !== 'GarmentJobCard') {
-    return false;
-  }
-  if (!body || typeof body !== 'object') {
-    return false;
-  }
-
-  const keys = Object.keys(body).map(k => k.toLowerCase().replace(/[-_]/g, ''));
-  // If ANY core customer/order specification is being modified, require approval
-  const touchesCoreSpec = keys.some(k => CORE_JOBCARD_SPEC_FIELDS.has(k));
-  if (touchesCoreSpec) {
-    return false;
-  }
-
-  // Purely operational department data entry (fusing, printing, QA, delivery dispatch)
-  return true;
-};
-
-/**
- * Checks whether this update is a "first-time fill" — i.e., setting data that
- * was previously null, empty, or absent in the existing document.
- * These are treated as initial data entry (not edits) and bypass approval.
- *
- * Rules:
- * - If EVERY field in the incoming payload was previously null/undefined/empty
- *   in the stored document, it's first-time entry → bypass.
- * - Specifically handles tpDetails: if existing doc has no tpDetails (null / []) and
- *   incoming body only sets tpDetails + optional derived fields (totalTp, qty), bypass.
- */
-const isFirstTimeDataEntry = (beforeData, requestBody) => {
-  if (!beforeData || !requestBody || typeof requestBody !== 'object') {
-    return false;
-  }
-
-  const bodyKeys = Object.keys(requestBody).filter(k =>
-    !['_id', 'id', '__v', 'csrfToken', 'idempotencyKey'].includes(k)
-  );
-
-  if (bodyKeys.length === 0) return false;
-
-  // Special case: tpDetails-only update on a record that has no tpDetails yet
-  const isTpOnlyUpdate = bodyKeys.every(k => ['tpDetails', 'totalTp', 'qty'].includes(k));
-  if (isTpOnlyUpdate) {
-    const existingTps = beforeData.tpDetails;
-    const hasNoExistingTps =
-      existingTps == null ||
-      (Array.isArray(existingTps) && existingTps.filter(r => r.tpMeter != null && parseFloat(r.tpMeter) > 0).length === 0);
-    if (hasNoExistingTps) {
-      return true; // First-time TP entry → no approval needed
-    }
-  }
-
-  // General rule: all updated fields were previously empty/null/undefined in the stored doc
-  const allWereEmpty = bodyKeys.every(k => {
-    const existing = beforeData[k];
-    if (existing === null || existing === undefined) return true;
-    if (Array.isArray(existing) && existing.length === 0) return true;
-    if (typeof existing === 'string' && existing.trim() === '') return true;
-    return false;
-  });
-
-  return allWereEmpty;
+  return { name: cleanName, model: models[cleanName] || null };
 };
 
 // Calculate field-by-field diff between old and new state
@@ -226,8 +170,10 @@ const computeDiff = (beforeObj, afterObj) => {
 
 /**
  * Universal Approval Interceptor Middleware
- * Intercepts mutating actions (PUT, PATCH, DELETE) made by non-admin users across ERP modules,
- * captures before/after diffs, stages them in ChangeApprovalRequest, and alerts Admins.
+ * Intercepts mutating actions (PUT, PATCH, DELETE, and POST update endpoints)
+ * made by non-admin users across all ERP screens & modules,
+ * captures before/after diffs, stages them in ChangeApprovalRequest,
+ * broadcasts alerts to Admins via Socket.IO, and returns a 202 Accepted response.
  */
 const approvalInterceptor = async (req, res, next) => {
   try {
@@ -236,10 +182,33 @@ const approvalInterceptor = async (req, res, next) => {
       return next();
     }
 
-    // 2. Only intercept state-changing edit & delete operations
+    // 2. Identify mutating edit & delete operations
     const method = req.method.toUpperCase();
-    const isEdit = method === 'PUT' || method === 'PATCH';
-    const isDelete = method === 'DELETE';
+    const originalUrl = req.originalUrl || req.url;
+    const lowerUrl = originalUrl.toLowerCase();
+
+    const isExplicitEdit = method === 'PUT' || method === 'PATCH';
+    const isExplicitDelete = method === 'DELETE';
+    const isPostUpdate =
+      method === 'POST' &&
+      (lowerUrl.includes('/update') ||
+        lowerUrl.includes('/edit') ||
+        lowerUrl.includes('/status') ||
+        lowerUrl.includes('/modify') ||
+        lowerUrl.includes('/adjust') ||
+        lowerUrl.includes('/save') ||
+        lowerUrl.includes('/calc-cost') ||
+        lowerUrl.includes('/rebalance') ||
+        lowerUrl.includes('/refinish') ||
+        lowerUrl.includes('/process') ||
+        lowerUrl.includes('/clear-all'));
+
+    const isPostDelete =
+      method === 'POST' &&
+      (lowerUrl.includes('/delete') || lowerUrl.includes('/remove') || lowerUrl.includes('/clear-all'));
+
+    const isEdit = isExplicitEdit || (isPostUpdate && !isPostDelete);
+    const isDelete = isExplicitDelete || isPostDelete;
 
     if (!isEdit && !isDelete) {
       return next();
@@ -254,8 +223,7 @@ const approvalInterceptor = async (req, res, next) => {
     }
 
     // 4. Check if the route is excluded (Tasks, Chat/Communication, Auth, Uploads, etc.)
-    const originalUrl = req.originalUrl || req.url;
-    const isExcluded = EXCLUDED_PREFIXES.some(prefix => originalUrl.startsWith(prefix));
+    const isExcluded = EXCLUDED_PREFIXES.some((prefix) => originalUrl.startsWith(prefix));
     if (isExcluded) {
       return next();
     }
@@ -275,23 +243,20 @@ const approvalInterceptor = async (req, res, next) => {
     }
 
     // 6. User is a non-admin attempting an edit or delete!
-    // Extract target ID from URL (24 hex characters ObjectId)
+    // Extract target ID from URL, params, body, or query
     const idMatch = originalUrl.match(/\/([0-9a-fA-F]{24})(?:[/?#]|$)/);
-    const targetId = idMatch ? idMatch[1] : (req.body?.id || req.body?._id || '');
+    const targetId =
+      (idMatch ? idMatch[1] : '') ||
+      req.params?.id ||
+      req.body?.id ||
+      req.body?._id ||
+      req.body?.targetId ||
+      req.body?.jobCardId ||
+      req.query?.id ||
+      '';
 
     // Resolve module name and Mongoose model
     const { name: moduleName, model: TargetModel } = getModuleAndModel(originalUrl);
-
-    // 5.1 Bypass approval for routine factory process data entry (Fusing, Printing, QA, Delivery tracking)
-    // Operators filling in routine production metrics on job cards is normal data entry, not an edit!
-    if (isEdit && isRoutineJobCardDataEntry(moduleName, req.body)) {
-      logger.info('[ApprovalInterceptor] Allowing routine factory data entry without approval for %s (%s)', moduleName, targetId);
-      return next();
-    }
-
-    // 5.2 Bypass approval for first-time data entry on fields that were previously empty/null
-    // (e.g. adding tpDetails to a fabric inward that was recorded without TP breakdown)
-    // This is NOT an "edit" — it is initial data fill and should not require approval.
 
     // Snapshot existing document for "Before" data
     let beforeData = null;
@@ -299,21 +264,38 @@ const approvalInterceptor = async (req, res, next) => {
 
     if (TargetModel && targetId) {
       try {
-        const existingDoc = await TargetModel.findById(targetId).lean();
+        let existingDoc = null;
+        if (mongoose.Types.ObjectId.isValid(targetId)) {
+          existingDoc = await TargetModel.findById(targetId).lean();
+        }
+        if (!existingDoc) {
+          existingDoc = await TargetModel.findOne({
+            $or: [
+              { id: targetId },
+              { jobNo: targetId },
+              { invoiceNo: targetId },
+              { challanNo: targetId },
+              { lotNo: targetId },
+              { code: targetId },
+              { name: targetId },
+            ],
+          }).lean();
+        }
+
         if (existingDoc) {
           beforeData = existingDoc;
           targetIdentifier =
             (existingDoc.lotNo ? `Lot #${existingDoc.lotNo}` : '') ||
-            existingDoc.jobNo ||
-            existingDoc.invoiceNo ||
-            existingDoc.challanNo ||
-            existingDoc.voucherNo ||
-            existingDoc.partyName ||
-            existingDoc.vendorName ||
+            (existingDoc.jobNo ? `Job #${existingDoc.jobNo}` : '') ||
+            (existingDoc.invoiceNo ? `Invoice #${existingDoc.invoiceNo}` : '') ||
+            (existingDoc.challanNo ? `Challan #${existingDoc.challanNo}` : '') ||
+            (existingDoc.voucherNo ? `Voucher #${existingDoc.voucherNo}` : '') ||
+            (existingDoc.partyName ? `Party: ${existingDoc.partyName}` : '') ||
+            (existingDoc.vendorName ? `Vendor: ${existingDoc.vendorName}` : '') ||
             existingDoc.name ||
             existingDoc.title ||
             existingDoc.code ||
-            `#${targetId.slice(-6)}`;
+            `#${String(targetId).slice(-6)}`;
         }
       } catch (lookupErr) {
         logger.warn('[ApprovalInterceptor] Could not lookup beforeData: %s', lookupErr.message);
@@ -321,27 +303,17 @@ const approvalInterceptor = async (req, res, next) => {
     }
 
     if (!targetIdentifier) {
-      targetIdentifier = targetId ? `#${targetId.slice(-6)}` : `${moduleName} Record`;
-    }
-
-    // First-time data entry check (after we have beforeData)
-    if (isEdit && isFirstTimeDataEntry(beforeData, req.body)) {
-      logger.info(
-        '[ApprovalInterceptor] Allowing first-time data fill without approval for %s (%s) — fields were previously empty',
-        moduleName,
-        targetId
-      );
-      return next();
+      targetIdentifier = targetId ? `#${String(targetId).slice(-6)}` : `${moduleName} Record`;
     }
 
     // Calculate diff between existing document and proposed changes
-    const diffSummary = computeDiff(beforeData, req.body);
+    const diffSummary = computeDiff(beforeData, req.body || {});
 
     // 7. Create Pending Change Approval Request
     const approval = await ChangeApprovalRequest.create({
       module: moduleName,
       action: isDelete ? 'DELETE' : 'EDIT',
-      targetId: targetId || '',
+      targetId: String(targetId || ''),
       targetIdentifier,
       targetEndpoint: originalUrl,
       httpMethod: method,
@@ -360,6 +332,14 @@ const approvalInterceptor = async (req, res, next) => {
       status: 'PENDING',
     });
 
+    logger.info(
+      '[ApprovalInterceptor] Captured non-admin %s on %s (%s) by %s',
+      approval.action,
+      approval.module,
+      approval.targetIdentifier,
+      approval.requestedBy.name
+    );
+
     // 8. Broadcast real-time socket alert to all connected Admins
     try {
       const io = global.io || (req.app && req.app.get('io'));
@@ -377,7 +357,7 @@ const approvalInterceptor = async (req, res, next) => {
       logger.warn('[ApprovalInterceptor] Socket broadcast failed: %s', sockErr.message);
     }
 
-    // 9. Respond to client that request has been submitted for Admin Review
+    // 9. Respond to client with 202 Accepted and requiresApproval flag
     return res.status(202).json({
       success: true,
       requiresApproval: true,

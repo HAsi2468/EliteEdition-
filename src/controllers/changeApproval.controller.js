@@ -137,12 +137,40 @@ const executeApprovedAction = async (approval, adminUser) => {
   // 2. Fail-safe Fallback: Direct Mongoose Model update / delete
   try {
     let targetModel = models[approval.module];
-    if (!targetModel && (approval.module === 'Fabric' || approval.module === 'FabricTransaction')) {
-      targetModel = models.FabricTransaction || models.Fabric;
+    if (!targetModel) {
+      if (approval.module === 'Fabric' || approval.module === 'FabricTransaction') {
+        targetModel = models.FabricTransaction || models.Fabric;
+      } else if (approval.module === 'RawMaterial') {
+        targetModel = models.RawMaterialTransaction;
+      } else if (approval.module === 'Stitching') {
+        targetModel = models.StitchingChallan;
+      } else if (approval.module === 'WhiteFabricLog') {
+        targetModel = models.WhiteFabricLog;
+      } else if (approval.module === 'MonthlyCosting') {
+        targetModel = models.MonthlyCosting;
+      } else if (approval.module === 'Returns' || approval.module === 'ReturnRecord') {
+        targetModel = models.ReturnRecord;
+      } else if (approval.module === 'SaleOrder' || approval.module === 'SalesList') {
+        targetModel = models.SaleOrder || models.SalesList;
+      }
     }
+
     if (targetModel && approval.targetId) {
+      const idQuery = mongoose.Types.ObjectId.isValid(approval.targetId)
+        ? { _id: approval.targetId }
+        : {
+            $or: [
+              { id: approval.targetId },
+              { jobNo: approval.targetId },
+              { invoiceNo: approval.targetId },
+              { challanNo: approval.targetId },
+              { lotNo: approval.targetId },
+              { code: approval.targetId },
+            ],
+          };
+
       if (approval.httpMethod === 'DELETE') {
-        const deleted = await targetModel.findByIdAndDelete(approval.targetId);
+        const deleted = await targetModel.findOneAndDelete(idQuery);
         return { success: true, method: 'DIRECT_MODEL_DELETE', data: deleted };
       } else {
         const payload = { ...approval.requestBody };
@@ -161,8 +189,8 @@ const executeApprovedAction = async (approval, adminUser) => {
           }
         }
 
-        const updated = await targetModel.findByIdAndUpdate(
-          approval.targetId,
+        const updated = await targetModel.findOneAndUpdate(
+          idQuery,
           { $set: payload },
           { new: true, runValidators: false }
         );

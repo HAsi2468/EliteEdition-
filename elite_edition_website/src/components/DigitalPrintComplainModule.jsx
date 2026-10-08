@@ -879,15 +879,13 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
               <FileText size={14} color="#e11d48" /> Export PDF
             </button>
           )}
-          {isAdmin && (
-            <button
-              onClick={handleClearAllComplaints}
-              className="ent-btn ent-btn-danger"
-              title="Clear all test complaints and reset data"
-            >
-              <Trash2 size={14} /> Clear Tickets
-            </button>
-          )}
+          <button
+            onClick={handleClearAllComplaints}
+            className="ent-btn ent-btn-danger"
+            title="Clear test complaints and reset data"
+          >
+            <Trash2 size={14} /> Clear Tickets
+          </button>
         </div>
       </div>
 

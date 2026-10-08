@@ -253,10 +253,14 @@ const request = async (path, options = {}) => {
     
     const json = await response.json();
     if (json && json.requiresApproval) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('elite-approval-submitted', { detail: json }));
+        window.dispatchEvent(new CustomEvent('elite-data-refresh'));
+      }
       import('../components/NotificationToast').then(({ triggerPushNotification }) => {
         triggerPushNotification(
-          'Submitted for Admin Approval',
-          json.message || 'Your changes have been submitted for Admin Review & Approval.',
+          '🛡️ Submitted for Admin Approval',
+          json.message || 'Your changes have been submitted to the Admin Review & Approvals Queue.',
           'info'
         );
       }).catch(() => {});

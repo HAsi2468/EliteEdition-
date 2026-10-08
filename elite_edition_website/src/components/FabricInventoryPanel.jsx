@@ -3845,16 +3845,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           <Layers size={13} />
                           <span>{Array.isArray(t.tpDetails) && t.tpDetails.length > 0 ? `${t.tpDetails.length} TP` : '+ TP'}</span>
                         </button>
-                        {isAdmin && (
-                          <button
-                            className="btn-icon"
-                            title="Edit"
-                            style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
-                            onClick={() => startEditInward(t)}
-                          >
-                            <Edit size={15} />
-                          </button>
-                        )}
+                        <button
+                          className="btn-icon"
+                          title="Edit"
+                          style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
+                          onClick={() => startEditInward(t)}
+                        >
+                          <Edit size={15} />
+                        </button>
                         <button
                           className="btn-icon"
                           title="Delete"
