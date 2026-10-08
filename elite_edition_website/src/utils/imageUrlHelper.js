@@ -322,3 +322,54 @@ export function convertDriveUrl(link, designName) {
   const candidates = getImageCandidates(link, designName);
   return candidates[0] || '';
 }
+
+/**
+ * Server Request Optimizer: Converts any image source into a lightweight,
+ * compressed thumbnail URL bounded to target width and quality (e.g. ?w=100&q=75)
+ * preventing 5MB-15MB natural upload files from overloading high-density tables.
+ */
+export function getOptimizedThumbnailUrl(src, options = {}) {
+  if (!src || typeof src !== 'string') return '';
+  const clean = src.trim();
+  if (clean.startsWith('data:')) return clean;
+
+  const width = options.width || 100;
+  const quality = options.quality || 75;
+
+  // 1. Google Drive URLs -> Direct LH3 embed with bounded size
+  if (clean.includes('drive.google.com') || clean.includes('googleusercontent') || clean.includes('lh3.google')) {
+    let fid = '';
+    const m1 = clean.match(/\/d\/([-\w]{20,})/);
+    if (m1) fid = m1[1];
+    if (!fid) {
+      const m2 = clean.match(/[?&]id=([-\w]{20,})/);
+      if (m2) fid = m2[1];
+    }
+    if (fid) {
+      return `https://lh3.googleusercontent.com/d/${fid}=s${Math.min(width * 2, 200)}`;
+    }
+  }
+
+  // 2. TIFF files -> backend preview converter
+  if (isTiffFile(clean)) {
+    return `/v1/upload/preview?url=${encodeURIComponent(clean)}&w=${width}&q=${quality}`;
+  }
+
+  // 3. Cloudflare R2 files -> Route through backend Sharp thumbnail pipeline
+  if (clean.includes('r2.dev') || clean.startsWith(R2_PUBLIC_BASE)) {
+    const rawFilename = extractCleanFilename(clean);
+    if (rawFilename) {
+      return `/v1/designs/${encodeURIComponent(rawFilename)}?thumb=1&w=${width}&q=${quality}`;
+    }
+  }
+
+  // 4. Relative backend designs
+  if (clean.startsWith('/v1/designs/') || clean.startsWith('/designs/')) {
+    const sep = clean.includes('?') ? '&' : '?';
+    return `${clean}${sep}thumb=1&w=${width}&q=${quality}`;
+  }
+
+  // 5. Default return
+  return clean;
+}
+
