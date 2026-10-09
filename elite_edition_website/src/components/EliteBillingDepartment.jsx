@@ -2425,6 +2425,7 @@ export default function EliteBillingDepartment({
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [signedCopyFilter, setSignedCopyFilter] = useState('All');
   const [customerSearch, setCustomerSearch] = useState('');
+  const [vendorSearch, setVendorSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
   const [digitalChallans, setDigitalChallans] = useState([]);
   const [loadingChallans, setLoadingChallans] = useState(false);
@@ -2587,7 +2588,6 @@ export default function EliteBillingDepartment({
   });
 
   // New Vendor Modal State
-  const [vendorSearch, setVendorSearch] = useState('');
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [editingVendorId, setEditingVendorId] = useState(null);
   const [vendorForm, setVendorForm] = useState({
