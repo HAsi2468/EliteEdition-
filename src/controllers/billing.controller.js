@@ -1643,34 +1643,57 @@ const downloadInvoicePdf = async (req, res) => {
           });
         };
 
-        let targetRowHPerItem = 42;
+        let targetRowHPerItem = 82;
 
         itemsToRender.forEach((item, localIdx) => {
           const idx = startIdx + localIdx;
           const rowBg = localIdx % 2 === 0 ? WHT : S50;
 
           const metaLines = [];
+
+          // 1. Design No (from item or jobCardMap)
+          let designStr = item.designNo || '';
+          if (!designStr && item.jobNo) {
+            const matches = String(item.jobNo).match(/\d+/g) || [];
+            for (const n of matches) {
+              if (jobCardMap[n]) {
+                designStr = jobCardMap[n].designNo || jobCardMap[n].designName || '';
+                if (designStr) break;
+              }
+            }
+          }
+          if (designStr) {
+            metaLines.push({ text: `Design No: ${designStr}`, font: 'Helvetica-Bold', size: 8, color: PRP });
+          }
+
+          // 2. Job Card & Delivery Challan
           const jd = cleanJobDisplay(item.jobNo);
           const chNo = item.ourChallanNo || '';
           const line1 = [];
           if (jd) line1.push(jd);
           if (chNo) line1.push(`Challan: ${chNo}`);
-          if (line1.length) metaLines.push({ text: line1.join('  |  '), font: 'Helvetica-Bold', size: 8, color: PRPM });
+          if (line1.length) metaLines.push({ text: line1.join('   |   '), font: 'Helvetica-Bold', size: 8, color: PRPM });
 
+          // 3. Fabric & Lot
           const line2 = [];
-          if (item.lotNo) line2.push(`Lot: ${item.lotNo}`);
           const fab = item.fabric || item.fabricName || '';
           if (fab) line2.push(`Fabric: ${fab}`);
-          if (item.partyChallan) line2.push(`Party Ch: ${item.partyChallan}`);
-          if (line2.length) metaLines.push({ text: line2.join('  |  '), font: 'Helvetica', size: 7.5, color: S700 });
+          if (item.lotNo) line2.push(`Lot: ${item.lotNo}`);
+          if (line2.length) metaLines.push({ text: line2.join('   |   '), font: 'Helvetica', size: 7.5, color: S700 });
 
+          // 4. Party Challan (standalone line, never truncated)
+          if (item.partyChallan) {
+            metaLines.push({ text: `Party Challan: ${item.partyChallan}`, font: 'Helvetica-Bold', size: 7.5, color: S900 });
+          }
+
+          // 5. Additional custom description or notes
           if (item.description) {
             const cleanDesc = item.description
               .replace(new RegExp(`Challan\\s*${chNo}`, 'i'), '')
               .replace(new RegExp(`Fabric:\\s*${fab}`, 'i'), '')
               .replace(/^[|\s]+|[|\s]+$/g, '').trim();
-            if (cleanDesc && cleanDesc.length > 1) {
-              metaLines.push({ text: cleanDesc, font: 'Helvetica', size: 7, color: S500 });
+            if (cleanDesc && cleanDesc.length > 1 && !metaLines.some(m => m.text.includes(cleanDesc))) {
+              metaLines.push({ text: cleanDesc, font: 'Helvetica-Oblique', size: 7, color: S500 });
             }
           }
 
@@ -1680,44 +1703,44 @@ const downloadInvoicePdf = async (req, res) => {
             doc.font(m.font).fontSize(m.size);
             descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1.5;
           });
-          const rowH = Math.max(targetRowHPerItem, descH + 8);
+          const rowH = Math.max(targetRowHPerItem, descH + 10);
 
           doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
           drawColSeps(Y, rowH);
 
-          const contentPadY = Math.max(4, Math.floor((rowH - Math.max(32, descH)) / 2));
+          const contentPadY = Math.max(5, Math.floor((rowH - descH) / 2));
+          const numY = Y + Math.max(6, Math.floor((rowH - 12) / 2));
 
           doc.fillColor(S700).fontSize(9.5).font('Helvetica-Bold')
-            .text(String(idx + 1), colX[0] + 2, Y + contentPadY, { width: COL[0] - 2, align: 'center' });
+            .text(String(idx + 1), colX[0] + 2, numY, { width: COL[0] - 2, align: 'center' });
 
           const imgPath = itemImages[idx];
           const imgMaxW = COL[1] - 6;
-          const imgMaxH = Math.min(rowH - 6, 40);
+          const imgMaxH = Math.min(rowH - 8, 70);
           const hasImage = imgPath && (Buffer.isBuffer(imgPath) || (typeof imgPath === 'string' && fs.existsSync(imgPath)));
           if (hasImage) {
             try {
-              const imgY = Y + Math.max(3, Math.floor((rowH - imgMaxH) / 2));
+              const imgY = Y + Math.max(4, Math.floor((rowH - imgMaxH) / 2));
               doc.image(imgPath, colX[1] + 3, imgY, { fit: [imgMaxW, imgMaxH], align: 'center', valign: 'center' });
             } catch(e) {
               doc.fillColor(S200).fontSize(7).font('Helvetica')
-                .text('N/A', colX[1], Y + contentPadY + 6, { width: COL[1], align: 'center' });
+                .text('N/A', colX[1], numY, { width: COL[1], align: 'center' });
             }
           } else {
             doc.fillColor(S200).fontSize(7).font('Helvetica')
-              .text('N/A', colX[1], Y + contentPadY + 6, { width: COL[1], align: 'center' });
+              .text('N/A', colX[1], numY, { width: COL[1], align: 'center' });
           }
 
           let textY = Y + contentPadY;
           doc.fillColor(S900).font('Helvetica-Bold').fontSize(10);
-          doc.text(item.itemName || '--', colX[2] + 3, textY, { width: COL[2] - 6, height: 14, ellipsis: true });
+          doc.text(item.itemName || '--', colX[2] + 3, textY, { width: COL[2] - 6 });
           textY += 13;
           metaLines.forEach(m => {
             doc.font(m.font).fontSize(m.size).fillColor(m.color);
-            doc.text(m.text, colX[2] + 3, textY, { width: COL[2] - 6, height: 12, ellipsis: true });
+            doc.text(m.text, colX[2] + 3, textY, { width: COL[2] - 6 });
             textY += 11;
           });
 
-          const numY    = Y + contentPadY;
           const taxRate = item.taxRate || 5;
           let u = (item.unit || 'MTR').trim();
           if (/meter|mtr/i.test(u)) u = 'MTR';
@@ -1913,8 +1936,7 @@ const downloadInvoicePdf = async (req, res) => {
 
       const drawFooter = (startY) => {
         const minFooterY = PH - PAD - 82;
-        const validStartY = (typeof startY === 'number' && !isNaN(startY)) ? startY : minFooterY - 8;
-        const footerY = Math.max(validStartY + 6, minFooterY);
+        const footerY = (typeof startY === 'number' && !isNaN(startY)) ? Math.max(startY, minFooterY) : minFooterY;
         doc.moveTo(PAD, footerY).lineTo(PAD+CW, footerY).strokeColor(S200).lineWidth(0.6).stroke();
 
         const leftFW = 320;
@@ -1953,11 +1975,13 @@ const downloadInvoicePdf = async (req, res) => {
       if (pageChunks.length === 0) pageChunks.push([]);
       const totalPages = pageChunks.length;
 
-      // Calculate exact summary height to position minBottomY
+      // Calculate exact summary height and position minBottomY so summary meets footer with zero blank gap
       const sumH = isIgst
-        ? (16 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16 + 18)
-        : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16 + 18);
-      const minBottomY = Math.min(480, PH - PAD - 84 - sumH);
+        ? (16 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16)
+        : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16);
+      const minFooterY = PH - PAD - 82;
+      const subRowH = 18;
+      const minBottomY = minFooterY - sumH - subRowH;
 
       pageChunks.forEach((chunk, pageIdx) => {
         if (pageIdx > 0) {
@@ -2316,34 +2340,57 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             });
           };
 
-          let targetRowHPerItem = 42;
+          let targetRowHPerItem = 82;
 
           itemsToRender.forEach((item, localIdx) => {
             const idx = startIdx + localIdx;
             const rowBg = localIdx % 2 === 0 ? WHT : S50;
 
             const metaLines = [];
+
+            // 1. Design No (from item or jobCardMap)
+            let designStr = item.designNo || '';
+            if (!designStr && item.jobNo) {
+              const matches = String(item.jobNo).match(/\d+/g) || [];
+              for (const n of matches) {
+                if (jobCardMap[n]) {
+                  designStr = jobCardMap[n].designNo || jobCardMap[n].designName || '';
+                  if (designStr) break;
+                }
+              }
+            }
+            if (designStr) {
+              metaLines.push({ text: `Design No: ${designStr}`, font: 'Helvetica-Bold', size: 8, color: PRP });
+            }
+
+            // 2. Job Card & Delivery Challan
             const jd = cleanJobDisplay(item.jobNo);
             const chNo = item.ourChallanNo || '';
             const line1 = [];
             if (jd) line1.push(jd);
             if (chNo) line1.push(`Challan: ${chNo}`);
-            if (line1.length) metaLines.push({ text: line1.join('  |  '), font: 'Helvetica-Bold', size: 8, color: PRPM });
+            if (line1.length) metaLines.push({ text: line1.join('   |   '), font: 'Helvetica-Bold', size: 8, color: PRPM });
 
+            // 3. Fabric & Lot
             const line2 = [];
-            if (item.lotNo) line2.push(`Lot: ${item.lotNo}`);
             const fab = item.fabric || item.fabricName || '';
             if (fab) line2.push(`Fabric: ${fab}`);
-            if (item.partyChallan) line2.push(`Party Ch: ${item.partyChallan}`);
-            if (line2.length) metaLines.push({ text: line2.join('  |  '), font: 'Helvetica', size: 7.5, color: S700 });
+            if (item.lotNo) line2.push(`Lot: ${item.lotNo}`);
+            if (line2.length) metaLines.push({ text: line2.join('   |   '), font: 'Helvetica', size: 7.5, color: S700 });
 
+            // 4. Party Challan (standalone line, never truncated)
+            if (item.partyChallan) {
+              metaLines.push({ text: `Party Challan: ${item.partyChallan}`, font: 'Helvetica-Bold', size: 7.5, color: S900 });
+            }
+
+            // 5. Additional custom description or notes
             if (item.description) {
               const cleanDesc = item.description
                 .replace(new RegExp(`Challan\\s*${chNo}`, 'i'), '')
                 .replace(new RegExp(`Fabric:\\s*${fab}`, 'i'), '')
                 .replace(/^[|\s]+|[|\s]+$/g, '').trim();
-              if (cleanDesc && cleanDesc.length > 1) {
-                metaLines.push({ text: cleanDesc, font: 'Helvetica', size: 7, color: S500 });
+              if (cleanDesc && cleanDesc.length > 1 && !metaLines.some(m => m.text.includes(cleanDesc))) {
+                metaLines.push({ text: cleanDesc, font: 'Helvetica-Oblique', size: 7, color: S500 });
               }
             }
 
@@ -2353,66 +2400,67 @@ const downloadBulkInvoicesPdf = async (req, res) => {
               doc.font(m.font).fontSize(m.size);
               descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1.5;
             });
-            const rowH = Math.max(targetRowHPerItem, descH + 8);
+            const rowH = Math.max(targetRowHPerItem, descH + 10);
 
             doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
             drawColSeps(Y, rowH);
 
-            const contentPadY = Math.max(4, Math.floor((rowH - Math.max(32, descH)) / 2));
+            const contentPadY = Math.max(5, Math.floor((rowH - descH) / 2));
+            const numY = Y + Math.max(6, Math.floor((rowH - 12) / 2));
 
             doc.fillColor(S700).fontSize(9.5).font('Helvetica-Bold')
-              .text(String(idx + 1), colX[0] + 2, Y + contentPadY, { width: COL[0] - 2, align: 'center' });
+              .text(String(idx + 1), colX[0] + 2, numY, { width: COL[0] - 2, align: 'center' });
 
             const imgPath = itemImages[idx];
             const imgMaxW = COL[1] - 6;
-            const imgMaxH = Math.min(rowH - 6, 40);
+            const imgMaxH = Math.min(rowH - 8, 70);
             const hasImage = imgPath && (Buffer.isBuffer(imgPath) || (typeof imgPath === 'string' && fs.existsSync(imgPath)));
 
             if (hasImage) {
               try {
-                const imgY = Y + Math.max(3, Math.floor((rowH - imgMaxH) / 2));
+                const imgY = Y + Math.max(4, Math.floor((rowH - imgMaxH) / 2));
                 doc.image(imgPath, colX[1] + 3, imgY, { fit: [imgMaxW, imgMaxH], align: 'center', valign: 'center' });
               } catch(e) {
                 doc.fillColor(S500).fontSize(7).font('Helvetica')
-                  .text('[Img Err]', colX[1] + 2, Y + 12, { width: COL[1] - 4, align: 'center' });
+                  .text('[Img Err]', colX[1] + 2, numY, { width: COL[1] - 4, align: 'center' });
               }
             } else {
               doc.fillColor(S500).fontSize(7).font('Helvetica')
-                .text('NO IMAGE', colX[1] + 2, Y + Math.floor(rowH / 2) - 4, { width: COL[1] - 4, align: 'center' });
+                .text('NO IMAGE', colX[1] + 2, numY, { width: COL[1] - 4, align: 'center' });
             }
 
             let descY = Y + contentPadY;
             doc.fillColor(S900).font('Helvetica-Bold').fontSize(10);
-            doc.text(item.itemName || '--', colX[2] + 3, descY, { width: COL[2] - 6, height: 14, ellipsis: true });
+            doc.text(item.itemName || '--', colX[2] + 3, descY, { width: COL[2] - 6 });
             descY += 13;
 
             metaLines.forEach(m => {
               doc.fillColor(m.color).fontSize(m.size).font(m.font)
-                .text(m.text, colX[2] + 3, descY, { width: COL[2] - 6, height: 12, ellipsis: true });
+                .text(m.text, colX[2] + 3, descY, { width: COL[2] - 6 });
               descY += 11;
             });
 
             doc.fillColor(S700).fontSize(9.5).font('Helvetica-Bold')
-              .text(item.hsnCode || '998821', colX[3] + 2, Y + contentPadY, { width: COL[3] - 4, align: 'center' });
+              .text(item.hsnCode || '998821', colX[3] + 2, numY, { width: COL[3] - 4, align: 'center' });
 
             const gstVal = item.taxRate !== undefined && item.taxRate !== null ? `${item.taxRate}%` : '5%';
             doc.fillColor(S700).fontSize(9.5).font('Helvetica-Bold')
-              .text(gstVal, colX[4] + 2, Y + contentPadY, { width: COL[4] - 4, align: 'center' });
+              .text(gstVal, colX[4] + 2, numY, { width: COL[4] - 4, align: 'center' });
 
             const qtyVal = Number(item.qty || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
             doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
-              .text(qtyVal, colX[5] + 2, Y + contentPadY, { width: COL[5] - 4, align: 'center' });
+              .text(qtyVal, colX[5] + 2, numY, { width: COL[5] - 4, align: 'center' });
 
             const rateVal = Number(item.unitPrice || 0).toFixed(2);
             doc.fillColor(S700).fontSize(9.5).font('Helvetica')
-              .text(rateVal, colX[6] + 2, Y + contentPadY, { width: COL[6] - 4, align: 'right' });
+              .text(rateVal, colX[6] + 2, numY, { width: COL[6] - 4, align: 'right' });
 
             doc.fillColor(S500).fontSize(8.5).font('Helvetica')
-              .text(item.unit || 'Mtr', colX[7] + 2, Y + contentPadY, { width: COL[7] - 4, align: 'center' });
+              .text(item.unit || 'Mtr', colX[7] + 2, numY, { width: COL[7] - 4, align: 'center' });
 
             const amtVal = Number(item.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
-              .text(amtVal, colX[8] + 2, Y + contentPadY, { width: COL[8] - 4, align: 'right' });
+              .text(amtVal, colX[8] + 2, numY, { width: COL[8] - 4, align: 'right' });
 
             Y += rowH;
           });
@@ -2556,8 +2604,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 
         const drawFooter = (startY) => {
           const minFooterY = PH - PAD - 82;
-          const validStartY = (typeof startY === 'number' && !isNaN(startY)) ? startY : minFooterY - 8;
-          const footerY = Math.max(validStartY + 6, minFooterY);
+          const footerY = (typeof startY === 'number' && !isNaN(startY)) ? Math.max(startY, minFooterY) : minFooterY;
           doc.moveTo(PAD, footerY).lineTo(PAD + CW, footerY).strokeColor(S200).lineWidth(0.6).stroke();
 
           const leftFW = 320;
@@ -2598,7 +2645,9 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         const sumH = isIgst
           ? (16 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16)
           : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16);
-        const minBottomY = Math.min(480, PH - PAD - 84 - sumH);
+        const minFooterY = PH - PAD - 82;
+        const subRowH = 18;
+        const minBottomY = minFooterY - sumH - subRowH;
 
         pageChunks.forEach((chunk, pageIdx) => {
           if (!isFirstPageOverall) {
