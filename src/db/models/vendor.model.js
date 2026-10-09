@@ -27,6 +27,41 @@ const vendorSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    email: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    billingAddress: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    shippingAddress: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    state: {
+      type: String,
+      trim: true,
+      default: 'Gujarat',
+    },
+    stateCode: {
+      type: String,
+      trim: true,
+      default: '24',
+    },
+    vendorType: {
+      type: String,
+      trim: true,
+      default: 'General',
+    },
+    companyEntity: {
+      type: String,
+      trim: true,
+      default: 'Elite Online',
+    },
   },
   {
     timestamps: {

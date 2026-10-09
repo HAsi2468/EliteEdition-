@@ -27,6 +27,41 @@ const fabricVendorSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    email: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    billingAddress: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    shippingAddress: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    state: {
+      type: String,
+      trim: true,
+      default: 'Gujarat',
+    },
+    stateCode: {
+      type: String,
+      trim: true,
+      default: '24',
+    },
+    vendorType: {
+      type: String,
+      trim: true,
+      default: 'Fabric',
+    },
+    companyEntity: {
+      type: String,
+      trim: true,
+      default: 'Elite Digital Prints',
+    },
   },
   {
     timestamps: {

@@ -2665,54 +2665,127 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
-// ── 10B. VENDOR CRUD ──────────────────────────────────────────────────────────
+// ── 10B. UNIFIED VENDOR CRUD (Directly connected with Master FabricVendor & Vendor) ──
 const getVendors = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const filter = buildCompanyFilter(companyEntity);
-    let vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
 
-    // Auto-seed/fallback from existing FabricVendor & Vendor collections if none found
-    if (!vendors || vendors.length === 0) {
-      const [fVendors, genVendors] = await Promise.all([
-        FabricVendor.find().lean().catch(() => []),
-        Vendor.find().lean().catch(() => [])
-      ]);
+    // Directly fetch from master FabricVendor, Vendor, and BillingVendor collections
+    const [fabricVendors, masterVendors, billingVendors] = await Promise.all([
+      FabricVendor.find().sort({ name: 1 }).lean().catch(() => []),
+      Vendor.find().sort({ name: 1 }).lean().catch(() => []),
+      BillingVendor.find().sort({ name: 1 }).lean().catch(() => []),
+    ]);
 
-      const seenNames = new Set();
-      const seedList = [];
+    // Build unified map keyed by normalized vendor name or businessName
+    const unifiedMap = new Map();
 
-      for (const fv of [...(fVendors || []), ...(genVendors || [])]) {
-        const vName = (fv.name || fv.vendorName || '').trim();
-        if (vName && !seenNames.has(vName.toLowerCase())) {
-          seenNames.add(vName.toLowerCase());
-          seedList.push({
-            companyEntity: companyEntity || 'Elite Digital Prints',
-            name: vName,
-            businessName: fv.businessName || fv.firmName || vName,
-            phone: fv.phone || fv.mobile || '',
-            email: fv.email || '',
-            gstin: fv.gstin || fv.gstNo || '',
-            billingAddress: fv.address || fv.billingAddress || '',
-            shippingAddress: fv.shippingAddress || fv.address || '',
-            state: fv.state || 'Gujarat',
-            stateCode: fv.stateCode || '24',
-            vendorType: 'Fabric'
-          });
-        }
-      }
+    // 1. Process FabricVendor (primary master table for fabric/digital printing)
+    for (const fv of fabricVendors) {
+      const vName = (fv.name || fv.vendorName || '').trim();
+      const bName = (fv.businessName || fv.firmName || vName).trim();
+      const key = (bName || vName).toLowerCase();
+      if (!key) continue;
 
-      if (seedList.length > 0) {
-        try {
-          await BillingVendor.insertMany(seedList);
-          vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
-        } catch (seedErr) {
-          console.warn('BillingVendor auto-seed warning:', seedErr);
+      unifiedMap.set(key, {
+        _id: fv._id,
+        id: String(fv._id),
+        name: vName,
+        businessName: bName,
+        phone: fv.phone || '',
+        email: fv.email || '',
+        gstin: fv.gstin || '',
+        address: fv.address || fv.billingAddress || '',
+        billingAddress: fv.billingAddress || fv.address || '',
+        shippingAddress: fv.shippingAddress || fv.address || '',
+        state: fv.state || 'Gujarat',
+        stateCode: fv.stateCode || '24',
+        vendorType: fv.vendorType || 'Fabric',
+        companyEntity: fv.companyEntity || (companyEntity || 'Elite Digital Prints'),
+        sourceTable: 'FabricVendor',
+        createdAt: fv.created_date_time || fv.createdAt,
+        updatedAt: fv.modified_date_time || fv.updatedAt,
+      });
+    }
+
+    // 2. Process General/Master Vendor collection
+    for (const mv of masterVendors) {
+      const vName = (mv.name || mv.vendorName || '').trim();
+      const bName = (mv.businessName || mv.firmName || vName).trim();
+      const key = (bName || vName).toLowerCase();
+      if (!key) continue;
+
+      if (!unifiedMap.has(key)) {
+        unifiedMap.set(key, {
+          _id: mv._id,
+          id: String(mv._id),
+          name: vName,
+          businessName: bName,
+          phone: mv.phone || '',
+          email: mv.email || '',
+          gstin: mv.gstin || '',
+          address: mv.address || mv.billingAddress || '',
+          billingAddress: mv.billingAddress || mv.address || '',
+          shippingAddress: mv.shippingAddress || mv.address || '',
+          state: mv.state || 'Gujarat',
+          stateCode: mv.stateCode || '24',
+          vendorType: mv.vendorType || 'General',
+          companyEntity: mv.companyEntity || 'Elite Online',
+          sourceTable: 'Vendor',
+          createdAt: mv.created_date_time || mv.createdAt,
+          updatedAt: mv.modified_date_time || mv.updatedAt,
+        });
+      } else {
+        const existing = unifiedMap.get(key);
+        if (!existing.phone && mv.phone) existing.phone = mv.phone;
+        if (!existing.gstin && mv.gstin) existing.gstin = mv.gstin;
+        if (!existing.email && mv.email) existing.email = mv.email;
+        if (!existing.address && mv.address) {
+          existing.address = mv.address;
+          existing.billingAddress = mv.address;
         }
       }
     }
 
-    res.json({ success: true, data: vendors || [] });
+    // 3. Merge any extra billing vendors if present and enrich details
+    for (const bv of billingVendors) {
+      const vName = (bv.name || '').trim();
+      const bName = (bv.businessName || vName).trim();
+      const key = (bName || vName).toLowerCase();
+      if (!key) continue;
+
+      if (!unifiedMap.has(key)) {
+        unifiedMap.set(key, {
+          _id: bv._id,
+          id: String(bv._id),
+          name: vName,
+          businessName: bName,
+          phone: bv.phone || '',
+          email: bv.email || '',
+          gstin: bv.gstin || '',
+          address: bv.billingAddress || '',
+          billingAddress: bv.billingAddress || '',
+          shippingAddress: bv.shippingAddress || '',
+          state: bv.state || 'Gujarat',
+          stateCode: bv.stateCode || '24',
+          vendorType: bv.vendorType || 'Fabric',
+          companyEntity: bv.companyEntity || (companyEntity || 'Elite Digital Prints'),
+          sourceTable: 'BillingVendor',
+          createdAt: bv.created_at || bv.createdAt,
+          updatedAt: bv.updated_at || bv.updatedAt,
+        });
+      } else {
+        const existing = unifiedMap.get(key);
+        if (!existing.email && bv.email) existing.email = bv.email;
+        if (!existing.shippingAddress && bv.shippingAddress) existing.shippingAddress = bv.shippingAddress;
+        if (!existing.billingAddress && bv.billingAddress) existing.billingAddress = bv.billingAddress;
+        if (bv.state) existing.state = bv.state;
+        if (bv.stateCode) existing.stateCode = bv.stateCode;
+      }
+    }
+
+    const unifiedList = Array.from(unifiedMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    res.json({ success: true, data: unifiedList });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -2720,8 +2793,49 @@ const getVendors = async (req, res) => {
 
 const createVendor = async (req, res) => {
   try {
-    const vendor = await BillingVendor.create(req.body);
-    res.status(201).json({ success: true, data: vendor });
+    const payload = req.body || {};
+    const vName = (payload.name || payload.vendorName || '').trim();
+    const bName = (payload.businessName || payload.firmName || vName).trim();
+    const vType = payload.vendorType || (payload.companyEntity === 'Elite Online' ? 'General' : 'Fabric');
+    const addr = payload.billingAddress || payload.address || '';
+
+    if (!vName) {
+      return res.status(400).json({ success: false, error: 'Vendor name is required' });
+    }
+
+    const vendorDoc = {
+      name: vName,
+      businessName: bName,
+      phone: payload.phone || '',
+      email: payload.email || '',
+      gstin: payload.gstin || '',
+      address: addr,
+      billingAddress: addr,
+      shippingAddress: payload.shippingAddress || addr,
+      state: payload.state || 'Gujarat',
+      stateCode: payload.stateCode || '24',
+      vendorType: vType,
+      companyEntity: payload.companyEntity || 'Elite Digital Prints',
+    };
+
+    let createdRecord;
+    // Write directly into master FabricVendor (or Vendor)
+    if (vType === 'Fabric' || payload.companyEntity === 'Elite Digital Prints') {
+      createdRecord = await FabricVendor.create(vendorDoc);
+    } else {
+      createdRecord = await Vendor.create(vendorDoc);
+    }
+
+    // Keep BillingVendor in sync
+    try {
+      await BillingVendor.findOneAndUpdate(
+        { $or: [{ name: vName }, { businessName: bName }] },
+        { ...vendorDoc, _id: createdRecord._id },
+        { upsert: true, new: true }
+      );
+    } catch (syncErr) {}
+
+    res.status(201).json({ success: true, data: createdRecord });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -2729,8 +2843,52 @@ const createVendor = async (req, res) => {
 
 const updateVendor = async (req, res) => {
   try {
-    const vendor = await BillingVendor.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json({ success: true, data: vendor });
+    const { id } = req.params;
+    const updates = req.body || {};
+    const addr = updates.billingAddress || updates.address || undefined;
+
+    const vendorDoc = {
+      ...updates,
+      ...(addr !== undefined ? { address: addr, billingAddress: addr } : {})
+    };
+
+    let updatedRecord = null;
+
+    // Check & update FabricVendor first
+    try {
+      updatedRecord = await FabricVendor.findByIdAndUpdate(id, { $set: vendorDoc }, { new: true });
+    } catch (e) {}
+
+    // Check & update Vendor
+    if (!updatedRecord) {
+      try {
+        updatedRecord = await Vendor.findByIdAndUpdate(id, { $set: vendorDoc }, { new: true });
+      } catch (e) {}
+    }
+
+    // Check & update BillingVendor
+    try {
+      const bRec = await BillingVendor.findByIdAndUpdate(id, { $set: vendorDoc }, { new: true });
+      if (!updatedRecord) updatedRecord = bRec;
+    } catch (e) {}
+
+    // Ensure cross-table sync by name/businessName
+    if (updatedRecord) {
+      const vName = updatedRecord.name;
+      const bName = updatedRecord.businessName;
+      const matchFilter = { $or: [...(vName ? [{ name: vName }] : []), ...(bName ? [{ businessName: bName }] : [])] };
+      await Promise.all([
+        FabricVendor.updateOne(matchFilter, { $set: vendorDoc }).catch(() => {}),
+        Vendor.updateOne(matchFilter, { $set: vendorDoc }).catch(() => {}),
+        BillingVendor.updateOne(matchFilter, { $set: vendorDoc }).catch(() => {}),
+      ]);
+    }
+
+    if (!updatedRecord) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
+    }
+
+    res.json({ success: true, data: updatedRecord });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -2738,8 +2896,33 @@ const updateVendor = async (req, res) => {
 
 const deleteVendor = async (req, res) => {
   try {
-    await BillingVendor.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: 'Vendor deleted successfully' });
+    const { id } = req.params;
+    let vendor = null;
+
+    try { vendor = await FabricVendor.findByIdAndDelete(id); } catch (e) {}
+    if (!vendor) {
+      try { vendor = await Vendor.findByIdAndDelete(id); } catch (e) {}
+    }
+    try { 
+      const bVendor = await BillingVendor.findByIdAndDelete(id); 
+      if (!vendor) vendor = bVendor;
+    } catch (e) {}
+
+    // Purge across all master collections to prevent stale ghosts
+    if (vendor) {
+      const vName = vendor.name;
+      const bName = vendor.businessName;
+      if (vName || bName) {
+        const delFilter = { $or: [...(vName ? [{ name: vName }] : []), ...(bName ? [{ businessName: bName }] : [])] };
+        await Promise.all([
+          FabricVendor.deleteMany(delFilter).catch(() => {}),
+          Vendor.deleteMany(delFilter).catch(() => {}),
+          BillingVendor.deleteMany(delFilter).catch(() => {})
+        ]);
+      }
+    }
+
+    res.json({ success: true, message: 'Vendor deleted successfully across master collections' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
