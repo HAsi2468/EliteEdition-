@@ -410,6 +410,7 @@ export default function EliteBillingDepartment({
   const createEmptyPurchaseItem = () => ({
     id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     itemName: '',
+    description: '',
     hsnCode: '998821',
     qty: 1,
     quantity: 1,
@@ -679,6 +680,7 @@ export default function EliteBillingDepartment({
       ? p.items.map(it => ({
           id: it.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           itemName: it.itemName || '',
+          description: it.description || '',
           hsnCode: it.hsnCode || '998821',
           qty: it.qty != null ? it.qty : (it.quantity != null ? it.quantity : 1),
           quantity: it.quantity != null ? it.quantity : (it.qty != null ? it.qty : 1),
@@ -697,6 +699,7 @@ export default function EliteBillingDepartment({
       : [{
           id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           itemName: p.itemName || '',
+          description: p.description || '',
           hsnCode: '998821',
           qty: p.quantity != null ? p.quantity : 1,
           quantity: p.quantity != null ? p.quantity : 1,
@@ -1109,7 +1112,7 @@ export default function EliteBillingDepartment({
         const matchNo = p.purchaseNo && p.purchaseNo.toLowerCase().includes(q);
         const matchVendor = p.vendorName && p.vendorName.toLowerCase().includes(q);
         const matchItem = p.itemName && p.itemName.toLowerCase().includes(q);
-        const matchChildItems = Array.isArray(p.items) && p.items.some(it => it.itemName && it.itemName.toLowerCase().includes(q));
+        const matchChildItems = Array.isArray(p.items) && p.items.some(it => (it.itemName && it.itemName.toLowerCase().includes(q)) || (it.description && it.description.toLowerCase().includes(q)));
         if (!matchNo && !matchVendor && !matchItem && !matchChildItems) return false;
       }
 
@@ -5098,6 +5101,11 @@ export default function EliteBillingDepartment({
                                   <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '5px' }}>
                                     ({it.qty || it.quantity || 1} {it.unit || 'Mtr'} @ ₹{it.unitPrice || it.rate || 0})
                                   </span>
+                                  {it.description && (
+                                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '10px' }}>
+                                      {it.description}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                               {p.items.length > 3 && (
@@ -5512,37 +5520,13 @@ export default function EliteBillingDepartment({
                             {itemsList.map(item => <option key={item._id} value={item.itemName} />)}
                           </datalist>
 
-                          {/* Sub-inputs: Job No, Lot No, Vendor/Party Challan, Our Challan */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.3rem' }}>
-                            <input
-                              type="text"
-                              value={it.jobNo || ''}
-                              onChange={e => handlePurchaseItemChange(idx, 'jobNo', e.target.value)}
-                              placeholder="Job Card"
-                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                            />
-                            <input
-                              type="text"
-                              value={it.lotNo || ''}
-                              onChange={e => handlePurchaseItemChange(idx, 'lotNo', e.target.value)}
-                              placeholder="Lot No"
-                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                            />
-                            <input
-                              type="text"
-                              value={it.partyChallan || ''}
-                              onChange={e => handlePurchaseItemChange(idx, 'partyChallan', e.target.value)}
-                              placeholder="Vendor Challan"
-                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                            />
-                            <input
-                              type="text"
-                              value={it.ourChallanNo || ''}
-                              onChange={e => handlePurchaseItemChange(idx, 'ourChallanNo', e.target.value)}
-                              placeholder="Inward Challan"
-                              style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                            />
-                          </div>
+                          <input
+                            type="text"
+                            value={it.description || ''}
+                            onChange={e => handlePurchaseItemChange(idx, 'description', e.target.value)}
+                            placeholder="Description (optional)..."
+                            style={{ ...inputStyle, fontSize: '0.78rem', padding: '0.3rem 0.5rem', color: '#475569' }}
+                          />
                         </td>
                         <td style={{ padding: '0.4rem' }}>
                           <input
@@ -5864,6 +5848,11 @@ export default function EliteBillingDepartment({
                             <td style={{ padding: '0.6rem 0.8rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
                             <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>
                               <div>{it.itemName}</div>
+                              {it.description && (
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginTop: 2 }}>
+                                  {it.description}
+                                </div>
+                              )}
                               {(it.jobNo || it.lotNo || it.partyChallan || it.ourChallanNo) && (
                                 <div style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', gap: '0.4rem', marginTop: 2, flexWrap: 'wrap' }}>
                                   {it.jobNo && <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>Job: {it.jobNo}</span>}
