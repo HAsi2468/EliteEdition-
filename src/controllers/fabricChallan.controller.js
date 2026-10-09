@@ -502,7 +502,7 @@ const createChallan = async (req, res) => {
       billTo: billTo || '',
       shipTo: shipTo || '',
       notes: notes || '',
-      createdBy: createdBy || '',
+      createdBy: createdBy || req.user?.fullName || req.user?.name || req.user?.username || '',
     });
 
     await challan.save();
@@ -799,6 +799,11 @@ const updateChallan = async (req, res) => {
     if (billTo !== undefined) challan.billTo = billTo;
     if (shipTo !== undefined) challan.shipTo = shipTo;
     if (notes !== undefined) challan.notes = notes;
+    if (req.body.createdBy !== undefined && req.body.createdBy) {
+      challan.createdBy = req.body.createdBy;
+    } else if (!challan.createdBy && (req.user?.fullName || req.user?.name)) {
+      challan.createdBy = req.user?.fullName || req.user?.name;
+    }
 
     const details = tpDetails !== undefined ? (Array.isArray(tpDetails) ? tpDetails : []) : challan.tpDetails;
     const rawLotStr = lotNo !== undefined ? String(lotNo) : challan.lotNo;
@@ -1272,6 +1277,39 @@ const downloadChallanPdf = async (req, res) => {
     const hasNotes = !!(challan.notes && challan.notes.trim());
     const hasPcs = !!(challan.pcs);
 
+    // ── Resolve Creator Name for Authorized Signature ──
+    let creatorName = (challan.createdByName || challan.createdBy || '').trim();
+    const mongoose = require('mongoose');
+    if (creatorName && mongoose.Types.ObjectId.isValid(creatorName)) {
+      try {
+        const User = require('../db/models/user.model');
+        const u = await User.findById(creatorName).lean();
+        if (u && (u.name || u.fullName)) {
+          creatorName = u.fullName || u.name;
+        }
+      } catch (e) {}
+    }
+    if (!creatorName || mongoose.Types.ObjectId.isValid(creatorName)) {
+      if (foundJobCards && foundJobCards.length > 0) {
+        const jc = foundJobCards[0];
+        const jcCreator = (jc.createdByName || jc.createdBy || '').trim();
+        if (jcCreator && mongoose.Types.ObjectId.isValid(jcCreator)) {
+          try {
+            const User = require('../db/models/user.model');
+            const u = await User.findById(jcCreator).lean();
+            if (u && (u.name || u.fullName)) {
+              creatorName = u.fullName || u.name;
+            }
+          } catch (e) {}
+        } else if (jcCreator) {
+          creatorName = jcCreator;
+        }
+      }
+    }
+    if (!creatorName || mongoose.Types.ObjectId.isValid(creatorName)) {
+      creatorName = 'HASI';
+    }
+
     const getColor = (colorStr, isColorPage) => {
       if (isColorPage) return colorStr;
       if (colorStr === '#dc2626') return '#dc2626'; // Keep Challan No & Total TP in RED!
@@ -1300,6 +1338,20 @@ const downloadChallanPdf = async (req, res) => {
         doc.image(logoPath, ML + (contentWidth - 130) / 2, MR + 29, { width: 130 });
       }
 
+      // Digital QR Code Physical Document Verification Seal (Header Right Side)
+      if (qrBuffer) {
+        const qrSize = 42;
+        const qrX = PW - MR - qrSize - 12;
+        const qrY = MR + 18;
+        try {
+          doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+          doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(5.5).font('Helvetica-Bold')
+            .text('SCAN TO VERIFY', qrX - 10, qrY + qrSize + 2, { width: qrSize + 20, align: 'center', lineBreak: false });
+        } catch (qrDrawErr) {
+          console.warn('Failed to draw header QR code on PDF:', qrDrawErr.message);
+        }
+      }
+
       // Pin
       const drawMapPin = (d, x, y) => {
         d.save();
@@ -1316,7 +1368,7 @@ const downloadChallanPdf = async (req, res) => {
       };
 
       const addressText = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10).font('Helvetica-Bold');
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold');
       const textWidth = doc.widthOfString(addressText);
       const startX = ML + (contentWidth - textWidth) / 2;
       
@@ -1506,16 +1558,10 @@ const downloadChallanPdf = async (req, res) => {
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
         .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
 
-      // Digital QR Code Physical Document Verification Seal
-      if (qrBuffer) {
-        const qrCenterX = ML + (contentWidth - 46) / 2;
-        try {
-          doc.image(qrBuffer, qrCenterX, sigLineY - 14, { width: 46, height: 46 });
-          doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(6.5).font('Helvetica-Bold')
-            .text('SCAN TO VERIFY', qrCenterX - 17, sigLineY + 36, { width: 80, align: 'center', lineBreak: false });
-        } catch (qrDrawErr) {
-          console.warn('Failed to draw QR code on PDF:', qrDrawErr.message);
-        }
+      // Print creator name above Authorized Signature line
+      if (creatorName) {
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(11).font('Helvetica-Bold')
+          .text(creatorName, PW - MR - 160, sigLineY - 16, { width: 130, align: 'center', lineBreak: false });
       }
 
       doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();

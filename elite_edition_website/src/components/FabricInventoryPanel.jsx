@@ -1361,7 +1361,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       date: new Date().toISOString().split('T')[0],
       partyName: '', lotNo: '', vendorChallanNo: '', deliveryBy: '', fabricName: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct',
       jobNo: '', designNo: '', colour: '', panna: '', pcs: '', billTo: '', shipTo: '',
-      tpDetails: emptyTpRows(), notes: '',
+      tpDetails: emptyTpRows(), notes: '', createdBy: '',
     });
     setAvailableLots([]);
   };
@@ -1831,11 +1831,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         ? challanTotalMtr
         : (parseFloat(challanForm.totalMtr) || parseFloat(challanForm.pcs) || 0);
 
+      const creatorName = challanForm.createdBy || currentUser.fullName || currentUser.name || currentUser.username || 'HASI';
+
       const payload = {
         ...challanForm,
         fabricName: cleanFabric || challanForm.fabricName,
         totalMtr: effectiveTotalMtr,
         totalTp: challanTotalTp,
+        createdBy: creatorName,
         adminOverride: forceAdminOverride || (isAdmin && needsOverride),
         tpDetails: challanForm.tpDetails
           .filter(r => (r.tpMeter !== '' && r.tpMeter != null && parseFloat(r.tpMeter) > 0))
@@ -1905,6 +1908,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       shipTo: c.shipTo || '',
       tpDetails: tpRows,
       notes: c.notes || '',
+      createdBy: c.createdBy || c.createdByName || '',
     });
 
     if (c.fabricName) {
