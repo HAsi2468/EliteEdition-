@@ -432,7 +432,6 @@ export default function EliteBillingDepartment({
     purchaseNo: 'PUR-2026-001',
     ourChallanNo: '',
     date: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
     vendor: {
       vendorId: '',
       name: '',
@@ -454,8 +453,7 @@ export default function EliteBillingDepartment({
     taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
     gstRate: 5,
     paidAmount: 0,
-    notes: 'Vendor purchase bill recorded in ERP.',
-    terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
+    notes: 'Vendor purchase bill recorded in ERP.'
   });
 
   // ── REAL-TIME PURCHASE CALCULATIONS (mirroring calculatedInvoice) ─────────────
@@ -720,7 +718,6 @@ export default function EliteBillingDepartment({
       purchaseNo: p.purchaseNo || '',
       ourChallanNo: p.ourChallanNo || '',
       date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : new Date().toISOString().split('T')[0],
-      dueDate: p.dueDate ? (typeof p.dueDate === 'string' && p.dueDate.includes('T') ? p.dueDate.split('T')[0] : (p.dueDate instanceof Date ? p.dueDate.toISOString().split('T')[0] : p.dueDate)) : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       vendor: {
         vendorId: p.vendor?.vendorId || '',
         name: p.vendor?.name || p.vendorName || '',
@@ -743,8 +740,7 @@ export default function EliteBillingDepartment({
       gstRate: pGstRate,
       paidAmount: p.paidAmount || 0,
       totalAmount: p.grandTotal || p.totalAmount || '',
-      notes: p.notes || '',
-      terms: p.terms || 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
+      notes: p.notes || ''
     });
     setShowPurchaseModal(true);
   };
@@ -909,7 +905,7 @@ export default function EliteBillingDepartment({
       purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
       ourChallanNo: purchaseForm.ourChallanNo || '',
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
-      dueDate: purchaseForm.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      dueDate: purchaseForm.dueDate || undefined,
       vendor: {
         vendorId: purchaseForm.vendor?.vendorId || undefined,
         name: purchaseForm.vendor?.name || vendorFinalName.trim(),
@@ -1016,7 +1012,6 @@ export default function EliteBillingDepartment({
       purchaseNo: `PUR-2026-00${purchases.length + 2}`,
       ourChallanNo: '',
       date: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       vendor: {
         vendorId: '',
         name: '',
@@ -1038,8 +1033,7 @@ export default function EliteBillingDepartment({
       taxType: 'CGST_SGST',
       gstRate: 5,
       paidAmount: 0,
-      notes: 'Vendor purchase bill recorded in ERP.',
-      terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
+      notes: 'Vendor purchase bill recorded in ERP.'
     });
 
     triggerPushNotification('Purchase Recorded 📥', `Purchase Bill #${payload.purchaseNo} saved successfully!`, 'success');
@@ -4979,7 +4973,6 @@ export default function EliteBillingDepartment({
                     purchaseNo: `PUR-2026-00${purchases.length + 1}`,
                     ourChallanNo: '',
                     date: new Date().toISOString().split('T')[0],
-                    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
                     vendor: {
                       vendorId: '',
                       name: '',
@@ -5001,8 +4994,7 @@ export default function EliteBillingDepartment({
                     taxType: 'CGST_SGST',
                     gstRate: 5,
                     paidAmount: 0,
-                    notes: 'Vendor purchase bill recorded in ERP.',
-                    terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
+                    notes: 'Vendor purchase bill recorded in ERP.'
                   });
                   setShowPurchaseModal(true);
                 }}
@@ -5293,16 +5285,6 @@ export default function EliteBillingDepartment({
                     required
                     value={formatForInputDate(purchaseForm.date)}
                     onChange={e => setPurchaseForm(f => ({ ...f, date: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Due Date</label>
-                  <input
-                    type="date"
-                    value={formatForInputDate(purchaseForm.dueDate)}
-                    onChange={e => setPurchaseForm(f => ({ ...f, dueDate: e.target.value }))}
                     style={inputStyle}
                   />
                 </div>
@@ -5634,21 +5616,11 @@ export default function EliteBillingDepartment({
                   <div>
                     <label style={labelStyle}>Notes for Vendor / Inward Remarks</label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={purchaseForm.notes}
                       onChange={e => setPurchaseForm(f => ({ ...f, notes: e.target.value }))}
                       style={inputStyle}
                       placeholder="e.g. Delivery challan verified, fabric quality approved, transporter: XYZ Logistics"
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Terms & Conditions</label>
-                    <textarea
-                      rows={2}
-                      value={purchaseForm.terms}
-                      onChange={e => setPurchaseForm(f => ({ ...f, terms: e.target.value }))}
-                      style={inputStyle}
-                      placeholder="Payment terms, rejection policy, jurisdiction..."
                     />
                   </div>
                 </div>
