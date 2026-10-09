@@ -745,77 +745,250 @@ export default function EliteBillingDepartment({
     setShowPurchaseModal(true);
   };
 
-  // Standardized Purchase Clone Workflow (Line items duplicated, dates & status reset, quantity focused)
-  const handleClonePurchase = (purchaseToClone) => {
+  // Professional Printable Purchase Inward Voucher via openPrintOptionsDialog
+  const handlePrintPurchase = async (purchase) => {
+    if (!purchase) return;
     try {
-      const cloned = cloneDocumentPayload(purchaseToClone, 'purchase');
-      if (!cloned) return;
+      const vName = purchase.vendor?.businessName || purchase.vendor?.name || purchase.vendorName || 'Vendor';
+      const pDate = purchase.date ? (typeof purchase.date === 'string' && purchase.date.includes('T') ? purchase.date.split('T')[0] : (purchase.date instanceof Date ? purchase.date.toISOString().split('T')[0] : purchase.date)) : new Date().toISOString().split('T')[0];
+      const pDueDate = purchase.dueDate ? (typeof purchase.dueDate === 'string' && purchase.dueDate.includes('T') ? purchase.dueDate.split('T')[0] : (purchase.dueDate instanceof Date ? purchase.dueDate.toISOString().split('T')[0] : purchase.dueDate)) : '';
 
-      setEditingPurchaseId(null);
-      setPurchaseForm({
-        ...cloned,
-        purchaseNo: `PUR-DRAFT-${Date.now().toString().slice(-4)}`
+      const items = Array.isArray(purchase.items) && purchase.items.length > 0
+        ? purchase.items
+        : [{
+            itemName: purchase.itemName || 'Material Purchase',
+            description: '',
+            hsnCode: '998821',
+            qty: purchase.quantity || 1,
+            unit: purchase.unit || 'Nos',
+            unitPrice: purchase.rate !== '-' ? (purchase.rate || 0) : 0,
+            taxRate: purchase.gstRate || 0,
+            totalAmount: purchase.totalAmount || 0
+          }];
+
+      const subtotal = Number(purchase.subtotal || purchase.subtotalAmount || (purchase.totalAmount - (purchase.totalTax || purchase.gstAmount || 0)) || 0);
+      const discount = Number(purchase.discountTotal || 0);
+      const taxRate = Number(purchase.gstRate || 5);
+      const isIgst = purchase.taxType === 'IGST';
+      const igstAmt = Number(purchase.igstAmount || purchase.totalTax || purchase.gstAmount || 0);
+      const cgstAmt = Number(purchase.cgstAmount || (purchase.totalTax ? purchase.totalTax / 2 : 0));
+      const sgstAmt = Number(purchase.sgstAmount || (purchase.totalTax ? purchase.totalTax / 2 : 0));
+      const roundOff = Number(purchase.roundOff || 0);
+      const grandTotal = Number(purchase.grandTotal || purchase.totalAmount || 0);
+      const paidAmt = Number(purchase.paidAmount || 0);
+      const balDue = purchase.balanceDue != null ? Number(purchase.balanceDue) : Math.max(0, grandTotal - paidAmt);
+
+      const itemsHtml = items.map((it, idx) => {
+        const qty = it.qty || it.quantity || 1;
+        const rate = it.unitPrice || it.rate || 0;
+        const lineTotal = Number(it.totalAmount || it.amount || (qty * rate));
+        return `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 8px 10px; text-align: center; color: #64748b;">${idx + 1}</td>
+            <td style="padding: 8px 10px;">
+              <strong style="color: #0f172a;">${it.itemName || ''}</strong>
+              ${it.description ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">${it.description}</div>` : ''}
+              ${(it.jobNo || it.lotNo || it.partyChallan || it.ourChallanNo) ? `
+                <div style="font-size: 10px; color: #64748b; margin-top: 3px;">
+                  ${it.jobNo ? `Job: ${it.jobNo} ` : ''}
+                  ${it.lotNo ? `Lot: ${it.lotNo} ` : ''}
+                  ${it.partyChallan ? `Vendor Ch: ${it.partyChallan} ` : ''}
+                  ${it.ourChallanNo ? `Challan: ${it.ourChallanNo}` : ''}
+                </div>` : ''}
+            </td>
+            <td style="padding: 8px 10px; text-align: center; color: #64748b;">${it.hsnCode || '998821'}</td>
+            <td style="padding: 8px 10px; text-align: right; font-weight: 700;">${qty}</td>
+            <td style="padding: 8px 10px; text-align: center; color: #64748b;">${it.unit || 'Nos'}</td>
+            <td style="padding: 8px 10px; text-align: right;">₹${Number(rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td style="padding: 8px 10px; text-align: right;">${it.taxRate != null ? it.taxRate : taxRate}%</td>
+            <td style="padding: 8px 10px; text-align: right; font-weight: 800; color: #0f172a;">₹${lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const htmlContent = `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; padding: 24px; max-width: 820px; margin: 0 auto; line-height: 1.45;">
+          <style>
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+
+          <!-- Header -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px;">
+            <div>
+              <div style="font-size: 22px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.5px; text-transform: uppercase;">
+                ${companyEntity || 'ELITE DIGITAL PRINTS'}
+              </div>
+              <div style="font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px;">
+                Enterprise ERP • Inward Materials & Vendor Purchase Voucher
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <span style="background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; font-size: 11px; font-weight: 900; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; text-transform: uppercase; display: inline-block;">
+                PURCHASE INWARD VOUCHER
+              </span>
+              <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-top: 6px;">
+                Bill #${purchase.purchaseNo || '-'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Metadata Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">
+              <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">SUPPLIER / VENDOR DETAILS</div>
+              <div style="font-size: 14px; font-weight: 900; color: #0f172a;">${vName}</div>
+              ${purchase.vendor?.name && purchase.vendor?.name !== vName ? `<div style="font-size: 11px; color: #475569; margin-top: 2px;">Contact: <strong>${purchase.vendor.name}</strong></div>` : ''}
+              ${purchase.vendor?.gstin ? `<div style="font-size: 11px; color: #1e3a8a; font-weight: 700; margin-top: 2px;">GSTIN: ${purchase.vendor.gstin}</div>` : ''}
+              ${purchase.vendor?.billingAddress ? `<div style="font-size: 11px; color: #475569; margin-top: 2px;">${purchase.vendor.billingAddress}${purchase.vendor?.state ? `, ${purchase.vendor.state}` : ''}</div>` : ''}
+              ${purchase.vendor?.phone ? `<div style="font-size: 11px; color: #475569; margin-top: 2px;">Phone: ${purchase.vendor.phone}</div>` : ''}
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; text-align: right;">
+              <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">PURCHASE DETAILS</div>
+              <div style="font-size: 11px; color: #475569;">Inward Date: <strong style="color: #0f172a;">${pDate}</strong></div>
+              ${pDueDate ? `<div style="font-size: 11px; color: #475569; margin-top: 2px;">Due Date: <strong style="color: #d97706;">${pDueDate}</strong></div>` : ''}
+              ${purchase.ourChallanNo ? `<div style="font-size: 11px; color: #475569; margin-top: 2px;">Challan / Ref: <strong style="color: #0284c7;">${purchase.ourChallanNo}</strong></div>` : ''}
+              <div style="margin-top: 6px;">
+                <span style="font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: ${purchase.paymentStatus === 'PAID' ? '#dcfce7' : (purchase.paymentStatus === 'PARTIAL' || purchase.paymentStatus === 'PARTIALLY_PAID') ? '#fef3c7' : '#fee2e2'}; color: ${purchase.paymentStatus === 'PAID' ? '#15803d' : (purchase.paymentStatus === 'PARTIAL' || purchase.paymentStatus === 'PARTIALLY_PAID') ? '#b45309' : '#b91c1c'};">
+                  STATUS: ${purchase.paymentStatus || 'UNPAID'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Items Table -->
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+            <thead>
+              <tr style="background: #1e3a8a; color: #ffffff; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">
+                <th style="padding: 8px 10px; width: 30px; text-align: center;">#</th>
+                <th style="padding: 8px 10px; text-align: left;">Item Description</th>
+                <th style="padding: 8px 10px; text-align: center; width: 60px;">HSN</th>
+                <th style="padding: 8px 10px; text-align: right; width: 60px;">Qty</th>
+                <th style="padding: 8px 10px; text-align: center; width: 50px;">Unit</th>
+                <th style="padding: 8px 10px; text-align: right; width: 80px;">Rate (₹)</th>
+                <th style="padding: 8px 10px; text-align: right; width: 60px;">Tax %</th>
+                <th style="padding: 8px 10px; text-align: right; width: 95px;">Total (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <!-- Financial Breakdown -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 20px;">
+            <div style="flex: 1;">
+              ${purchase.notes ? `
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px;">
+                  <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 3px;">Notes / Remarks</div>
+                  <div style="font-size: 11px; color: #334155;">${purchase.notes}</div>
+                </div>
+              ` : ''}
+            </div>
+
+            <div style="width: 280px; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 14px; font-size: 12px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                <span style="color: #64748b;">Subtotal:</span>
+                <strong>₹${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+              </div>
+              ${discount > 0 ? `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #16a34a;">
+                  <span>Discount:</span>
+                  <strong>- ₹${discount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </div>` : ''}
+              ${isIgst ? `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #475569;">
+                  <span>IGST (${taxRate}%):</span>
+                  <strong>₹${igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </div>` : `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #475569;">
+                  <span>CGST (${taxRate / 2}%):</span>
+                  <strong>₹${cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #475569;">
+                  <span>SGST (${taxRate / 2}%):</span>
+                  <strong>₹${sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </div>`}
+              ${roundOff !== 0 ? `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #475569;">
+                  <span>Round Off:</span>
+                  <strong>${roundOff > 0 ? `+ ₹${roundOff.toFixed(2)}` : `- ₹${Math.abs(roundOff).toFixed(2)}`}</strong>
+                </div>` : ''}
+              <div style="border-top: 1.5px solid #0f172a; padding-top: 6px; margin-top: 4px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 900; color: #1e3a8a;">
+                <span>Grand Total:</span>
+                <span>₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: #15803d; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+                <span>Paid Amount:</span>
+                <strong>₹${paidAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; font-weight: 800; color: ${balDue > 0 ? '#dc2626' : '#15803d'};">
+                <span>Balance Due:</span>
+                <span>₹${balDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signatures Footer -->
+          <div style="display: flex; justify-content: space-between; border-top: 1px solid #cbd5e1; padding-top: 36px; margin-top: 30px; font-size: 11px; color: #64748b;">
+            <div style="text-align: center; width: 180px; border-top: 1px dashed #94a3b8; padding-top: 6px;">
+              Goods Received By
+            </div>
+            <div style="text-align: center; width: 180px; border-top: 1px dashed #94a3b8; padding-top: 6px;">
+              Checked & Verified By
+            </div>
+            <div style="text-align: center; width: 180px; border-top: 1px dashed #94a3b8; padding-top: 6px;">
+              Authorized Signatory
+            </div>
+          </div>
+        </div>
+      `;
+
+      await openPrintOptionsDialog({
+        title: `Purchase Voucher — ${purchase.purchaseNo || 'Entry'}`,
+        content: htmlContent,
+        defaultSettings: {
+          paperSize: 'A4',
+          orientation: 'portrait',
+          margin: 'default'
+        }
       });
-      setShowPurchaseModal(true);
-
-      triggerPushNotification('Purchase Entry Cloned 📋', 'Duplicated line items into draft. Quantity field focused for instant entry.', 'info');
-      focusPrimaryQuantityInput('[data-primary-qty="true"]', 200);
+      triggerPushNotification('🖨️ Purchase Voucher', `Print ready for #${purchase.purchaseNo || ''}.`, 'success');
     } catch (err) {
-      console.error('Failed to clone purchase:', err);
+      console.error('Failed to print purchase voucher:', err);
+      alert('Failed to prepare purchase voucher for printing: ' + err.message);
     }
   };
 
   const fetchPurchases = async () => {
     try {
-      const res = await api.getBillingPurchases(companyEntity);
-      let dbPurchases = (res && res.data) ? res.data : [];
-
-      // Collect all local storage purchases to ensure no previous entry is lost
-      const allLocalPurchases = [];
-      const keysToCheck = [
-        `elite_purchases_${companyEntity || 'edp'}`,
-        'elite_purchases_edp',
-        'elite_purchases_Elite Digital Prints',
-        'elite_purchases_Elite Edition',
-        'elite_purchases_Elite Fabtex'
-      ];
-      keysToCheck.forEach(k => {
-        try {
+      // One-time client purge of deleted test/stale entries from legacy localStorage keys
+      try {
+        const legacyKeys = [
+          `elite_purchases_${companyEntity || 'edp'}`,
+          'elite_purchases_edp',
+          'elite_purchases_Elite Digital Prints',
+          'elite_purchases_Elite Edition',
+          'elite_purchases_Elite Fabtex'
+        ];
+        const purgedNos = new Set(['INV/26-27/563', '4177/26-27']);
+        legacyKeys.forEach(k => {
           const raw = localStorage.getItem(k);
           if (raw) {
             const arr = JSON.parse(raw);
             if (Array.isArray(arr)) {
-              arr.forEach(item => {
-                if (item && (item.purchaseNo || item.vendorName)) {
-                  allLocalPurchases.push({ ...item, companyEntity: item.companyEntity || companyEntity || 'Elite Digital Prints' });
-                }
-              });
+              const cleaned = arr.filter(p => !purgedNos.has(p.purchaseNo));
+              localStorage.setItem(k, JSON.stringify(cleaned));
             }
           }
-        } catch (err) {}
-      });
+        });
+      } catch (cleanErr) {}
 
-      // Filter unsynced items
-      const unsynced = allLocalPurchases.filter(localP => {
-        const localNo = String(localP.purchaseNo || '').trim().toLowerCase();
-        const localVendor = String(localP.vendorName || '').trim().toLowerCase();
-        return !dbPurchases.some(dbP => 
-          String(dbP.purchaseNo || '').trim().toLowerCase() === localNo &&
-          String(dbP.vendorName || '').trim().toLowerCase() === localVendor
-        );
-      });
-
-      if (unsynced.length > 0) {
-        try {
-          await api.bulkSyncBillingPurchases(unsynced);
-          const freshRes = await api.getBillingPurchases(companyEntity);
-          if (freshRes && freshRes.data) {
-            dbPurchases = freshRes.data;
-          }
-        } catch (syncErr) {
-          console.warn('Failed bulkSyncBillingPurchases:', syncErr);
-        }
-      }
+      // Authoritative fetch from MongoDB database
+      const res = await api.getBillingPurchases(companyEntity);
+      let dbPurchases = (res && res.data) ? res.data : [];
 
       setPurchases(dbPurchases);
       try {
@@ -823,6 +996,13 @@ export default function EliteBillingDepartment({
       } catch (e) {}
     } catch (err) {
       console.warn('Failed to load purchases from API:', err);
+      try {
+        const cached = localStorage.getItem(`elite_purchases_${companyEntity || 'edp'}`);
+        if (cached) {
+          const arr = JSON.parse(cached);
+          if (Array.isArray(arr)) setPurchases(arr);
+        }
+      } catch (e) {}
     }
   };
 
@@ -1039,7 +1219,7 @@ export default function EliteBillingDepartment({
     triggerPushNotification('Purchase Recorded 📥', `Purchase Bill #${payload.purchaseNo} saved successfully!`, 'success');
   };
 
-  const handleDeletePurchase = async (id) => {
+  const handleDeletePurchase = async (id, purchaseNo) => {
     const ok = await triggerEliteConfirm({
       title: 'Delete Purchase Record',
       message: 'Are you sure you want to delete this purchase record? This action cannot be undone.',
@@ -1053,11 +1233,33 @@ export default function EliteBillingDepartment({
       if (isMongoId) {
         await api.deleteBillingPurchase(id);
       }
-      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
+      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id && (purchaseNo ? p.purchaseNo !== purchaseNo : true)));
+
+      // Authoritatively purge from all localStorage cache keys so it never resurrects
+      const legacyKeys = [
+        `elite_purchases_${companyEntity || 'edp'}`,
+        'elite_purchases_edp',
+        'elite_purchases_Elite Digital Prints',
+        'elite_purchases_Elite Edition',
+        'elite_purchases_Elite Fabtex'
+      ];
+      legacyKeys.forEach(k => {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) {
+              const cleaned = arr.filter(p => p._id !== id && p.id !== id && (purchaseNo ? p.purchaseNo !== purchaseNo : true));
+              localStorage.setItem(k, JSON.stringify(cleaned));
+            }
+          }
+        } catch (e) {}
+      });
+
       triggerPushNotification('🗑️ Purchase Deleted', 'Purchase record deleted successfully.', 'success');
     } catch (err) {
       console.error('Error deleting purchase:', err);
-      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id));
+      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id && (purchaseNo ? p.purchaseNo !== purchaseNo : true)));
     }
   };
 
@@ -5168,36 +5370,52 @@ export default function EliteBillingDepartment({
                           )}
                         </td>
                         <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center', verticalAlign: 'top' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                            <button
-                              onClick={() => setViewPurchaseModal(p)}
-                              style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#2563eb', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
-                              title="View Purchase Details"
-                            >
-                              <Eye size={12} /> View
-                            </button>
-                            <button
-                              onClick={() => handleEditPurchase(p)}
-                              style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#d97706', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
-                              title="Edit Purchase Entry"
-                            >
-                              <Edit2 size={12} /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleClonePurchase(p)}
-                              style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#7c3aed', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
-                              title="Clone / Duplicate Purchase Entry (Duplicate items & reset status)"
-                            >
-                              <Copy size={12} /> Clone
-                            </button>
-                            <button
-                              onClick={() => handleDeletePurchase(p._id || p.id)}
-                              style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', fontWeight: 700 }}
-                              title="Delete Purchase Entry"
-                            >
-                              <Trash2 size={12} /> Delete
-                            </button>
-                          </div>
+                          {(() => {
+                            const purchaseActions = [
+                              {
+                                id: 'print-purchase',
+                                icon: Printer,
+                                label: 'Print Purchase',
+                                tooltip: 'Print Purchase Voucher / Inward Bill',
+                                variant: 'blue',
+                                color: '#38bdf8',
+                                onClick: () => handlePrintPurchase(p),
+                                isPrimary: true
+                              },
+                              {
+                                id: 'view',
+                                icon: Eye,
+                                label: 'View Details',
+                                tooltip: 'View Purchase Details',
+                                variant: 'default',
+                                color: '#38bdf8',
+                                onClick: () => setViewPurchaseModal(p),
+                                isPrimary: false
+                              },
+                              {
+                                id: 'edit',
+                                icon: Edit2,
+                                label: 'Edit',
+                                tooltip: 'Edit Purchase Entry',
+                                variant: 'primary',
+                                color: '#fbbf24',
+                                onClick: () => handleEditPurchase(p),
+                                isPrimary: false
+                              },
+                              {
+                                id: 'delete',
+                                icon: Trash2,
+                                label: 'Delete',
+                                tooltip: 'Delete Purchase Entry',
+                                variant: 'danger',
+                                color: '#f87171',
+                                onClick: () => handleDeletePurchase(p._id || p.id, p.purchaseNo),
+                                isPrimary: false
+                              }
+                            ];
+
+                            return <SmartActionGroup actions={purchaseActions} maxInlineMobile={2} align="center" />;
+                          })()}
                         </td>
                       </tr>
                     );
@@ -5959,12 +6177,11 @@ export default function EliteBillingDepartment({
                   type="button"
                   onClick={() => {
                     const p = viewPurchaseModal;
-                    setViewPurchaseModal(null);
-                    handleClonePurchase(p);
+                    handlePrintPurchase(p);
                   }}
-                  style={{ padding: '0.5rem 1.1rem', background: 'rgba(139, 92, 246, 0.1)', color: '#7c3aed', border: '1px solid #c4b5fd', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
                 >
-                  <Copy size={15} /> Clone Purchase
+                  <Printer size={15} /> Print Purchase Voucher
                 </button>
                 <button type="button" onClick={() => setViewPurchaseModal(null)} style={{ padding: '0.5rem 1.2rem', background: '#475569', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
                   Close
