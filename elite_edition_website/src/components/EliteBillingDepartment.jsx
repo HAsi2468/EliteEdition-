@@ -4269,8 +4269,14 @@ export default function EliteBillingDepartment({
                         style={inputStyle}
                       >
                         <option value="Meters">Meters</option>
+                        <option value="KG">KG</option>
+                        <option value="Kg">Kg</option>
                         <option value="Pcs">Pcs</option>
                         <option value="Rolls">Rolls</option>
+                        <option value="Ltr">Ltr</option>
+                        <option value="Boxes">Boxes</option>
+                        <option value="Bags">Bags</option>
+                        <option value="Set">Set</option>
                         <option value="Hours">Hours</option>
                       </select>
                     </td>
@@ -4761,6 +4767,9 @@ export default function EliteBillingDepartment({
                   filteredItems.map(item => (
                     <tr key={item._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.hsnCode || '—'}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>₹{item.unitPrice} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ {item.unit || 'Meters'}</span></td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate != null ? item.taxRate : 5}%</td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
@@ -5557,6 +5566,7 @@ export default function EliteBillingDepartment({
                             <option value="Mtr">Mtr</option>
                             <option value="Pcs">Pcs</option>
                             <option value="Rolls">Rolls</option>
+                            <option value="KG">KG</option>
                             <option value="Kg">Kg</option>
                             <option value="Ltr">Ltr</option>
                             <option value="Boxes">Boxes</option>
@@ -6482,8 +6492,14 @@ export default function EliteBillingDepartment({
                 <label style={labelStyle}>Unit</label>
                 <select value={itemForm.unit} onChange={e => setItemForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle}>
                   <option value="Meters">Meters</option>
+                  <option value="KG">KG</option>
+                  <option value="Kg">Kg</option>
                   <option value="Pcs">Pcs</option>
                   <option value="Rolls">Rolls</option>
+                  <option value="Ltr">Ltr</option>
+                  <option value="Boxes">Boxes</option>
+                  <option value="Bags">Bags</option>
+                  <option value="Set">Set</option>
                   <option value="Hours">Hours</option>
                 </select>
               </div>
