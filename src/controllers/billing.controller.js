@@ -1339,6 +1339,32 @@ const cleanJobDisplay = (jobStr) => {
   return String(jobStr).replace(/JOB NO\.-?\s*/gi,'').replace(/Job\s*#?\s*/gi,'').trim();
 };
 
+const getInvoicePageChunks = (items, maxNonLast = 6, maxLast = 4) => {
+  const total = (items || []).length;
+  if (total <= maxLast) return [items || []];
+  const pagesNeeded = 1 + Math.ceil((total - maxLast) / maxNonLast);
+  const chunkSizes = new Array(pagesNeeded).fill(0);
+  let remaining = total;
+  for (let p = 0; p < pagesNeeded - 1; p++) {
+    const pagesLeftAfterThis = pagesNeeded - 1 - p;
+    let size = Math.ceil(remaining / (pagesLeftAfterThis + 1));
+    if (size > maxNonLast) size = maxNonLast;
+    if (remaining - size < pagesLeftAfterThis) size = remaining - pagesLeftAfterThis;
+    const maxCapacityRemaining = (pagesLeftAfterThis - 1) * maxNonLast + maxLast;
+    if (remaining - size > maxCapacityRemaining) size = remaining - maxCapacityRemaining;
+    chunkSizes[p] = size;
+    remaining -= size;
+  }
+  chunkSizes[pagesNeeded - 1] = remaining;
+  const chunks = [];
+  let curr = 0;
+  for (const s of chunkSizes) {
+    chunks.push((items || []).slice(curr, curr + s));
+    curr += s;
+  }
+  return chunks;
+};
+
 // ── 9. DOWNLOAD INVOICE PDF ──────────────────────────────────────────────────
 const downloadInvoicePdf = async (req, res) => {
   const startTime = Date.now();
@@ -1765,19 +1791,36 @@ const downloadInvoicePdf = async (req, res) => {
           Y = minBottomY;
         }
 
-        const grandTotalQty = (items || []).reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
-        let qtyUnit = (items && items[0] && (items[0].unit || items[0].qtyUnit)) || 'MTR';
-        if (/meter|mtr/i.test(qtyUnit)) qtyUnit = 'MTR';
-        const subRowH = 18;
-        doc.rect(PAD, Y, CW, subRowH).fill(PRPL).stroke(S200);
-        drawColSeps(Y, subRowH);
-        doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
-          .text('Total Qty:', colX[0] + 3, Y + 4, { width: colX[5] - colX[0] - 6, align: 'right' });
-        doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
-          .text(`${grandTotalQty.toFixed(2)} ${qtyUnit}`, colX[5] + 2, Y + 4, { width: COL[5] - 4, align: 'center' });
-        doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
-          .text(Number(totalTaxable || 0).toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
-        Y += subRowH;
+        if (isLastPage) {
+          const grandTotalQty = (items || []).reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
+          let qtyUnit = (items && items[0] && (items[0].unit || items[0].qtyUnit)) || 'MTR';
+          if (/meter|mtr/i.test(qtyUnit)) qtyUnit = 'MTR';
+          const subRowH = 18;
+          doc.rect(PAD, Y, CW, subRowH).fill(PRPL).stroke(S200);
+          drawColSeps(Y, subRowH);
+          doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
+            .text('Total Qty:', colX[0] + 3, Y + 4, { width: colX[5] - colX[0] - 6, align: 'right' });
+          doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
+            .text(`${grandTotalQty.toFixed(2)} ${qtyUnit}`, colX[5] + 2, Y + 4, { width: COL[5] - 4, align: 'center' });
+          doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
+            .text(Number(totalTaxable || 0).toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+          Y += subRowH;
+        } else {
+          const pageQty = (itemsToRender || []).reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
+          let qtyUnit = (items && items[0] && (items[0].unit || items[0].qtyUnit)) || 'MTR';
+          if (/meter|mtr/i.test(qtyUnit)) qtyUnit = 'MTR';
+          const pageAmt = (itemsToRender || []).reduce((s, i) => s + (parseFloat(i.totalAmount) || 0), 0);
+          const subRowH = 18;
+          doc.rect(PAD, Y, CW, subRowH).fill(PRPL).stroke(S200);
+          drawColSeps(Y, subRowH);
+          doc.fillColor(PRPM).fontSize(8).font('Helvetica-Bold')
+            .text('Page Subtotal (Continued on Next Page...):', colX[0] + 3, Y + 4, { width: colX[5] - colX[0] - 6, align: 'right' });
+          doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+            .text(`${pageQty.toFixed(2)} ${qtyUnit}`, colX[5] + 2, Y + 4, { width: COL[5] - 4, align: 'center' });
+          doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+            .text(pageAmt.toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+          Y += subRowH;
+        }
 
         return Y;
       };
@@ -1966,13 +2009,8 @@ const downloadInvoicePdf = async (req, res) => {
           .text('This is a Computer Generated Document', PAD, bottomNoteY+2, { width: CW, align:'center' });
       };
 
-      // ── PAGINATION: STRICT MAX 4 CHALLANS/ITEMS PER PAGE ──────────────────
-      const MAX_ITEMS_PER_PAGE = 4;
-      const pageChunks = [];
-      for (let i = 0; i < items.length; i += MAX_ITEMS_PER_PAGE) {
-        pageChunks.push(items.slice(i, i + MAX_ITEMS_PER_PAGE));
-      }
-      if (pageChunks.length === 0) pageChunks.push([]);
+      // ── PAGINATION: INTERMEDIATE PAGES FIT UP TO 6 ITEMS; LAST PAGE HAS FULL DETAILS ──
+      const pageChunks = getInvoicePageChunks(items, 6, 4);
       const totalPages = pageChunks.length;
 
       // Calculate exact summary height and position minBottomY so summary meets footer with zero blank gap
@@ -1981,21 +2019,32 @@ const downloadInvoicePdf = async (req, res) => {
         : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16);
       const minFooterY = PH - PAD - 82;
       const subRowH = 18;
-      const minBottomY = minFooterY - sumH - subRowH;
+      const minBottomYLast = minFooterY - sumH - subRowH;
+      const minBottomYNonLast = PH - PAD - 16 - subRowH;
 
+      let runningStartIdx = 0;
       pageChunks.forEach((chunk, pageIdx) => {
         if (pageIdx > 0) {
           doc.addPage({ margin: 0, size: 'A4' });
         }
+        const isLast = pageIdx === pageChunks.length - 1;
         const pageLabel = totalPages > 1 ? `${pageIdx + 1} of ${totalPages}` : '';
         let Y = drawHeader(pageLabel);
 
-        const startIdx = pageIdx * MAX_ITEMS_PER_PAGE;
+        const startIdx = runningStartIdx;
+        runningStartIdx += chunk.length;
 
-        // Render up to 4 items + full GST summary table + totals in words & figures + bank details + terms & signatory on EVERY page
-        Y = drawItemsTable(Y, chunk, startIdx, true, minBottomY);
-        Y = drawSummary(Y);
-        drawFooter(Y);
+        if (isLast) {
+          Y = drawItemsTable(Y, chunk, startIdx, true, minBottomYLast);
+          Y = drawSummary(Y);
+          drawFooter(Y);
+        } else {
+          Y = drawItemsTable(Y, chunk, startIdx, false, minBottomYNonLast);
+          const bottomNoteY = PH - PAD - 12;
+          doc.moveTo(PAD, bottomNoteY).lineTo(PAD + CW, bottomNoteY).strokeColor(S200).lineWidth(0.4).stroke();
+          doc.fillColor(S500).fontSize(7).font('Helvetica')
+            .text('This is a Computer Generated Document', PAD, bottomNoteY + 2, { width: CW, align: 'center' });
+        }
       });
     };
 
@@ -2472,20 +2521,35 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             Y = minBottomY;
           }
 
-          const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
-          const subtotal = invoice.subtotal || totalTaxable;
-          const totalH   = 18;
+          if (isLastPage) {
+            const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
+            const subtotal = invoice.subtotal || totalTaxable;
+            const totalH   = 18;
 
-          doc.rect(PAD, Y, CW, totalH).fill(PRPL).stroke(S200);
-          drawColSeps(Y, totalH);
+            doc.rect(PAD, Y, CW, totalH).fill(PRPL).stroke(S200);
+            drawColSeps(Y, totalH);
 
-          doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
-            .text('Total Qty:', colX[0] + 3, Y + 4, { width: colX[5] - colX[0] - 6, align: 'right' });
-          doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
-            .text(totalQty.toLocaleString('en-IN', { maximumFractionDigits: 2 }), colX[5] + 2, Y + 4, { width: COL[5] - 4, align: 'center' });
-          doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
-            .text(Number(subtotal).toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
-          Y += totalH;
+            doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
+              .text('Total Qty:', colX[0] + 3, Y + 4, { width: colX[5] - colX[0] - 6, align: 'right' });
+            doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
+              .text(totalQty.toLocaleString('en-IN', { maximumFractionDigits: 2 }), colX[5] + 2, Y + 4, { width: COL[5] - 4, align: 'center' });
+            doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
+              .text(Number(subtotal).toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+            Y += totalH;
+          } else {
+            const pageQty = (itemsToRender || []).reduce((s, i) => s + Number(i.qty || 0), 0);
+            const pageAmt = (itemsToRender || []).reduce((s, i) => s + Number(i.totalAmount || 0), 0);
+            const subRowH = 18;
+            doc.rect(PAD, Y, CW, subRowH).fill(PRPL).stroke(S200);
+            drawColSeps(Y, subRowH);
+            doc.fillColor(PRPM).fontSize(8).font('Helvetica-Bold')
+              .text('Page Subtotal (Continued on Next Page...):', colX[0] + 3, Y + 4, { width: colX[5] - colX[0] - 6, align: 'right' });
+            doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+              .text(pageQty.toLocaleString('en-IN', { maximumFractionDigits: 2 }), colX[5] + 2, Y + 4, { width: COL[5] - 4, align: 'center' });
+            doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+              .text(Number(pageAmt).toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+            Y += subRowH;
+          }
 
           return Y;
         };
@@ -2634,12 +2698,8 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             .text('This is a Computer Generated Document', PAD, bottomNoteY + 2, { width: CW, align: 'center' });
         };
 
-        const MAX_ITEMS_PER_PAGE = 4;
-        const pageChunks = [];
-        for (let i = 0; i < items.length; i += MAX_ITEMS_PER_PAGE) {
-          pageChunks.push(items.slice(i, i + MAX_ITEMS_PER_PAGE));
-        }
-        if (pageChunks.length === 0) pageChunks.push([]);
+        // ── PAGINATION: INTERMEDIATE PAGES FIT UP TO 6 ITEMS; LAST PAGE HAS FULL DETAILS ──
+        const pageChunks = getInvoicePageChunks(items, 6, 4);
         const totalPages = pageChunks.length;
 
         const sumH = isIgst
@@ -2647,21 +2707,34 @@ const downloadBulkInvoicesPdf = async (req, res) => {
           : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16);
         const minFooterY = PH - PAD - 82;
         const subRowH = 18;
-        const minBottomY = minFooterY - sumH - subRowH;
+        const minBottomYLast = minFooterY - sumH - subRowH;
+        const minBottomYNonLast = PH - PAD - 16 - subRowH;
 
+        let runningStartIdx = 0;
         pageChunks.forEach((chunk, pageIdx) => {
           if (!isFirstPageOverall) {
             doc.addPage({ margin: 0, size: 'A4' });
           }
           isFirstPageOverall = false;
 
+          const isLast = pageIdx === pageChunks.length - 1;
           const pageLabel = totalPages > 1 ? `${pageIdx + 1} of ${totalPages}` : '';
           let Y = drawHeader(pageLabel);
 
-          const startIdx = pageIdx * MAX_ITEMS_PER_PAGE;
-          Y = drawItemsTable(Y, chunk, startIdx, true, minBottomY);
-          Y = drawSummary(Y);
-          drawFooter(Y);
+          const startIdx = runningStartIdx;
+          runningStartIdx += chunk.length;
+
+          if (isLast) {
+            Y = drawItemsTable(Y, chunk, startIdx, true, minBottomYLast);
+            Y = drawSummary(Y);
+            drawFooter(Y);
+          } else {
+            Y = drawItemsTable(Y, chunk, startIdx, false, minBottomYNonLast);
+            const bottomNoteY = PH - PAD - 12;
+            doc.moveTo(PAD, bottomNoteY).lineTo(PAD + CW, bottomNoteY).strokeColor(S200).lineWidth(0.4).stroke();
+            doc.fillColor(S500).fontSize(7).font('Helvetica')
+              .text('This is a Computer Generated Document', PAD, bottomNoteY + 2, { width: CW, align: 'center' });
+          }
         });
       };
 
