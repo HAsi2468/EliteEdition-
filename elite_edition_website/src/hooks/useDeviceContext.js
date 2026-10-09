@@ -86,6 +86,57 @@ export function useDeviceContext() {
 
     const orientation = width >= height ? 'landscape' : 'portrait';
 
+    // Exact 10 Platform Variants mapping
+    let platformVariant = 'desktop_browser';
+    let platformLabel = 'PC / Desktop: Browser Website';
+
+    if (isDesktop) {
+      if (isPWA) {
+        platformVariant = 'desktop_pwa';
+        platformLabel = 'PC / Desktop: Standalone Web App (PWA / Electron)';
+      } else {
+        platformVariant = 'desktop_browser';
+        platformLabel = 'PC / Desktop: Browser Website';
+      }
+    } else if (isTablet) {
+      if (platform === 'ios') {
+        if (isPWA) {
+          platformVariant = 'ipad_pwa';
+          platformLabel = 'iPad / Tablets: Standalone Web App (PWA)';
+        } else {
+          platformVariant = 'ipad_browser';
+          platformLabel = 'iPad / Tablets: Browser Website';
+        }
+      } else {
+        if (isPWA) {
+          platformVariant = 'android_tablet_pwa';
+          platformLabel = 'Android Tablets: Standalone Web App (PWA)';
+        } else {
+          platformVariant = 'android_tablet_browser';
+          platformLabel = 'Android Tablets: Browser Website';
+        }
+      }
+    } else {
+      // Mobile Handheld
+      if (platform === 'ios') {
+        if (isPWA) {
+          platformVariant = 'ios_phone_pwa';
+          platformLabel = 'iPhone / iOS: Standalone Web App (PWA)';
+        } else {
+          platformVariant = 'ios_phone_browser';
+          platformLabel = 'iPhone / iOS: Browser Website';
+        }
+      } else {
+        if (isPWA) {
+          platformVariant = 'android_phone_pwa';
+          platformLabel = 'Android Phones: Standalone Web App (PWA)';
+        } else {
+          platformVariant = 'android_phone_browser';
+          platformLabel = 'Android Phones: Browser Website';
+        }
+      }
+    }
+
     return {
       width,
       height,
@@ -97,6 +148,8 @@ export function useDeviceContext() {
       isTouch,
       orientation,
       platform,
+      platformVariant,
+      platformLabel,
     };
   }, []);
 

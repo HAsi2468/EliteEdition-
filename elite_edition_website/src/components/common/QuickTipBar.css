@@ -1,0 +1,141 @@
+/* QuickTipBar - Minimalist Ambient Micro-Tip Ticker */
+.quick-tip-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(56, 189, 248, 0.2);
+  color: #f1f5f9;
+  padding: 0.35rem 1rem;
+  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.25);
+  animation: slideUp 200ms ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.quick-tip-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quick-tip-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  overflow: hidden;
+  flex: 1;
+}
+
+.quick-tip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  white-space: nowrap;
+}
+
+.quick-tip-icon {
+  color: #f59e0b;
+}
+
+.quick-tip-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quick-tip-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.quick-tip-nav-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.quick-tip-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.quick-tip-today-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 120ms ease;
+}
+
+.quick-tip-today-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.quick-tip-close-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 120ms ease;
+}
+
+.quick-tip-close-btn:hover {
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .quick-tip-bar {
+    bottom: 56px; /* Position above mobile bottom nav */
+  }
+  .quick-tip-today-btn {
+    display: none;
+  }
+}

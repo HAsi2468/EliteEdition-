@@ -21,12 +21,16 @@ import {
   Home,
   SlidersHorizontal,
   Building2,
+  Keyboard,
   X
 } from 'lucide-react';
 import { useDeviceContext } from '../../hooks/useDeviceContext';
 import { SplitActionGroup } from '../common/SplitActionGroup';
 import { MultiTabBar } from './MultiTabBar';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
+import { ChangelogDrawer } from '../common/ChangelogDrawer';
+import { KeyboardGuideModal } from '../common/KeyboardGuideModal';
+import { QuickTipBar } from '../common/QuickTipBar';
 import './ErpLayoutShell.css';
 
 /**
@@ -77,11 +81,12 @@ export function ResponsiveErpShell({
   tabletSelectedId,
   onTabletSelect
 }) {
-  const { breakpoint, isMobile, isTablet, isDesktop, isPWA } = useDeviceContext();
+  const { breakpoint, isMobile, isTablet, isDesktop, isPWA, platformVariant, platformLabel } = useDeviceContext();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isKeyboardGuideOpen, setIsKeyboardGuideOpen] = useState(false);
   const [mobileActiveNav, setMobileActiveNav] = useState('Home');
 
   // Default browser-style workspace tabs if none provided
@@ -295,8 +300,23 @@ export function ResponsiveErpShell({
           </button>
         </div>
 
-        {/* Header Right Actions (Desktop & Tablet) */}
-        <div className="erp-header-right">
+        {/* Header Right Actions */}
+        <div className="erp-header-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Keyboard Shortcuts Trigger Button */}
+          <button
+            type="button"
+            className="changelog-trigger-btn"
+            onClick={() => setIsKeyboardGuideOpen(true)}
+            title="Keyboard Shortcuts Cheat Sheet (?)"
+            aria-label="Keyboard Shortcuts Guide"
+          >
+            <Keyboard size={16} />
+          </button>
+
+          {/* Changelog "What's New" Release Center Drawer Trigger */}
+          <ChangelogDrawer />
+
+          {/* Desktop & Tablet Consolidated Split Actions */}
           {!isMobile && primaryAction && (
             <SplitActionGroup
               primaryAction={primaryAction}
@@ -510,6 +530,19 @@ export function ResponsiveErpShell({
             onModuleChange?.(item.tab);
           }
         }}
+      />
+
+      {/* =====================================================================
+          6. Ambient Operational Micro-Tip Ticker
+          ===================================================================== */}
+      <QuickTipBar />
+
+      {/* =====================================================================
+          7. Interactive Keyboard Shortcut Cheat Sheet Modal (?)
+          ===================================================================== */}
+      <KeyboardGuideModal
+        isOpen={isKeyboardGuideOpen}
+        onClose={() => setIsKeyboardGuideOpen(false)}
       />
     </div>
   );

@@ -2839,11 +2839,6 @@ export default function EliteBillingDepartment({
         return;
       }
 
-      // MAX 10 CHALLANS LIMIT
-      if (challanList.length > 10) {
-        triggerEliteAlert('Too Many Challans', 'Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.', 'error');
-        return;
-      }
 
       // 1. FLEXIBLE SAME-CUSTOMER VALIDATION CHECK
       const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');

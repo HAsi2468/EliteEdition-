@@ -4788,10 +4788,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   className="btn-primary"
                   style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', fontSize: '0.78rem', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)' }}
                   onClick={() => {
-                    if (selectedChallanIds.length > 10) {
-                      alert('Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.');
-                      return;
-                    }
+
                     const selected = Object.values(selectedChallanMap);
                     const alreadyBilled = selected.filter(c => c && (c.status === 'INVOICED' || c.billingStatus === 'INVOICED' || c.isBilled || Boolean(c.invoiceNo)));
                     if (alreadyBilled.length > 0) {
