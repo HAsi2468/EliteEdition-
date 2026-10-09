@@ -959,13 +959,41 @@ const updateJobCard = async (req, res) => {
       }
     });
 
+    const masterFieldsChanged = changesArr.filter(c =>
+      !c.startsWith('Status:') &&
+      !c.startsWith('Print Status:') &&
+      !c.startsWith('Fusing Status:') &&
+      !c.startsWith('Delivery Status:')
+    );
+
+    const isFusingUpdate = body.fusingStatus !== undefined || body.freshMtr !== undefined || body.fusingMtr !== undefined;
+    const isPrintUpdate = body.printStatus !== undefined || body.printMtr !== undefined;
+
+    let auditAction = 'EDIT';
+    if (masterFieldsChanged.length > 0) {
+      auditAction = 'UPDATE';
+      body.updatedBy = editorName;
+      body.updatedByName = editorName;
+    } else if (isFusingUpdate) {
+      auditAction = 'FUSING_ENTRY';
+      // Routine stage log: preserve existing master card editor info
+      body.updatedBy = existingCard.updatedBy || '';
+      body.updatedByName = existingCard.updatedByName || '';
+    } else if (isPrintUpdate) {
+      auditAction = 'PRINT_ENTRY';
+      body.updatedBy = existingCard.updatedBy || '';
+      body.updatedByName = existingCard.updatedByName || '';
+    } else {
+      auditAction = 'STAGE_PROGRESS';
+    }
+
     const auditEntry = {
       performedBy: editorName,
       performedByName: editorName,
       performedById: String(editorId || ''),
-      action: changesArr.length > 0 ? 'UPDATE' : 'EDIT',
+      action: auditAction,
       timestamp: new Date(),
-      details: changesArr.length > 0 ? `Changed: ${changesArr.join('; ')}` : 'Updated Job Card details',
+      details: changesArr.length > 0 ? `Changed: ${changesArr.join('; ')}` : (auditAction === 'FUSING_ENTRY' ? 'Fusing production entry logged' : (auditAction === 'PRINT_ENTRY' ? 'Printing production entry logged' : 'Updated Job Card details')),
       changesSummary: changesArr.join('; ')
     };
 

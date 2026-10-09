@@ -144,7 +144,7 @@ const getDepartmentBackup = async (req, res) => {
     const deptCollections = {
       billing: ['billinginvoices', 'billingcustomers', 'billingitems'],
       design: ['designs'],
-      digital_printing: ['jobCards', 'jobPrintLogs'],
+      digital_printing: ['jobCards', 'jobPrintLogs', 'jobFusingLogs'],
       fabric: ['fabricChallans', 'fabricTransactions', 'fabricStockAdjustments'],
       stitching: ['stitching_challans', 'stitching_configs'],
       garment: ['garmentJobCards'],
@@ -152,7 +152,7 @@ const getDepartmentBackup = async (req, res) => {
       customers: ['vendors', 'partys', 'fabricVendors'],
       all: [
         'billinginvoices', 'billingcustomers', 'billingitems',
-        'designs', 'jobCards', 'jobPrintLogs',
+        'designs', 'jobCards', 'jobPrintLogs', 'jobFusingLogs',
         'fabricChallans', 'fabricTransactions', 'fabricStockAdjustments',
         'stitching_challans', 'stitching_configs', 'garmentJobCards',
         'sale_orders', 'products', 'inventory_products',

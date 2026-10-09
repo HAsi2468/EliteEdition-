@@ -42,6 +42,9 @@ const getModuleAndModel = (urlPath) => {
   if (lower.includes('/jobprintlogs') || lower.includes('/job-print-logs')) {
     return { name: 'JobPrintLog', model: models.JobPrintLog };
   }
+  if (lower.includes('/jobfusinglogs') || lower.includes('/job-fusing-logs')) {
+    return { name: 'JobFusingLog', model: models.JobFusingLog };
+  }
   if (lower.includes('/billing')) {
     if (lower.includes('/customers')) return { name: 'BillingCustomer', model: models.BillingCustomer };
     if (lower.includes('/items')) return { name: 'BillingItem', model: models.BillingItem };
@@ -257,6 +260,28 @@ const approvalInterceptor = async (req, res, next) => {
 
     // Resolve module name and Mongoose model
     const { name: moduleName, model: TargetModel } = getModuleAndModel(originalUrl);
+
+    // If non-admin is doing routine shop-floor stage logging (Print/Fusing progress) on JobCard
+    // without altering master order specifications (party, totalMtr, fabric, design), do not block
+    if (moduleName === 'JobCard' && !isDelete && req.body) {
+      const masterFields = ['party', 'partyName', 'clientName', 'totalMtr', 'fabric', 'fabricName', 'designNo', 'designName', 'pcs', 'panna', 'billNo'];
+      const touchesMaster = masterFields.some(f => req.body[f] !== undefined);
+      const isRoutineStageLog = !touchesMaster && (
+        req.body.fusingStatus !== undefined ||
+        req.body.printStatus !== undefined ||
+        req.body.deliveryStatus !== undefined ||
+        req.body.freshMtr !== undefined ||
+        req.body.fusingMtr !== undefined ||
+        req.body.printMtr !== undefined ||
+        req.body.fusingOperator !== undefined ||
+        req.body.operatorName !== undefined ||
+        req.body.fusingDate !== undefined ||
+        req.body.printDate !== undefined
+      );
+      if (isRoutineStageLog) {
+        return next();
+      }
+    }
 
     // Snapshot existing document for "Before" data
     let beforeData = null;

@@ -5,7 +5,7 @@ import {
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, FileText, FileSpreadsheet,
   AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle, ChevronDown,
-  ChevronUp, PlayCircle, Filter, ArrowRight, Sparkles
+  ChevronUp, PlayCircle, Filter, ArrowRight, Sparkles, ListFilter
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
@@ -190,7 +190,9 @@ export default function FusingDepartment() {
   }, [searchQuery]);
 
   // Tab & Form Collapsed State
-  const [activeFusingTab, setActiveFusingTab] = useState('entry'); // 'entry' | 'queue'
+  const [activeFusingTab, setActiveFusingTab] = useState('entry'); // 'entry' | 'runs' | 'queue'
+  const [fusingLogs, setFusingLogs] = useState([]);
+  const [runsSearch, setRunsSearch] = useState('');
   const [isFormExpanded, setIsFormExpanded] = useState(true);
   const [queueFabricFilter, setQueueFabricFilter] = useState('All');
   const [queueSearchQuery, setQueueSearchQuery] = useState('');
@@ -283,8 +285,9 @@ export default function FusingDepartment() {
     }
   };
 
-  // ── TOP FORM STATE (New Fusing Entry) ───────────────────────────────────
+  // ── TOP FORM STATE (New Fusing Entry / Edit Run) ─────────────────────────
   const [topForm, setTopForm] = useState({
+    logId: null,
     date: toLocalYMD(),
     shift: getAutoShift(),
     onTime: '09:00',
@@ -474,6 +477,7 @@ export default function FusingDepartment() {
 
   // Edit Modal Form State
   const [form, setForm] = useState({
+    logId: null,
     jobCardId: '',
     jobNo: '',
     fusingStatus: 'Fusing Done',
@@ -575,6 +579,14 @@ export default function FusingDepartment() {
       } catch (rmErr) {
         console.warn('Failed to load raw material transactions:', rmErr);
       }
+
+      try {
+        const fLogsRes = await api.getJobFusingLogs({ limit: 5000 });
+        const flogs = fLogsRes?.data || (Array.isArray(fLogsRes) ? fLogsRes : []);
+        setFusingLogs(flogs);
+      } catch (flErr) {
+        console.warn('Failed to load fusing logs:', flErr);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load fusing job cards data.');
     } finally {
@@ -662,6 +674,20 @@ export default function FusingDepartment() {
       return true;
     });
   }, [eligibleFusingCards, queueFabricFilter, queueSearchQuery]);
+
+  // Filtered individual runs in fusing runs log
+  const filteredFusingRuns = useMemo(() => {
+    if (!runsSearch || !runsSearch.trim()) return fusingLogs;
+    const q = runsSearch.toLowerCase().trim();
+    return fusingLogs.filter(r => {
+      const jNo = String(r.jobNo || '').toLowerCase();
+      const mName = String(r.fusingMachine || '').toLowerCase();
+      const op = String(r.operatorName || '').toLowerCase();
+      const notes = String(r.notes || '').toLowerCase();
+      const panna = String(r.panna || '').toLowerCase();
+      return jNo.includes(q) || mName.includes(q) || op.includes(q) || notes.includes(q) || panna.includes(q);
+    });
+  }, [fusingLogs, runsSearch]);
 
   // Handle Selection of Job Card in Top Form
   const handleTopJobCardSelect = (cardOrId) => {
@@ -861,60 +887,96 @@ export default function FusingDepartment() {
       }
 
       if (targetId) {
-        const payload = {
-          fusingStatus: fusingStatusToSave,
-          fusingDate: topForm.date,
-          shift: topForm.shift,
+        const fusingPayload = {
+          jobCardId: targetId,
+          jobNo: targetCard ? targetCard.jobNo : topForm.jobNo,
           fusingMachine: topForm.fusingMachine,
+          shift: topForm.shift,
+          date: topForm.date,
           fusingTemp: topForm.fusingTemp,
-          temperature: topForm.fusingTemp,
           fusingSpeed: topForm.fusingSpeed,
-          speed: topForm.fusingSpeed,
           panna: topForm.panna,
+          freshMtr: freshMtrVal,
+          totalWastageMtr: wasteMtrVal,
+          fabricFaultMtr: parseFloat(topForm.fabricFaultMtr) || 0,
+          fusingFaultMtr: parseFloat(topForm.fusingFaultMtr) || 0,
+          printFaultMtr: parseFloat(topForm.printFaultMtr) || 0,
+          genuineFaultMtr: parseFloat(topForm.genuineFaultMtr) || 0,
+          fusingMtr: wasteMtrVal > 0 ? parseFloat(totalFabricUsed) : freshMtrVal,
           useButterPaper: topForm.useButterPaper,
-          butterPaperWeightKg: finalButterKg,
-          freshMtr: String(freshMtrVal),
-          totalWastageMtr: String(wasteMtrVal),
-          totalFabricUsedMtr: String(totalFabricUsed),
-          fabricFaultMtr: String(topForm.fabricFaultMtr !== undefined ? topForm.fabricFaultMtr : wasteMtrVal),
-          fusingFaultMtr: String(topForm.fusingFaultMtr || 0),
-          printFaultMtr: String(topForm.printFaultMtr || 0),
-          genuineFaultMtr: String(topForm.genuineFaultMtr || 0),
-          fusingMtr: wasteMtrVal > 0 ? String(totalFabricUsed) : String(freshMtrVal),
-          fusingOperator: topForm.fusingOperator,
-          emergencyNotes: `Roll Status: ${rollStatus}${wasteMtrVal > 0 ? ` | Wastage: ${wasteMtrVal}m` : ''}${topForm.notes ? ' | ' + topForm.notes : ''}`
+          butterPaperWeightKg: parseFloat(finalButterKg) || 0,
+          rollCompleted: rollStatus,
+          operatorName: topForm.fusingOperator,
+          notes: `Roll Status: ${rollStatus}${wasteMtrVal > 0 ? ` | Wastage: ${wasteMtrVal}m` : ''}${topForm.notes ? ' | ' + topForm.notes : ''}`
         };
-        await api.updateJobCard(targetId, payload);
-      }
 
-      // 2. Log Raw Material Consumption for Butter Paper (Weight in KG)
-      if (topForm.useButterPaper === 'Yes' && parseFloat(finalButterKg) > 0) {
-        try {
-          await api.createRawMaterialTransaction({
-            type: 'OUTWARD',
-            date: topForm.date,
-            materialName: 'Butter Paper',
-            qty: Number(finalButterKg),
-            unit: 'Kg',
-            panna: topForm.panna,
-            jobNo: topForm.jobNo,
-            notes: `Fusing Entry — Machine: ${topForm.fusingMachine} | Operator: ${topForm.fusingOperator} | Roll Status: ${rollStatus}`
-          });
-        } catch (rmErr) {
-          console.warn('Raw material log failed:', rmErr.message);
+        if (topForm.logId) {
+          await api.updateJobFusingLog(topForm.logId, fusingPayload);
+          triggerPushNotification(
+            '✏️ Fusing Run Updated',
+            `Job #${topForm.jobNo}: Fusing run updated successfully! (Edit)`,
+            'success'
+          );
+        } else {
+          try {
+            await api.createJobFusingLog(fusingPayload);
+          } catch (flogErr) {
+            console.warn('createJobFusingLog fallback to updateJobCard:', flogErr.message);
+            const legacyPayload = {
+              fusingStatus: fusingStatusToSave,
+              fusingDate: topForm.date,
+              shift: topForm.shift,
+              fusingMachine: topForm.fusingMachine,
+              fusingTemp: topForm.fusingTemp,
+              temperature: topForm.fusingTemp,
+              fusingSpeed: topForm.fusingSpeed,
+              speed: topForm.fusingSpeed,
+              panna: topForm.panna,
+              useButterPaper: topForm.useButterPaper,
+              butterPaperWeightKg: finalButterKg,
+              freshMtr: String(freshMtrVal),
+              totalWastageMtr: String(wasteMtrVal),
+              totalFabricUsedMtr: String(totalFabricUsed),
+              fabricFaultMtr: String(topForm.fabricFaultMtr !== undefined ? topForm.fabricFaultMtr : wasteMtrVal),
+              fusingFaultMtr: String(topForm.fusingFaultMtr || 0),
+              printFaultMtr: String(topForm.printFaultMtr || 0),
+              genuineFaultMtr: String(topForm.genuineFaultMtr || 0),
+              fusingMtr: wasteMtrVal > 0 ? String(totalFabricUsed) : String(freshMtrVal),
+              fusingOperator: topForm.fusingOperator,
+              emergencyNotes: fusingPayload.notes
+            };
+            await api.updateJobCard(targetId, legacyPayload);
+            if (topForm.useButterPaper === 'Yes' && parseFloat(finalButterKg) > 0) {
+              try {
+                await api.createRawMaterialTransaction({
+                  type: 'OUTWARD',
+                  date: topForm.date,
+                  materialName: 'Butter Paper',
+                  qty: Number(finalButterKg),
+                  unit: 'Kg',
+                  panna: topForm.panna,
+                  jobNo: topForm.jobNo,
+                  notes: `Fusing Entry — Machine: ${topForm.fusingMachine} | Operator: ${topForm.fusingOperator} | Roll Status: ${rollStatus}`
+                });
+              } catch (rmErr) {
+                console.warn('Raw material log failed:', rmErr.message);
+              }
+            }
+          }
+
+          triggerPushNotification(
+            '🔥 New Fusing Entry Created',
+            `Job #${topForm.jobNo}: ${freshMtrVal}m Fresh${wasteMtrVal > 0 ? ` | ${wasteMtrVal}m Wastage` : ''} | Logged as New Entry!`,
+            'success'
+          );
         }
       }
-
-      triggerPushNotification(
-        '🔥 Fusing Entry Submitted',
-        `Job #${topForm.jobNo}: ${freshMtrVal}m Fresh${wasteMtrVal > 0 ? ` | ${wasteMtrVal}m Wastage` : ''} | Roll: ${rollStatus} logged!`,
-        'success'
-      );
 
       triggerGlobalDataRefresh('fusing');
       
       // Reset form
       setTopForm({
+        logId: null,
         date: toLocalYMD(),
         shift: getAutoShift(),
         onTime: '09:00',
@@ -965,65 +1027,167 @@ export default function FusingDepartment() {
     return (fresh + waste).toFixed(2);
   }, [form.freshMtr, calculatedWastageMtr]);
 
-  // Open Edit Modal for a card
-  const openFusingModal = (card) => {
+  // Helper to get all fusing logs for a specific card
+  const getCardLogs = useCallback((card) => {
+    if (!card) return [];
+    const cId = String(card._id || card.id || '');
+    const jNo = String(card.jobNo || '').toLowerCase();
+    return fusingLogs.filter(l => 
+      (l.jobCardId && String(l.jobCardId) === cId) || 
+      (l.jobNo && String(l.jobNo).toLowerCase() === jNo)
+    );
+  }, [fusingLogs]);
+
+  // Open New Run for a Card in Fast Entry Top Form (New Entry, NOT Edit)
+  const openNewRunForCard = (card) => {
+    if (!card) return;
     setSelectedCard(card);
     const printedM = getCardPrintedMeters(card);
-    const defaultFresh = card.freshMtr || card.fusingMtr || printedM || card.totalMtr || '';
     const cardPanna = card.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"';
     const cardButterUsed = card.useButterPaper || (parseFloat(card.butterPaperWeightKg) > 0 ? 'Yes' : 'No');
+    const preset = getFabricFusingPreset(card.fabric);
 
-    setForm({
-      jobCardId: card._id || card.id,
-      jobNo: card.jobNo || '',
-      fusingStatus: card.fusingStatus || 'Fusing Done',
-      fusingDate: card.fusingDate || toLocalYMD(),
-      panna: cardPanna,
-      useButterPaper: cardButterUsed,
-      
-      freshMtr: defaultFresh,
-      fabricFaultMtr: card.fabricFaultMtr !== undefined && card.fabricFaultMtr !== '' ? String(card.fabricFaultMtr) : '0',
-      fusingFaultMtr: card.fusingFaultMtr !== undefined && card.fusingFaultMtr !== '' ? String(card.fusingFaultMtr) : '0',
-      printFaultMtr: card.printFaultMtr !== undefined && card.printFaultMtr !== '' ? String(card.printFaultMtr) : '0',
-      genuineFaultMtr: card.genuineFaultMtr !== undefined && card.genuineFaultMtr !== '' ? String(card.genuineFaultMtr) : '0',
-      
-      fusingTemp: card.fusingTemp || card.temperature || '210°C',
-      fusingSpeed: card.fusingSpeed || card.speed || '80',
-      fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
-      fusingOperator: card.fusingOperator || accountFullName,
-      shift: card.shift || getAutoShift(),
-      butterPaperWeightKg: card.butterPaperWeightKg || '',
-      notes: card.emergencyNotes || card.note1 || ''
-    });
-
-    // Populate top form so user can view and edit values directly in top form as well!
-    const cardWaste = card.totalWastageMtr !== undefined && card.totalWastageMtr !== '' ? String(card.totalWastageMtr) : '0';
     setTopForm({
-      date: card.fusingDate || toLocalYMD(),
-      shift: card.shift || getAutoShift(),
+      logId: null, // Explicitly New Entry
+      date: toLocalYMD(),
+      shift: getAutoShift(),
       onTime: '09:00',
       offTime: '19:00',
       jobCardId: card._id || card.id,
       jobNo: card.jobNo || '',
       fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
-      fusingTemp: card.fusingTemp || card.temperature || '210°C',
-      fusingSpeed: card.fusingSpeed || card.speed || '80',
+      fusingTemp: card.fusingTemp || preset.temp || card.temperature || '210°C',
+      fusingSpeed: card.fusingSpeed || preset.speed || card.speed || '80',
       panna: cardPanna,
       useButterPaper: cardButterUsed,
-      butterPaperWeightKg: card.butterPaperWeightKg || '',
-      rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Complete' : ((card.fusingStatus === 'Fusing In Progress' || card.fusingStatus === 'Partial Complete') ? 'Partial Complete' : 'Pending'),
-      printedMtr: printedM || defaultFresh,
-      freshMtr: defaultFresh,
-      fabricWastageMtr: cardWaste,
-      fabricFaultMtr: card.fabricFaultMtr !== undefined && card.fabricFaultMtr !== '' ? String(card.fabricFaultMtr) : cardWaste,
-      fusingFaultMtr: card.fusingFaultMtr !== undefined && card.fusingFaultMtr !== '' ? String(card.fusingFaultMtr) : '0',
-      printFaultMtr: card.printFaultMtr !== undefined && card.printFaultMtr !== '' ? String(card.printFaultMtr) : '0',
-      genuineFaultMtr: card.genuineFaultMtr !== undefined && card.genuineFaultMtr !== '' ? String(card.genuineFaultMtr) : '0',
-      fusingMtr: card.fusingMtr || defaultFresh,
-      fusingOperator: card.fusingOperator || accountFullName,
-      notes: card.emergencyNotes || card.note1 || ''
+      butterPaperWeightKg: '',
+      rollCompleted: 'Complete',
+      printedMtr: printedM || card.totalMtr || '',
+      freshMtr: '',
+      fabricWastageMtr: '0',
+      fabricFaultMtr: '0',
+      fusingFaultMtr: '0',
+      printFaultMtr: '0',
+      genuineFaultMtr: '0',
+      fusingMtr: '',
+      fusingOperator: accountFullName,
+      notes: ''
     });
     setJobSearchText(`${formatJobCardNo(card.jobNo)} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
+    setActiveFusingTab('entry');
+    setIsFormExpanded(true);
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+    triggerPushNotification('➕ New Fusing Entry', `Job #${card.jobNo} selected for new run (New Entry - No Edit)`, 'info');
+  };
+
+  // Delete an individual fusing run
+  const handleDeleteFusingLog = async (logId, jobNo) => {
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Fusing Run',
+      message: `Are you sure you want to delete this fusing run for Job #${jobNo}? Totals on the Job Card will be automatically recalculated.`,
+      confirmText: 'Delete Run',
+      cancelText: 'Cancel'
+    });
+    if (!ok) return;
+    try {
+      await api.deleteJobFusingLog(logId);
+      triggerPushNotification('🗑️ Run Deleted', `Fusing run for Job #${jobNo} removed.`, 'success');
+      fetchData();
+    } catch (err) {
+      triggerEliteAlert('Delete Failed', err.message || 'Failed to delete fusing run.', 'error');
+    }
+  };
+
+  // Open Edit Modal for a card (or specific fusing log)
+  const openFusingModal = (card, specificLog = null) => {
+    setSelectedCard(card);
+    const printedM = card ? getCardPrintedMeters(card) : '';
+    const cardPanna = specificLog?.panna || (card?.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"');
+    const cardButterUsed = specificLog?.useButterPaper || card?.useButterPaper || (parseFloat(card?.butterPaperWeightKg) > 0 ? 'Yes' : 'No');
+
+    if (specificLog) {
+      setForm({
+        logId: specificLog._id || specificLog.id,
+        jobCardId: specificLog.jobCardId || card?._id || card?.id,
+        jobNo: specificLog.jobNo || card?.jobNo || '',
+        fusingStatus: specificLog.rollCompleted === 'Complete' ? 'Fusing Done' : (specificLog.rollCompleted === 'Partial Complete' ? 'Fusing In Progress' : 'Fusing Pending'),
+        fusingDate: specificLog.date ? specificLog.date.split('T')[0] : toLocalYMD(),
+        panna: cardPanna,
+        useButterPaper: cardButterUsed,
+        
+        freshMtr: specificLog.freshMtr !== undefined && specificLog.freshMtr !== '' ? String(specificLog.freshMtr) : '',
+        fabricFaultMtr: String(specificLog.fabricFaultMtr ?? '0'),
+        fusingFaultMtr: String(specificLog.fusingFaultMtr ?? '0'),
+        printFaultMtr: String(specificLog.printFaultMtr ?? '0'),
+        genuineFaultMtr: String(specificLog.genuineFaultMtr ?? '0'),
+        
+        fusingTemp: specificLog.fusingTemp || card?.fusingTemp || '210°C',
+        fusingSpeed: String(specificLog.fusingSpeed || card?.fusingSpeed || '80'),
+        fusingMachine: specificLog.fusingMachine || DEFAULT_FUSING_MACHINES[0],
+        fusingOperator: specificLog.operatorName || accountFullName,
+        shift: specificLog.shift || getAutoShift(),
+        butterPaperWeightKg: specificLog.butterPaperWeightKg !== undefined ? String(specificLog.butterPaperWeightKg) : '',
+        notes: specificLog.notes || ''
+      });
+    } else {
+      const defaultFresh = card?.freshMtr || card?.fusingMtr || printedM || card?.totalMtr || '';
+      setForm({
+        logId: null,
+        jobCardId: card?._id || card?.id,
+        jobNo: card?.jobNo || '',
+        fusingStatus: card?.fusingStatus || 'Fusing Done',
+        fusingDate: card?.fusingDate || toLocalYMD(),
+        panna: cardPanna,
+        useButterPaper: cardButterUsed,
+        
+        freshMtr: defaultFresh,
+        fabricFaultMtr: card?.fabricFaultMtr !== undefined && card?.fabricFaultMtr !== '' ? String(card.fabricFaultMtr) : '0',
+        fusingFaultMtr: card?.fusingFaultMtr !== undefined && card?.fusingFaultMtr !== '' ? String(card.fusingFaultMtr) : '0',
+        printFaultMtr: card?.printFaultMtr !== undefined && card?.printFaultMtr !== '' ? String(card.printFaultMtr) : '0',
+        genuineFaultMtr: card?.genuineFaultMtr !== undefined && card?.genuineFaultMtr !== '' ? String(card.genuineFaultMtr) : '0',
+        
+        fusingTemp: card?.fusingTemp || card?.temperature || '210°C',
+        fusingSpeed: card?.fusingSpeed || card?.speed || '80',
+        fusingMachine: card?.fusingMachine || DEFAULT_FUSING_MACHINES[0],
+        fusingOperator: card?.fusingOperator || accountFullName,
+        shift: card?.shift || getAutoShift(),
+        butterPaperWeightKg: card?.butterPaperWeightKg || '',
+        notes: card?.emergencyNotes || card?.note1 || ''
+      });
+    }
+
+    // Also populate top form in Edit mode if user wants to inspect in Top Form
+    if (card) {
+      const cardWaste = card.totalWastageMtr !== undefined && card.totalWastageMtr !== '' ? String(card.totalWastageMtr) : '0';
+      const defaultFresh = card.freshMtr || card.fusingMtr || printedM || card.totalMtr || '';
+      setTopForm({
+        logId: specificLog ? (specificLog._id || specificLog.id) : null,
+        date: specificLog?.date ? specificLog.date.split('T')[0] : (card.fusingDate || toLocalYMD()),
+        shift: specificLog?.shift || card.shift || getAutoShift(),
+        onTime: '09:00',
+        offTime: '19:00',
+        jobCardId: card._id || card.id,
+        jobNo: card.jobNo || '',
+        fusingMachine: specificLog?.fusingMachine || card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
+        fusingTemp: specificLog?.fusingTemp || card.fusingTemp || card.temperature || '210°C',
+        fusingSpeed: specificLog?.fusingSpeed || card.fusingSpeed || card.speed || '80',
+        panna: cardPanna,
+        useButterPaper: cardButterUsed,
+        butterPaperWeightKg: specificLog?.butterPaperWeightKg !== undefined ? String(specificLog.butterPaperWeightKg) : (card.butterPaperWeightKg || ''),
+        rollCompleted: specificLog?.rollCompleted || (card.fusingStatus === 'Fusing Done' ? 'Complete' : ((card.fusingStatus === 'Fusing In Progress' || card.fusingStatus === 'Partial Complete') ? 'Partial Complete' : 'Pending')),
+        printedMtr: printedM || defaultFresh,
+        freshMtr: specificLog?.freshMtr !== undefined ? String(specificLog.freshMtr) : defaultFresh,
+        fabricWastageMtr: specificLog?.totalWastageMtr !== undefined ? String(specificLog.totalWastageMtr) : cardWaste,
+        fabricFaultMtr: specificLog?.fabricFaultMtr !== undefined ? String(specificLog.fabricFaultMtr) : (card.fabricFaultMtr !== undefined && card.fabricFaultMtr !== '' ? String(card.fabricFaultMtr) : cardWaste),
+        fusingFaultMtr: specificLog?.fusingFaultMtr !== undefined ? String(specificLog.fusingFaultMtr) : (card.fusingFaultMtr !== undefined && card.fusingFaultMtr !== '' ? String(card.fusingFaultMtr) : '0'),
+        printFaultMtr: specificLog?.printFaultMtr !== undefined ? String(specificLog.printFaultMtr) : (card.printFaultMtr !== undefined && card.printFaultMtr !== '' ? String(card.printFaultMtr) : '0'),
+        genuineFaultMtr: specificLog?.genuineFaultMtr !== undefined ? String(specificLog.genuineFaultMtr) : (card.genuineFaultMtr !== undefined && card.genuineFaultMtr !== '' ? String(card.genuineFaultMtr) : '0'),
+        fusingMtr: specificLog?.fusingMtr !== undefined ? String(specificLog.fusingMtr) : (card.fusingMtr || defaultFresh),
+        fusingOperator: specificLog?.operatorName || card.fusingOperator || accountFullName,
+        notes: specificLog?.notes || card.emergencyNotes || card.note1 || ''
+      });
+      setJobSearchText(`${formatJobCardNo(card.jobNo)} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
+    }
 
     setShowFormModal(true);
   };
@@ -1062,33 +1226,63 @@ export default function FusingDepartment() {
 
     setSubmitting(true);
     try {
-      const payload = {
-        fusingStatus: form.fusingStatus,
-        fusingDate: form.fusingDate,
-        shift: form.shift,
-        panna: form.panna,
-        useButterPaper: form.useButterPaper,
-        butterPaperWeightKg: finalButterKg,
-        freshMtr: String(freshMtrVal),
-        totalWastageMtr: String(wasteMtr),
-        totalFabricUsedMtr: String(totalFabricUsed),
-        fabricFaultMtr: String(form.fabricFaultMtr || 0),
-        fusingFaultMtr: String(form.fusingFaultMtr || 0),
-        printFaultMtr: String(form.printFaultMtr || 0),
-        genuineFaultMtr: String(form.genuineFaultMtr || 0),
-        fusingMtr: wasteMtr > 0 ? String(totalFabricUsed) : String(freshMtrVal),
-        fusingTemp: form.fusingTemp,
-        temperature: form.fusingTemp,
-        fusingSpeed: String(form.fusingSpeed),
-        speed: String(form.fusingSpeed),
-        fusingMachine: form.fusingMachine,
-        fusingOperator: form.fusingOperator,
-        emergencyNotes: form.notes,
-        notes: form.notes
-      };
+      if (form.logId) {
+        // Updating a specific fusing run (EDIT)
+        const logPayload = {
+          jobCardId: form.jobCardId,
+          jobNo: form.jobNo,
+          fusingMachine: form.fusingMachine,
+          shift: form.shift,
+          date: form.fusingDate,
+          fusingTemp: form.fusingTemp,
+          fusingSpeed: form.fusingSpeed,
+          panna: form.panna,
+          freshMtr: freshMtrVal,
+          totalWastageMtr: wasteMtr,
+          fabricFaultMtr: parseFloat(form.fabricFaultMtr) || 0,
+          fusingFaultMtr: parseFloat(form.fusingFaultMtr) || 0,
+          printFaultMtr: parseFloat(form.printFaultMtr) || 0,
+          genuineFaultMtr: parseFloat(form.genuineFaultMtr) || 0,
+          fusingMtr: wasteMtr > 0 ? parseFloat(totalFabricUsed) : freshMtrVal,
+          useButterPaper: form.useButterPaper,
+          butterPaperWeightKg: parseFloat(finalButterKg) || 0,
+          rollCompleted: form.fusingStatus === 'Fusing Done' ? 'Complete' : (form.fusingStatus === 'Fusing In Progress' ? 'Partial Complete' : 'Pending'),
+          operatorName: form.fusingOperator,
+          notes: form.notes
+        };
+        await api.updateJobFusingLog(form.logId, logPayload);
+        triggerPushNotification('✏️ Fusing Log Updated', `Job #${form.jobNo}: Fusing run updated successfully! (Edit)`, 'success');
+      } else {
+        // Updating master Job Card
+        const payload = {
+          fusingStatus: form.fusingStatus,
+          fusingDate: form.fusingDate,
+          shift: form.shift,
+          panna: form.panna,
+          useButterPaper: form.useButterPaper,
+          butterPaperWeightKg: finalButterKg,
+          freshMtr: String(freshMtrVal),
+          totalWastageMtr: String(wasteMtr),
+          totalFabricUsedMtr: String(totalFabricUsed),
+          fabricFaultMtr: String(form.fabricFaultMtr || 0),
+          fusingFaultMtr: String(form.fusingFaultMtr || 0),
+          printFaultMtr: String(form.printFaultMtr || 0),
+          genuineFaultMtr: String(form.genuineFaultMtr || 0),
+          fusingMtr: wasteMtr > 0 ? String(totalFabricUsed) : String(freshMtrVal),
+          fusingTemp: form.fusingTemp,
+          temperature: form.fusingTemp,
+          fusingSpeed: String(form.fusingSpeed),
+          speed: String(form.fusingSpeed),
+          fusingMachine: form.fusingMachine,
+          fusingOperator: form.fusingOperator,
+          emergencyNotes: form.notes,
+          notes: form.notes
+        };
 
-      await api.updateJobCard(form.jobCardId, payload);
-      triggerPushNotification('🔥 Fusing Record Updated', `Job #${form.jobNo}: ${freshMtrVal}m Fresh | ${wasteMtr}m Wastage updated.`, 'success');
+        await api.updateJobCard(form.jobCardId, payload);
+        triggerPushNotification('🔥 Fusing Record Updated', `Job #${form.jobNo}: ${freshMtrVal}m Fresh | ${wasteMtr}m Wastage updated.`, 'success');
+      }
+
       setShowFormModal(false);
       fetchData();
     } catch (err) {
@@ -1534,6 +1728,21 @@ export default function FusingDepartment() {
         <button
           type="button"
           role="tab"
+          aria-selected={activeFusingTab === 'runs'}
+          className={`fusing-subnav-btn ${activeFusingTab === 'runs' ? 'active' : ''}`}
+          onClick={() => setActiveFusingTab('runs')}
+          aria-label="Fusing Runs Log History"
+        >
+          <Zap size={15} />
+          <span>Fusing Runs History</span>
+          <span className="fusing-count-badge">
+            {fusingLogs.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
           aria-selected={activeFusingTab === 'queue'}
           className={`fusing-subnav-btn ${activeFusingTab === 'queue' ? 'active' : ''}`}
           onClick={() => setActiveFusingTab('queue')}
@@ -1556,17 +1765,51 @@ export default function FusingDepartment() {
         <div className="fusing-entry-header-row" style={{ marginBottom: isFormExpanded ? '1.25rem' : '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
             <div style={{
-              width: 30, height: 30, borderRadius: '50%', background: '#e0f2fe',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7'
+              width: 30, height: 30, borderRadius: '50%',
+              background: topForm.logId ? '#fef3c7' : '#e0f2fe',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: topForm.logId ? '#d97706' : '#0284c7'
             }}>
-              <PlusCircle size={18} />
+              {topForm.logId ? <Edit2 size={16} /> : <PlusCircle size={18} />}
             </div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0284c7', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              NEW FUSING ENTRY
-            </h3>
+            <div>
+              <h3 style={{
+                fontSize: '1.05rem', fontWeight: 900,
+                color: topForm.logId ? '#b45309' : '#0284c7',
+                margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em'
+              }}>
+                {topForm.logId ? `EDIT FUSING RUN #${String(topForm.logId).slice(-6)}` : 'NEW FUSING ENTRY'}
+              </h3>
+              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                {topForm.logId
+                  ? 'Modifying an existing fusing run record (Edit Action)'
+                  : 'Logging a fresh production run (New Entry - Not an Edit)'}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {topForm.logId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTopForm(prev => ({ ...prev, logId: null }));
+                  triggerPushNotification('Switched to New Entry', 'Now in New Entry mode.', 'info');
+                }}
+                style={{
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  color: '#92400e',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                ✕ Switch to New Entry
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsFormExpanded(prev => !prev)}
@@ -2610,15 +2853,32 @@ export default function FusingDepartment() {
           </div>
 
           {/* Submit Action Button */}
-          <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center' }}>
+          <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
               type="submit"
               disabled={submitting}
               className="fusing-submit-btn"
+              style={{
+                background: topForm.logId ? '#d97706' : undefined
+              }}
             >
-              {submitting ? <RefreshCw size={18} className="spin-loader" /> : <PlusCircle size={18} />}
-              <span>Submit Fusing Entry Log</span>
+              {submitting ? <RefreshCw size={18} className="spin-loader" /> : (topForm.logId ? <Edit2 size={18} /> : <PlusCircle size={18} />)}
+              <span>{topForm.logId ? 'Update Fusing Run (Edit)' : 'Submit Fusing Entry Log (New Entry)'}</span>
             </button>
+
+            {topForm.logId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTopForm(prev => ({ ...prev, logId: null }));
+                  triggerPushNotification('Switched to New Entry', 'Now creating a new fusing entry.', 'info');
+                }}
+                className="fusing-btn-secondary"
+                style={{ height: '42px', padding: '0 1.25rem', fontSize: '0.85rem', fontWeight: 800 }}
+              >
+                Cancel Edit
+              </button>
+            )}
           </div>
         </form>
         )}
@@ -2992,15 +3252,43 @@ export default function FusingDepartment() {
 
                           {/* Actions (Sticky Column) */}
                           <td className="fusing-sticky-col-cell">
-                            <button
-                              type="button"
-                              onClick={() => openFusingModal(c)}
-                              className="fusing-btn-primary"
-                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', minHeight: '32px' }}
-                              aria-label={`Edit fusing production entry for Job ${c.jobNo}`}
-                            >
-                              <Edit2 size={13} /> Edit
-                            </button>
+                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => openNewRunForCard(c)}
+                                className="fusing-btn-primary"
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.78rem',
+                                  minHeight: '32px',
+                                  background: '#059669',
+                                  borderColor: '#059669',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Add a new fusing run entry for this Job Card (New Entry)"
+                                aria-label={`Add new fusing run for Job ${c.jobNo}`}
+                              >
+                                <PlusCircle size={13} /> Add Run
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openFusingModal(c)}
+                                className="fusing-btn-secondary"
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.78rem',
+                                  minHeight: '32px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                aria-label={`Edit fusing production entry for Job ${c.jobNo}`}
+                              >
+                                <Edit2 size={13} /> Edit
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -3139,8 +3427,17 @@ export default function FusingDepartment() {
                     <div className="fusing-card-actions">
                       <button
                         type="button"
-                        onClick={() => openFusingModal(c)}
+                        onClick={() => openNewRunForCard(c)}
                         className="fusing-touch-btn fusing-btn-primary"
+                        style={{ background: '#059669', borderColor: '#059669' }}
+                        aria-label={`Add new fusing run for Job ${c.jobNo}`}
+                      >
+                        <PlusCircle size={16} /> + Add Run
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openFusingModal(c)}
+                        className="fusing-touch-btn fusing-btn-secondary"
                         aria-label={`Edit Jobcard ${c.jobNo} production log`}
                       >
                         <Edit2 size={16} /> Edit Entry
@@ -3188,7 +3485,210 @@ export default function FusingDepartment() {
       </>
       )}
 
-      {/* ── TAB 2: READY FOR FUSING QUEUE ── */}
+      {/* ── TAB 2: FUSING RUNS HISTORY (INDIVIDUAL RUNS LEDGER) ── */}
+      {activeFusingTab === 'runs' && (
+        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Runs Toolbar */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+            background: '#ffffff',
+            padding: '1rem 1.25rem',
+            borderRadius: '12px',
+            border: '1.5px solid var(--ee-fusing-border)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1d4ed8' }}>
+                <Zap size={20} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                  Fusing Runs Log History
+                </h3>
+                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  Individual machine meterage entries. Each run is a New Entry; updates are Edits.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', minWidth: '260px' }}>
+                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  value={runsSearch}
+                  onChange={e => setRunsSearch(e.target.value)}
+                  placeholder="Filter by Job #, Machine, Operator..."
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem 0.5rem 2.2rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    fontSize: '0.84rem'
+                  }}
+                />
+              </div>
+
+              <span style={{
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                border: '1px solid #bfdbfe',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 900
+              }}>
+                ⚡ {filteredFusingRuns.length} Runs Logged
+              </span>
+            </div>
+          </div>
+
+          {/* Runs Table */}
+          {filteredFusingRuns.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--ee-fusing-border)' }}>
+              <Zap size={36} color="#94A3B8" style={{ margin: '0 auto 10px', display: 'block' }} />
+              <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 900, color: 'var(--ee-fusing-text-primary)' }}>No Fusing Runs Found</h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--ee-fusing-text-muted)' }}>
+                {runsSearch ? 'No individual runs match your search query.' : 'No individual fusing runs logged yet. Use the Production Logs form above to log runs!'}
+              </p>
+            </div>
+          ) : (
+            <div className="fusing-desktop-table-wrapper">
+              <div className="fusing-table-scroll">
+                <table className="fusing-table" role="table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date &amp; Shift</th>
+                      <th scope="col">Job Card #</th>
+                      <th scope="col">Machine &amp; Operator</th>
+                      <th scope="col">Panna &amp; Speed/Temp</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>Fresh Output</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>Wastage Loss</th>
+                      <th scope="col" style={{ textAlign: 'center' }}>Roll Status</th>
+                      <th scope="col" style={{ textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredFusingRuns.map((run) => {
+                      const matchingCard = cards.find(c => 
+                        String(c._id || c.id) === String(run.jobCardId) || 
+                        String(c.jobNo).toLowerCase() === String(run.jobNo).toLowerCase()
+                      );
+                      const fMtr = Number(run.freshMtr || 0);
+                      const wMtr = Number(run.totalWastageMtr || 0);
+                      const runDateStr = run.date ? formatDateTimeDDMMYYYY(run.date) : '—';
+
+                      return (
+                        <tr key={run._id || run.id}>
+                          <td>
+                            <div style={{ fontWeight: 800, color: '#0f172a' }}>{runDateStr}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Shift: {run.shift || 'Morning'}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 900, color: '#2563eb' }}>{formatJobCardNo(run.jobNo)}</div>
+                            {matchingCard && (
+                              <div style={{ fontSize: '0.72rem', color: '#475569', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {matchingCard.party || ''} • {matchingCard.fabric || ''}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 800, color: '#0f172a' }}>{run.fusingMachine || '—'}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>👤 {run.operatorName || '—'}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 700, fontSize: '0.8rem' }}>{run.panna || '58"'}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>
+                              {run.fusingTemp || '210°C'} @ {run.fusingSpeed || '80'}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              background: '#ecfdf5',
+                              color: '#047857',
+                              border: '1px solid #a7f3d0',
+                              padding: '2px 8px',
+                              borderRadius: '5px',
+                              fontWeight: 900,
+                              fontSize: '0.88rem'
+                            }}>
+                              ✨ {fMtr} m
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {wMtr > 0 ? (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  background: '#fff1f2',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fca5a5',
+                                  padding: '2px 8px',
+                                  borderRadius: '5px',
+                                  fontWeight: 900,
+                                  fontSize: '0.84rem'
+                                }}
+                                title={`Fabric: ${run.fabricFaultMtr || 0}m | Fusing: ${run.fusingFaultMtr || 0}m | Print: ${run.printFaultMtr || 0}m | Joint: ${run.genuineFaultMtr || 0}m`}
+                              >
+                                ⚠️ {wMtr} m
+                              </span>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>0 m</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              background: run.rollCompleted === 'Complete' ? '#f0fdf4' : '#f0f9ff',
+                              color: run.rollCompleted === 'Complete' ? '#15803d' : '#0369a1',
+                              border: `1px solid ${run.rollCompleted === 'Complete' ? '#86efac' : '#7dd3fc'}`
+                            }}>
+                              {run.rollCompleted || 'Complete'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', gap: '5px' }}>
+                              <button
+                                type="button"
+                                onClick={() => openFusingModal(matchingCard, run)}
+                                className="fusing-btn-primary"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', minHeight: '30px' }}
+                                title="Edit this run record"
+                              >
+                                <Edit2 size={12} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFusingLog(run._id || run.id, run.jobNo)}
+                                className="fusing-btn-secondary"
+                                style={{ padding: '0.35rem 0.55rem', fontSize: '0.74rem', minHeight: '30px', color: '#dc2626', borderColor: '#fca5a5' }}
+                                title="Delete this run record"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 3: READY FOR FUSING QUEUE ── */}
       {activeFusingTab === 'queue' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Queue Header & Filters Banner */}
@@ -3416,13 +3916,13 @@ export default function FusingDepartment() {
             {/* Modal Header */}
             <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Flame size={22} color="#2563eb" />
+                <Flame size={22} color={form.logId ? '#d97706' : '#2563eb'} />
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                    Edit Fusing Production Entry — {formatJobCardNo(form.jobNo)}
+                    {form.logId ? `Edit Fusing Run #${String(form.logId).slice(-6)}` : 'Edit Fusing Master Card'} — {formatJobCardNo(form.jobNo)}
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Verify Fresh Output, 4-Fault Wastage breakdown &amp; calculate Total Fabric Used
+                    {form.logId ? 'Modifying this specific machine run log record' : 'Verify Fresh Output, 4-Fault Wastage breakdown & calculate Total Fabric Used'}
                   </span>
                 </div>
               </div>
@@ -3433,6 +3933,51 @@ export default function FusingDepartment() {
 
             {/* Modal Body Form */}
             <form onSubmit={handleFormSubmit} style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              
+              {/* Runs Switcher on this Job Card */}
+              {(() => {
+                const cardRuns = getCardLogs(selectedCard);
+                if (cardRuns.length > 0) {
+                  return (
+                    <div style={{ background: '#f0f9ff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #bae6fd', fontSize: '0.78rem' }}>
+                      <div style={{ fontWeight: 800, color: '#0369a1', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>⚡ Production Runs for Job #{selectedCard?.jobNo} ({cardRuns.length}):</span>
+                        {form.logId && (
+                          <button
+                            type="button"
+                            onClick={() => openFusingModal(selectedCard, null)}
+                            style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', color: '#475569' }}
+                          >
+                            Switch to Master Card Edit
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {cardRuns.map((run, idx) => (
+                          <button
+                            key={run._id || run.id}
+                            type="button"
+                            onClick={() => openFusingModal(selectedCard, run)}
+                            style={{
+                              background: form.logId === (run._id || run.id) ? '#0284c7' : '#ffffff',
+                              color: form.logId === (run._id || run.id) ? '#ffffff' : '#0369a1',
+                              border: form.logId === (run._id || run.id) ? '1px solid #0284c7' : '1px solid #7dd3fc',
+                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Run #{idx + 1}: {run.freshMtr}m Fresh {run.totalWastageMtr > 0 ? `(${run.totalWastageMtr}m waste)` : ''}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               
               {/* Fresh Output MTR & Total Fabric Used formula box */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -3684,9 +4229,19 @@ export default function FusingDepartment() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ padding: '0.6rem 1.35rem', borderRadius: '8px', background: '#2563eb', color: '#ffffff', fontWeight: 800, fontSize: '0.9rem', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' }}
+                  style={{
+                    padding: '0.6rem 1.35rem',
+                    borderRadius: '8px',
+                    background: form.logId ? '#d97706' : '#2563eb',
+                    color: '#ffffff',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: form.logId ? '0 4px 12px rgba(217, 119, 6, 0.25)' : '0 4px 12px rgba(37, 99, 235, 0.25)'
+                  }}
                 >
-                  {submitting ? 'Saving...' : 'Update Fusing Record'}
+                  {submitting ? 'Saving...' : (form.logId ? 'Update Fusing Run (Edit)' : 'Update Master Fusing Record')}
                 </button>
               </div>
             </form>

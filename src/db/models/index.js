@@ -47,6 +47,7 @@ const db = {
   GarmentJobCard: require('./garmentJobCard.model'),
   StitchingChallan: require('./stitchingChallan.model'),
   JobPrintLog: require('./jobPrintLog.model'),
+  JobFusingLog: require('./jobFusingLog.model'),
   Design: require('./design.model'),
   MyntraConfig: require('./myntraConfig.model'),
   ReturnRecord: require('./returnRecord.model'),

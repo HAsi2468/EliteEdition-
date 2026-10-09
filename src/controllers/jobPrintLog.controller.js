@@ -64,6 +64,20 @@ async function syncJobCardPrintTotals(jobCardId, jobNo) {
     jobCard.printStatus = 'Printing Pending';
   }
 
+  if (logs.length > 0) {
+    const latestLog = logs[0];
+    const auditEntry = {
+      performedBy: latestLog.operatorName || 'Printing Operator',
+      performedByName: latestLog.operatorName || 'Printing Operator',
+      action: 'PRINT_ENTRY',
+      timestamp: new Date(),
+      details: `Print Run Logged: ${latestLog.meters}m on ${latestLog.machineName} (${latestLog.pass || '4 Pass'}) [Cumulative: ${totalPrintedMtr.toFixed(1)}m]`,
+      changesSummary: `Print Status: ${jobCard.printStatus}; Total Printed: ${totalPrintedMtr.toFixed(1)}m`
+    };
+    if (!Array.isArray(jobCard.auditTrail)) jobCard.auditTrail = [];
+    jobCard.auditTrail.push(auditEntry);
+  }
+
   await jobCard.save();
   return { jobCard, totalPrintedMtr, targetMtr, logsCount: logs.length };
 }

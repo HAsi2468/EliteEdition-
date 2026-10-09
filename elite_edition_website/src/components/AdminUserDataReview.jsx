@@ -199,6 +199,7 @@ export default function AdminUserDataReview() {
     { value: 'ALL', label: 'All Modules' },
     { value: 'JobCard', label: 'Job Cards (Digital Print)' },
     { value: 'JobPrintLog', label: 'Printing Logs (Machine Meterage)' },
+    { value: 'JobFusingLog', label: 'Fusing Logs (Heat-Press Runs)' },
     { value: 'Task', label: 'Projects & Tasks' },
     { value: 'FabricTransaction', label: 'Fabric Inward/Outward' },
     { value: 'RawMaterialTransaction', label: 'Raw Materials' },
@@ -671,6 +672,23 @@ export default function AdminUserDataReview() {
                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                   {item.createdAt ? new Date(item.createdAt).toLocaleString('en-IN') : 'N/A'}
                 </div>
+                {!(item.updatedByName || item.updatedBy) && (
+                  <div style={{
+                    marginTop: '2px',
+                    fontSize: '0.73rem',
+                    fontWeight: 800,
+                    color: '#15803d',
+                    background: '#dcfce7',
+                    border: '1px solid #bbf7d0',
+                    padding: '1px 6px',
+                    borderRadius: '5px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>➕ New Entry</span>
+                  </div>
+                )}
                 {(item.updatedByName || item.updatedBy) && (
                   <div style={{
                     marginTop: '2px',
@@ -1023,8 +1041,17 @@ export default function AdminUserDataReview() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
                           {raw.auditTrail.slice().reverse().map((at, idx) => (
                             <div key={idx} style={{ padding: '0.4rem 0.6rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.73rem' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: '#1e40af' }}>
-                                <span>{at.performedByName || at.performedBy || 'Staff'} ({at.action || 'UPDATE'})</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800, color: '#1e40af' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span>{at.performedByName || at.performedBy || 'Staff'}</span>
+                                  {at.action === 'FUSING_ENTRY' && <span style={{ color: '#c2410c', background: '#ffedd5', border: '1px solid #fed7aa', padding: '1px 6px', borderRadius: 4, fontSize: '0.68rem', fontWeight: 800 }}>🔥 New Fusing Entry</span>}
+                                  {at.action === 'PRINT_ENTRY' && <span style={{ color: '#1d4ed8', background: '#dbeafe', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: 4, fontSize: '0.68rem', fontWeight: 800 }}>🖨️ New Print Entry</span>}
+                                  {at.action === 'CREATE' && <span style={{ color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: 4, fontSize: '0.68rem', fontWeight: 800 }}>✨ Created Job Card</span>}
+                                  {(at.action === 'UPDATE' || at.action === 'EDIT') && <span style={{ color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '1px 6px', borderRadius: 4, fontSize: '0.68rem', fontWeight: 800 }}>✏️ Edited Record</span>}
+                                  {at.action !== 'FUSING_ENTRY' && at.action !== 'PRINT_ENTRY' && at.action !== 'CREATE' && at.action !== 'UPDATE' && at.action !== 'EDIT' && (
+                                    <span style={{ color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700 }}>{at.action || 'UPDATE'}</span>
+                                  )}
+                                </div>
                                 <span style={{ color: '#64748b', fontWeight: 600 }}>{at.timestamp ? new Date(at.timestamp).toLocaleString('en-IN') : ''}</span>
                               </div>
                               {at.details && <div style={{ color: '#334155', marginTop: '2px' }}>{at.details}</div>}
@@ -1417,6 +1444,30 @@ export default function AdminUserDataReview() {
                       <div><span style={{ color: '#64748b' }}>Machine:</span> <b style={{ color: '#1d4ed8' }}>{raw.machineName}</b></div>
                       <div><span style={{ color: '#64748b' }}>Printed Meters:</span> <b style={{ color: '#1d4ed8', fontSize: '0.9rem' }}>{raw.meters} Mtr</b></div>
                       <div><span style={{ color: '#64748b' }}>Pass:</span> <b style={{ color: '#0f172a' }}>{raw.pass || '4 Pass'}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Operator:</span> <b style={{ color: '#0f172a' }}>{raw.operatorName || '—'}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Shift:</span> <b style={{ color: '#0f172a' }}>{raw.shift || 'General'}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Date:</span> <b style={{ color: '#0f172a' }}>{raw.date ? new Date(raw.date).toLocaleDateString('en-IN') : '—'}</b></div>
+                    </div>
+                    {raw.notes && (
+                      <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.6rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.74rem' }}>
+                        <b>Notes:</b> {raw.notes}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 17. Fusing Machine Log Details */}
+                {inspectEntry.module === 'JobFusingLog' && (
+                  <div style={{ background: '#f8faff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.85rem' }}>
+                    <h5 style={{ margin: '0 0 0.6rem', fontSize: '0.82rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Flame size={15} color="#ea580c" /> Fusing Machine Production Log
+                    </h5>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', fontSize: '0.78rem' }}>
+                      <div><span style={{ color: '#64748b' }}>Job No:</span> <b style={{ color: '#0f172a' }}>{raw.jobNo}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Machine:</span> <b style={{ color: '#ea580c' }}>{raw.fusingMachine || 'Fusing Machine'}</b></div>
+                      <div><span style={{ color: '#64748b' }}>Fresh Output:</span> <b style={{ color: '#059669', fontSize: '0.9rem' }}>{raw.freshMtr} Mtr</b></div>
+                      <div><span style={{ color: '#64748b' }}>Total Wastage:</span> <b style={{ color: '#dc2626' }}>{raw.totalWastageMtr || 0} Mtr</b></div>
+                      <div><span style={{ color: '#64748b' }}>Temp / Speed:</span> <b style={{ color: '#0f172a' }}>{raw.fusingTemp || '210°C'} / {raw.fusingSpeed || '80'}</b></div>
                       <div><span style={{ color: '#64748b' }}>Operator:</span> <b style={{ color: '#0f172a' }}>{raw.operatorName || '—'}</b></div>
                       <div><span style={{ color: '#64748b' }}>Shift:</span> <b style={{ color: '#0f172a' }}>{raw.shift || 'General'}</b></div>
                       <div><span style={{ color: '#64748b' }}>Date:</span> <b style={{ color: '#0f172a' }}>{raw.date ? new Date(raw.date).toLocaleDateString('en-IN') : '—'}</b></div>

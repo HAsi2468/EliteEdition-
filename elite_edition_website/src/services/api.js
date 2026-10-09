@@ -957,6 +957,26 @@ export const api = {
     return request(`/jobPrintLogs/${id}`, { method: 'DELETE' });
   },
 
+  // ─── Machine Fusing Logs ──────────────────────────────────────────────────
+  async createJobFusingLog(data) {
+    return request('/jobFusingLogs', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async getJobFusingLogs(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/jobFusingLogs${qs}`);
+  },
+  async getJobCardFusingLogs(jobNoOrId) {
+    return request(`/jobFusingLogs/job/${jobNoOrId}`);
+  },
+  async updateJobFusingLog(id, data) {
+    return request(`/jobFusingLogs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteJobFusingLog(id) {
+    return request(`/jobFusingLogs/${id}`, { method: 'DELETE' });
+  },
+
   // ─── Design Catalogue & Cloudflare R2 Uploads ──────────────────────────────────────
   async uploadImage(file, folder = 'designs') {
     if (file) {

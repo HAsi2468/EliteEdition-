@@ -632,11 +632,12 @@ const getUserDataEntries = async (req, res) => {
             const rawFabric = doc.fabric || doc.fabricName || doc.fabricType || 'Fabric';
             const rawMtr = doc.totalMtr || doc.freshMtr || doc.fusingMtr || 0;
             const parsedDate = doc.created_date_time || (doc.date ? new Date(doc.date) : (doc.createdAt || new Date()));
-            const lastAudit = Array.isArray(doc.auditTrail) && doc.auditTrail.length > 0
-              ? doc.auditTrail[doc.auditTrail.length - 1]
-              : null;
-            const editorName = doc.updatedByName || doc.updatedBy || (lastAudit ? (lastAudit.performedByName || lastAudit.performedBy) : '');
-            const editorDate = doc.modified_date_time || doc.updatedAt || (lastAudit ? lastAudit.timestamp : null);
+            const actualEdits = Array.isArray(doc.auditTrail)
+              ? doc.auditTrail.filter(at => at.action === 'EDIT' || at.action === 'UPDATE')
+              : [];
+            const lastActualEdit = actualEdits.length > 0 ? actualEdits[actualEdits.length - 1] : null;
+            const editorName = lastActualEdit ? (lastActualEdit.performedByName || lastActualEdit.performedBy || doc.updatedByName || doc.updatedBy || '') : '';
+            const editorDate = lastActualEdit ? (lastActualEdit.timestamp || doc.modified_date_time || doc.updatedAt) : null;
 
             return {
               id: doc._id,
@@ -697,6 +698,7 @@ const getUserDataEntries = async (req, res) => {
           .then(docs => docs.map(doc => {
             const parsedDate = doc.date || doc.created_date_time || doc.createdAt || new Date();
             const meters = doc.meters || 0;
+            const isEdited = doc.modified_date_time && Math.abs(new Date(doc.modified_date_time).getTime() - new Date(doc.created_date_time || parsedDate).getTime()) > 5000;
             return {
               id: doc._id,
               module: 'JobPrintLog',
@@ -710,9 +712,68 @@ const getUserDataEntries = async (req, res) => {
               status: `${doc.shift || 'General'} Shift`,
               createdBy: doc.operatorName || 'Printing Operator',
               createdAt: parsedDate,
-              updatedBy: '',
-              updatedByName: '',
-              updatedAt: doc.modified_date_time || null,
+              updatedBy: isEdited ? (doc.operatorName || 'Operator') : '',
+              updatedByName: isEdited ? (doc.operatorName || 'Operator') : '',
+              updatedAt: isEdited ? doc.modified_date_time : null,
+              rawDoc: doc,
+            };
+          }))
+      );
+    }
+
+    // 1c. Daily Fusing Machine Production Logs (JobFusingLog)
+    if (shouldFetch('JobFusingLog', 'Elite Digital Print', 'Digital Printing') && models.JobFusingLog) {
+      const q = {};
+      if (hasDate) {
+        const dateCond = {};
+        if (dateStartObj) dateCond.$gte = dateStartObj;
+        if (dateEndObj) dateCond.$lte = dateEndObj;
+        q.$or = [
+          { date: dateCond },
+          { created_date_time: dateCond },
+          { createdAt: dateCond },
+        ];
+      }
+      if (userRegex) {
+        q.operatorName = userRegex;
+      }
+      if (searchRegex) {
+        const searchOr = [
+          { jobNo: searchRegex },
+          { fusingMachine: searchRegex },
+          { operatorName: searchRegex },
+          { shift: searchRegex },
+          { notes: searchRegex },
+        ];
+        q.$and = q.$and ? [...q.$and, { $or: searchOr }] : [{ $or: searchOr }];
+      }
+
+      promises.push(
+        models.JobFusingLog.find(q)
+          .sort({ date: -1, created_date_time: -1, _id: -1 })
+          .limit(maxFetch)
+          .lean()
+          .then(docs => docs.map(doc => {
+            const parsedDate = doc.date || doc.created_date_time || doc.createdAt || new Date();
+            const fresh = doc.freshMtr || 0;
+            const waste = doc.totalWastageMtr || 0;
+            const isEdited = doc.modified_date_time && Math.abs(new Date(doc.modified_date_time).getTime() - new Date(doc.created_date_time || parsedDate).getTime()) > 5000;
+            return {
+              id: doc._id,
+              module: 'JobFusingLog',
+              moduleLabel: 'Fusing Machine Log',
+              companyEntity: normalizeCompany(doc.companyEntity || 'Elite Digital Print'),
+              department: 'Digital Printing',
+              identifier: doc.jobNo ? `${doc.jobNo} • ${doc.fusingMachine || 'Fusing'}` : `Fusing Log #${String(doc._id).slice(-6)}`,
+              party: doc.fusingMachine ? `Machine: ${doc.fusingMachine}` : 'Fusing Unit',
+              details: `${fresh}m Fresh${waste > 0 ? ` • ${waste}m Waste` : ''} • Temp: ${doc.fusingTemp || '210°C'} • Speed: ${doc.fusingSpeed || '80'} • Shift: ${doc.shift || 'General'}${doc.notes ? ` • ${doc.notes}` : ''}`,
+              amountOrQuantity: `${fresh} Mtr Fresh`,
+              status: `${doc.rollCompleted || 'Complete'}`,
+              createdBy: doc.operatorName || 'Fusing Operator',
+              createdAt: parsedDate,
+              updatedBy: isEdited ? (doc.operatorName || 'Operator') : '',
+              updatedByName: isEdited ? (doc.operatorName || 'Operator') : '',
+              updatedAt: isEdited ? doc.modified_date_time : null,
               rawDoc: doc,
             };
           }))
