@@ -333,6 +333,7 @@ export default function EliteBillingDepartment({
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoiceHistory, setSelectedInvoiceHistory] = useState(null);
   const [customers, setCustomers] = useState([]);
+  const [vendorsList, setVendorsList] = useState([]);
   const [itemsList, setItemsList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -565,6 +566,37 @@ export default function EliteBillingDepartment({
       return;
     }
 
+    // 1. Look in Billing Vendors Master first (has full comprehensive details)
+    const matchedBilling = (vendorsList || []).find(v => {
+      const bName = String(v.businessName || v.name || '').trim().toLowerCase();
+      const cName = String(v.name || '').trim().toLowerCase();
+      const target = selectedName.trim().toLowerCase();
+      return bName === target || cName === target;
+    });
+
+    if (matchedBilling) {
+      const resolvedName = matchedBilling.name || selectedName;
+      const resolvedBiz = matchedBilling.businessName || resolvedName;
+      setPurchaseForm(prev => ({
+        ...prev,
+        vendorName: resolvedBiz || resolvedName,
+        vendor: {
+          vendorId: matchedBilling._id || matchedBilling.id || '',
+          name: resolvedName,
+          businessName: resolvedBiz,
+          phone: matchedBilling.phone || '',
+          email: matchedBilling.email || '',
+          gstin: matchedBilling.gstin || '',
+          billingAddress: matchedBilling.billingAddress || matchedBilling.address || '',
+          shippingAddress: matchedBilling.shippingAddress || matchedBilling.billingAddress || matchedBilling.address || '',
+          state: matchedBilling.state || 'Gujarat',
+          stateCode: matchedBilling.stateCode || '24'
+        }
+      }));
+      return;
+    }
+
+    // 2. Fallback to fabricVendors
     const matched = (fabricVendors || []).find(v => {
       const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
       return vName && String(vName).trim().toLowerCase() === selectedName.trim().toLowerCase();
@@ -1069,9 +1101,14 @@ export default function EliteBillingDepartment({
       .catch(err => console.warn('Could not load fabric vendors:', err));
   }, []);
 
-  // Vendor options populated ONLY from Elite Digital Prints Vendor Master (Fabric Vendors)
+  // Vendor options populated from Billing Vendors Master (with full proper details) + Fabric Vendors
   const vendorOptions = useMemo(() => {
     const list = new Set();
+
+    (vendorsList || []).forEach(v => {
+      const vName = v.businessName || v.name;
+      if (vName && String(vName).trim()) list.add(String(vName).trim());
+    });
 
     (fabricVendors || []).forEach(v => {
       const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
@@ -1079,7 +1116,7 @@ export default function EliteBillingDepartment({
     });
 
     return Array.from(list).filter(Boolean);
-  }, [fabricVendors]);
+  }, [vendorsList, fabricVendors]);
 
   // Dynamic list of unique vendors for purchases filter
   const purchaseVendorsList = useMemo(() => {
@@ -1087,12 +1124,16 @@ export default function EliteBillingDepartment({
     (purchases || []).forEach(p => {
       if (p.vendorName && p.vendorName.trim()) list.add(p.vendorName.trim());
     });
+    (vendorsList || []).forEach(v => {
+      const vName = v.businessName || v.name;
+      if (vName && String(vName).trim()) list.add(String(vName).trim());
+    });
     (fabricVendors || []).forEach(v => {
       const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
       if (vName && String(vName).trim()) list.add(String(vName).trim());
     });
     return Array.from(list).sort();
-  }, [purchases, fabricVendors]);
+  }, [purchases, vendorsList, fabricVendors]);
 
   // Date range object based on preset or custom range
   const purchaseDateRange = useMemo(() => {
@@ -2438,9 +2479,10 @@ export default function EliteBillingDepartment({
 
   // Filtered Customers & Items
   const filteredCustomers = useMemo(() => {
-    if (!customerSearch) return customers;
+    const list = Array.isArray(customers) ? customers : [];
+    if (!customerSearch) return list;
     const q = customerSearch.toLowerCase();
-    return customers.filter(c =>
+    return list.filter(c =>
       (c.name || '').toLowerCase().includes(q) ||
       (c.businessName || '').toLowerCase().includes(q) ||
       (c.phone || '').toLowerCase().includes(q) ||
@@ -2448,10 +2490,24 @@ export default function EliteBillingDepartment({
     );
   }, [customers, customerSearch]);
 
+  const filteredVendors = useMemo(() => {
+    const list = Array.isArray(vendorsList) ? vendorsList : [];
+    if (!vendorSearch || !vendorSearch.trim()) return list;
+    const q = vendorSearch.toLowerCase().trim();
+    return list.filter(v =>
+      (v.name || '').toLowerCase().includes(q) ||
+      (v.businessName || '').toLowerCase().includes(q) ||
+      (v.phone || '').toLowerCase().includes(q) ||
+      (v.gstin || '').toLowerCase().includes(q) ||
+      (v.email || '').toLowerCase().includes(q)
+    );
+  }, [vendorsList, vendorSearch]);
+
   const filteredItems = useMemo(() => {
-    if (!itemSearch) return itemsList;
+    const list = Array.isArray(itemsList) ? itemsList : [];
+    if (!itemSearch) return list;
     const q = itemSearch.toLowerCase();
-    return itemsList.filter(i =>
+    return list.filter(i =>
       (i.itemName || '').toLowerCase().includes(q) ||
       (i.hsnCode || '').toLowerCase().includes(q) ||
       (i.category || '').toLowerCase().includes(q)
@@ -2474,6 +2530,25 @@ export default function EliteBillingDepartment({
       triggerPushNotification('🗑️ Customer Deleted', `Customer "${name}" deleted.`, 'info');
     } catch (err) {
       alert(err.message || 'Failed to delete customer');
+    }
+  };
+
+  // Delete Vendor
+  const handleDeleteVendor = async (id, name) => {
+    const ok = await triggerEliteConfirm({
+      title: 'Delete Vendor',
+      message: `Are you sure you want to delete vendor "${name}"?`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.deleteBillingVendor(id);
+      setVendorsList(prev => prev.filter(v => (v._id || v.id) !== id));
+      triggerPushNotification('🗑️ Vendor Deleted', `Vendor "${name}" deleted.`, 'info');
+    } catch (err) {
+      alert(err.message || 'Failed to delete vendor');
     }
   };
 
@@ -2509,6 +2584,14 @@ export default function EliteBillingDepartment({
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [custForm, setCustForm] = useState({
     name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
+  });
+
+  // New Vendor Modal State
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [editingVendorId, setEditingVendorId] = useState(null);
+  const [vendorForm, setVendorForm] = useState({
+    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric'
   });
 
   // New Item Modal State
@@ -2556,17 +2639,25 @@ export default function EliteBillingDepartment({
     setLoading(true);
     setError('');
     try {
-      const [sRes, iRes, cRes, itemRes] = await Promise.all([
+      const [sRes, iRes, cRes, itemRes, vRes] = await Promise.all([
         api.getBillingDashboardStats(companyEntity),
         api.getBillingInvoices({ companyEntity, search, paymentStatus: statusFilter }),
         api.getBillingCustomers(companyEntity),
-        api.getBillingItems(companyEntity)
+        api.getBillingItems(companyEntity),
+        api.getBillingVendors(companyEntity).catch(err => {
+          console.warn('Billing vendors load warning:', err);
+          return { data: [] };
+        })
       ]);
 
-      if (sRes.data) setStats(sRes.data);
-      if (iRes.data) setInvoices(iRes.data);
-      if (cRes.data) setCustomers(cRes.data);
-      if (itemRes.data) setItemsList(itemRes.data);
+      if (sRes?.data) setStats(sRes.data);
+      if (iRes?.data) setInvoices(Array.isArray(iRes.data) ? iRes.data : []);
+      if (cRes?.data) setCustomers(Array.isArray(cRes.data) ? cRes.data : []);
+      if (itemRes?.data) setItemsList(Array.isArray(itemRes.data) ? itemRes.data : []);
+      if (vRes) {
+        const vData = Array.isArray(vRes.data) ? vRes.data : (Array.isArray(vRes) ? vRes : []);
+        setVendorsList(vData);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load billing data');
     } finally {
@@ -3224,6 +3315,46 @@ export default function EliteBillingDepartment({
     setShowCustomerModal(true);
   };
 
+  // Create / Update Vendor Handler
+  const handleSaveVendor = async () => {
+    if (!vendorForm.name || !vendorForm.name.trim()) {
+      alert('Vendor Contact / Representative Name is required');
+      return;
+    }
+    try {
+      if (editingVendorId) {
+        const res = await api.updateBillingVendor(editingVendorId, vendorForm);
+        setVendorsList(prev => prev.map(v => ((v._id || v.id) === editingVendorId ? res.data : v)));
+        triggerPushNotification('✏️ Vendor Updated', `Vendor "${vendorForm.name}" updated.`, 'success');
+      } else {
+        const res = await api.createBillingVendor({ ...vendorForm, companyEntity });
+        setVendorsList(prev => [...prev, res.data]);
+        triggerPushNotification('🏢 Vendor Created', `Vendor "${vendorForm.name}" registered.`, 'success');
+      }
+      setShowVendorModal(false);
+      setEditingVendorId(null);
+      setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric' });
+    } catch (err) {
+      alert(err.message || 'Failed to save vendor');
+    }
+  };
+
+  const handleEditVendor = (v) => {
+    setEditingVendorId(v._id || v.id);
+    setVendorForm({
+      name: v.name || '',
+      businessName: v.businessName || '',
+      phone: v.phone || '',
+      email: v.email || '',
+      gstin: v.gstin || '',
+      billingAddress: v.billingAddress || v.address || '',
+      state: v.state || 'Gujarat',
+      stateCode: v.stateCode || '24',
+      vendorType: v.vendorType || 'Fabric'
+    });
+    setShowVendorModal(true);
+  };
+
   // Create / Update Item Handler
   const handleSaveItem = async () => {
     if (!itemForm.itemName || !itemForm.unitPrice) {
@@ -3321,6 +3452,7 @@ export default function EliteBillingDepartment({
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
             { id: 'expense', label: 'Expenses & Ledger' },
             { id: 'customers', label: `Customers (${customers.length})` },
+            { id: 'vendors', label: `Vendors (${vendorsList.length})` },
             { id: 'items', label: `Items (${itemsList.length})` }
           ].map(t => {
             const isActive = activeTab === t.id;
@@ -4533,6 +4665,103 @@ export default function EliteBillingDepartment({
         </div>
       )}
 
+      {/* ── TAB 4B: VENDORS DIRECTORY ─────────────────────────────────────────── */}
+      {activeTab === 'vendors' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={vendorSearch}
+                onChange={e => setVendorSearch(e.target.value)}
+                placeholder="Search Vendor Name, Business, Phone, GSTIN..."
+                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <button 
+                type="button"
+                className="btn-secondary" 
+                onClick={() => setActiveTab('customers')}
+                style={{ fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <span>Customers ({customers.length})</span>
+              </button>
+              <button 
+                type="button"
+                className="btn-primary" 
+                onClick={() => {
+                  setEditingVendorId(null);
+                  setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric' });
+                  setShowVendorModal(true);
+                }}
+              >
+                <PlusCircle size={15} /> Add New Vendor
+              </button>
+            </div>
+          </div>
+
+          <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Vendor / Contact</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Business / Firm Name</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Phone & Email</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>GSTIN</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Address & State</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(filteredVendors || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No vendors found. Click "Add New Vendor" to register your supplier!
+                    </td>
+                  </tr>
+                ) : (
+                  (filteredVendors || []).map(v => (
+                    <tr key={v._id || v.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span>{v.name}</span>
+                          {v.vendorType && (
+                            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', fontWeight: 700 }}>
+                              {v.vendorType}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{v.businessName || '—'}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
+                        <div>{v.phone || '—'}</div>
+                        {v.email && <div style={{ fontSize: '0.7rem' }}>{v.email}</div>}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0284c7' }}>{v.gstin || 'Unregistered'}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {v.billingAddress || v.address || '—'} ({v.state || 'Gujarat'})
+                      </td>
+                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button onClick={() => handleEditVendor(v)} className="btn-icon" title="Edit Vendor">
+                            <Edit2 size={14} color="var(--primary)" />
+                          </button>
+                          <button onClick={() => handleDeleteVendor(v._id || v.id, v.name)} className="btn-icon" title="Delete Vendor">
+                            <Trash2 size={14} color="#f87171" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── TAB 5: BILLING PRODUCTS CATALOG ──────────────────────────────────── */}
       {activeTab === 'items' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -4751,49 +4980,76 @@ export default function EliteBillingDepartment({
               )}
             </div>
 
-            <button
-              onClick={() => {
-                setEditingPurchaseId(null);
-                setPurchaseForm({
-                  purchaseNo: `PUR-2026-00${purchases.length + 1}`,
-                  ourChallanNo: '',
-                  date: new Date().toISOString().split('T')[0],
-                  dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-                  vendor: {
-                    vendorId: '',
-                    name: '',
-                    businessName: '',
-                    phone: '',
-                    email: '',
-                    gstin: '',
-                    billingAddress: '',
-                    shippingAddress: '',
-                    state: 'Gujarat',
-                    stateCode: '24'
-                  },
-                  vendorName: '',
-                  items: [createEmptyPurchaseItem()],
-                  enableRoundOff: true,
-                  manualRoundOff: undefined,
-                  discountType: 'flat',
-                  discountValue: 0,
-                  taxType: 'CGST_SGST',
-                  gstRate: 5,
-                  paidAmount: 0,
-                  notes: 'Vendor purchase bill recorded in ERP.',
-                  terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
-                });
-                setShowPurchaseModal(true);
-              }}
-              style={{
-                padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
-                border: 'none', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Plus size={16} /> + New Purchase Inward Entry
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('vendors')}
+                className="ent-tab-btn"
+                title="View & Manage All Registered Vendors"
+                style={{
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  border: '1px solid var(--border-light, #cbd5e1)',
+                  background: '#ffffff',
+                  color: '#475569',
+                  borderRadius: '8px',
+                  height: '34px',
+                  padding: '0 0.95rem',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <span>Vendors ({vendorsList.length})</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setEditingPurchaseId(null);
+                  setPurchaseForm({
+                    purchaseNo: `PUR-2026-00${purchases.length + 1}`,
+                    ourChallanNo: '',
+                    date: new Date().toISOString().split('T')[0],
+                    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+                    vendor: {
+                      vendorId: '',
+                      name: '',
+                      businessName: '',
+                      phone: '',
+                      email: '',
+                      gstin: '',
+                      billingAddress: '',
+                      shippingAddress: '',
+                      state: 'Gujarat',
+                      stateCode: '24'
+                    },
+                    vendorName: '',
+                    items: [createEmptyPurchaseItem()],
+                    enableRoundOff: true,
+                    manualRoundOff: undefined,
+                    discountType: 'flat',
+                    discountValue: 0,
+                    taxType: 'CGST_SGST',
+                    gstRate: 5,
+                    paidAmount: 0,
+                    notes: 'Vendor purchase bill recorded in ERP.',
+                    terms: 'Payment due within agreed credit terms. Subject to Surat jurisdiction.'
+                  });
+                  setShowPurchaseModal(true);
+                }}
+                style={{
+                  padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                  border: 'none', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Plus size={16} /> + New Purchase Inward Entry
+              </button>
+            </div>
           </div>
 
           {/* Purchase History Table */}
@@ -5105,9 +5361,31 @@ export default function EliteBillingDepartment({
                   <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     🏢 Supplied By (Vendor / Supplier Details)
                   </div>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    {vendorOptions.length} Saved Vendors Available
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      {vendorsList.length} Registered Vendors
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingVendorId(null);
+                        setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric' });
+                        setShowVendorModal(true);
+                      }}
+                      style={{
+                        background: '#e0e7ff',
+                        color: '#4338ca',
+                        border: '1px solid #c7d2fe',
+                        borderRadius: '6px',
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      + Add New Vendor
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.8rem' }}>
@@ -6101,6 +6379,131 @@ export default function EliteBillingDepartment({
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button className="btn-secondary" onClick={() => setShowCustomerModal(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleSaveCustomer}>Save Customer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CREATE / EDIT VENDOR MODAL ────────────────────────────────────────── */}
+      {showVendorModal && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                {editingVendorId ? 'Edit Vendor / Supplier' : 'Add New Vendor / Supplier'}
+              </h3>
+              <button onClick={() => setShowVendorModal(false)} className="btn-icon"><X size={16} /></button>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Contact Person / Representative Name *</label>
+              <input 
+                type="text" 
+                value={vendorForm.name} 
+                onChange={e => setVendorForm(f => ({ ...f, name: e.target.value }))} 
+                style={inputStyle} 
+                placeholder="e.g. Ramesh Patel" 
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Business / Supplier Firm Name</label>
+              <input 
+                type="text" 
+                value={vendorForm.businessName} 
+                onChange={e => setVendorForm(f => ({ ...f, businessName: e.target.value }))} 
+                style={inputStyle} 
+                placeholder="e.g. Surat Textile Mills Pvt Ltd" 
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Phone Number</label>
+                <input 
+                  type="text" 
+                  value={vendorForm.phone} 
+                  onChange={e => setVendorForm(f => ({ ...f, phone: e.target.value }))} 
+                  style={inputStyle} 
+                  placeholder="e.g. 9876543210" 
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>GSTIN Number</label>
+                <input 
+                  type="text" 
+                  value={vendorForm.gstin} 
+                  onChange={e => setVendorForm(f => ({ ...f, gstin: e.target.value }))} 
+                  style={inputStyle} 
+                  placeholder="e.g. 24AAAAA0000A1Z5" 
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Email Address</label>
+                <input 
+                  type="email" 
+                  value={vendorForm.email} 
+                  onChange={e => setVendorForm(f => ({ ...f, email: e.target.value }))} 
+                  style={inputStyle} 
+                  placeholder="vendor@company.com" 
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Vendor Category</label>
+                <select 
+                  value={vendorForm.vendorType} 
+                  onChange={e => setVendorForm(f => ({ ...f, vendorType: e.target.value }))} 
+                  style={inputStyle}
+                >
+                  <option value="Fabric">Fabric Supplier</option>
+                  <option value="Inks & Chemicals">Inks & Chemicals</option>
+                  <option value="Packaging & Accessories">Packaging & Accessories</option>
+                  <option value="Machinery & Spares">Machinery & Spares</option>
+                  <option value="General Supplier">General Supplier</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Billing / Factory Address</label>
+              <textarea 
+                rows={2} 
+                value={vendorForm.billingAddress} 
+                onChange={e => setVendorForm(f => ({ ...f, billingAddress: e.target.value }))} 
+                style={inputStyle} 
+                placeholder="Plot no, GIDC, Ring Road, Surat..." 
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>State</label>
+                <input 
+                  type="text" 
+                  value={vendorForm.state} 
+                  onChange={e => setVendorForm(f => ({ ...f, state: e.target.value }))} 
+                  style={inputStyle} 
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>State Code</label>
+                <input 
+                  type="text" 
+                  value={vendorForm.stateCode} 
+                  onChange={e => setVendorForm(f => ({ ...f, stateCode: e.target.value }))} 
+                  style={inputStyle} 
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <button className="btn-secondary" onClick={() => setShowVendorModal(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleSaveVendor}>
+                {editingVendorId ? 'Update Vendor' : 'Save Vendor'}
+              </button>
             </div>
           </div>
         </div>

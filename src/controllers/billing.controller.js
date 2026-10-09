@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const BillingInvoice = require('../db/models/billingInvoice.model');
 const BillingPurchase = require('../db/models/billingPurchase.model');
 const BillingCustomer = require('../db/models/billingCustomer.model');
+const BillingVendor = require('../db/models/billingVendor.model');
+const Vendor = require('../db/models/vendor.model');
+const FabricVendor = require('../db/models/fabricVendor.model');
 const BillingItem = require('../db/models/billingItem.model');
 const FabricChallan = require('../db/models/fabricChallan.model');
 const StitchingChallan = require('../db/models/stitchingChallan.model');
@@ -2662,6 +2665,86 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
+// ── 10B. VENDOR CRUD ──────────────────────────────────────────────────────────
+const getVendors = async (req, res) => {
+  try {
+    const { companyEntity } = req.query;
+    const filter = buildCompanyFilter(companyEntity);
+    let vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
+
+    // Auto-seed/fallback from existing FabricVendor & Vendor collections if none found
+    if (!vendors || vendors.length === 0) {
+      const [fVendors, genVendors] = await Promise.all([
+        FabricVendor.find().lean().catch(() => []),
+        Vendor.find().lean().catch(() => [])
+      ]);
+
+      const seenNames = new Set();
+      const seedList = [];
+
+      for (const fv of [...(fVendors || []), ...(genVendors || [])]) {
+        const vName = (fv.name || fv.vendorName || '').trim();
+        if (vName && !seenNames.has(vName.toLowerCase())) {
+          seenNames.add(vName.toLowerCase());
+          seedList.push({
+            companyEntity: companyEntity || 'Elite Digital Prints',
+            name: vName,
+            businessName: fv.businessName || fv.firmName || vName,
+            phone: fv.phone || fv.mobile || '',
+            email: fv.email || '',
+            gstin: fv.gstin || fv.gstNo || '',
+            billingAddress: fv.address || fv.billingAddress || '',
+            shippingAddress: fv.shippingAddress || fv.address || '',
+            state: fv.state || 'Gujarat',
+            stateCode: fv.stateCode || '24',
+            vendorType: 'Fabric'
+          });
+        }
+      }
+
+      if (seedList.length > 0) {
+        try {
+          await BillingVendor.insertMany(seedList);
+          vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
+        } catch (seedErr) {
+          console.warn('BillingVendor auto-seed warning:', seedErr);
+        }
+      }
+    }
+
+    res.json({ success: true, data: vendors || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const createVendor = async (req, res) => {
+  try {
+    const vendor = await BillingVendor.create(req.body);
+    res.status(201).json({ success: true, data: vendor });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const updateVendor = async (req, res) => {
+  try {
+    const vendor = await BillingVendor.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ success: true, data: vendor });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const deleteVendor = async (req, res) => {
+  try {
+    await BillingVendor.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Vendor deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // ── 11. ITEM CRUD ────────────────────────────────────────────────────────────
 const getItems = async (req, res) => {
   try {
@@ -2949,6 +3032,10 @@ module.exports = {
   createCustomer,
   updateCustomer,
   deleteCustomer,
+  getVendors,
+  createVendor,
+  updateVendor,
+  deleteVendor,
   getItems,
   createItem,
   updateItem,

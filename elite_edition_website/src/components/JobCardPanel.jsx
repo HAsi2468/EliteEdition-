@@ -285,8 +285,8 @@ export async function triggerJobCardPrint(cardOrCards) {
       imageUrl1 = `/v1/designs/${encodeURIComponent(design1)}.jpg`;
     }
 
-    const candidates1 = getImageCandidates(imageUrl1, design1);
-    const candidates2 = showTwoImages ? getImageCandidates(imageUrl2, design2) : [];
+    const candidates1 = getImageCandidates(imageUrl1, design1, { thumbnail: false });
+    const candidates2 = showTwoImages ? getImageCandidates(imageUrl2, design2, { thumbnail: false }) : [];
 
     const [dataUrl1, dataUrl2] = await Promise.all([
       resolveImageToDataUrl(candidates1),
@@ -2493,10 +2493,13 @@ function JobCardForm({ card, onSave, onClose, department }) {
       try {
         const res = await api.getDesigns({ limit: 5000 });
         if (res && res.data) {
-          setDesignsList(res.data);
+          setDesignsList(Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.designs) ? res.data.designs : []));
+        } else {
+          setDesignsList([]);
         }
       } catch (err) {
         console.error('Failed to load designs list for autofill:', err);
+        setDesignsList([]);
       }
     };
     fetchAllDesigns();
@@ -2518,7 +2521,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
 
   // Sync selectedDesign if editing an existing card (for reference / machine profiles / preview only, DO NOT overwrite user fields)
   useEffect(() => {
-    if (card && (card.designName || card.designNo) && designsList.length > 0) {
+    if (card && (card.designName || card.designNo) && Array.isArray(designsList) && designsList.length > 0) {
       const raw = (card.designName || card.designNo || '').trim().toUpperCase();
       const clean = raw.replace(/^ED-/i, '').trim();
       const matched = designsList.find(d => {
@@ -2651,15 +2654,16 @@ function JobCardForm({ card, onSave, onClose, department }) {
   };
 
   const filteredDesigns = useMemo(() => {
+    const list = Array.isArray(designsList) ? designsList : [];
     const val = (form.designName || form.designNo || '').trim();
-    if (!val) return designsList;
+    if (!val) return list;
 
     const names = val.split(/[,&/+]|\band\b/i).map(s => s.trim());
     const lastTerm = (names[names.length - 1] || val).trim();
 
-    if (!lastTerm) return designsList;
+    if (!lastTerm) return list;
 
-    return designsList.filter(d =>
+    return list.filter(d =>
       matchSearchQuery(d, lastTerm, ['designName', 'designNo', 'category', 'fabricName', 'designerName'])
     );
   }, [form.designName, form.designNo, designsList]);
@@ -2929,7 +2933,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
                   fontWeight: 700
                 }}
               />
-              {showSuggestions && filteredDesigns.length > 0 && (
+              {showSuggestions && Array.isArray(filteredDesigns) && filteredDesigns.length > 0 && (
                 <div style={{
                   position:'absolute',
                   top:'100%',
@@ -3141,7 +3145,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
           {/* Section: Fabric & Garment */}
           <div style={sectionLabel}>👗 Garment & Fabric Details</div>
           <div style={rowStyle}>
-            <Field label="Category" name="category" form={form} onChange={onChange} options={['', ...printConfig.categories]} half/>
+            <Field label="Category" name="category" form={form} onChange={onChange} options={['', ...(Array.isArray(printConfig.categories) ? printConfig.categories : [])]} half/>
             <Field label="Fabric" name="fabric" form={form} onChange={onChange} options={['', ...(printConfig.fabrics || [])]} half/>
             <Field label="Fabric Source / Mill" name="fabricSource" form={form} onChange={onChange} placeholder="e.g. Surat Mill / In-House" half/>
             <Field label="Raw Panna (Greige)" name="rawPanna" form={form} onChange={onChange} placeholder="e.g. 48 Inch" half/>
@@ -3161,7 +3165,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
             <Field label="Panna (Width)" name="panna" form={form} onChange={onChange} options={['', ...(printConfig.widths || [])]} half/>
             <Field label="Profile" name="profile" form={form} onChange={onChange} options={['', ...((printConfig.machines?.find(m => m.name === form.machineName)?.profiles) || [])]} half/>
             <Field label="Pass" name="pass" form={form} onChange={onChange} half
-              options={['', ...printConfig.passes]}/>
+              options={['', ...(Array.isArray(printConfig.passes) ? printConfig.passes : [])]}/>
             <Field label="Total Mtr" name="totalMtr" type="number" form={form} onChange={onChange} half/>
             <Field label="EXP. Time (Auto)" name="expTime" form={form} onChange={onChange} half readOnly highlight/>
             <Field label="Consumption" name="consumption" form={form} onChange={onChange} half/>
@@ -3524,17 +3528,17 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
   // Client-side multi-filter refinement for cards display
   const displayedCards = useMemo(() => {
-    let result = cards;
-    if (selectedParty.length > 0) {
+    let result = Array.isArray(cards) ? cards : [];
+    if (selectedParty && selectedParty.length > 0) {
       result = result.filter(c => c.party && selectedParty.some(p => p.toLowerCase() === c.party.toLowerCase()));
     }
-    if (selectedMachine.length > 0) {
+    if (selectedMachine && selectedMachine.length > 0) {
       result = result.filter(c => c.machineName && selectedMachine.some(m => m.toLowerCase() === c.machineName.toLowerCase()));
     }
-    if (selectedFabric.length > 0) {
+    if (selectedFabric && selectedFabric.length > 0) {
       result = result.filter(c => c.fabric && selectedFabric.some(f => f.toLowerCase() === c.fabric.toLowerCase()));
     }
-    if (selectedDesigner.length > 0) {
+    if (selectedDesigner && selectedDesigner.length > 0) {
       result = result.filter(c => c.designer && selectedDesigner.some(d => d.toLowerCase() === c.designer.toLowerCase()));
     }
     return result;
@@ -3781,13 +3785,15 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       });
       if (!controller.signal.aborted) {
         if (!isSilent) {
-          setCards(res.data || []);
-        } else if (res.data) {
+          setCards(Array.isArray(res?.data) ? res.data : []);
+        } else if (res && res.data) {
           setCards(prev => {
-            if (prev.length !== res.data.length) return res.data;
-            const prevIds = prev.map(c => c._id || c.id).join(',');
-            const nextIds = res.data.map(c => c._id || c.id).join(',');
-            return prevIds === nextIds ? prev : res.data;
+            const prevArr = Array.isArray(prev) ? prev : [];
+            const nextArr = Array.isArray(res.data) ? res.data : [];
+            if (prevArr.length !== nextArr.length) return nextArr;
+            const prevIds = prevArr.map(c => c._id || c.id).join(',');
+            const nextIds = nextArr.map(c => c._id || c.id).join(',');
+            return prevIds === nextIds ? prevArr : nextArr;
           });
         }
         setTotal(res.total || 0);
@@ -3831,11 +3837,12 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
         dateStart,
         dateEnd
       });
-      if (res && res.data && res.data.length > 0) {
+      if (res && Array.isArray(res.data) && res.data.length > 0) {
         setCards(prev => {
-          const existingIds = new Set(prev.map(c => String(c._id || c.id)));
+          const prevArr = Array.isArray(prev) ? prev : [];
+          const existingIds = new Set(prevArr.map(c => String(c._id || c.id)));
           const newItems = res.data.filter(c => !existingIds.has(String(c._id || c.id)));
-          return newItems.length > 0 ? [...prev, ...newItems] : prev;
+          return newItems.length > 0 ? [...prevArr, ...newItems] : prevArr;
         });
         setPage(nextPage);
         pageRef.current = nextPage;

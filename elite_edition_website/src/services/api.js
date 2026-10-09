@@ -1956,6 +1956,29 @@ export const api = {
     return request(`/billing/customers/${id}`, { method: 'DELETE' });
   },
 
+  // Billing Vendors
+  async getBillingVendors(companyEntity = 'Elite Digital Prints') {
+    return request(`/billing/vendors?companyEntity=${encodeURIComponent(companyEntity)}`);
+  },
+
+  async createBillingVendor(data) {
+    return request('/billing/vendors', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateBillingVendor(id, data) {
+    return request(`/billing/vendors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBillingVendor(id) {
+    return request(`/billing/vendors/${id}`, { method: 'DELETE' });
+  },
+
   // Billing Items
   async getBillingItems(companyEntity = 'Elite Online') {
     return request(`/billing/items?companyEntity=${encodeURIComponent(companyEntity)}`);

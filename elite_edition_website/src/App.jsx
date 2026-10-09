@@ -1798,7 +1798,7 @@ export default function App() {
                         type="button"
                       >
                         {renderCompanyIcon()}
-                        <span>{company.name}</span>
+                        <span>{company.code || company.name}</span>
                       </button>
                     );
                   })}

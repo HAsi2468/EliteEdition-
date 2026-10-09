@@ -25,6 +25,12 @@ router.post('/customers', billingController.createCustomer);
 router.put('/customers/:id', billingController.updateCustomer);
 router.delete('/customers/:id', billingController.deleteCustomer);
 
+// Vendors CRUD
+router.get('/vendors', billingController.getVendors);
+router.post('/vendors', billingController.createVendor);
+router.put('/vendors/:id', billingController.updateVendor);
+router.delete('/vendors/:id', billingController.deleteVendor);
+
 // Items CRUD
 router.get('/items', billingController.getItems);
 router.post('/items', billingController.createItem);

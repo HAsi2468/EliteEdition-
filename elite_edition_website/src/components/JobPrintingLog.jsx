@@ -13,7 +13,7 @@ import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { openPrintOptionsDialog } from '../utils/printService';
 import JobCardTooltip from './JobCardTooltip';
-import DateRangePicker from './DateRangePicker';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 
 // Automatic Shift Calculator:
@@ -2516,9 +2516,9 @@ export default function JobPrintingLog() {
                   </tr>
                 </thead>
                 <tbody>
-                  {jobHistoryData.data.map((l, idx) => (
+                  {Array.isArray(jobHistoryData?.data) && jobHistoryData.data.map((l, idx) => (
                     <tr key={l._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={tdStyle}>Run #{jobHistoryData.data.length - idx}</td>
+                      <td style={tdStyle}>Run #{(jobHistoryData.data?.length || 0) - idx}</td>
                       <td style={tdStyle}>{formatDateDDMMYYYY(l.date)}</td>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{l.machineName}</td>
                       <td style={tdStyle}>{l.pass}</td>

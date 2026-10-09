@@ -56,6 +56,7 @@ const db = {
   BillingInvoice: require('./billingInvoice.model'),
   BillingPurchase: require('./billingPurchase.model'),
   BillingCustomer: require('./billingCustomer.model'),
+  BillingVendor: require('./billingVendor.model'),
   BillingItem: require('./billingItem.model'),
   FabricChallan: require('./fabricChallan.model'),
   Fabric: require('./fabricTransaction.model'),

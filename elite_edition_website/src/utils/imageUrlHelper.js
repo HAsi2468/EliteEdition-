@@ -114,7 +114,7 @@ export function getWinningUrl(rawUrl, designName, isThumb = true) {
   const key = getCacheKey(rawUrl, designName, isThumb);
   if (imageWinnerMap.has(key)) return imageWinnerMap.get(key);
   const dName = (designName || '').trim().toUpperCase();
-  if (dName && imageWinnerMap.has(`${dName}::::${isThumb ? 'thumb' : 'full'}`)) {
+  if (!rawUrl && dName && imageWinnerMap.has(`${dName}::::${isThumb ? 'thumb' : 'full'}`)) {
     return imageWinnerMap.get(`${dName}::::${isThumb ? 'thumb' : 'full'}`);
   }
   try {
@@ -229,17 +229,18 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   const rawFilename = extractCleanFilename(raw);
   const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif|tiff?)$/i, '').trim();
 
-  // 4. For thumbnails, prioritize backend thumbnail endpoint to avoid downloading 10MB+ raw originals
+  // 4. Direct absolute HTTP/HTTPS URL (Cloudflare R2 / CDN link / user-provided URL)
+  // When an explicit URL is provided, it is the actual designated image and MUST be prioritized.
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    add(raw);
+  }
+
+  // 5. For thumbnails, prioritize backend thumbnail endpoint to avoid downloading 10MB+ raw originals
   if (isThumb && cleanDesign) {
     add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg${thumbQuery}`);
   }
   if (isThumb && rawFilename && !rawFilename.startsWith('http')) {
     add(`/v1/designs/${encodeURIComponent(rawFilename)}${thumbQuery}`);
-  }
-
-  // 5. Direct absolute HTTP/HTTPS URL (Cloudflare R2 / CDN link)
-  if (raw.startsWith('http://') || raw.startsWith('https://')) {
-    add(raw);
   }
 
   // 6. Direct Cloudflare R2 links (and master fallbacks)

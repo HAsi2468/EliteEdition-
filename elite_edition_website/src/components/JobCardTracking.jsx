@@ -1144,7 +1144,7 @@ export default function JobCardTracking({ onPreview }) {
                                 </button>
                               ))}
                             </div>
-                            {c.invoices.length > 1 && (
+                            {c.invoices && c.invoices.length > 1 && (
                               <span style={{ fontSize: '0.65rem', color: '#34d399', fontWeight: 700 }}>
                                 Delivered: {c.deliveredMtr || c.invoices.reduce((s, x) => s + (x.meters || 0), 0)}m ({c.invoices.length} bills)
                               </span>
