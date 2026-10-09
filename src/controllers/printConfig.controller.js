@@ -237,7 +237,69 @@ const updatePrintConfig = async (req, res) => {
   }
 };
 
+const getSystemLockStatus = async (req, res) => {
+  try {
+    const config = await getConfig();
+    return res.status(httpStatus.OK).json({
+      success: true,
+      isSystemLocked: Boolean(config.isSystemLocked),
+      systemLockedAt: config.systemLockedAt || null,
+      systemLockedBy: config.systemLockedBy || '',
+      systemLockMessage: config.systemLockMessage || 'System operations are temporarily paused by Administrator for routine maintenance. Please wait, operations will resume automatically.',
+    });
+  } catch (error) {
+    logger.error('Error fetching system lock status: %o', error);
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      isSystemLocked: false,
+      error: 'Error checking system lock',
+    });
+  }
+};
+
+const setSystemLockStatus = async (req, res) => {
+  try {
+    const { isSystemLocked, message } = req.body;
+    const config = await getConfig();
+
+    config.isSystemLocked = Boolean(isSystemLocked);
+    config.systemLockedAt = config.isSystemLocked ? new Date() : null;
+    config.systemLockedBy = req.user?.name || req.user?.username || (config.isSystemLocked ? 'Admin' : '');
+    if (message && typeof message === 'string' && message.trim()) {
+      config.systemLockMessage = message.trim();
+    }
+    await config.save();
+
+    const payload = {
+      isSystemLocked: config.isSystemLocked,
+      systemLockedAt: config.systemLockedAt,
+      systemLockedBy: config.systemLockedBy,
+      systemLockMessage: config.systemLockMessage,
+    };
+
+    // Broadcast across all connected websockets immediately!
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    if (io) {
+      io.emit('system:lock_status', payload);
+      logger.info(`[SystemLock] Broadcasted system:lock_status to all clients: isSystemLocked=${config.isSystemLocked}`);
+    }
+
+    return res.status(httpStatus.OK).json({
+      success: true,
+      ...payload,
+    });
+  } catch (error) {
+    logger.error('Error setting system lock status: %o', error);
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      error: 'Failed to update system lock status',
+    });
+  }
+};
+
 module.exports = {
   getPrintConfig,
   updatePrintConfig,
+  getSystemLockStatus,
+  setSystemLockStatus,
 };

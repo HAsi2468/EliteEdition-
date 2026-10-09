@@ -27,6 +27,8 @@ class SocketManager {
     this.listeners = new Set();
     this.statusListeners = new Set();
     this.conflictListeners = new Set();
+    this.lockListeners = new Set();
+    this.systemLockStatus = null;
 
     this.lastEventId = 0;
     this.lastEventTimestamp = 0;
@@ -165,6 +167,17 @@ class SocketManager {
         caches.keys().then(names => names.forEach(k => caches.delete(k)));
       }
       setTimeout(() => window.location.reload(true), 300);
+    });
+
+    // Real-time system lock / maintenance mode status
+    this.socket.on('system:lock_status', (payload) => {
+      this.systemLockStatus = payload;
+      this.lockListeners.forEach((fn) => {
+        try { fn(payload); } catch (e) {}
+      });
+      try {
+        window.dispatchEvent(new CustomEvent('elite-system-lock-status', { detail: payload }));
+      } catch (e) {}
     });
   }
 
@@ -553,6 +566,22 @@ class SocketManager {
   onRecordConflict(fn) {
     this.conflictListeners.add(fn);
     return () => this.conflictListeners.delete(fn);
+  }
+
+  /**
+   * Subscribe to real-time system lock / maintenance mode changes
+   */
+  onSystemLockChange(fn) {
+    if (typeof fn !== 'function') return () => {};
+    this.lockListeners.add(fn);
+    if (this.systemLockStatus) {
+      try { fn(this.systemLockStatus); } catch (e) {}
+    }
+    return () => this.lockListeners.delete(fn);
+  }
+
+  getSystemLockStatus() {
+    return this.systemLockStatus;
   }
 
   /**

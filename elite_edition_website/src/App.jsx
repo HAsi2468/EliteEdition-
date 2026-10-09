@@ -88,12 +88,15 @@ import {
   PhoneOff,
   Search,
   MoreHorizontal,
-  CheckSquare
+  CheckSquare,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
 import WebDevicePermissionsModal from './components/WebDevicePermissionsModal';
 import PermissionHelpModal from './components/PermissionHelpModal';
+import SystemMaintenanceLockScreen from './components/SystemMaintenanceLockScreen';
 import { useSocket } from './contexts/SocketContext';
 import { socketManager } from './services/socketManager';
 import GlobalSearchModal from './components/common/GlobalSearchModal';
@@ -150,6 +153,55 @@ export default function App() {
       setConnectionStatus(newStatus);
     });
   }, []);
+
+  // System Maintenance Lock & Unlock State Sync
+  const [isSystemLocked, setIsSystemLocked] = useState(false);
+  const [systemLockData, setSystemLockData] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.getSystemLockStatus().then((res) => {
+      if (isMounted && res) {
+        setIsSystemLocked(Boolean(res.isSystemLocked));
+        setSystemLockData(res);
+      }
+    }).catch(() => {});
+
+    const unsubSocket = socketManager.onSystemLockChange((payload) => {
+      if (isMounted && payload) {
+        setIsSystemLocked(Boolean(payload.isSystemLocked));
+        setSystemLockData(payload);
+      }
+    });
+
+    const handleLockEvent = (e) => {
+      if (isMounted && e.detail) {
+        setIsSystemLocked(Boolean(e.detail.isSystemLocked));
+        setSystemLockData(e.detail);
+      }
+    };
+    window.addEventListener('elite-system-lock-status', handleLockEvent);
+
+    return () => {
+      isMounted = false;
+      unsubSocket();
+      window.removeEventListener('elite-system-lock-status', handleLockEvent);
+    };
+  }, []);
+
+  const handleQuickAdminUnlock = async () => {
+    if (!window.confirm('🔓 Unlock ERP system for all non-admin users now?')) return;
+    try {
+      const res = await api.setSystemLockStatus(false);
+      if (res && res.success !== false) {
+        setIsSystemLocked(false);
+        setSystemLockData((prev) => (prev ? { ...prev, isSystemLocked: false } : { isSystemLocked: false }));
+        triggerPushNotification('System Unlocked', 'System is now accessible to all users.', 'success');
+      }
+    } catch (err) {
+      alert(err?.message || 'Failed to unlock system');
+    }
+  };
 
   const checkIsClientUrl = () => {
     try {
@@ -1600,6 +1652,19 @@ export default function App() {
     fetchData();
   };
 
+  // If system is locked and current user is NOT an admin, display ONLY the loading maintenance screen!
+  if (isSystemLocked && !isSuperOrAdmin) {
+    return (
+      <SystemMaintenanceLockScreen
+        lockData={systemLockData}
+        onAdminAuthSuccess={(adminUser) => {
+          setCurrentUser(adminUser);
+          setIsAuthenticated(true);
+        }}
+      />
+    );
+  }
+
   if (!isAuthenticated) {
     if (isClientPortalMode) {
       return (
@@ -1652,6 +1717,27 @@ export default function App() {
 
   return (
     <div style={styles.appContainer} className="app-container">
+      {/* Admin Notice Banner when System is Locked for Non-Admin Staff */}
+      {isSystemLocked && isSuperOrAdmin && (
+        <div style={styles.adminSystemLockBanner}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <Lock size={18} color="#ffffff" />
+            <span>
+              <strong>SYSTEM MAINTENANCE MODE ACTIVE:</strong> Non-admin staff screens are locked with the maintenance loading screen.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleQuickAdminUnlock}
+            style={styles.adminQuickUnlockBtn}
+            title="Click to instantly unlock system for all users"
+          >
+            <Unlock size={14} />
+            <span>Unlock System for All Users</span>
+          </button>
+        </div>
+      )}
+
       {/* Non-Intrusive Floating Offline Connection Banner */}
       <OfflineBanner />
 
@@ -3822,5 +3908,36 @@ const styles = {
   dropActionBtn: {
     padding: '0.35rem 0.75rem',
     fontSize: '0.75rem',
+  },
+  adminSystemLockBanner: {
+    backgroundColor: '#dc2626',
+    background: 'linear-gradient(90deg, #b91c1c 0%, #dc2626 50%, #b91c1c 100%)',
+    color: '#ffffff',
+    padding: '0.65rem 1.25rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    zIndex: 9999,
+    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.35)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+    flexWrap: 'wrap',
+  },
+  adminQuickUnlockBtn: {
+    backgroundColor: '#ffffff',
+    color: '#b91c1c',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '0.4rem 0.85rem',
+    fontSize: '0.8rem',
+    fontWeight: '700',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    cursor: 'pointer',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+    transition: 'all 0.15s ease',
   },
 };

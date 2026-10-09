@@ -15,6 +15,7 @@ import {
   Check,
   X,
   Lock,
+  Unlock,
   Mail,
   Sliders,
   Coins,
@@ -171,6 +172,61 @@ export default function AdminPanel() {
     return () => window.removeEventListener('elite-switch-admin-tab', handleSwitchTab);
   }, []);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  // System Maintenance Lock & Unlock Toggle
+  const [isSystemLocked, setIsSystemLocked] = useState(false);
+  const [systemLockLoading, setSystemLockLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.getSystemLockStatus().then((res) => {
+      if (isMounted && res) {
+        setIsSystemLocked(Boolean(res.isSystemLocked));
+      }
+    }).catch(() => {});
+
+    const handleLockStatus = (e) => {
+      if (isMounted && e.detail) {
+        setIsSystemLocked(Boolean(e.detail.isSystemLocked));
+      }
+    };
+    window.addEventListener('elite-system-lock-status', handleLockStatus);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('elite-system-lock-status', handleLockStatus);
+    };
+  }, []);
+
+  const handleToggleSystemLock = async () => {
+    const willLock = !isSystemLocked;
+    const confirmMsg = willLock
+      ? '🔒 Lock ERP System for Non-Admin Users?\n\nWhen locked, all non-admin staff and clients will see ONLY a loading maintenance screen and cannot interact with the system.\n\nAdministrators retain full access to unlock anytime.\n\nDo you want to proceed?'
+      : '🔓 Unlock ERP System?\n\nThis will immediately remove the loading screen for all non-admin users and allow them to resume work.\n\nUnlock system now?';
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setSystemLockLoading(true);
+    try {
+      const res = await api.setSystemLockStatus(willLock);
+      if (res && res.success !== false) {
+        setIsSystemLocked(willLock);
+        triggerPushNotification(
+          willLock ? 'System Locked' : 'System Unlocked',
+          willLock
+            ? 'ERP is now locked for all non-admin users (loading screen displayed).'
+            : 'ERP has been unlocked. Users can now resume normal operations.',
+          willLock ? 'warning' : 'success'
+        );
+      } else {
+        alert(res?.error || 'Failed to update system lock status');
+      }
+    } catch (err) {
+      alert(err?.message || 'Error communicating with server');
+    } finally {
+      setSystemLockLoading(false);
+    }
+  };
+
   const [bills, setBills] = useState([]);
   const [billsLoading, setBillsLoading] = useState(false);
   const [billingCurrency, setBillingCurrency] = useState('INR'); // 'INR' or 'USD'
@@ -1267,6 +1323,39 @@ export default function AdminPanel() {
                 : 'Configure Cash IN categories, Cash OUT categories, and Payment Modes for department expense entry forms.'}
             </p>
           </div>
+        </div>
+
+        {/* Lock / Unlock System Button */}
+        <div style={styles.topBarRight}>
+          <button
+            type="button"
+            onClick={handleToggleSystemLock}
+            disabled={systemLockLoading}
+            style={isSystemLocked ? styles.systemLockBtnActive : styles.systemLockBtn}
+            title={
+              isSystemLocked
+                ? 'System is currently LOCKED. Non-admin users see only a loading screen. Click to Unlock.'
+                : 'Click to lock the ERP system. Non-admin users will immediately see only a loading screen.'
+            }
+          >
+            {systemLockLoading ? (
+              <>
+                <RotateCw size={16} className="spin-loader" />
+                <span>Updating...</span>
+              </>
+            ) : isSystemLocked ? (
+              <>
+                <Unlock size={17} />
+                <span>System Locked • Click to Unlock</span>
+                <span style={styles.lockBadgeActive}>LOCKED</span>
+              </>
+            ) : (
+              <>
+                <Lock size={17} />
+                <span>Lock System</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -5098,6 +5187,51 @@ const styles = {
     fontSize: '0.85rem',
     color: 'var(--text-muted)',
     margin: '2px 0 0 0'
+  },
+  topBarRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    flexShrink: 0,
+  },
+  systemLockBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.55rem',
+    padding: '0.6rem 1.15rem',
+    borderRadius: '10px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    background: 'rgba(239, 68, 68, 0.08)',
+    color: '#ef4444',
+    border: '1px solid rgba(239, 68, 68, 0.35)',
+    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.1)',
+  },
+  systemLockBtnActive: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.6rem',
+    padding: '0.6rem 1.2rem',
+    borderRadius: '10px',
+    fontSize: '0.85rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+    color: '#ffffff',
+    border: '1px solid #ef4444',
+    boxShadow: '0 0 16px rgba(239, 68, 68, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3)',
+  },
+  lockBadgeActive: {
+    background: '#ffffff',
+    color: '#b91c1c',
+    fontSize: '0.65rem',
+    fontWeight: '800',
+    padding: '0.15rem 0.45rem',
+    borderRadius: '4px',
+    letterSpacing: '0.05em',
   },
   contentLayout: {
     display: 'grid',

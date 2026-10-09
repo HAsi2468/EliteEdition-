@@ -100,6 +100,40 @@ const setupSockets = (io) => {
       io.emit('presence-sync', getOnlineUserIds());
     }
 
+    // 2b. Sync current system lock state to newly connected client
+    try {
+      const { PrintConfig } = require('../db/models');
+      if (PrintConfig) {
+        PrintConfig.findOne({ isConfig: true }).lean().then((cfg) => {
+          if (cfg && cfg.isSystemLocked) {
+            socket.emit('system:lock_status', {
+              isSystemLocked: Boolean(cfg.isSystemLocked),
+              systemLockedAt: cfg.systemLockedAt || null,
+              systemLockedBy: cfg.systemLockedBy || '',
+              systemLockMessage: cfg.systemLockMessage || '',
+            });
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    socket.on('system:get_lock_status', async (callback) => {
+      try {
+        const { PrintConfig } = require('../db/models');
+        const cfg = await PrintConfig.findOne({ isConfig: true }).lean();
+        const payload = {
+          isSystemLocked: Boolean(cfg?.isSystemLocked),
+          systemLockedAt: cfg?.systemLockedAt || null,
+          systemLockedBy: cfg?.systemLockedBy || '',
+          systemLockMessage: cfg?.systemLockMessage || '',
+        };
+        if (typeof callback === 'function') callback(payload);
+        else socket.emit('system:lock_status', payload);
+      } catch (e) {
+        if (typeof callback === 'function') callback({ isSystemLocked: false });
+      }
+    });
+
     // 3. Switch company room request with server-side permission validation
     socket.on('switch-company', (companyId) => {
       const canonical = normalizeCompanyId(companyId);

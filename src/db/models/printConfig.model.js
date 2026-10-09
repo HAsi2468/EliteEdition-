@@ -283,6 +283,22 @@ const printConfigSchema = new mongoose.Schema(
       watermarkText: { type: String, default: '' },
       footerDisclaimer: { type: String, default: 'Confidential ERP Report - For Internal Operations Only.' },
     },
+    isSystemLocked: {
+      type: Boolean,
+      default: false,
+    },
+    systemLockedAt: {
+      type: Date,
+      default: null,
+    },
+    systemLockedBy: {
+      type: String,
+      default: '',
+    },
+    systemLockMessage: {
+      type: String,
+      default: 'System operations are temporarily paused by Administrator for routine maintenance. Please wait, operations will resume automatically.',
+    },
   },
   {
     timestamps: true,

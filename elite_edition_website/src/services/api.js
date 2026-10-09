@@ -1266,6 +1266,17 @@ export const api = {
     });
   },
 
+  async getSystemLockStatus() {
+    return request('/print-config/system-lock');
+  },
+
+  async setSystemLockStatus(isSystemLocked, message = '') {
+    return request('/print-config/system-lock', {
+      method: 'POST',
+      body: JSON.stringify({ isSystemLocked, message }),
+    });
+  },
+
   // --- Stitching Settings Engine ---
   async getStitchingConfig() {
     return request('/stitching-config');
