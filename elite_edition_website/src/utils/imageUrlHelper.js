@@ -15,7 +15,9 @@ export function extractCleanFilename(raw) {
   let str = raw.trim();
   if (str.startsWith('data:')) return '';
 
-  if (str.includes('/design_samples/')) {
+  if (str.includes('/sample_reference/')) {
+    str = 'sample_reference/' + str.split('/sample_reference/')[1];
+  } else if (str.includes('/design_samples/')) {
     str = 'design_samples/' + str.split('/design_samples/')[1];
   } else if (str.includes('/designs/')) {
     str = str.split('/designs/')[1];
@@ -233,25 +235,22 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   // When an explicit URL is provided, it is the actual designated image and MUST be prioritized.
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     add(raw);
+    if (raw.includes('/designs/blob-') || raw.includes('/designs/image-')) {
+      add(raw.replace('/designs/', '/sample_reference/'));
+      add(raw.replace('/designs/', '/design_samples/'));
+    }
   }
 
-  // 5. For thumbnails, prioritize backend thumbnail endpoint to avoid downloading 10MB+ raw originals
-  if (isThumb && cleanDesign) {
-    add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg${thumbQuery}`);
-  }
-  if (isThumb && rawFilename && !rawFilename.startsWith('http')) {
-    add(`/v1/designs/${encodeURIComponent(rawFilename)}${thumbQuery}`);
-  }
-
-  // 6. Direct Cloudflare R2 links (and master fallbacks)
+  // 5. Direct Cloudflare R2 links (and master fallbacks)
   if (rawFilename) {
     if (isTiffFile(rawFilename)) {
       add(`/v1/upload/preview?url=${encodeURIComponent(rawFilename)}`);
     }
-    if (rawFilename.startsWith('design_samples/') || rawFilename.startsWith('designs/')) {
+    if (rawFilename.startsWith('sample_reference/') || rawFilename.startsWith('design_samples/') || rawFilename.startsWith('designs/')) {
       add(`${R2_PUBLIC_BASE}/${rawFilename}`);
     } else {
       add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(rawFilename)}`);
+      add(`${R2_PUBLIC_BASE}/sample_reference/${encodeURIComponent(rawFilename)}`);
       add(`${R2_PUBLIC_BASE}/design_samples/${encodeURIComponent(rawFilename)}`);
     }
     add(`/v1/designs/${encodeURIComponent(rawFilename)}`);

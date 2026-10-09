@@ -360,6 +360,10 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
 
     // If filename is already a multer upload key (image-178...) or blob-
     if (cleanName.startsWith('image-') || cleanName.startsWith('blob-')) {
+      r2Candidates.push(`sample_reference/${encodeURIComponent(cleanName)}`);
+      r2Candidates.push(`sample_reference/${encodeURIComponent(cleanName)}.jpg`);
+      r2Candidates.push(`sample_reference/${encodeURIComponent(cleanName)}.webp`);
+      r2Candidates.push(`sample_reference/${encodeURIComponent(cleanName)}.png`);
       r2Candidates.push(`design_samples/${encodeURIComponent(cleanName)}`);
       r2Candidates.push(`design_samples/${encodeURIComponent(cleanName)}.webp`);
       r2Candidates.push(`design_samples/${encodeURIComponent(cleanName)}.jpg`);
@@ -369,6 +373,7 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
       r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.jpg`);
       r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.webp`);
     } else if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename)) {
+      r2Candidates.push(`sample_reference/${encodeURIComponent(filename)}`);
       r2Candidates.push(`design_samples/${encodeURIComponent(filename)}`);
       r2Candidates.push(`designs/drow_design/${encodeURIComponent(filename)}`);
       r2Candidates.push(`designs/colour_matching/${encodeURIComponent(filename)}`);

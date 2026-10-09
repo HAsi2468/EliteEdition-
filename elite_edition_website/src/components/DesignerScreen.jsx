@@ -1076,6 +1076,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     const bestImage = task.outputImage ||
       (Array.isArray(task.outputImages) && task.outputImages[0]) ||
       (Array.isArray(task.finalDesignImages) && task.finalDesignImages[0]) ||
+      (Array.isArray(task.stage3Images) && task.stage3Images[0]) ||
+      (Array.isArray(task.colourMatchingImages) && task.colourMatchingImages[0]) ||
+      (Array.isArray(task.drowDesignImages) && task.drowDesignImages[0]) ||
       task.sampleImage ||
       task.sampleLink ||
       '';

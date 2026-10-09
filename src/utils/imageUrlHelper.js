@@ -40,11 +40,17 @@ function normalizeImageUrl(url, designName = '') {
 
   const r2Base = ((config.r2 && config.r2.publicUrl) || 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev').replace(/\/+$/, '');
 
-  // Extract clean filename if file is under /designs/ or /uploads/
+  // Extract clean filename and preserve any valid subfolder
   let subFolder = 'designs';
   let rawFilename = '';
 
-  if (trimmed.includes('/designs/')) {
+  if (trimmed.includes('/sample_reference/')) {
+    subFolder = 'sample_reference';
+    rawFilename = trimmed.split('/sample_reference/')[1];
+  } else if (trimmed.includes('/design_samples/')) {
+    subFolder = 'design_samples';
+    rawFilename = trimmed.split('/design_samples/')[1];
+  } else if (trimmed.includes('/designs/')) {
     subFolder = 'designs';
     rawFilename = trimmed.split('/designs/')[1];
   } else if (trimmed.includes('/uploads/')) {
@@ -53,7 +59,14 @@ function normalizeImageUrl(url, designName = '') {
   } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     try {
       const parsed = new URL(trimmed);
-      rawFilename = parsed.pathname.split('/').pop() || '';
+      const cleanPath = parsed.pathname.replace(/^\/+/, '');
+      const parts = cleanPath.split('/');
+      if (parts.length > 1) {
+        subFolder = parts.slice(0, -1).join('/');
+        rawFilename = parts[parts.length - 1];
+      } else {
+        rawFilename = parts[0] || '';
+      }
     } catch (e) {
       rawFilename = trimmed.split('/').pop() || '';
     }
@@ -67,8 +80,8 @@ function normalizeImageUrl(url, designName = '') {
     try { rawFilename = decodeURIComponent(rawFilename); } catch (e) {}
     rawFilename = rawFilename.replace(/^\/+/, '').trim();
 
-    // Default to .jpg if no extension present and not a timestamped multer upload (e.g. image-178...)
-    if (!/\.[a-zA-Z0-9]+$/.test(rawFilename) && !rawFilename.startsWith('image-')) {
+    // Default to .jpg if no extension present and not a timestamped multer upload (e.g. image-178... or blob-...)
+    if (!/\.[a-zA-Z0-9]+$/.test(rawFilename) && !rawFilename.startsWith('image-') && !rawFilename.startsWith('blob-')) {
       rawFilename = `${rawFilename}.jpg`;
     }
 
