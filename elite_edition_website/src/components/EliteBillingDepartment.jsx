@@ -596,42 +596,15 @@ export default function EliteBillingDepartment({
       return;
     }
 
-    // 2. Fallback to fabricVendors
-    const matched = (fabricVendors || []).find(v => {
-      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
-      return vName && String(vName).trim().toLowerCase() === selectedName.trim().toLowerCase();
-    });
-
-    if (matched && typeof matched === 'object') {
-      const resolvedName = matched.name || matched.vendorName || selectedName;
-      const resolvedBiz = matched.businessName || matched.firmName || matched.company || resolvedName;
-      setPurchaseForm(prev => ({
-        ...prev,
-        vendorName: resolvedBiz || resolvedName,
-        vendor: {
-          vendorId: matched._id || matched.id || '',
-          name: resolvedName,
-          businessName: resolvedBiz,
-          phone: matched.phone || matched.mobile || '',
-          email: matched.email || '',
-          gstin: matched.gstin || matched.gstNo || '',
-          billingAddress: matched.address || matched.billingAddress || '',
-          shippingAddress: matched.shippingAddress || matched.address || '',
-          state: matched.state || 'Gujarat',
-          stateCode: matched.stateCode || '24'
-        }
-      }));
-    } else {
-      setPurchaseForm(prev => ({
-        ...prev,
-        vendorName: selectedName,
-        vendor: {
-          ...prev.vendor,
-          name: selectedName,
-          businessName: selectedName
-        }
-      }));
-    }
+    setPurchaseForm(prev => ({
+      ...prev,
+      vendorName: selectedName,
+      vendor: {
+        ...prev.vendor,
+        name: selectedName,
+        businessName: selectedName
+      }
+    }));
   };
 
   const handleAddPurchaseItem = () => {
@@ -1091,17 +1064,7 @@ export default function EliteBillingDepartment({
     }
   };
 
-  const [fabricVendors, setFabricVendors] = useState([]);
-
-  useEffect(() => {
-    api.getFabricVendors()
-      .then(res => {
-        if (Array.isArray(res)) setFabricVendors(res);
-      })
-      .catch(err => console.warn('Could not load fabric vendors:', err));
-  }, []);
-
-  // Vendor options populated from Billing Vendors Master (with full proper details) + Fabric Vendors
+  // Vendor options populated strictly from Billing Vendors Master (saved billing vendors)
   const vendorOptions = useMemo(() => {
     const list = new Set();
 
@@ -1110,13 +1073,8 @@ export default function EliteBillingDepartment({
       if (vName && String(vName).trim()) list.add(String(vName).trim());
     });
 
-    (fabricVendors || []).forEach(v => {
-      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
-      if (vName) list.add(String(vName).trim());
-    });
-
     return Array.from(list).filter(Boolean);
-  }, [vendorsList, fabricVendors]);
+  }, [vendorsList]);
 
   // Dynamic list of unique vendors for purchases filter
   const purchaseVendorsList = useMemo(() => {
@@ -1128,12 +1086,8 @@ export default function EliteBillingDepartment({
       const vName = v.businessName || v.name;
       if (vName && String(vName).trim()) list.add(String(vName).trim());
     });
-    (fabricVendors || []).forEach(v => {
-      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
-      if (vName && String(vName).trim()) list.add(String(vName).trim());
-    });
     return Array.from(list).sort();
-  }, [purchases, vendorsList, fabricVendors]);
+  }, [purchases, vendorsList]);
 
   // Date range object based on preset or custom range
   const purchaseDateRange = useMemo(() => {
