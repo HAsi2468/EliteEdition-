@@ -2496,12 +2496,34 @@ export default function App() {
                         Reports Center
                       </button>
                     )}
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) && (
+                      <button onClick={() => { setActiveTab('unicommerce'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'unicommerce' ? 'active' : ''}`}>
+                        Uniware Integrations
+                      </button>
+                    )}
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
+                      <button onClick={() => { setActiveTab('myntra'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'myntra' ? 'active' : ''}`} style={{ color: activeTab === 'myntra' ? '#e11d48' : '#be123c', fontWeight: 600 }}>
+                        Myntra Integrations
+                      </button>
+                    )}
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) && (
                       <button onClick={() => { setActiveTab('eo_settings'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_settings' ? 'active' : ''}`}>
                         Settings
                       </button>
                     )}
                   </>
+                )}
+
+                {/* Direct Integrations Access for Quick Switching */}
+                {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && activeDepartment !== 'elite_online' && (
+                  <button 
+                    onClick={() => { setActiveTab('myntra'); setMobileMenuOpen(false); }} 
+                    className={`mobile-drawer-item ${activeTab === 'myntra' ? 'active' : ''}`}
+                    style={{ color: '#e11d48', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                  >
+                    <span>Myntra Integrations</span>
+                    <span style={{ fontSize: '0.72rem', background: '#ffe4e6', color: '#e11d48', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>PPMP</span>
+                  </button>
                 )}
 
                 {currentUser && (isSuperOrAdmin || currentUser.role === 'admin') && (

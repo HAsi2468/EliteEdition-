@@ -643,3 +643,168 @@
 .py-2 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
 .text-slate-500 { color: #64748b !important; }
 .font-medium { font-weight: 500 !important; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS & NATIVE APP EXPERIENCE (< 768px)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .myntra-root {
+    gap: 1rem;
+    /* Safe padding so bottom navigation bar does not cover content */
+    padding-bottom: 95px !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .myntra-card-container {
+    padding: 0.85rem !important;
+    border-radius: 0.875rem !important;
+  }
+
+  /* Header */
+  .myntra-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .myntra-header-left {
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .myntra-badge-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .myntra-title {
+    font-size: 1.15rem;
+  }
+
+  .myntra-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .myntra-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Smooth Touch Tab Navigation Bar */
+  .myntra-nav-tabs {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    padding-bottom: 6px;
+    gap: 0.35rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .myntra-nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .myntra-nav-tab {
+    flex-shrink: 0;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  /* Smooth Touch Pipeline Bar */
+  .myntra-pipeline-bar {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    padding: 0.35rem;
+    padding-bottom: 6px;
+    gap: 0.35rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .myntra-pipeline-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .myntra-pipeline-step {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 0.5rem 0.85rem;
+  }
+
+  /* Actions Bar */
+  .myntra-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .myntra-action-bar > div {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .myntra-search-wrapper {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .myntra-search-input {
+    width: 100% !important;
+  }
+
+  .myntra-scan-box {
+    width: 100% !important;
+    box-sizing: border-box;
+    justify-content: space-between;
+  }
+
+  .myntra-scan-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Data Table */
+  .myntra-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    margin-top: 0.5rem;
+    border-radius: 0.5rem;
+  }
+
+  .myntra-table {
+    min-width: 720px;
+  }
+
+  .myntra-th, .myntra-td {
+    padding: 0.6rem 0.75rem;
+  }
+
+  /* Grids: Stock, Simulator & Settings */
+  .myntra-grid-3,
+  div[style*="gridTemplateColumns: repeat(auto-fit"],
+  div[style*="gridTemplateColumns: repeat(auto-fill"],
+  div[style*="gridTemplateColumns: repeat(2, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Modals on Mobile */
+  .myntra-modal-content {
+    width: 94% !important;
+    max-width: 94% !important;
+    margin: 1rem auto;
+    padding: 1.15rem !important;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+}

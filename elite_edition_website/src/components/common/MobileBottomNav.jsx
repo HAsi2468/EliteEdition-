@@ -29,7 +29,7 @@ const COMPANY_NAV_CONFIG = {
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'inventory', label: 'Stock' },
     { id: 'sales', label: 'Orders' },
-    { id: 'returns', label: 'Returns' },
+    { id: 'myntra', label: 'Myntra' },
     { id: '__more__', label: 'More' }
   ],
   elite_edition: [
