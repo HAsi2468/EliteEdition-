@@ -1581,7 +1581,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       const defaultMtr = remainingFresh > 0 ? remainingFresh : '';
 
       setChallanForm(prev => {
-        const needsTpUpdate = prev.tpDetails.length <= 1 && (!prev.tpDetails[0]?.tpMeter || prev.tpDetails[0]?.tpMeter === '0' || prev.tpDetails[0]?.tpMeter === '');
+        const prevTp = Array.isArray(prev.tpDetails) ? prev.tpDetails : [];
+        const needsTpUpdate = prevTp.length <= 1 && (!prevTp[0]?.tpMeter || prevTp[0]?.tpMeter === '0' || prevTp[0]?.tpMeter === '');
         return {
           ...prev,
           jobNo: val.includes(',') ? val : (combinedJobNo || val),
@@ -1597,7 +1598,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             tpNo: 1,
             tpMeter: String(defaultMtr),
             lotNo: prev.lotNo || ''
-          }] : prev.tpDetails
+          }] : prevTp
         };
       });
 
@@ -1716,14 +1717,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const addTpRow = () => {
     setChallanForm(prev => {
-      if (prev.tpDetails.length >= 30) return prev;
-      const nextNo = prev.tpDetails.length + 1;
+      const prevTp = Array.isArray(prev.tpDetails) ? prev.tpDetails : [];
+      if (prevTp.length >= 30) return prev;
+      const nextNo = prevTp.length + 1;
       const lots = String(prev.lotNo || '')
         .split(',')
         .map(s => s.trim())
         .filter(s => s.length > 0);
       const defaultLot = lots[0] || '';
-      return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot }] };
+      return { ...prev, tpDetails: [...prevTp, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot }] };
     });
     setChallanMobileTab('tp');
   };
@@ -6081,7 +6083,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP METERS VALUES</span>
                     <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700 }}>Manual Lot No &amp; TP meters entry per row</div>
                   </div>
-                  <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
+                  <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#ffffff', border: '1px solid #cbd5e1', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={addTpRow} disabled={(challanForm.tpDetails?.length || 0) >= 30}>
                     <PlusCircle size={14} /> Add TP Row
                   </button>
                 </div>

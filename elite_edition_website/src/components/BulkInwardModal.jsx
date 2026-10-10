@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Plus, Minus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera, Building2, Package, Warehouse } from 'lucide-react';
 import { api } from '../services/api';
@@ -7,6 +7,7 @@ import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 import { SmartThumbnail } from './common/SmartThumbnail';
+import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -72,6 +73,24 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
   // Barcode / SKU Scanner Input
   const [scanSkuInput, setScanSkuInput] = useState('');
+  const scanInputRef = useRef(null);
+  const scanDebounceRef = useRef(null);
+
+  useEffect(() => {
+    if (scanInputRef.current) {
+      scanInputRef.current.focus();
+    }
+  }, []);
+
+  // Auto-listen to physical hardware USB/Bluetooth barcode scanners globally
+  useHardwareBarcodeSniffer((scanData) => {
+    if (scanData && scanData.code) {
+      processScannedSku(scanData.code);
+      setTimeout(() => {
+        if (scanInputRef.current) scanInputRef.current.focus();
+      }, 50);
+    }
+  });
 
   // Multi-Row Form Data State (Default 3 rows)
   const createEmptyRow = (vendorName = '', challanNum = '', facName = '') => ({
@@ -366,11 +385,47 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     });
   };
 
-  // Barcode / SKU Form Submit Handler
+  // Barcode / SKU Form Handlers with instant auto-add
+  const handleScanInputChange = (e) => {
+    const val = e.target.value;
+    setScanSkuInput(val);
+    if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+    // Auto-commit on rapid scanner burst or 4+ characters after 160ms idle
+    if (val && val.trim().length >= 4) {
+      scanDebounceRef.current = setTimeout(() => {
+        processScannedSku(val.trim());
+        setScanSkuInput('');
+        setTimeout(() => {
+          if (scanInputRef.current) scanInputRef.current.focus();
+        }, 30);
+      }, 160);
+    }
+  };
+
+  const handleScanInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+      if (scanSkuInput && scanSkuInput.trim()) {
+        processScannedSku(scanSkuInput.trim());
+        setScanSkuInput('');
+        setTimeout(() => {
+          if (scanInputRef.current) scanInputRef.current.focus();
+        }, 30);
+      }
+    }
+  };
+
   const handleScanSubmit = (e) => {
     e.preventDefault();
-    processScannedSku(scanSkuInput);
-    setScanSkuInput('');
+    if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+    if (scanSkuInput && scanSkuInput.trim()) {
+      processScannedSku(scanSkuInput.trim());
+      setScanSkuInput('');
+      setTimeout(() => {
+        if (scanInputRef.current) scanInputRef.current.focus();
+      }, 30);
+    }
   };
 
   // Quick Apply Settings to all rows
@@ -493,17 +548,19 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               <div style={{ position: 'relative', width: '100%' }}>
                 <Scan size={15} color="#475569" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
+                  ref={scanInputRef}
                   type="text"
                   value={scanSkuInput}
-                  onChange={e => setScanSkuInput(e.target.value)}
-                  placeholder="Scan SKU barcode..."
+                  onChange={handleScanInputChange}
+                  onKeyDown={handleScanInputKeyDown}
+                  placeholder="Scan SKU barcode (Auto-adds)..."
                   style={{
                     ...styles.scannerInput,
                     fontSize: isMobile ? '16px' : '0.82rem'
                   }}
                 />
               </div>
-              <button type="submit" style={styles.scanBtn}>+ Scan</button>
+              <button type="submit" style={styles.scanBtn}>⚡ Auto-Add</button>
             </form>
             
             <button onClick={onClose} style={styles.closeBtn} title="Close Modal">

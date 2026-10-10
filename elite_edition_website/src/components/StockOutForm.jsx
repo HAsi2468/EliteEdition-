@@ -6,6 +6,7 @@ import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 import { api } from '../services/api';
+import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -76,6 +77,17 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [justScannedSku, setJustScannedSku] = useState(null);
   const [lastScannedItem, setLastScannedItem] = useState(null);
   const scannedTimeoutRef = useRef(null);
+  const scanDebounceRef = useRef(null);
+
+  // Auto-listen to physical hardware USB/Bluetooth barcode scanners globally
+  useHardwareBarcodeSniffer((scanData) => {
+    if (scanData && scanData.code) {
+      processBarcodeScan(scanData.code);
+      setTimeout(() => {
+        if (scanInputRef.current) scanInputRef.current.focus();
+      }, 50);
+    }
+  });
 
   useEffect(() => {
     api.getFacilities().then(res => {
@@ -316,11 +328,45 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     });
   };
 
+  const handleScanInputChange = (e) => {
+    const val = e.target.value;
+    setScanInput(val);
+    if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+    // Instant auto-add: when a barcode scanner types characters in rapid succession (e.g. 4+ chars), auto-commit after 150ms idle
+    if (val && val.trim().length >= 4) {
+      scanDebounceRef.current = setTimeout(() => {
+        processBarcodeScan(val.trim());
+        setScanInput('');
+        setTimeout(() => {
+          if (scanInputRef.current) scanInputRef.current.focus();
+        }, 30);
+      }, 160);
+    }
+  };
+
+  const handleScanInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+      if (scanInput && scanInput.trim()) {
+        processBarcodeScan(scanInput.trim());
+        setScanInput('');
+        setTimeout(() => {
+          if (scanInputRef.current) scanInputRef.current.focus();
+        }, 30);
+      }
+    }
+  };
+
   const handleManualScanSubmit = (e) => {
     e.preventDefault();
-    if (scanInput) {
-      processBarcodeScan(scanInput);
+    if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+    if (scanInput && scanInput.trim()) {
+      processBarcodeScan(scanInput.trim());
       setScanInput('');
+      setTimeout(() => {
+        if (scanInputRef.current) scanInputRef.current.focus();
+      }, 30);
     }
   };
 
@@ -554,9 +600,10 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   <input
                     ref={scanInputRef}
                     type="text"
-                    placeholder="Scan SKU or Brand Barcode..."
+                    placeholder="Scan SKU or Brand Barcode (Auto-adds on scan)..."
                     value={scanInput}
-                    onChange={(e) => setScanInput(e.target.value)}
+                    onChange={handleScanInputChange}
+                    onKeyDown={handleScanInputKeyDown}
                     style={{
                       width: '100%',
                       padding: '0.6rem 0.85rem 0.6rem 2.6rem',
@@ -571,8 +618,8 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   />
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', width: isMobile ? '100%' : 'auto' }}>
-                  <button type="submit" style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 1.1rem', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    + Scan / Add
+                  <button type="submit" style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 1.1rem', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', boxShadow: '0 2px 6px rgba(37,99,235,0.3)' }}>
+                    <span>⚡ Auto-Add</span>
                   </button>
                   <button
                     type="button"

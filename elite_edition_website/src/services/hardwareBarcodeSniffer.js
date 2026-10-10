@@ -60,7 +60,7 @@ class HardwareBarcodeSniffer {
   }
 
   handleKeyDown(e) {
-    if (!this.isEnabled) return;
+    if (!this.isEnabled || !e || typeof e.key !== 'string') return;
 
     // Ignore modifier keys alone
     if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab'].includes(e.key)) {
@@ -68,12 +68,14 @@ class HardwareBarcodeSniffer {
     }
 
     const now = performance.now();
-    const lastTimestamp = this.timestamps.length > 0 ? this.timestamps[this.timestamps.length - 1] : 0;
+    const lastTimestamp = Array.isArray(this.timestamps) && this.timestamps.length > 0 
+      ? this.timestamps[this.timestamps.length - 1] 
+      : 0;
     const delta = lastTimestamp > 0 ? (now - lastTimestamp) : 0;
 
     // Check for Scan Terminator (usually Enter)
     if (e.key === 'Enter') {
-      if (this.buffer.length >= this.minBarcodeLength) {
+      if (this.buffer && this.buffer.length >= this.minBarcodeLength) {
         // Calculate average keystroke interval
         const totalDuration = this.timestamps[this.timestamps.length - 1] - this.timestamps[0];
         const avgInterval = totalDuration / Math.max(this.buffer.length - 1, 1);
@@ -96,9 +98,9 @@ class HardwareBarcodeSniffer {
     }
 
     // Only collect single printable characters
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (typeof e.key === 'string' && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       // If delta exceeds threshold and we already had buffered keys, human typed or burst broke
-      if (this.timestamps.length > 0 && delta > this.maxInterKeyDelay) {
+      if (Array.isArray(this.timestamps) && this.timestamps.length > 0 && delta > this.maxInterKeyDelay) {
         // Reset and start new buffer with this character
         this.buffer = e.key;
         this.timestamps = [now];
