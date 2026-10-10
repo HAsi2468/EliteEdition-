@@ -8,7 +8,8 @@ import {
   CheckSquare,
   GripVertical,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Zap
 } from 'lucide-react';
 import './EnterpriseHUDThemeController.css';
 
@@ -21,9 +22,9 @@ import './EnterpriseHUDThemeController.css';
  * 3. Tasks / Task Manager (with active status indicator)
  * 
  * Features:
- * - Free 2D drag & drop positioning with window boundary clamping.
- * - Persistent dock coordinates in localStorage.
- * - Smooth pointer (mouse + touch) event handling.
+ * - Free 2D drag & drop positioning with dynamic window boundary clamping.
+ * - Auto-realigns if screen is resized or position overflows window edges.
+ * - Single-button compact collapsed mode vs. full 3-button island mode.
  * - Collision-aware popover placement (smart up/down and left/right flip).
  */
 export function EnterpriseHUDThemeController({
@@ -51,46 +52,63 @@ export function EnterpriseHUDThemeController({
   const hasMovedRef = useRef(false);
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, dockX: 0, dockY: 0 });
 
-  // Initial position from localStorage or default bottom-left
+  // Safe clamping helper ensuring the dock is never cut off on any screen edge
+  const getClampedCoordinates = useCallback((targetX, targetY) => {
+    if (typeof window === 'undefined') return { x: targetX, y: targetY };
+    const dockEl = dockRef.current;
+    const width = dockEl?.offsetWidth || 260;
+    const height = dockEl?.offsetHeight || 44;
+    const minPadding = 12;
+
+    const maxX = Math.max(minPadding, window.innerWidth - width - minPadding);
+    const maxY = Math.max(minPadding, window.innerHeight - height - minPadding);
+
+    return {
+      x: Math.min(Math.max(minPadding, targetX), maxX),
+      y: Math.min(Math.max(minPadding, targetY), maxY)
+    };
+  }, []);
+
+  // Initial position from localStorage or clean bottom-right
   const [position, setPosition] = useState(() => {
+    if (typeof window === 'undefined') return { x: 20, y: 700 };
     try {
       const saved = localStorage.getItem('erp_floating_dock_pos');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          const maxX = typeof window !== 'undefined' ? Math.max(10, window.innerWidth - 300) : 1000;
-          const maxY = typeof window !== 'undefined' ? Math.max(10, window.innerHeight - 60) : 800;
+          // Guard against old positions that were cut off on the right
+          const maxX = Math.max(12, window.innerWidth - 280);
+          const maxY = Math.max(12, window.innerHeight - 56);
           return {
-            x: Math.min(Math.max(10, parsed.x), maxX),
-            y: Math.min(Math.max(10, parsed.y), maxY)
+            x: Math.min(Math.max(12, parsed.x), maxX),
+            y: Math.min(Math.max(12, parsed.y), maxY)
           };
         }
       }
     } catch (e) {}
+
+    // Default: Clean top-right under header, with safe margin from right edge
     return {
-      x: 20,
-      y: typeof window !== 'undefined' ? Math.max(20, window.innerHeight - 70) : 700
+      x: Math.max(12, window.innerWidth - 290),
+      y: 68
     };
   });
 
-  // Re-check window boundaries on window resize
+  // Re-check and auto-clamp dock position on window resize or when expanded/collapsed
   useEffect(() => {
-    const handleResize = () => {
-      setPosition(prev => {
-        const dockEl = dockRef.current;
-        const width = dockEl?.offsetWidth || 280;
-        const height = dockEl?.offsetHeight || 44;
-        const maxX = Math.max(10, window.innerWidth - width - 10);
-        const maxY = Math.max(10, window.innerHeight - height - 10);
-        return {
-          x: Math.min(Math.max(10, prev.x), maxX),
-          y: Math.min(Math.max(10, prev.y), maxY)
-        };
-      });
+    const handleReclamp = () => {
+      setPosition(prev => getClampedCoordinates(prev.x, prev.y));
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+
+    // Run slightly deferred to allow DOM to measure after render/collapse
+    const timer = setTimeout(handleReclamp, 40);
+    window.addEventListener('resize', handleReclamp);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleReclamp);
+    };
+  }, [isCollapsed, getClampedCoordinates]);
 
   // Initialize scale and HUD theme from localStorage
   useEffect(() => {
@@ -137,7 +155,7 @@ export function EnterpriseHUDThemeController({
 
   // Pointer drag listeners
   const onPointerDown = useCallback((e) => {
-    // Only primary button
+    // Only primary mouse/touch button
     if (e.button !== undefined && e.button !== 0) return;
     
     // Don't drag if target is inside popover panel
@@ -162,16 +180,10 @@ export function EnterpriseHUDThemeController({
         setIsDragging(true);
       }
 
-      const dockEl = dockRef.current;
-      const width = dockEl?.offsetWidth || 280;
-      const height = dockEl?.offsetHeight || 44;
-      const maxX = Math.max(10, window.innerWidth - width - 10);
-      const maxY = Math.max(10, window.innerHeight - height - 10);
+      const nextX = dragStartRef.current.dockX + deltaX;
+      const nextY = dragStartRef.current.dockY + deltaY;
 
-      const nextX = Math.min(Math.max(10, dragStartRef.current.dockX + deltaX), maxX);
-      const nextY = Math.min(Math.max(10, dragStartRef.current.dockY + deltaY), maxY);
-
-      setPosition({ x: nextX, y: nextY });
+      setPosition(getClampedCoordinates(nextX, nextY));
     };
 
     const onPointerUp = () => {
@@ -186,18 +198,21 @@ export function EnterpriseHUDThemeController({
 
       setPosition(current => {
         try {
-          localStorage.setItem('erp_floating_dock_pos', JSON.stringify(current));
-        } catch (e) {}
-        return current;
+          const clamped = getClampedCoordinates(current.x, current.y);
+          localStorage.setItem('erp_floating_dock_pos', JSON.stringify(clamped));
+          return clamped;
+        } catch (err) {
+          return current;
+        }
       });
     };
 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
-  }, [position]);
+  }, [position, getClampedCoordinates]);
 
   const toggleCollapsed = (e) => {
-    e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
     setIsCollapsed(prev => {
       const next = !prev;
       try {
@@ -207,7 +222,17 @@ export function EnterpriseHUDThemeController({
     });
   };
 
-  // Safe item click wrapper to ignore clicks that occurred during dragging
+  // Double-click grip handle to snap back to default top-right corner
+  const handleDoubleClickGrip = (e) => {
+    e.stopPropagation();
+    const defaultPos = getClampedCoordinates(window.innerWidth - 290, 68);
+    setPosition(defaultPos);
+    try {
+      localStorage.setItem('erp_floating_dock_pos', JSON.stringify(defaultPos));
+    } catch (err) {}
+  };
+
+  // Safe item click wrapper to ignore clicks during drag
   const handleItemClick = (action) => (e) => {
     if (hasMovedRef.current) {
       e.stopPropagation();
@@ -218,11 +243,11 @@ export function EnterpriseHUDThemeController({
   };
 
   // Determine smart popover placement relative to dock position
-  const isDockNearBottom = position.y > 340;
-  const isDockNearRight = position.x > (typeof window !== 'undefined' ? window.innerWidth - 330 : 900);
+  const isDockNearBottom = position.y > (typeof window !== 'undefined' ? window.innerHeight - 340 : 340);
+  const isDockNearRight = position.x > (typeof window !== 'undefined' ? window.innerWidth - 320 : 900);
 
   const popoverStyle = {
-    ...(isDockNearBottom ? { bottom: 'calc(100% + 10px)' } : { top: 'calc(100% + 10px)' }),
+    ...(isDockNearBottom ? { bottom: 'calc(100% + 12px)' } : { top: 'calc(100% + 12px)' }),
     ...(isDockNearRight ? { right: 0 } : { left: 0 })
   };
 
@@ -232,93 +257,130 @@ export function EnterpriseHUDThemeController({
   return (
     <div
       ref={dockRef}
-      className={`floating-enterprise-dock ${isDragging ? 'is-dragging' : ''} ${isIndustrial ? 'is-industrial' : ''}`}
+      className={`floating-enterprise-dock ${isDragging ? 'is-dragging' : ''} ${isCollapsed ? 'is-collapsed' : ''} ${isIndustrial ? 'is-industrial' : ''}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`
       }}
       onPointerDown={onPointerDown}
-      title="Click & Drag freely to position anywhere on your screen"
+      title="Click & Drag freely to position anywhere on your screen. Double-click grip to reset."
     >
       {/* Drag Grip Handle */}
-      <div className="dock-grip-handle" title="Drag to reposition anywhere">
-        <GripVertical size={14} className="dock-grip-icon" />
+      <div 
+        className="dock-grip-handle" 
+        onDoubleClick={handleDoubleClickGrip}
+        title="Drag anywhere (Double click to reset position)"
+      >
+        <GripVertical size={14} />
       </div>
 
-      {/* Button 1: Scale & Industrial HUD Display (100% pill) */}
-      <button
-        type="button"
-        className={`dock-action-btn dock-btn-scale ${isOpen ? 'active' : ''}`}
-        onClick={handleItemClick(() => setIsOpen(o => !o))}
-        title="Adjust UI Scale & Factory Floor Display Mode"
-        aria-label="UI Display Controller"
-      >
-        <Gauge size={13} style={{ color: isIndustrial ? '#38bdf8' : '#2563eb' }} />
-        <span className="dock-btn-label">{Math.round(scale * 100)}%</span>
-        {isIndustrial && <span className="dock-hud-indicator">• HUD</span>}
-      </button>
+      {/* ── COLLAPSED MODE: Single Smart Pill Button ── */}
+      {isCollapsed ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            type="button"
+            className="dock-master-orb-btn"
+            onClick={toggleCollapsed}
+            title="Expand Floating Action Dock"
+            aria-label="Expand Dock"
+          >
+            <Zap size={13} style={{ color: '#38bdf8' }} />
+            <span className="dock-scale-badge">{Math.round(scale * 100)}%</span>
+            {chatUnreadCount > 0 && (
+              <span className="dock-unread-badge">
+                {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className="dock-toggle-btn"
+            onClick={toggleCollapsed}
+            title="Expand to full controls"
+            aria-label="Expand"
+          >
+            <ChevronLeft size={12} />
+          </button>
+        </div>
+      ) : (
+        /* ── EXPANDED MODE: Full 3-Action Dock ── */
+        <>
+          {/* Button 1: Scale & Industrial HUD Display */}
+          <button
+            type="button"
+            className={`dock-action-btn dock-btn-scale ${isOpen ? 'active' : ''}`}
+            onClick={handleItemClick(() => setIsOpen(o => !o))}
+            title="Adjust UI Scale & Factory Floor Ergonomics"
+            aria-label="UI Display Controller"
+          >
+            <Gauge size={13} style={{ color: isIndustrial ? '#38bdf8' : '#38bdf8' }} />
+            <span className="dock-scale-badge">{Math.round(scale * 100)}%</span>
+            {isIndustrial && <span className="dock-hud-indicator">HUD</span>}
+          </button>
 
-      {/* Divider */}
-      {isAuthenticated && (hasCommunicationAccess || hasTaskAccess) && !isCollapsed && (
-        <div className="dock-divider" />
-      )}
-
-      {/* Button 2: Communication / Chat */}
-      {isAuthenticated && hasCommunicationAccess && !isCollapsed && (
-        <button
-          type="button"
-          className={`dock-action-btn dock-btn-comm ${isCommActive ? 'active' : ''}`}
-          onClick={handleItemClick(() => {
-            onNavigateTab('communication');
-            if (typeof window !== 'undefined' && window.innerWidth < 768) {
-              window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
-            }
-          })}
-          title="Inter-Department Communication & Team Chat"
-          aria-label="Communication"
-        >
-          <MessageSquare size={13} style={{ color: isCommActive ? '#2563eb' : '#475569' }} />
-          <span className="dock-btn-label">Chat</span>
-          {chatUnreadCount > 0 && (
-            <span className="dock-unread-badge">
-              {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-            </span>
+          {/* Divider */}
+          {isAuthenticated && (hasCommunicationAccess || hasTaskAccess) && (
+            <div className="dock-divider" />
           )}
-        </button>
-      )}
 
-      {/* Divider */}
-      {isAuthenticated && hasTaskAccess && !isCollapsed && (
-        <div className="dock-divider" />
-      )}
+          {/* Button 2: Communication / Chat */}
+          {isAuthenticated && hasCommunicationAccess && (
+            <button
+              type="button"
+              className={`dock-action-btn dock-btn-comm ${isCommActive ? 'active' : ''}`}
+              onClick={handleItemClick(() => {
+                onNavigateTab('communication');
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
+                }
+              })}
+              title="Inter-Department Communication & Team Chat"
+              aria-label="Communication"
+            >
+              <MessageSquare size={13} style={{ color: isCommActive ? '#60a5fa' : '#94a3b8' }} />
+              <span style={{ fontWeight: 700 }}>Chat</span>
+              {chatUnreadCount > 0 && (
+                <span className="dock-unread-badge">
+                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                </span>
+              )}
+            </button>
+          )}
 
-      {/* Button 3: Task Management */}
-      {isAuthenticated && hasTaskAccess && !isCollapsed && (
-        <button
-          type="button"
-          className={`dock-action-btn dock-btn-task ${isTaskActive ? 'active' : ''}`}
-          onClick={handleItemClick(() => {
-            onNavigateTab('task_management');
-          })}
-          title="Task Management & Staff Workloads"
-          aria-label="Tasks"
-        >
-          <CheckSquare size={13} style={{ color: isTaskActive ? '#10b981' : '#475569' }} />
-          <span className="dock-btn-label">Tasks</span>
-        </button>
-      )}
+          {/* Divider */}
+          {isAuthenticated && hasTaskAccess && (
+            <div className="dock-divider" />
+          )}
 
-      {/* Collapse / Expand Toggle Button */}
-      {isAuthenticated && (hasCommunicationAccess || hasTaskAccess) && (
-        <button
-          type="button"
-          className="dock-toggle-btn"
-          onClick={toggleCollapsed}
-          title={isCollapsed ? "Expand Dock" : "Minimize Dock"}
-          aria-label="Toggle Dock Size"
-        >
-          {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-        </button>
+          {/* Button 3: Task Management */}
+          {isAuthenticated && hasTaskAccess && (
+            <button
+              type="button"
+              className={`dock-action-btn dock-btn-task ${isTaskActive ? 'active' : ''}`}
+              onClick={handleItemClick(() => {
+                onNavigateTab('task_management');
+              })}
+              title="Task Management & Staff Workloads"
+              aria-label="Tasks"
+            >
+              <CheckSquare size={13} style={{ color: isTaskActive ? '#34d399' : '#94a3b8' }} />
+              <span style={{ fontWeight: 700 }}>Tasks</span>
+            </button>
+          )}
+
+          {/* Collapse to Single Button Toggle */}
+          {isAuthenticated && (hasCommunicationAccess || hasTaskAccess) && (
+            <button
+              type="button"
+              className="dock-toggle-btn"
+              onClick={toggleCollapsed}
+              title="Minimize to compact button"
+              aria-label="Minimize Dock"
+            >
+              <ChevronRight size={12} />
+            </button>
+          )}
+        </>
       )}
 
       {/* Popover Panel for Display Ergonomics (smart absolute positioned) */}
@@ -329,14 +391,14 @@ export function EnterpriseHUDThemeController({
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="hud-panel-title">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sliders size={14} style={{ color: 'var(--primary, #2563eb)' }} />
-              <span>Display Ergonomics</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <Sliders size={14} style={{ color: '#38bdf8' }} />
+              <span style={{ fontWeight: 800 }}>Display Ergonomics</span>
             </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted, #64748b)' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center' }}
             >
               <X size={15} />
             </button>
@@ -346,7 +408,7 @@ export function EnterpriseHUDThemeController({
           <div className="hud-scale-slider-row">
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700 }}>
               <span>UI Scale Density:</span>
-              <span style={{ color: 'var(--primary, #2563eb)' }}>{Math.round(scale * 100)}%</span>
+              <span style={{ color: '#38bdf8', fontWeight: 800 }}>{Math.round(scale * 100)}%</span>
             </div>
             <input
               type="range"
@@ -367,8 +429,8 @@ export function EnterpriseHUDThemeController({
           {/* Industrial High Contrast Theme Toggle */}
           <div className="hud-theme-toggle-row">
             <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>🏭 Factory HUD Mode</div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted, #64748b)' }}>Solid 2px high-visibility outlines</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc' }}>🏭 Factory HUD Mode</div>
+              <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Solid 2px high-visibility outlines</div>
             </div>
             <button
               type="button"
@@ -376,12 +438,13 @@ export function EnterpriseHUDThemeController({
               onClick={handleToggleIndustrial}
               style={{
                 fontSize: '0.7rem',
-                padding: '0.25rem 0.55rem',
-                borderColor: isIndustrial ? '#0284c7' : undefined,
-                background: isIndustrial ? 'rgba(2, 132, 199, 0.2)' : undefined,
-                color: isIndustrial ? '#38bdf8' : undefined,
-                fontWeight: 700,
-                cursor: 'pointer'
+                padding: '0.3rem 0.65rem',
+                borderColor: isIndustrial ? '#38bdf8' : 'rgba(255,255,255,0.15)',
+                background: isIndustrial ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.06)',
+                color: isIndustrial ? '#38bdf8' : '#e2e8f0',
+                fontWeight: 800,
+                cursor: 'pointer',
+                borderRadius: '6px'
               }}
             >
               {isIndustrial ? 'ON' : 'OFF'}
@@ -396,12 +459,13 @@ export function EnterpriseHUDThemeController({
               style={{
                 background: 'none',
                 border: 'none',
-                fontSize: '0.7rem',
-                color: 'var(--text-muted, #64748b)',
+                fontSize: '0.72rem',
+                color: '#94a3b8',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.3rem'
+                gap: '0.3rem',
+                fontWeight: 600
               }}
             >
               <RotateCcw size={11} /> Reset Defaults
