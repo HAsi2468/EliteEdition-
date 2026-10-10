@@ -44,7 +44,6 @@ import {
   Repeat,
   BarChart2,
   CalendarRange,
-  Wand2,
   Award,
   Zap,
   TrendingUp,
@@ -53,84 +52,6 @@ import {
   ChevronLeft,
   ChevronDown
 } from 'lucide-react';
-
-const TASK_TEMPLATES = [
-  {
-    id: 'digital_print_qc',
-    name: '🎨 Digital Print Audit SOP',
-    category: 'Production',
-    title: 'Digital Print Audit & CMYK Calibration',
-    desc: 'Verify color fidelity, DPI resolution, nozzle alignment, and print proof generation before running bulk production.',
-    priority: 'high',
-    estHours: 1.5,
-    checklist: [
-      'Verify CMYK color profile matching job card sample',
-      'Check design resolution (Minimum 300 DPI required)',
-      'Run printhead nozzle test & check alignment',
-      'Generate digital print proof and attach to Job Card'
-    ]
-  },
-  {
-    id: 'stitching_qc',
-    name: '🪡 Stitching & Finishing QC SOP',
-    category: 'Quality Assurance',
-    title: 'Stitching & Finishing Quality Inspection',
-    desc: 'Comprehensive post-production audit for seam strength, thread shade matching, and garment packaging.',
-    priority: 'medium',
-    estHours: 2.0,
-    checklist: [
-      'Inspect seam tension and stitch density (12 SPI min)',
-      'Verify thread color and shade accuracy',
-      'Check zipper/button alignment and functional clearance',
-      'Pack finished order in protective poly sleeve'
-    ]
-  },
-  {
-    id: 'fabric_inward',
-    name: '📦 Fabric Inward Quality Inspection',
-    category: 'Inventory',
-    title: 'Fabric Inward Goods Inspection & Tagging',
-    desc: 'Audit newly arrived fabric rolls for weight, GSM density, weaving flaws, and barcode tagging.',
-    priority: 'high',
-    estHours: 1.0,
-    checklist: [
-      'Weigh incoming fabric rolls & verify supplier bill',
-      'Measure GSM density using GSM cutter scale',
-      'Scan fabric for weave defects, stains, or shade variation',
-      'Generate & attach store inventory QR/Barcode tag'
-    ]
-  },
-  {
-    id: 'machine_maint',
-    name: '🛠️ Machine Preventive Maintenance SOP',
-    category: 'Maintenance',
-    title: 'Weekly Production Machinery Maintenance',
-    desc: 'Routine cleaning, rail lubrication, sensor testing, and calibration of digital printing & cutting machinery.',
-    priority: 'urgent',
-    estHours: 3.0,
-    checklist: [
-      'Clean printhead capping station & wiper blades',
-      'Lubricate linear motion rails and gear tracks',
-      'Test ink level float sensors and vacuum suction pump',
-      'Run bi-directional alignment calibration print'
-    ]
-  },
-  {
-    id: 'billing_audit',
-    name: '📄 Billing & Invoice Verification SOP',
-    category: 'Finance',
-    title: 'Billing Audit & Client Payment Processing',
-    desc: 'Cross-check finished job card quantities against rates, generate GST tax invoice, and send digital link.',
-    priority: 'medium',
-    estHours: 0.5,
-    checklist: [
-      'Match delivered quantity with signed Job Card receipt',
-      'Calculate applicable GST tax rate and discount terms',
-      'Generate official Billing Invoice & payment link',
-      'File digital invoice copy in accounting records'
-    ]
-  }
-];
 
 export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const { socket } = useSocket() || {};
@@ -232,10 +153,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [editEstHours, setEditEstHours] = useState('');
   const [editAssigneeIds, setEditAssigneeIds] = useState([]);
   const [editStaffSearch, setEditStaffSearch] = useState('');
-  
-  // Feature 4: Task Template Library state
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [templateChecklist, setTemplateChecklist] = useState([]);
 
   // Feature 5: Voice-to-Task Creation state
   const [isListening, setIsListening] = useState(false);
@@ -312,20 +229,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     } catch (err) {
       console.error('Failed to start speech recognition:', err);
       setIsListening(false);
-    }
-  };
-
-  // Apply Template SOP
-  const handleApplyTemplate = (templateId) => {
-    setSelectedTemplateId(templateId);
-    if (!templateId) return;
-    const tmpl = TASK_TEMPLATES.find((t) => t.id === templateId);
-    if (tmpl) {
-      setNewTitle(tmpl.title);
-      setNewDesc(tmpl.desc);
-      setNewPriority(tmpl.priority);
-      setNewEstHours(String(tmpl.estHours));
-      setTemplateChecklist([...tmpl.checklist]);
     }
   };
 
@@ -710,13 +613,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const handleCreateTaskSubmit = async (e) => {
     e.preventDefault();
     if (!newTitle.trim()) {
-      alert('Please enter a task title.');
+      triggerEliteAlert('Validation', 'Please enter a task title.', 'warning');
       return;
     }
 
     setCreating(true);
     try {
-      const res = await api.createTask({
+      const payload = {
         title: newTitle.trim(),
         description: newDesc.trim(),
         priority: newPriority,
@@ -728,34 +631,25 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         estimatedHours: parseFloat(newEstHours) || 0,
         assignees: selectedAssigneeIds && selectedAssigneeIds.length > 0 ? selectedAssigneeIds : (myId ? [myId] : []),
         attachments: newAttachments,
-        createdBy: myId,
+        createdBy: myId || undefined,
         createdByName: myName,
         recurrence: isRecurring ? { isRecurring: true, frequency: recurrenceFreq } : { isRecurring: false }
-      });
+      };
 
-      if (res.success && res.data) {
-        let createdTask = res.data;
+      const res = await api.createTask(payload);
 
-        // If template checklist items exist, add them to the created task
-        if (templateChecklist && templateChecklist.length > 0) {
-          for (const itemText of templateChecklist) {
-            try {
-              const checkRes = await api.addTaskChecklistItem(createdTask._id, { text: itemText });
-              if (checkRes.success && checkRes.data) {
-                createdTask = checkRes.data;
-              }
-            } catch (cErr) {
-              console.error('Failed to add template checklist item:', cErr);
-            }
-          }
-        }
-
+      if (res && (res.success || res.data)) {
+        const createdTask = res.data || res;
         setTasks((prev) => [createdTask, ...prev]);
         setShowCreateModal(false);
         resetCreateForm();
+        triggerEliteAlert('Success', `Task "${createdTask.title || newTitle.trim()}" created successfully!`, 'success');
+      } else {
+        throw new Error(res?.message || 'Server did not return created task.');
       }
     } catch (err) {
-      alert('Failed to create task: ' + err.message);
+      console.error('Failed to create task:', err);
+      triggerEliteAlert('Task Creation Failed', err.message || 'Unknown error occurred while creating task.', 'error');
     } finally {
       setCreating(false);
     }
@@ -772,8 +666,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setNewDueDate('');
     setNewEstHours('');
     setSelectedAssigneeIds([]);
-    setSelectedTemplateId('');
-    setTemplateChecklist([]);
     setIsRecurring(false);
     setRecurrenceFreq('daily');
     setNewAttachments([]);
@@ -4009,33 +3901,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
             <form onSubmit={handleCreateTaskSubmit} style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               
-              {/* Feature 4: Task Template Library SOP Picker */}
-              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px dashed #bfdbfe' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Wand2 size={14} color="#2563eb" />
-                    <span>📚 Task Template SOP Library</span>
-                  </label>
-                  {selectedTemplateId && (
-                    <span style={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 800 }}>
-                      ✓ Template Loaded ({templateChecklist.length} SOP steps)
-                    </span>
-                  )}
-                </div>
-                <select
-                  value={selectedTemplateId}
-                  onChange={(e) => handleApplyTemplate(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #bfdbfe', background: '#ffffff', color: '#1e293b' }}
-                >
-                  <option value="">Select SOP Template to Auto-Fill (Optional)...</option>
-                  {TASK_TEMPLATES.map((tmpl) => (
-                    <option key={tmpl.id} value={tmpl.id}>
-                      {tmpl.name} ({tmpl.category})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Task Title & Feature 5: Voice-to-Task */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>

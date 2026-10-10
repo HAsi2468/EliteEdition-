@@ -194,17 +194,43 @@ const createTask = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Task title is required' });
     }
 
-    const creatorId = req.user ? req.user._id : (customCreatedBy || null);
+    // Robustly determine and validate creatorId
+    let rawCreatorId = req.user ? req.user._id : (customCreatedBy || null);
+    let creatorId = (rawCreatorId && mongoose.Types.ObjectId.isValid(rawCreatorId))
+      ? new mongoose.Types.ObjectId(rawCreatorId)
+      : null;
 
-    // If no staff members were selected, automatically assign to creator (themselves)
-    let finalAssignees = Array.isArray(assignees) ? assignees.filter(Boolean) : [];
+    if (!creatorId) {
+      try {
+        const adminUser = await User.findOne({
+          $or: [{ role: 'admin' }, { role: 'super_admin' }, { username: 'admin' }]
+        }).select('_id');
+        if (adminUser) creatorId = adminUser._id;
+      } catch (uErr) {
+        console.warn('[TaskController] Could not find fallback admin user:', uErr.message);
+      }
+    }
+
+    // Sanitize assignees: only keep valid ObjectIds
+    let finalAssignees = Array.isArray(assignees)
+      ? assignees
+          .filter(a => a && mongoose.Types.ObjectId.isValid(typeof a === 'object' ? (a._id || a.id) : a))
+          .map(a => new mongoose.Types.ObjectId(typeof a === 'object' ? (a._id || a.id) : a))
+      : [];
+
+    // If no staff members were selected, automatically assign to creator if valid
     if (finalAssignees.length === 0 && creatorId) {
       finalAssignees = [creatorId];
     }
 
+    // Sanitize dependencies
+    const validDependencies = Array.isArray(dependencies)
+      ? dependencies.filter(d => d && mongoose.Types.ObjectId.isValid(d)).map(d => new mongoose.Types.ObjectId(d))
+      : [];
+
     const initialAudit = [{
-      user: creatorId,
-      userName: createdByName,
+      user: creatorId || undefined,
+      userName: createdByName || 'Admin',
       fieldChanged: 'Task Created',
       oldValue: '',
       newValue: `Created "${title.trim()}" in ${department}`,
@@ -216,7 +242,7 @@ const createTask = async (req, res) => {
       fileUrl: att.fileUrl || att.url,
       fileSize: Number(att.fileSize || att.size) || 0,
       fileType: att.fileType || att.type || 'document',
-      uploadedBy: creatorId,
+      uploadedBy: creatorId || undefined,
       uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
     })).filter(att => !!att.fileUrl) : [];
 
@@ -232,12 +258,12 @@ const createTask = async (req, res) => {
       dueDate: dueDate ? new Date(dueDate) : null,
       estimatedHours: Number(estimatedHours) || 0,
       assignees: finalAssignees,
-      dependencies,
+      dependencies: validDependencies,
       checklist,
       tags,
       attachments: formattedAttachments,
       images: Array.isArray(images) ? images : formattedAttachments.filter(a => /\.(jpg|jpeg|png|webp|gif)$/i.test(a.fileName)).map(a => a.fileUrl),
-      createdBy: creatorId,
+      createdBy: creatorId || undefined,
       auditLogs: initialAudit
     });
 
