@@ -110,16 +110,46 @@ export function EnterpriseHUDThemeController({
     };
   }, [isCollapsed, getClampedCoordinates]);
 
+  // Helper to cleanly apply UI scale to document root without breaking body margins or window scrolling
+  const applyScale = useCallback((targetScale) => {
+    if (typeof document === 'undefined') return;
+
+    // 1. Clear any legacy zoom on body that caused horizontal blank voids & jittery scroller
+    document.body.style.zoom = '';
+
+    // 2. Set CSS custom property for fluid font & padding scaling
+    document.documentElement.style.setProperty('--erp-scale', String(targetScale));
+
+    // 3. Apply root zoom to documentElement smoothly
+    if (Math.abs(targetScale - 1) < 0.005) {
+      document.documentElement.style.zoom = '';
+      document.documentElement.classList.remove('erp-scaled-dense', 'erp-scaled-comfort');
+    } else {
+      document.documentElement.style.zoom = String(targetScale);
+      if (targetScale < 1) {
+        document.documentElement.classList.add('erp-scaled-dense');
+        document.documentElement.classList.remove('erp-scaled-comfort');
+      } else {
+        document.documentElement.classList.add('erp-scaled-comfort');
+        document.documentElement.classList.remove('erp-scaled-dense');
+      }
+    }
+  }, []);
+
   // Initialize scale and HUD theme from localStorage
   useEffect(() => {
+    document.body.style.zoom = '';
     const savedScale = localStorage.getItem('erp_ui_scale');
     if (savedScale) {
       const parsed = parseFloat(savedScale);
       if (!isNaN(parsed) && parsed >= 0.85 && parsed <= 1.15) {
         setScale(parsed);
-        document.documentElement.style.setProperty('--erp-scale', parsed);
-        document.body.style.zoom = parsed;
+        applyScale(parsed);
+      } else {
+        applyScale(1);
       }
+    } else {
+      applyScale(1);
     }
 
     const savedTheme = localStorage.getItem('erp_hud_theme');
@@ -127,13 +157,28 @@ export function EnterpriseHUDThemeController({
       setIsIndustrial(true);
       document.documentElement.setAttribute('data-hud-theme', 'industrial');
     }
-  }, []);
+
+    return () => {
+      document.body.style.zoom = '';
+    };
+  }, [applyScale]);
+
+  const rafRef = useRef(null);
 
   const handleScaleChange = (newScale) => {
-    setScale(newScale);
-    localStorage.setItem('erp_ui_scale', newScale);
-    document.documentElement.style.setProperty('--erp-scale', newScale);
-    document.body.style.zoom = newScale;
+    const clamped = Math.min(1.15, Math.max(0.85, Math.round(newScale * 100) / 100));
+    setScale(clamped);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      applyScale(clamped);
+      try {
+        localStorage.setItem('erp_ui_scale', String(clamped));
+      } catch (e) {}
+    });
+  };
+
+  const handlePresetSelect = (presetVal) => {
+    handleScaleChange(presetVal);
   };
 
   const handleToggleIndustrial = () => {
@@ -383,7 +428,7 @@ export function EnterpriseHUDThemeController({
         </>
       )}
 
-      {/* Popover Panel for Display Ergonomics (smart absolute positioned) */}
+      {/* Popover Panel for Display Ergonomics (Clean White & Royal Blue) */}
       {isOpen && (
         <div
           className="hud-popover-panel dock-attached-popover"
@@ -391,82 +436,123 @@ export function EnterpriseHUDThemeController({
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="hud-panel-title">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <Sliders size={14} style={{ color: '#38bdf8' }} />
-              <span style={{ fontWeight: 800 }}>Display Ergonomics</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{
+                width: 26,
+                height: 26,
+                borderRadius: '8px',
+                background: '#eff6ff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid #bfdbfe'
+              }}>
+                <Sliders size={14} style={{ color: '#2563eb' }} />
+              </div>
+              <span style={{ fontWeight: 800, color: '#0f172a' }}>Display Ergonomics</span>
             </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center' }}
+              style={{
+                background: '#f1f5f9',
+                border: 'none',
+                borderRadius: '6px',
+                width: 24,
+                height: 24,
+                cursor: 'pointer',
+                color: '#64748b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              title="Close Panel"
             >
-              <X size={15} />
+              <X size={14} />
             </button>
           </div>
 
           {/* Scale Slider */}
           <div className="hud-scale-slider-row">
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700 }}>
-              <span>UI Scale Density:</span>
-              <span style={{ color: '#38bdf8', fontWeight: 800 }}>{Math.round(scale * 100)}%</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', fontWeight: 700 }}>
+              <span style={{ color: '#334155' }}>UI Scale Density:</span>
+              <span style={{
+                background: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontWeight: 800,
+                fontSize: '0.78rem'
+              }}>
+                {Math.round(scale * 100)}%
+              </span>
             </div>
             <input
               type="range"
               min="0.85"
               max="1.15"
-              step="0.05"
+              step="0.01"
               value={scale}
               onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
               className="hud-scale-slider"
+              style={{
+                background: `linear-gradient(to right, #2563eb 0%, #2563eb ${Math.round(((scale - 0.85) / 0.3) * 100)}%, #e2e8f0 ${Math.round(((scale - 0.85) / 0.3) * 100)}%, #e2e8f0 100%)`
+              }}
+              title="Drag to smoothly scale UI density"
             />
-            <div className="hud-scale-labels">
-              <span>85% (Dense)</span>
-              <span>100% (Default)</span>
-              <span>115% (Comfort)</span>
+            
+            {/* Interactive Presets */}
+            <div className="hud-scale-presets">
+              <button
+                type="button"
+                className={`hud-preset-pill ${Math.abs(scale - 0.85) < 0.02 ? 'is-active' : ''}`}
+                onClick={() => handlePresetSelect(0.85)}
+                title="Dense layout (fits more data on small screens)"
+              >
+                85% (Dense)
+              </button>
+              <button
+                type="button"
+                className={`hud-preset-pill ${Math.abs(scale - 1.0) < 0.02 ? 'is-active' : ''}`}
+                onClick={() => handlePresetSelect(1.0)}
+                title="Standard 100% baseline (recommended)"
+              >
+                100% (Default)
+              </button>
+              <button
+                type="button"
+                className={`hud-preset-pill ${Math.abs(scale - 1.15) < 0.02 ? 'is-active' : ''}`}
+                onClick={() => handlePresetSelect(1.15)}
+                title="Comfort layout (larger fonts and touch targets)"
+              >
+                115% (Comfort)
+              </button>
             </div>
           </div>
 
           {/* Industrial High Contrast Theme Toggle */}
           <div className="hud-theme-toggle-row">
             <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc' }}>🏭 Factory HUD Mode</div>
-              <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Solid 2px high-visibility outlines</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a' }}>🏭 Factory HUD Mode</div>
+              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Solid 2px high-visibility outlines</div>
             </div>
             <button
               type="button"
-              className={`btn-secondary ${isIndustrial ? 'active' : ''}`}
+              className={`hud-theme-toggle-btn ${isIndustrial ? 'active' : ''}`}
               onClick={handleToggleIndustrial}
-              style={{
-                fontSize: '0.7rem',
-                padding: '0.3rem 0.65rem',
-                borderColor: isIndustrial ? '#38bdf8' : 'rgba(255,255,255,0.15)',
-                background: isIndustrial ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.06)',
-                color: isIndustrial ? '#38bdf8' : '#e2e8f0',
-                fontWeight: 800,
-                cursor: 'pointer',
-                borderRadius: '6px'
-              }}
             >
               {isIndustrial ? 'ON' : 'OFF'}
             </button>
           </div>
 
           {/* Reset Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.1rem' }}>
             <button
               type="button"
+              className="hud-reset-btn"
               onClick={handleReset}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '0.72rem',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                fontWeight: 600
-              }}
             >
               <RotateCcw size={11} /> Reset Defaults
             </button>
