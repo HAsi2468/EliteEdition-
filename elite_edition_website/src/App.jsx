@@ -3651,8 +3651,18 @@ export default function App() {
       {/* Scroll-Triggered Sticky Drop-Shadows Tracker */}
       <StickyScrollShadowTracker />
 
-      {/* Enterprise Industrial HUD Theme & UI Scale Controller */}
-      <EnterpriseHUDThemeController />
+      {/* Enterprise Floating Action Dock: UI Scale, Communication & Tasks */}
+      <EnterpriseHUDThemeController 
+        activeTab={activeTab}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setMobileMenuOpen(false);
+        }}
+        hasCommunicationAccess={hasCommunicationAccess}
+        hasTaskAccess={hasTaskAccess}
+        chatUnreadCount={chatUnreadCount}
+        isAuthenticated={isAuthenticated}
+      />
 
       {/* Rotating Smart Tips Banner */}
       <QuickTipPill />
