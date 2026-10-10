@@ -152,16 +152,34 @@ const setupSockets = (io) => {
       }
     });
 
-    // 4. Client reconnection resync handler (requests missed events)
-    socket.on('sync-events', ({ sinceEventId, companyId }, callback) => {
+    // 4. Client reconnection resync handler (requests missed events & messages)
+    socket.on('sync-events', async ({ sinceEventId, companyId, sinceTimestamp, lastReceivedMessageTimestamp }, callback) => {
       try {
         eventBus.metrics.clientReconnects++;
         const targetCompany = normalizeCompanyId(companyId) || socket.activeCompanyId;
         const missed = eventBus.getMissedEvents(sinceEventId || 0, targetCompany);
+
+        let missedMessages = [];
+        if (lastReceivedMessageTimestamp && socket.userId) {
+          const userRooms = await ChatRoom.find({ members: socket.userId }).select('_id').lean();
+          const rIds = userRooms.map(r => r._id);
+          if (rIds.length > 0) {
+            missedMessages = await ChatMessage.find({
+              roomId: { $in: rIds },
+              createdAt: { $gt: new Date(lastReceivedMessageTimestamp) }
+            })
+            .populate('senderId', 'name username email role')
+            .sort({ createdAt: 1 })
+            .limit(50)
+            .lean();
+          }
+        }
+
         if (typeof callback === 'function') {
           callback({
             success: true,
             events: missed,
+            messages: missedMessages,
             latestEventId: eventBus.currentEventId
           });
         }
@@ -204,7 +222,7 @@ const setupSockets = (io) => {
     });
 
     // Handle sending a standard text message (supports quoted replies, attachments, mentions, priority, voice notes, record cards)
-    socket.on('send-message', async (data) => {
+    socket.on('send-message', async (data, callback) => {
       try {
         const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = data;
         
@@ -212,6 +230,7 @@ const setupSockets = (io) => {
         const actualSenderId = socket.userId || (socket.user ? String(socket.user._id) : senderId);
         if (!actualSenderId) {
           socket.emit('error-notice', { message: 'Authentication required to post messages' });
+          if (typeof callback === 'function') callback({ success: false, error: 'Authentication required' });
           return;
         }
 
@@ -339,6 +358,10 @@ const setupSockets = (io) => {
           });
         }
         broadcast.emit('receive-message', populatedMessage);
+
+        if (typeof callback === 'function') {
+          callback({ success: true, message: populatedMessage });
+        }
 
         // Dispatch Web Push Notification to backgrounded / unfocused room members
         try {
@@ -757,7 +780,7 @@ const setupSockets = (io) => {
     });
 
     // Handle production stage transitions for Job Cards & automated Bot logs
-    socket.on('update-production-stage', async (data) => {
+    const handleProductionStageUpdate = async (data, callback) => {
       try {
         const { jobCardId, newStage, actorId, actorName } = data;
         const JobCardModel = require('../db/models').JobCard;
@@ -766,7 +789,10 @@ const setupSockets = (io) => {
         const OrderActivityLogModel = require('../db/models').OrderActivityLog;
 
         const card = await JobCardModel.findById(jobCardId);
-        if (!card) return;
+        if (!card) {
+          if (typeof callback === 'function') callback({ success: false, error: 'Job Card not found' });
+          return;
+        }
 
         const prevStage = card.productionStage || 'Order Received';
         card.productionStage = newStage;
@@ -827,10 +853,38 @@ const setupSockets = (io) => {
 
         io.to(String(roomId)).emit('receive-message', populatedBotMsg);
         io.emit('job-stage-updated', { jobCardId, jobNo: card.jobNo, newStage, prevStage });
+
+        // Dispatch Web Push to relevant room members
+        try {
+          const roomDoc = await ChatRoomModel.findById(roomId);
+          const recipientIds = (roomDoc?.members || [])
+            .map((m) => getMemberIdString(m))
+            .filter((id) => id && id !== String(actorId));
+
+          if (recipientIds.length > 0) {
+            webPushService.dispatchJobUpdateNotification(recipientIds, {
+              jobCardId: String(jobCardId),
+              jobNo: String(card.jobNo),
+              newStage,
+              party: card.party || '',
+              actorName: actorName || 'Operator'
+            }).catch((e) => console.warn('[WebPush] Job stage update push notice:', e.message));
+          }
+        } catch (e) {}
+
+        if (typeof callback === 'function') {
+          callback({ success: true, jobCardId, newStage, prevStage });
+        }
       } catch (err) {
         console.error('Error updating production stage socket:', err);
+        if (typeof callback === 'function') {
+          callback({ success: false, error: err.message });
+        }
       }
-    });
+    };
+
+    socket.on('update-production-stage', handleProductionStageUpdate);
+    socket.on('job-card-stage-update', handleProductionStageUpdate);
 
     // Handle Proofing & Artwork Approval pipeline events
     socket.on('update-proof-approval', async (data) => {

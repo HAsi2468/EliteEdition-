@@ -1,12 +1,12 @@
 import React from 'react';
-import ConnectionStatusHUD from './ConnectionStatusHUD';
+import ConnectionStatusBanner from './ConnectionStatusBanner';
 
 /**
  * Backward compatibility wrapper for OfflineBanner.
- * Re-exports the unified, high-performance ConnectionStatusHUD.
+ * Exports the production-grade ConnectionStatusBanner.
  */
 export function OfflineBanner() {
-  return <ConnectionStatusHUD />;
+  return <ConnectionStatusBanner />;
 }
 
 export default OfflineBanner;

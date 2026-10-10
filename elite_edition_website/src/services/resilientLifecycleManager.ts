@@ -66,10 +66,10 @@ class ResilientLifecycleManager {
       pingEndpoint: customConfig.pingEndpoint || '/v1/auth/ping',
       activeIntervalMs: customConfig.activeIntervalMs || 10000,
       backgroundIntervalMs: customConfig.backgroundIntervalMs || 25000,
-      probeTimeoutMs: customConfig.probeTimeoutMs || 2500,
-      baseReconnectDelayMs: customConfig.baseReconnectDelayMs || 300,
-      maxReconnectDelayMs: customConfig.maxReconnectDelayMs || 3000,
-      jitterFactor: customConfig.jitterFactor || 0.2,
+      probeTimeoutMs: customConfig.probeTimeoutMs || 3000,
+      baseReconnectDelayMs: customConfig.baseReconnectDelayMs || 500,
+      maxReconnectDelayMs: customConfig.maxReconnectDelayMs || 10000,
+      jitterFactor: customConfig.jitterFactor || 0.25,
     };
   }
 

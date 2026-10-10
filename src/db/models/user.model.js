@@ -96,6 +96,41 @@ const userSchema = new mongoose.Schema(
 			type: Date,
 			default: Date.now,
 		},
+		pushSubscriptions: [
+			{
+				endpoint: {
+					type: String,
+					required: true,
+					trim: true,
+				},
+				keys: {
+					p256dh: {
+						type: String,
+						required: true,
+						trim: true,
+					},
+					auth: {
+						type: String,
+						required: true,
+						trim: true,
+					},
+				},
+				deviceFingerprint: {
+					type: String,
+					trim: true,
+					default: '',
+				},
+				userAgent: {
+					type: String,
+					trim: true,
+					default: '',
+				},
+				lastActiveAt: {
+					type: Date,
+					default: Date.now,
+				},
+			},
+		],
 		password: {
 			type: String,
 			required: true,

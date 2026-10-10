@@ -105,6 +105,7 @@ import MobileBottomNav from './components/common/MobileBottomNav';
 import UndoToastContainer from './components/common/UndoToast';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import OfflineBanner from './components/common/OfflineBanner';
+import IosInstallPrompt from './components/common/IosInstallPrompt';
 import PullToRefresh from './components/common/PullToRefresh';
 import { DashboardSkeleton } from './components/common/Skeleton';
 import BarcodeSnifferHUD from './components/common/BarcodeSnifferHUD';
@@ -1748,17 +1749,8 @@ export default function App() {
         </div>
       )}
 
-      {showIosInstallHint && !isStandalone && (
-        <div className="pwa-ios-hint">
-          <span>Install app: Tap Share then 'Add to Home Screen'</span>
-          <button onClick={() => {
-            try { localStorage.setItem('dismissed_ios_install_hint', 'true'); } catch (e) {}
-            setShowIosInstallHint(false);
-          }}>
-            Dismiss
-          </button>
-        </div>
-      )}
+      {/* Apple iOS PWA Installation Prompt (iOS 16.4+ Web Push Support) */}
+      <IosInstallPrompt />
 
       {/* Notifications permission bar - minimal */}
       {isAuthenticated && notificationPerm === 'denied' && !permSnoozedSession && (

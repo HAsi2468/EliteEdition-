@@ -65,4 +65,16 @@ router.post(
   })
 );
 
+/**
+ * Live test push notification dispatcher
+ */
+router.post(
+  '/test-push',
+  catchAsync(async (req, res) => {
+    const userId = req.headers['x-user-id'] || req.user?.id || req.body?.userId;
+    await webPushService.dispatchTestNotification(userId);
+    res.send({ success: true, message: 'Test notification sent' });
+  })
+);
+
 module.exports = router;

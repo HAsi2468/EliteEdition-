@@ -1,5 +1,5 @@
 const webpush = require('web-push');
-const { PushSubscription } = require('../db/models');
+const { PushSubscription, User } = require('../db/models');
 const logger = require('../config/logger');
 
 // VAPID Credentials for Elite Edition ERP Push Service
@@ -18,7 +18,8 @@ class WebPushService {
   }
 
   /**
-   * Stores or updates a user's browser push subscription
+   * Stores or updates a user's browser push subscription across both
+   * PushSubscription collection and the User document's pushSubscriptions array.
    */
   async saveSubscription(userId, subscription, userAgent = '', deviceFingerprint = '') {
     if (!subscription || !subscription.endpoint || !subscription.keys) {
@@ -27,7 +28,8 @@ class WebPushService {
 
     const { endpoint, keys, expirationTime } = subscription;
 
-    return PushSubscription.findOneAndUpdate(
+    // 1. Update/Upsert in dedicated PushSubscription collection
+    const savedRecord = await PushSubscription.findOneAndUpdate(
       { endpoint },
       {
         user: userId,
@@ -43,13 +45,72 @@ class WebPushService {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+
+    // 2. Sync into User document (User.pushSubscriptions)
+    if (userId) {
+      try {
+        const subDoc = {
+          endpoint,
+          keys: {
+            p256dh: keys.p256dh,
+            auth: keys.auth,
+          },
+          userAgent,
+          deviceFingerprint,
+          lastActiveAt: new Date(),
+        };
+
+        await User.findByIdAndUpdate(userId, {
+          $pull: { pushSubscriptions: { endpoint } },
+        });
+
+        await User.findByIdAndUpdate(userId, {
+          $push: { pushSubscriptions: subDoc },
+        });
+      } catch (userErr) {
+        logger.warn(`[WebPush] User document subscription sync notice: ${userErr.message}`);
+      }
+    }
+
+    return savedRecord;
   }
 
   /**
-   * Removes an unsubscribed endpoint
+   * Removes an unsubscribed endpoint from both models
    */
   async removeSubscription(endpoint) {
-    return PushSubscription.deleteOne({ endpoint });
+    if (!endpoint) return;
+
+    await Promise.allSettled([
+      PushSubscription.deleteOne({ endpoint }),
+      User.updateMany(
+        { 'pushSubscriptions.endpoint': endpoint },
+        { $pull: { pushSubscriptions: { endpoint } } }
+      ),
+    ]);
+  }
+
+  /**
+   * Auto-prunes expired/invalid endpoints returning HTTP 404 or 410 Gone
+   */
+  async pruneInvalidEndpoint(endpoint, subId = null) {
+    if (!endpoint) return;
+    logger.info(`[WebPush] Pruning expired/invalid subscription endpoint: ${endpoint.slice(0, 35)}...`);
+
+    const cleanupTasks = [
+      User.updateMany(
+        { 'pushSubscriptions.endpoint': endpoint },
+        { $pull: { pushSubscriptions: { endpoint } } }
+      ),
+    ];
+
+    if (subId) {
+      cleanupTasks.push(PushSubscription.deleteOne({ _id: subId }));
+    } else {
+      cleanupTasks.push(PushSubscription.deleteOne({ endpoint }));
+    }
+
+    await Promise.allSettled(cleanupTasks);
   }
 
   /**
@@ -64,6 +125,7 @@ class WebPushService {
 
   /**
    * Dispatches chat push notification to recipient user IDs
+   * Targeted dispatch: Suppresses OS push if user is actively focused in that room
    * @param {Array<string>} recipientUserIds 
    * @param {object} messageData 
    */
@@ -79,9 +141,13 @@ class WebPushService {
       avatarUrl = '/Logo.png',
     } = messageData;
 
+    // Clean recipient user IDs
+    const cleanUserIds = Array.from(new Set(recipientUserIds.map(String).filter(Boolean)));
+    if (cleanUserIds.length === 0) return;
+
     // Fetch all active push subscriptions for these recipients
     const subscriptions = await PushSubscription.find({
-      user: { $in: recipientUserIds },
+      user: { $in: cleanUserIds },
     });
 
     if (subscriptions.length === 0) return;
@@ -91,11 +157,11 @@ class WebPushService {
       body: messagePreview,
       icon: avatarUrl || '/Logo.png',
       badge: '/Logo.png',
-      tag: `chat-room-${roomId}`, // Collapses multiple messages from same room
+      tag: `chat-room-${roomId || 'general'}`, // Collapses multiple messages from same thread
       renotify: true,
       timestamp: Date.now(),
       data: {
-        roomId,
+        roomId: String(roomId),
         url: `/communication?room=${roomId}`,
         priority,
       },
@@ -107,11 +173,13 @@ class WebPushService {
 
     const pushPromises = subscriptions.map(async (sub) => {
       // Smart Focus Check: If user was active in this exact room within last 15 seconds, suppress OS push
-      const isActivelyFocused = sub.activeRoomId === String(roomId) &&
-        sub.lastActiveAt && (Date.now() - new Date(sub.lastActiveAt).getTime() < 15000);
+      const isActivelyFocused =
+        sub.activeRoomId === String(roomId) &&
+        sub.lastActiveAt &&
+        Date.now() - new Date(sub.lastActiveAt).getTime() < 15000;
 
       if (isActivelyFocused) {
-        return; // Suppress duplicate notification
+        return; // Tab is open & focused; suppress OS push
       }
 
       const pushConfig = {
@@ -124,16 +192,14 @@ class WebPushService {
 
       try {
         await webpush.sendNotification(pushConfig, notificationPayload, {
-          TTL: 86400, // 24 hours retention on push service
-          urgency: 'high', // High urgency wakes mobile devices from background/Doze sleep
+          TTL: 86400, // 24 hours retention
+          urgency: priority === 'urgent' ? 'high' : 'normal',
         });
       } catch (err) {
-        // HTTP 410 Gone or 404 Not Found indicates the browser unsubscribed or expired
         if (err.statusCode === 410 || err.statusCode === 404) {
-          logger.info(`Cleaning expired push subscription for endpoint: ${sub.endpoint.slice(0, 30)}...`);
-          await PushSubscription.deleteOne({ _id: sub._id });
+          await this.pruneInvalidEndpoint(sub.endpoint, sub._id);
         } else {
-          logger.warn(`Push notification send error: ${err.message}`);
+          logger.warn(`[WebPush] Chat push error for ${sub.endpoint.slice(0, 25)}: ${err.message}`);
         }
       }
     });
@@ -142,132 +208,116 @@ class WebPushService {
   }
 
   /**
-   * Dispatches task assignment push notification to assigned user IDs
-   * @param {Array<string>} recipientUserIds 
-   * @param {object} taskData 
+   * Dispatches priority job card update push notification to relevant staff/managers
+   * @param {Array<string>} recipientUserIds
+   * @param {object} jobData
    */
-  async dispatchTaskNotification(recipientUserIds, taskData) {
+  async dispatchJobUpdateNotification(recipientUserIds, jobData) {
     if (!Array.isArray(recipientUserIds) || recipientUserIds.length === 0) return;
 
-    // Filter out falsy IDs and deduplicate
     const cleanUserIds = Array.from(new Set(recipientUserIds.map(String).filter(Boolean)));
     if (cleanUserIds.length === 0) return;
 
     const {
-      taskId = '',
-      title = 'New Task Assigned',
-      priority = 'medium',
-      department = 'General',
-      dueDate = null,
-      createdByName = 'Admin',
-      projectRef = '',
-    } = taskData;
+      jobCardId = '',
+      jobNo = '',
+      newStage = 'Stage Advanced',
+      party = '',
+      actorName = 'Operator',
+    } = jobData;
 
-    try {
-      // Fetch all active push subscriptions for these recipients
-      const subscriptions = await PushSubscription.find({
-        user: { $in: cleanUserIds },
-      });
+    const subscriptions = await PushSubscription.find({
+      user: { $in: cleanUserIds },
+    });
 
-      if (!subscriptions || subscriptions.length === 0) {
-        logger.info(`[WebPush] No active push subscriptions found for assignees: ${cleanUserIds.join(', ')}`);
-        return;
-      }
+    if (subscriptions.length === 0) return;
 
-      const dueStr = dueDate ? ` • Due: ${new Date(dueDate).toLocaleDateString()}` : '';
-      const projStr = projectRef ? ` [${projectRef}]` : '';
-      const bodyText = `Assigned by ${createdByName} • Priority: ${priority.toUpperCase()} • Dept: ${department}${projStr}${dueStr}`;
-
-      const notificationPayload = JSON.stringify({
-        title: `📋 Task Assigned: ${title}`,
-        body: bodyText,
-        icon: '/Logo.png',
-        badge: '/Logo.png',
-        tag: `task-${taskId || Date.now()}`,
-        renotify: true,
-        timestamp: Date.now(),
-        data: {
-          taskId,
-          url: '/workspace',
-          priority,
-        },
-        actions: [
-          { action: 'open', title: 'Open Workspace' },
-          { action: 'dismiss', title: 'Dismiss' },
-        ],
-      });
-
-      const pushPromises = subscriptions.map(async (sub) => {
-        const pushConfig = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.keys.p256dh,
-            auth: sub.keys.auth,
-          },
-        };
-
-        try {
-          await webpush.sendNotification(pushConfig, notificationPayload, {
-            TTL: 86400, // 24 hours
-            urgency: 'high', // High urgency wakes mobile devices from background/Doze sleep
-          });
-        } catch (err) {
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            logger.info(`Cleaning expired push subscription for endpoint: ${sub.endpoint.slice(0, 30)}...`);
-            await PushSubscription.deleteOne({ _id: sub._id });
-          } else {
-            logger.warn(`Task push notification send error: ${err.message}`);
-          }
-        }
-      });
-
-      await Promise.allSettled(pushPromises);
-      logger.info(`[WebPush] Dispatched task assignment push notification to ${subscriptions.length} devices for task: "${title}"`);
-    } catch (pushErr) {
-      logger.error(`[WebPush] Failed to dispatch task push notification: ${pushErr.message}`);
-    }
-  }
-
-  /**
-   * Broadcasts executive intelligence alert to all active admin/manager devices
-   * @param {object} alertData
-   */
-  async dispatchExecutiveAlert(alertData) {
-    const {
-      title = '🏭 8:00 PM Executive Intelligence Briefing',
-      body = 'Daily production telemetry ready for review.',
-      url = '/analytics',
-    } = alertData;
-
-    const subscriptions = await PushSubscription.find({});
-    if (!subscriptions || subscriptions.length === 0) return;
-
-    const payload = JSON.stringify({
-      title,
-      body,
+    const notificationPayload = JSON.stringify({
+      title: `⚡ Job Card #${jobNo} Stage Update`,
+      body: `Advanced to "${newStage}" by ${actorName}${party ? ` • Client: ${party}` : ''}`,
       icon: '/Logo.png',
       badge: '/Logo.png',
-      tag: 'eod-executive-briefing',
+      tag: `job-${jobCardId || jobNo}`,
+      renotify: true,
       timestamp: Date.now(),
-      data: { url },
+      data: {
+        jobCardId,
+        url: `/jobcards_fusing_log?job=${jobNo}`,
+        priority: 'high',
+      },
+      actions: [
+        { action: 'open', title: 'View Job' },
+        { action: 'dismiss', title: 'Dismiss' },
+      ],
     });
 
     const pushPromises = subscriptions.map(async (sub) => {
+      const pushConfig = {
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: sub.keys.p256dh,
+          auth: sub.keys.auth,
+        },
+      };
+
       try {
-        await webpush.sendNotification({
-          endpoint: sub.endpoint,
-          keys: sub.keys,
-        }, payload, { TTL: 43200, urgency: 'high' });
+        await webpush.sendNotification(pushConfig, notificationPayload, {
+          TTL: 86400,
+          urgency: 'high',
+        });
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
-          await PushSubscription.deleteOne({ _id: sub._id });
+          await this.pruneInvalidEndpoint(sub.endpoint, sub._id);
         }
       }
     });
 
     await Promise.allSettled(pushPromises);
   }
+
+  /**
+   * Dispatches test notification to verify end-to-end delivery
+   */
+  async dispatchTestNotification(userId) {
+    const query = userId ? { user: userId } : {};
+    const subscriptions = await PushSubscription.find(query).limit(5);
+
+    if (subscriptions.length === 0) {
+      throw new Error('No active push subscriptions found to test');
+    }
+
+    const payload = JSON.stringify({
+      title: 'Elite Edition ERP • Live Push Test',
+      body: 'Production Web Push pipeline verified successfully! Real-time alerts are operational.',
+      icon: '/Logo.png',
+      badge: '/Logo.png',
+      tag: 'test-push-alert',
+      timestamp: Date.now(),
+      data: { url: '/communication' },
+    });
+
+    const results = await Promise.allSettled(
+      subscriptions.map(async (sub) => {
+        try {
+          return await webpush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: sub.keys,
+            },
+            payload,
+            { TTL: 300, urgency: 'high' }
+          );
+        } catch (err) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await this.pruneInvalidEndpoint(sub.endpoint, sub._id);
+          }
+          throw err;
+        }
+      })
+    );
+
+    return results;
+  }
 }
 
 module.exports = new WebPushService();
-
