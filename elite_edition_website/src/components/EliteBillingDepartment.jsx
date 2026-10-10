@@ -595,6 +595,33 @@ export default function EliteBillingDepartment({
       return;
     }
 
+    // 2. Check recent purchases for vendor snapshot
+    const matchedPurchase = (purchases || []).find(p => {
+      const vName = (p.vendorName || (p.vendor && (p.vendor.businessName || p.vendor.name)) || '').trim().toLowerCase();
+      return vName === selectedName.trim().toLowerCase();
+    });
+
+    if (matchedPurchase && matchedPurchase.vendor) {
+      const pv = matchedPurchase.vendor;
+      setPurchaseForm(prev => ({
+        ...prev,
+        vendorName: pv.businessName || pv.name || selectedName,
+        vendor: {
+          vendorId: pv.vendorId || '',
+          name: pv.name || selectedName,
+          businessName: pv.businessName || selectedName,
+          phone: pv.phone || '',
+          email: pv.email || '',
+          gstin: pv.gstin || '',
+          billingAddress: pv.billingAddress || '',
+          shippingAddress: pv.shippingAddress || pv.billingAddress || '',
+          state: pv.state || 'Gujarat',
+          stateCode: pv.stateCode || '24'
+        }
+      }));
+      return;
+    }
+
     setPurchaseForm(prev => ({
       ...prev,
       vendorName: selectedName,
@@ -1219,27 +1246,32 @@ export default function EliteBillingDepartment({
     triggerPushNotification('Purchase Recorded 📥', `Purchase Bill #${payload.purchaseNo} saved successfully!`, 'success');
   };
 
-  const handleDeletePurchase = async (id, purchaseNo) => {
+  const handleDeletePurchase = async (id, purchaseNo, vendorName) => {
     const ok = await triggerEliteConfirm({
       title: 'Delete Purchase Record',
-      message: 'Are you sure you want to delete this purchase record? This action cannot be undone.',
+      message: `Are you sure you want to delete purchase record ${purchaseNo ? `#${purchaseNo}` : ''}? This action permanently purges all duplicates.`,
       confirmText: 'Yes, Delete',
       cancelText: 'Cancel',
       type: 'danger'
     });
     if (!ok) return;
     try {
-      const isMongoId = /^[0-9a-fA-F]{24}$/.test(id);
-      if (isMongoId) {
-        await api.deleteBillingPurchase(id);
-      }
-      setPurchases(prev => prev.filter(p => p._id !== id && p.id !== id && (purchaseNo ? p.purchaseNo !== purchaseNo : true)));
+      await api.deleteBillingPurchase(id, { purchaseNo, vendorName });
+
+      const cleanFilter = p => {
+        const matchId = (p._id && (p._id === id || p._id === String(id))) || (p.id && (p.id === id || p.id === String(id)));
+        const matchNo = purchaseNo && p.purchaseNo && p.purchaseNo.trim().toLowerCase() === String(purchaseNo).trim().toLowerCase();
+        return !matchId && !matchNo;
+      };
+
+      setPurchases(prev => prev.filter(cleanFilter));
 
       // Authoritatively purge from all localStorage cache keys so it never resurrects
       const legacyKeys = [
         `elite_purchases_${companyEntity || 'edp'}`,
         'elite_purchases_edp',
         'elite_purchases_Elite Digital Prints',
+        'elite_purchases_Elite Digital Print',
         'elite_purchases_Elite Edition',
         'elite_purchases_Elite Fabtex'
       ];
@@ -1249,7 +1281,7 @@ export default function EliteBillingDepartment({
           if (raw) {
             const arr = JSON.parse(raw);
             if (Array.isArray(arr)) {
-              const cleaned = arr.filter(p => p._id !== id && p.id !== id && (purchaseNo ? p.purchaseNo !== purchaseNo : true));
+              const cleaned = arr.filter(cleanFilter);
               localStorage.setItem(k, JSON.stringify(cleaned));
             }
           }
@@ -1263,7 +1295,7 @@ export default function EliteBillingDepartment({
     }
   };
 
-  // Vendor options populated strictly from Billing Vendors Master (saved billing vendors)
+  // Vendor options populated from Billing Vendors Master + historical purchases so no vendor is ever missing
   const vendorOptions = useMemo(() => {
     const list = new Set();
 
@@ -1272,8 +1304,13 @@ export default function EliteBillingDepartment({
       if (vName && String(vName).trim()) list.add(String(vName).trim());
     });
 
-    return Array.from(list).filter(Boolean);
-  }, [vendorsList]);
+    (purchases || []).forEach(p => {
+      const pVendor = p.vendorName || (p.vendor && (p.vendor.businessName || p.vendor.name));
+      if (pVendor && String(pVendor).trim()) list.add(String(pVendor).trim());
+    });
+
+    return Array.from(list).filter(Boolean).sort();
+  }, [vendorsList, purchases]);
 
   // Dynamic list of unique vendors for purchases filter
   const purchaseVendorsList = useMemo(() => {
@@ -2744,7 +2781,7 @@ export default function EliteBillingDepartment({
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [editingVendorId, setEditingVendorId] = useState(null);
   const [vendorForm, setVendorForm] = useState({
-    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric'
+    name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'General Supplier'
   });
 
   // New Item Modal State
@@ -3481,7 +3518,7 @@ export default function EliteBillingDepartment({
       }
       setShowVendorModal(false);
       setEditingVendorId(null);
-      setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric' });
+      setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'General Supplier' });
     } catch (err) {
       alert(err.message || 'Failed to save vendor');
     }
@@ -4847,7 +4884,7 @@ export default function EliteBillingDepartment({
                 className="btn-primary" 
                 onClick={() => {
                   setEditingVendorId(null);
-                  setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric' });
+                  setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'General Supplier' });
                   setShowVendorModal(true);
                 }}
               >
@@ -5404,7 +5441,7 @@ export default function EliteBillingDepartment({
                                 tooltip: 'Delete Purchase Entry',
                                 variant: 'danger',
                                 color: '#f87171',
-                                onClick: () => handleDeletePurchase(p._id || p.id, p.purchaseNo),
+                                onClick: () => handleDeletePurchase(p._id || p.id, p.purchaseNo, p.vendorName),
                                 isPrimary: false
                               }
                             ];
@@ -5535,7 +5572,7 @@ export default function EliteBillingDepartment({
                       type="button"
                       onClick={() => {
                         setEditingVendorId(null);
-                        setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'Fabric' });
+                        setVendorForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24', vendorType: 'General Supplier' });
                         setShowVendorModal(true);
                       }}
                       style={{

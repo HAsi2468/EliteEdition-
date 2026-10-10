@@ -2794,22 +2794,7 @@ const deleteCustomer = async (req, res) => {
 const getVendors = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const filter = buildCompanyFilter(companyEntity);
-
-    // Clean up any previously auto-seeded fabric vendors from BillingVendor collection
-    try {
-      const fVendors = await FabricVendor.find({}, 'name businessName').lean().catch(() => []);
-      const fNames = fVendors.flatMap(fv => [fv.name, fv.businessName]).filter(Boolean);
-      if (fNames.length > 0) {
-        await BillingVendor.deleteMany({
-          $or: [
-            { name: { $in: fNames } },
-            { businessName: { $in: fNames } },
-            { vendorType: 'Fabric' }
-          ]
-        }).catch(() => {});
-      }
-    } catch (cleanErr) {}
+    const filter = buildPurchaseCompanyFilter(companyEntity);
 
     const vendors = await BillingVendor.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: vendors || [] });
@@ -3039,7 +3024,40 @@ const createPurchase = async (req, res) => {
     if (purchaseData._id && !mongoose.Types.ObjectId.isValid(purchaseData._id)) {
       delete purchaseData._id;
     }
+
     const purchase = await BillingPurchase.create(purchaseData);
+
+    // Auto-upsert into BillingVendor if vendor info is present so user never loses entered vendor
+    if (purchaseData.vendor && (purchaseData.vendor.name || purchaseData.vendor.businessName)) {
+      const vName = (purchaseData.vendor.name || purchaseData.vendor.businessName).trim();
+      const vBusiness = (purchaseData.vendor.businessName || purchaseData.vendor.name).trim();
+      const companyEntity = purchaseData.companyEntity || 'Elite Digital Print';
+      BillingVendor.findOneAndUpdate(
+        {
+          $or: [
+            { name: vName },
+            { businessName: vBusiness }
+          ]
+        },
+        {
+          $setOnInsert: {
+            name: vName,
+            businessName: vBusiness,
+            phone: purchaseData.vendor.phone || '',
+            email: purchaseData.vendor.email || '',
+            gstin: purchaseData.vendor.gstin || '',
+            billingAddress: purchaseData.vendor.billingAddress || '',
+            shippingAddress: purchaseData.vendor.shippingAddress || '',
+            state: purchaseData.vendor.state || 'Gujarat',
+            stateCode: purchaseData.vendor.stateCode || '24',
+            vendorType: 'General Supplier',
+            companyEntity
+          }
+        },
+        { upsert: true, new: true }
+      ).catch(() => {});
+    }
+
     res.status(201).json({ success: true, data: purchase });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -3063,6 +3081,38 @@ const updatePurchase = async (req, res) => {
     if (!purchase) {
       return res.status(404).json({ success: false, error: 'Purchase record not found' });
     }
+
+    // Auto-upsert into BillingVendor if vendor info is present
+    if (purchaseData.vendor && (purchaseData.vendor.name || purchaseData.vendor.businessName)) {
+      const vName = (purchaseData.vendor.name || purchaseData.vendor.businessName).trim();
+      const vBusiness = (purchaseData.vendor.businessName || purchaseData.vendor.name).trim();
+      const companyEntity = purchaseData.companyEntity || 'Elite Digital Print';
+      BillingVendor.findOneAndUpdate(
+        {
+          $or: [
+            { name: vName },
+            { businessName: vBusiness }
+          ]
+        },
+        {
+          $setOnInsert: {
+            name: vName,
+            businessName: vBusiness,
+            phone: purchaseData.vendor.phone || '',
+            email: purchaseData.vendor.email || '',
+            gstin: purchaseData.vendor.gstin || '',
+            billingAddress: purchaseData.vendor.billingAddress || '',
+            shippingAddress: purchaseData.vendor.shippingAddress || '',
+            state: purchaseData.vendor.state || 'Gujarat',
+            stateCode: purchaseData.vendor.stateCode || '24',
+            vendorType: 'General Supplier',
+            companyEntity
+          }
+        },
+        { upsert: true, new: true }
+      ).catch(() => {});
+    }
+
     res.json({ success: true, data: purchase });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -3071,8 +3121,35 @@ const updatePurchase = async (req, res) => {
 
 const deletePurchase = async (req, res) => {
   try {
-    await BillingPurchase.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: 'Purchase record deleted successfully' });
+    const { id } = req.params;
+    const { purchaseNo, vendorName } = req.query;
+
+    const filter = { $or: [] };
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      filter.$or.push({ _id: new mongoose.Types.ObjectId(id) });
+    } else if (id) {
+      filter.$or.push({ id });
+      filter.$or.push({ purchaseNo: id });
+    }
+
+    if (purchaseNo && String(purchaseNo).trim()) {
+      const pNo = String(purchaseNo).trim();
+      const escaped = pNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or.push({ purchaseNo: pNo });
+      filter.$or.push({ purchaseNo: new RegExp(`^${escaped}$`, 'i') });
+    }
+
+    if (filter.$or.length === 0) {
+      return res.status(400).json({ success: false, error: 'Valid purchase identifier required' });
+    }
+
+    // Atomic purge of all duplicate/alias records matching this purchase across all entity aliases
+    const result = await BillingPurchase.deleteMany(filter);
+    res.json({
+      success: true,
+      message: 'Purchase record deleted successfully',
+      deletedCount: result.deletedCount
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

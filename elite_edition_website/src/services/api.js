@@ -2074,8 +2074,12 @@ export const api = {
     });
   },
 
-  async deleteBillingPurchase(id) {
-    return request(`/billing/purchases/${id}`, { method: 'DELETE' });
+  async deleteBillingPurchase(id, params = {}) {
+    const q = new URLSearchParams();
+    if (params.purchaseNo) q.append('purchaseNo', params.purchaseNo);
+    if (params.vendorName) q.append('vendorName', params.vendorName);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return request(`/billing/purchases/${id}${qs}`, { method: 'DELETE' });
   },
 
   // Data Backup
