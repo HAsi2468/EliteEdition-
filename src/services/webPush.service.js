@@ -317,6 +317,8 @@ class WebPushService {
     );
 
     return results;
+  }
+
   /**
    * Sends push notification payload to a specific user across all registered devices
    */
