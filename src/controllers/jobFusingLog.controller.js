@@ -67,6 +67,19 @@ async function syncJobCardFusingTotals(jobCardId, jobNo) {
   targetJob.totalFabricUsedMtr = Number.isInteger(totalFusedMtr) ? String(totalFusedMtr) : totalFusedMtr.toFixed(2);
   targetJob.fusingMtr = Number.isInteger(totalFusedMtr) ? String(totalFusedMtr) : totalFusedMtr.toFixed(2);
 
+  // Baseline for Pending Fusing = sum(Print Logs) - sum(Fused Mtr)
+  const printStr = targetJob.printMtr || '0';
+  const printMatch = String(printStr).match(/[\d.]+/);
+  const printedMtr = printMatch ? parseFloat(printMatch[0]) : 0;
+
+  const targetStr = targetJob.totalMtr || targetJob.consumption || '0';
+  const targetMatch = String(targetStr).match(/[\d.]+/);
+  const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+
+  const fusingBaseline = printedMtr > 0 ? printedMtr : targetMtr;
+  const pendingFusingMtr = fusingBaseline > 0 ? Math.max(0, fusingBaseline - totalFusedMtr) : 0;
+  targetJob.pendingFusingMtr = Number(pendingFusingMtr.toFixed(2));
+
   if (logs.length > 0) {
     const latest = logs[0];
     if (latest.fusingMachine) targetJob.fusingMachine = latest.fusingMachine;
@@ -82,12 +95,7 @@ async function syncJobCardFusingTotals(jobCardId, jobNo) {
       targetJob.fusingDate = `${yr}-${mo}-${dy}`;
     }
 
-    // Determine status
-    const targetStr = targetJob.totalMtr || targetJob.printMtr || '0';
-    const targetMatch = String(targetStr).match(/[\d.]+/);
-    const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
-
-    const isComplete = latest.rollCompleted === 'Complete' || (targetMtr > 0 && totalFreshMtr >= targetMtr);
+    const isComplete = latest.rollCompleted === 'Complete' || (fusingBaseline > 0 && totalFusedMtr >= (fusingBaseline - 1.0));
     targetJob.fusingStatus = isComplete ? 'Fusing Done' : 'Fusing In Progress';
     if (targetJob.status === 'Pending') {
       targetJob.status = 'In Progress';

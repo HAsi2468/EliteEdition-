@@ -16,6 +16,73 @@ function computeTotals(tpDetails = []) {
   return { totalMtr: parseFloat(totalMtr.toFixed(3)), totalTp };
 }
 
+// ── Helper: sync JobCard deliveredMtr and deliveryStatus from active FabricChallans ──
+async function syncJobCardDeliveryTotals(jobNo) {
+  if (!jobNo) return;
+  try {
+    const rawJobTokens = String(jobNo).split(',').map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')).filter(Boolean);
+    for (const tok of rawJobTokens) {
+      const cleanNo = tok.replace(/\D/g, '');
+      const jCards = await JobCard.find({
+        $or: [
+          { jobNo: tok },
+          { jobNo: new RegExp('^' + tok + '$', 'i') },
+          ...(cleanNo ? [{ jobNo: new RegExp(cleanNo + '$', 'i') }] : [])
+        ]
+      });
+
+      for (const jCard of jCards) {
+        const jClean = jCard.jobNo.replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+        const jDigits = jClean.match(/\d+/)?.[0];
+        const challans = await FabricChallan.find({
+          $or: [
+            { jobNo: jCard.jobNo },
+            { jobNo: new RegExp('\\b' + jClean.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '\\b', 'i') },
+            ...(jDigits ? [{ jobNo: new RegExp('\\b' + jDigits + '\\b', 'i') }] : [])
+          ]
+        });
+
+        const totalDeliveredMtr = challans.reduce((sum, ch) => sum + (Number(ch.totalMtr) || 0), 0);
+        jCard.deliveredMtr = Math.round(totalDeliveredMtr * 100) / 100;
+
+        const freshMtr = parseFloat(String(jCard.freshMtr || 0).replace(/[^\d.]/g, '')) || 0;
+        const targetMtr = parseFloat(String(jCard.totalMtr || jCard.consumption || 0).replace(/[^\d.]/g, '')) || 0;
+        const benchmarkMtr = freshMtr > 0 ? freshMtr : targetMtr;
+
+        if (benchmarkMtr > 0 && totalDeliveredMtr >= (benchmarkMtr - 1.0)) {
+          jCard.deliveryStatus = 'Delivery Done';
+        } else if (totalDeliveredMtr > 0) {
+          jCard.deliveryStatus = 'Partial Complete';
+        } else {
+          jCard.deliveryStatus = 'Delivery Pending';
+        }
+
+        // Update overall Job Card status
+        if (
+          jCard.printStatus === 'Printing Done' &&
+          jCard.fusingStatus === 'Fusing Done' &&
+          jCard.deliveryStatus === 'Delivery Done'
+        ) {
+          jCard.status = 'Done';
+        } else if (
+          jCard.printStatus === 'Printing Done' ||
+          jCard.printStatus === 'Printing In Progress' ||
+          jCard.fusingStatus === 'Fusing Done' ||
+          jCard.fusingStatus === 'Fusing In Progress' ||
+          jCard.deliveryStatus === 'Delivery Done' ||
+          jCard.deliveryStatus === 'Partial Complete'
+        ) {
+          jCard.status = 'In Progress';
+        }
+
+        await jCard.save();
+      }
+    }
+  } catch (err) {
+    console.warn('Warning: Failed to sync JobCard delivery totals:', err.message);
+  }
+}
+
 // ── GET /fabric-challan/next-no ────────────────────────────────────────────
 const getNextChallanNo = async (req, res) => {
   try {
@@ -420,7 +487,59 @@ const createChallan = async (req, res) => {
     // ── Workflow Pipeline Validation: Job Card -> Printing -> Fusing -> Delivery Challan ──
     const userRole = String(req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
     const isUserAdmin = userRole === 'admin' || Boolean(req.user?.isAdmin) || Boolean(req.user?.isMainAdmin);
-    const hasAdminOverride = isUserAdmin && req.body.adminOverride === true;
+    const isApprovalReplay = req.headers['x-approval-execution'] === 'true' || req.headers['x-operator-override'] === 'true' || req.headers['x-is-admin'] === 'true';
+    const hasAdminOverride = (isUserAdmin && req.body.adminOverride === true) || isApprovalReplay;
+
+    // Support non-admin submission to Admin Approval Queue if requested
+    if (req.body.submitForApproval === true && !isUserAdmin) {
+      const { ChangeApprovalRequest } = require('../db/models');
+      const approval = await ChangeApprovalRequest.create({
+        module: 'FabricChallan',
+        action: 'CREATE',
+        targetIdentifier: `Delivery Challan for Job #${jobNo || 'N/A'} (${totalMtr.toFixed(1)}m)`,
+        targetEndpoint: '/v1/fabric-challan',
+        httpMethod: 'POST',
+        requestBody: { ...req.body, adminOverride: true, submitForApproval: false },
+        beforeData: null,
+        afterData: req.body,
+        diffSummary: [
+          { field: 'jobNo', before: null, after: jobNo },
+          { field: 'partyName', before: null, after: partyName },
+          { field: 'totalMtr', before: null, after: totalMtr },
+          { field: 'fabricName', before: null, after: fabricName },
+        ],
+        requestedBy: {
+          userId: String(req.user?._id || req.user?.id || 'staff'),
+          name: req.user?.fullName || req.user?.name || req.user?.username || 'Staff User',
+          email: req.user?.email || '',
+          role: req.user?.role || 'user',
+          department: 'Dispatch / Delivery',
+        },
+        status: 'PENDING',
+        adminNotes: `Staff requested creation of Delivery Challan for Job #${jobNo || 'N/A'} with ${totalMtr.toFixed(1)}m.`,
+      });
+
+      try {
+        const io = global.io || (req.app && req.app.get('io'));
+        if (io) {
+          io.emit('new-approval-request', {
+            id: approval._id,
+            module: approval.module,
+            action: approval.action,
+            targetIdentifier: approval.targetIdentifier,
+            requestedBy: approval.requestedBy,
+            createdAt: approval.createdAt,
+          });
+        }
+      } catch (sErr) {}
+
+      return res.status(202).json({
+        success: true,
+        requiresApproval: true,
+        approvalId: approval._id,
+        message: `Delivery Challan request for Job #${jobNo} (${totalMtr.toFixed(1)}m) submitted to Admin Review & Approvals Queue.`,
+      });
+    }
 
     if (jobNo && !hasAdminOverride) {
       const rawJobTokens = String(jobNo).split(',').map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')).filter(Boolean);
@@ -449,31 +568,34 @@ const createChallan = async (req, res) => {
             });
           }
 
-          // 2. Must pass Fusing Stage (or have partial fused meters)
-          const fStatus = (jCard.fusingStatus || '').toLowerCase();
-          const fusedMtr = parseFloat(jCard.fusingMtr || jCard.freshMtr || 0);
+          // 2. Must have Fresh Fused fabric available: Available = sum(Fresh Mtr) - sum(Delivered Challans)
+          const freshMtr = parseFloat(jCard.freshMtr || 0);
           const deliveredMtr = parseFloat(jCard.deliveredMtr || 0);
-          const availableFusedMtr = Math.max(0, fusedMtr - deliveredMtr);
-          const isFusingDone = fStatus.includes('done');
+          const availableFreshMtr = Math.max(0, freshMtr - deliveredMtr);
 
-          if (!isFusingDone && fusedMtr <= 0) {
+          if (freshMtr <= 0) {
             return res.status(400).json({
               success: false,
-              error: `Workflow Validation: Job Card #${jCard.jobNo} has not completed Fusing yet (Status: ${jCard.fusingStatus || 'Fusing Pending'}, 0m fused). It must pass the Fusing stage before a Delivery Challan can be created.`,
+              error: `Workflow Validation: Job Card #${jCard.jobNo} has 0m fresh fused fabric available. Goods must be fused before creating a Delivery Challan.`,
               stageError: 'FUSING_INCOMPLETE',
               canAdminOverride: isUserAdmin,
+              availableFreshMtr: 0,
+              freshMtr: 0,
+              deliveredMtr,
               jobNo: jCard.jobNo
             });
           }
 
-          // 3. Partial Quantities check: Cannot exceed available fused meters
-          if (fusedMtr > 0 && totalMtr > (availableFusedMtr + 2.0)) {
+          // 3. Partial Quantities check: Cannot exceed available fresh fused fabric
+          if (freshMtr > 0 && totalMtr > (availableFreshMtr + 2.0)) {
             return res.status(400).json({
               success: false,
-              error: `Workflow Validation: Requested Challan quantity (${totalMtr.toFixed(1)}m) exceeds available fused fabric (${availableFusedMtr.toFixed(1)}m available, ${fusedMtr.toFixed(1)}m fused, ${deliveredMtr.toFixed(1)}m already delivered) for Job #${jCard.jobNo}.`,
-              stageError: 'EXCEEDS_FUSED_MTR',
+              error: `Workflow Validation: Requested Challan quantity (${totalMtr.toFixed(1)}m) exceeds available fresh fused fabric (${availableFreshMtr.toFixed(1)}m available: ${freshMtr.toFixed(1)}m fresh fused - ${deliveredMtr.toFixed(1)}m already delivered) for Job #${jCard.jobNo}.`,
+              stageError: 'EXCEEDS_FRESH_MTR',
               canAdminOverride: isUserAdmin,
-              availableFusedMtr,
+              availableFreshMtr,
+              freshMtr,
+              deliveredMtr,
               jobNo: jCard.jobNo
             });
           }
@@ -617,37 +739,8 @@ const createChallan = async (req, res) => {
     }
 
     // ── Sync deliveredMtr & deliveryStatus to linked JobCard(s) ──────────────
-    if (jobNo && totalMtr > 0) {
-      try {
-        const rawJobTokens = String(jobNo).split(',').map(s => s.trim().replace(/^#?JOB\s*NO\.?\s*[-:]?\s*/i, '')).filter(Boolean);
-        for (const tok of rawJobTokens) {
-          const cleanNo = tok.replace(/\D/g, '');
-          const jCard = await JobCard.findOne({
-            $or: [
-              { jobNo: tok },
-              { jobNo: new RegExp('^' + tok + '$', 'i') },
-              ...(cleanNo ? [{ jobNo: new RegExp(cleanNo + '$', 'i') }] : [])
-            ]
-          });
-          if (jCard) {
-            const currentDelivered = parseFloat(jCard.deliveredMtr || 0);
-            const newDelivered = Math.round((currentDelivered + totalMtr) * 100) / 100;
-            jCard.deliveredMtr = newDelivered;
-            if (!jCard.lotNo && finalLotNoStr) {
-              jCard.lotNo = finalLotNoStr;
-            }
-            const targetMtr = parseFloat(jCard.totalMtr || jCard.totalQty || 0);
-            if (targetMtr > 0 && newDelivered >= targetMtr) {
-              jCard.deliveryStatus = 'Delivery Done';
-            } else if (newDelivered > 0) {
-              jCard.deliveryStatus = 'Partial Complete';
-            }
-            await jCard.save();
-          }
-        }
-      } catch (jcErr) {
-        console.warn('Warning: Failed to update JobCard deliveredMtr:', jcErr.message);
-      }
+    if (jobNo) {
+      await syncJobCardDeliveryTotals(jobNo);
     }
 
     res.status(201).json({ success: true, data: challan });
@@ -782,6 +875,7 @@ const updateChallan = async (req, res) => {
     if (!challan) {
       return res.status(404).json({ success: false, error: 'Challan not found' });
     }
+    const oldJobNo = challan.jobNo;
 
     if (date !== undefined) challan.date = new Date(date);
     if (partyName !== undefined) challan.partyName = partyName;
@@ -924,6 +1018,14 @@ const updateChallan = async (req, res) => {
       console.error('Warning: Failed to sync fabric outward transactions on update:', txErr.message);
     }
 
+    // ── Resync linked Job Card delivered metrics ──
+    if (oldJobNo) {
+      await syncJobCardDeliveryTotals(oldJobNo);
+    }
+    if (challan.jobNo && challan.jobNo !== oldJobNo) {
+      await syncJobCardDeliveryTotals(challan.jobNo);
+    }
+
     res.json({ success: true, data: challan });
   } catch (error) {
     console.error('Error updating fabric challan:', error);
@@ -967,7 +1069,11 @@ const deleteChallan = async (req, res) => {
       }
     }
 
+    const jobNoToDelete = challan.jobNo;
     await FabricChallan.findByIdAndDelete(req.params.id);
+    if (jobNoToDelete) {
+      await syncJobCardDeliveryTotals(jobNoToDelete);
+    }
     res.json({ success: true, message: 'Challan and linked fabric outward deleted' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -979,6 +1085,7 @@ const resetAllChallans = async (req, res) => {
   try {
     await FabricChallan.deleteMany({});
     await FabricTransaction.deleteMany({ challanNo: { $regex: /^EDP-/i } });
+    await JobCard.updateMany({}, { $set: { deliveredMtr: 0, deliveryStatus: 'Delivery Pending' } });
     res.json({ success: true, message: 'All fabric challans and linked transactions reset successfully. Next Challan No will start at 1.' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

@@ -1551,10 +1551,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       const isPrintDone = pStatus.includes('done') || pMtr > 0;
       
       const fStatus = (primaryJob.fusingStatus || '').toLowerCase();
+      const freshMtr = parseFloat(primaryJob.freshMtr || 0);
       const fusedMtr = parseFloat(primaryJob.fusingMtr || primaryJob.freshMtr || 0);
-      const isFusingDone = fStatus.includes('done');
       const deliveredMtr = parseFloat(primaryJob.deliveredMtr || 0);
-      const remainingFused = Math.max(0, fusedMtr - deliveredMtr);
+      const remainingFresh = Math.max(0, freshMtr - deliveredMtr);
 
       const currentUser = api.getCurrentUser() || {};
       const isAdmin = currentUser.role === 'admin' || currentUser.isAdmin === true || currentUser.isMainAdmin === true;
@@ -1568,17 +1568,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         return;
       }
 
-      if (!isFusingDone && fusedMtr <= 0 && !isAdmin) {
+      if (freshMtr <= 0 && fusedMtr <= 0 && !isAdmin) {
         triggerEliteAlert(
           'Fusing Stage Incomplete',
-          `Cannot link Job #${primaryJob.jobNo}: This Job Card has not completed Fusing yet (0m fused). Only fused goods can be dispatched via Delivery Challan.`,
+          `Cannot link Job #${primaryJob.jobNo}: This Job Card has not completed Fusing yet (0m fresh fused). Only fused goods can be dispatched via Delivery Challan.`,
           'warning'
         );
         return;
       }
 
-      // If partial quantities available, auto-set TP meter to remaining fused meters if empty
-      const defaultMtr = remainingFused > 0 ? remainingFused : (parseFloat(primaryJob.freshMtr || primaryJob.totalMtr) || '');
+      // If fresh fused quantities available, auto-set TP meter to remaining fresh meters if empty
+      const defaultMtr = remainingFresh > 0 ? remainingFresh : '';
 
       setChallanForm(prev => {
         const needsTpUpdate = prev.tpDetails.length <= 1 && (!prev.tpDetails[0]?.tpMeter || prev.tpDetails[0]?.tpMeter === '0' || prev.tpDetails[0]?.tpMeter === '');
@@ -1601,10 +1601,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         };
       });
 
-      if (remainingFused > 0) {
+      if (remainingFresh > 0) {
         triggerPushNotification(
-          '📦 Fused Batch Ready',
-          `Job #${primaryJob.jobNo}: ${remainingFused}m available fused fabric ready for Delivery Challan.`,
+          '📦 Fresh Fused Batch Ready',
+          `Job #${primaryJob.jobNo}: ${remainingFresh.toFixed(1)}m available fresh fabric ready for Delivery Challan (${freshMtr.toFixed(1)}m fresh - ${deliveredMtr.toFixed(1)}m delivered).`,
           'info'
         );
       }
@@ -1765,10 +1765,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         const isPrintDone = pStatus.includes('done') || pMtr > 0;
 
         const fStatus = (j.fusingStatus || '').toLowerCase();
+        const freshMtr = parseFloat(j.freshMtr || 0);
         const fusedMtr = parseFloat(j.fusingMtr || j.freshMtr || 0);
         const deliveredMtr = parseFloat(j.deliveredMtr || 0);
-        const availableFused = Math.max(0, fusedMtr - deliveredMtr);
-        const isFusingDone = fStatus.includes('done');
+        const availableFresh = Math.max(0, freshMtr - deliveredMtr);
 
         if (!isPrintDone) {
           if (!isAdmin) {
@@ -1783,31 +1783,89 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             needsOverride = true;
             overrideReasons.push(`• Job #${j.jobNo}: Printing is not completed (${j.printStatus || 'Pending'}).`);
           }
-        } else if (!isFusingDone && fusedMtr <= 0) {
+        } else if (freshMtr <= 0 && fusedMtr <= 0) {
           if (!isAdmin) {
             setLoading(false);
-            await triggerEliteAlert(
-              'Fusing Stage Incomplete',
-              `Job Card #${j.jobNo} has not completed Fusing (0m fused). Production flow requires Fusing to be done before dispatching a Delivery Challan.`,
-              'warning'
-            );
+            const sendForApproval = await triggerEliteConfirm({
+              title: '🛡️ Submit for Admin Approval?',
+              message: `Job Card #${j.jobNo} has not completed Fusing yet (0m fresh fused). Production flow requires Fusing before dispatching.\n\nWould you like to submit this Delivery Challan to the Admin Review & Approvals Queue for authorization?`,
+              confirmText: 'Yes, Submit for Approval',
+              cancelText: 'Cancel'
+            });
+            if (sendForApproval) {
+              setLoading(true);
+              try {
+                const effectiveTotalMtr = challanTotalMtr > 0
+                  ? challanTotalMtr
+                  : (parseFloat(challanForm.totalMtr) || parseFloat(challanForm.pcs) || 0);
+                const creatorName = challanForm.createdBy || currentUser.fullName || currentUser.name || currentUser.username || 'HASI';
+                const payload = {
+                  ...challanForm,
+                  totalMtr: effectiveTotalMtr,
+                  createdBy: creatorName,
+                  submitForApproval: true
+                };
+                await api.createFabricChallan(payload);
+                setLoading(false);
+                setIsModalOpen(false);
+                triggerPushNotification(
+                  '🛡️ Submitted to Admin Approval Queue',
+                  `Delivery Challan for Job #${j.jobNo} (${effectiveTotalMtr}m) submitted to Admin Review & Approvals Queue.`,
+                  'info'
+                );
+                return;
+              } catch (subErr) {
+                setLoading(false);
+                triggerEliteAlert('Submission Failed', subErr.message, 'error');
+                return;
+              }
+            }
             return;
           } else {
             needsOverride = true;
             overrideReasons.push(`• Job #${j.jobNo}: Fusing has not started (0m fused).`);
           }
-        } else if (fusedMtr > 0 && challanTotalMtr > (availableFused + 2.0)) {
+        } else if (freshMtr > 0 && challanTotalMtr > (availableFresh + 2.0)) {
           if (!isAdmin) {
             setLoading(false);
-            await triggerEliteAlert(
-              'Exceeds Available Fused Meters',
-              `Requested Challan quantity (${challanTotalMtr.toFixed(1)}m) exceeds available fused fabric (${availableFused.toFixed(1)}m available, ${deliveredMtr.toFixed(1)}m already delivered) for Job #${j.jobNo}.`,
-              'warning'
-            );
+            const sendForApproval = await triggerEliteConfirm({
+              title: '🛡️ Submit for Admin Approval?',
+              message: `Requested Challan quantity (${challanTotalMtr.toFixed(1)}m) exceeds available fresh fused fabric (${availableFresh.toFixed(1)}m available: ${freshMtr.toFixed(1)}m fresh fused - ${deliveredMtr.toFixed(1)}m already delivered) for Job #${j.jobNo}.\n\nWould you like to submit this Delivery Challan to the Admin Review & Approvals Queue for authorization?`,
+              confirmText: 'Yes, Submit for Approval',
+              cancelText: 'Cancel & Adjust Meters'
+            });
+            if (sendForApproval) {
+              setLoading(true);
+              try {
+                const effectiveTotalMtr = challanTotalMtr > 0
+                  ? challanTotalMtr
+                  : (parseFloat(challanForm.totalMtr) || parseFloat(challanForm.pcs) || 0);
+                const creatorName = challanForm.createdBy || currentUser.fullName || currentUser.name || currentUser.username || 'HASI';
+                const payload = {
+                  ...challanForm,
+                  totalMtr: effectiveTotalMtr,
+                  createdBy: creatorName,
+                  submitForApproval: true
+                };
+                await api.createFabricChallan(payload);
+                setLoading(false);
+                setIsModalOpen(false);
+                triggerPushNotification(
+                  '🛡️ Submitted to Admin Approval Queue',
+                  `Delivery Challan for Job #${j.jobNo} (${effectiveTotalMtr}m) submitted to Admin Review & Approvals Queue.`,
+                  'info'
+                );
+                return;
+              } catch (subErr) {
+                setLoading(false);
+                triggerEliteAlert('Submission Failed', subErr.message, 'error');
+                return;
+              }
+            }
             return;
           } else {
             needsOverride = true;
-            overrideReasons.push(`• Job #${j.jobNo}: Requested ${challanTotalMtr.toFixed(1)}m exceeds available fused quantity (${availableFused.toFixed(1)}m).`);
+            overrideReasons.push(`• Job #${j.jobNo}: Requested ${challanTotalMtr.toFixed(1)}m exceeds available fresh fused quantity (${availableFresh.toFixed(1)}m).`);
           }
         }
       }
@@ -2503,6 +2561,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     let totalFresh = 0;
     let totalWest = 0;
     let totalFused = 0;
+    let totalDelivered = 0;
     let hasAnyData = false;
 
     matched.forEach(j => {
@@ -2517,6 +2576,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         0
       );
       const fused = parseFloat(j.fusingMtr || 0);
+      const delivered = parseFloat(j.deliveredMtr || 0);
 
       if (fresh > 0 || waste > 0 || fused > 0) {
         hasAnyData = true;
@@ -2526,13 +2586,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       totalFresh += fresh > 0 ? fresh : (fused > 0 && waste === 0 ? fused : 0);
       totalWest += waste;
       totalFused += calculatedItemTotal;
+      totalDelivered += delivered;
     });
+
+    const availableMtr = Math.max(0, totalFresh - totalDelivered);
 
     return {
       hasData: hasAnyData,
       freshMtr: totalFresh,
       westMtr: totalWest,
       totalMtr: totalFused,
+      deliveredMtr: totalDelivered,
+      availableMtr,
       jobsCount: matched.length,
       jobLabels: matched.map(j => `#${j.jobNo}`).join(', ')
     };
@@ -6041,23 +6106,29 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
-                    <div style={{ background: '#ffffff', padding: '0.4rem 0.5rem', borderRadius: '8px', border: '1.5px solid #bbf7d0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Fresh Meter</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#047857', marginTop: '1px' }}>
-                        {challanFusingStats ? challanFusingStats.freshMtr.toFixed(2) : '0.00'}m
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', textAlign: 'center' }}>
+                    <div style={{ background: '#ffffff', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '1.5px solid #bbf7d0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Fresh Fused</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#047857', marginTop: '1px' }}>
+                        {challanFusingStats ? challanFusingStats.freshMtr.toFixed(1) : '0.0'}m
                       </div>
                     </div>
-                    <div style={{ background: '#ffffff', padding: '0.4rem 0.5rem', borderRadius: '8px', border: '1.5px solid #fde68a', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.02em' }}>West Mtr</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#b45309', marginTop: '1px' }}>
-                        {challanFusingStats ? challanFusingStats.westMtr.toFixed(2) : '0.00'}m
+                    <div style={{ background: '#ffffff', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '1.5px solid #fde68a', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.02em' }}>West Mtr</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#b45309', marginTop: '1px' }}>
+                        {challanFusingStats ? challanFusingStats.westMtr.toFixed(1) : '0.0'}m
                       </div>
                     </div>
-                    <div style={{ background: '#ffffff', padding: '0.4rem 0.5rem', borderRadius: '8px', border: '1.5px solid #bfdbfe', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Total Mtr</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1d4ed8', marginTop: '1px' }}>
-                        {challanFusingStats ? challanFusingStats.totalMtr.toFixed(2) : '0.00'}m
+                    <div style={{ background: '#ffffff', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '1.5px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Delivered</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#334155', marginTop: '1px' }}>
+                        {challanFusingStats ? challanFusingStats.deliveredMtr.toFixed(1) : '0.0'}m
+                      </div>
+                    </div>
+                    <div style={{ background: '#ecfdf5', padding: '0.4rem 0.35rem', borderRadius: '8px', border: '2px solid #10b981', boxShadow: '0 1px 4px rgba(16,185,129,0.15)' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Available</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#059669', marginTop: '1px' }}>
+                        {challanFusingStats ? challanFusingStats.availableMtr.toFixed(1) : '0.0'}m
                       </div>
                     </div>
                   </div>
