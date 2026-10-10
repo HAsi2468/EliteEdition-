@@ -1325,6 +1325,7 @@ tr:hover td {
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: auto !important;
   padding-right: 2px;
+  padding-bottom: 7rem !important; /* pb-28 bottom clearance for floating action dock */
 }
 
 .content-area-comm,

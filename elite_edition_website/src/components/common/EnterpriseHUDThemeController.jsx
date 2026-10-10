@@ -12,6 +12,7 @@ import {
   Zap
 } from 'lucide-react';
 import './EnterpriseHUDThemeController.css';
+import ErgonomicsPopover from './ErgonomicsPopover';
 
 /**
  * EnterpriseFloatingActionDock (EnterpriseHUDThemeController)
@@ -287,15 +288,6 @@ export function EnterpriseHUDThemeController({
     action(e);
   };
 
-  // Determine smart popover placement relative to dock position
-  const isDockNearBottom = position.y > (typeof window !== 'undefined' ? window.innerHeight - 340 : 340);
-  const isDockNearRight = position.x > (typeof window !== 'undefined' ? window.innerWidth - 320 : 900);
-
-  const popoverStyle = {
-    ...(isDockNearBottom ? { bottom: 'calc(100% + 12px)' } : { top: 'calc(100% + 12px)' }),
-    ...(isDockNearRight ? { right: 0 } : { left: 0 })
-  };
-
   const isCommActive = activeTab === 'communication' || activeTab === 'workspace';
   const isTaskActive = activeTab === 'task_management';
 
@@ -428,137 +420,17 @@ export function EnterpriseHUDThemeController({
         </>
       )}
 
-      {/* Popover Panel for Display Ergonomics (Clean White & Royal Blue) */}
-      {isOpen && (
-        <div
-          className="hud-popover-panel dock-attached-popover"
-          style={popoverStyle}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <div className="hud-panel-title">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{
-                width: 26,
-                height: 26,
-                borderRadius: '8px',
-                background: '#eff6ff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid #bfdbfe'
-              }}>
-                <Sliders size={14} style={{ color: '#2563eb' }} />
-              </div>
-              <span style={{ fontWeight: 800, color: '#0f172a' }}>Display Ergonomics</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              style={{
-                background: '#f1f5f9',
-                border: 'none',
-                borderRadius: '6px',
-                width: 24,
-                height: 24,
-                cursor: 'pointer',
-                color: '#64748b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease'
-              }}
-              title="Close Panel"
-            >
-              <X size={14} />
-            </button>
-          </div>
-
-          {/* Scale Slider */}
-          <div className="hud-scale-slider-row">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', fontWeight: 700 }}>
-              <span style={{ color: '#334155' }}>UI Scale Density:</span>
-              <span style={{
-                background: '#eff6ff',
-                color: '#2563eb',
-                border: '1px solid #bfdbfe',
-                padding: '2px 8px',
-                borderRadius: '6px',
-                fontWeight: 800,
-                fontSize: '0.78rem'
-              }}>
-                {Math.round(scale * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0.85"
-              max="1.15"
-              step="0.01"
-              value={scale}
-              onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
-              className="hud-scale-slider"
-              style={{
-                background: `linear-gradient(to right, #2563eb 0%, #2563eb ${Math.round(((scale - 0.85) / 0.3) * 100)}%, #e2e8f0 ${Math.round(((scale - 0.85) / 0.3) * 100)}%, #e2e8f0 100%)`
-              }}
-              title="Drag to smoothly scale UI density"
-            />
-            
-            {/* Interactive Presets */}
-            <div className="hud-scale-presets">
-              <button
-                type="button"
-                className={`hud-preset-pill ${Math.abs(scale - 0.85) < 0.02 ? 'is-active' : ''}`}
-                onClick={() => handlePresetSelect(0.85)}
-                title="Dense layout (fits more data on small screens)"
-              >
-                85% (Dense)
-              </button>
-              <button
-                type="button"
-                className={`hud-preset-pill ${Math.abs(scale - 1.0) < 0.02 ? 'is-active' : ''}`}
-                onClick={() => handlePresetSelect(1.0)}
-                title="Standard 100% baseline (recommended)"
-              >
-                100% (Default)
-              </button>
-              <button
-                type="button"
-                className={`hud-preset-pill ${Math.abs(scale - 1.15) < 0.02 ? 'is-active' : ''}`}
-                onClick={() => handlePresetSelect(1.15)}
-                title="Comfort layout (larger fonts and touch targets)"
-              >
-                115% (Comfort)
-              </button>
-            </div>
-          </div>
-
-          {/* Industrial High Contrast Theme Toggle */}
-          <div className="hud-theme-toggle-row">
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a' }}>🏭 Factory HUD Mode</div>
-              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Solid 2px high-visibility outlines</div>
-            </div>
-            <button
-              type="button"
-              className={`hud-theme-toggle-btn ${isIndustrial ? 'active' : ''}`}
-              onClick={handleToggleIndustrial}
-            >
-              {isIndustrial ? 'ON' : 'OFF'}
-            </button>
-          </div>
-
-          {/* Reset Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.1rem' }}>
-            <button
-              type="button"
-              className="hud-reset-btn"
-              onClick={handleReset}
-            >
-              <RotateCcw size={11} /> Reset Defaults
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Viewport Boundary-Aware Display Ergonomics Popover */}
+      <ErgonomicsPopover
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        anchorRef={dockRef}
+        scale={scale}
+        onScaleChange={handleScaleChange}
+        isIndustrial={isIndustrial}
+        onToggleIndustrial={handleToggleIndustrial}
+        onResetDefaults={handleReset}
+      />
     </div>
   );
 }

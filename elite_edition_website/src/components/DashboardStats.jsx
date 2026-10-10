@@ -1,5 +1,6 @@
 import React, { useState, useMemo, memo } from 'react';
 import { Package, TrendingUp, IndianRupee, AlertTriangle, Layers, ShoppingBag, MapPin, Activity, PieChart, BarChart3 } from 'lucide-react';
+import DashboardList from './DashboardList';
 
 function DashboardStats({ items, sales }) {
   const stats = useMemo(() => {
@@ -644,75 +645,14 @@ function DashboardStats({ items, sales }) {
           </div>
         </div>
 
-        {/* Low Stock Alerts */}
-        <div className="glass-panel" style={styles.alertPanel}>
-          <div style={styles.alertPanelHeader}>
-            <div style={styles.chartHeader}>
-              <AlertTriangle size={16} color="#fbbf24" />
-              <h3 style={styles.panelTitle}>Low Stock Alerts</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: '0.6rem' }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>Threshold:</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={threshold}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value);
-                    setThreshold(isNaN(v) ? 0 : v);
-                  }}
-                  style={{
-                    width: '52px',
-                    padding: '0.15rem 0.35rem',
-                    fontSize: '0.75rem',
-                    textAlign: 'center',
-                    fontWeight: 700
-                  }}
-                />
-              </div>
-            </div>
-            {lowStockItems.length > 0 && (
-              <span className="badge badge-danger">
-                {lowStockItems.length} Warnings
-              </span>
-            )}
-          </div>
-          
-          <div style={styles.alertList}>
-            {lowStockItems.length === 0 ? (
-              <div style={styles.emptyAlert}>
-                <span style={{ fontSize: '2rem' }}>✅</span>
-                <p style={{ marginTop: '0.5rem', color: '#10b981', fontWeight: '500' }}>All stock levels healthy</p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No items under {threshold} units available.</p>
-              </div>
-            ) : (
-              lowStockItems.map((item, idx) => (
-                <div key={item._id || idx} style={styles.alertRow}>
-                  <div style={styles.alertLeft}>
-                    <div style={styles.alertIcon}>
-                      <AlertTriangle size={14} color="#f59e0b" />
-                    </div>
-                    <div>
-                      <div style={styles.alertItemName}>{item.itemName}</div>
-                      <div style={styles.alertMeta}>Party: {item.party} | Size: {item.size}</div>
-                    </div>
-                  </div>
-                  <div style={styles.alertRight}>
-                    <span 
-                      style={
-                        item.currentlyAvailableStock === 0 
-                          ? styles.alertStockZero 
-                          : styles.alertStockLow
-                      }
-                    >
-                      {item.currentlyAvailableStock} Left
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
+
+      {/* SECTION 4: ERGONOMIC DASHBOARD INVENTORY & REORDER LIST */}
+      <DashboardList 
+        items={lowStockItems} 
+        threshold={threshold} 
+        onThresholdChange={setThreshold} 
+      />
     </div>
   );
 }

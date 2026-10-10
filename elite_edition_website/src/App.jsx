@@ -1837,8 +1837,8 @@ export default function App() {
             );
           })()}
 
-          {/* Master Company Switcher Buttons for Desktop */}
-          <div className="dept-switcher-header">
+          {/* Master Consolidated Business Unit Selector for Desktop */}
+          <div className="dept-switcher-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {(() => {
               const visibleCompanies = COMPANIES.filter(company => {
                 if (!isCompanyAllowed(company.id) && !isCompanyAllowed(company.name)) return false;
@@ -1850,46 +1850,56 @@ export default function App() {
                 return true;
               });
 
+              const isCommActive = ['communication', 'workspace', 'task_management'].includes(activeTab);
+
               return (
-                <>
+                <div 
+                  className="company-segmented-control"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    background: '#f1f5f9',
+                    borderRadius: '8px',
+                    padding: '2px',
+                    border: '1px solid #e2e8f0'
+                  }}
+                  title="Switch Business Unit"
+                >
                   {visibleCompanies.map(company => {
-                    const isCommActive = ['communication', 'workspace', 'task_management'].includes(activeTab);
                     const isActive = activeDepartment === company.id && !isCommActive;
-
-                    const renderCompanyIcon = () => {
-                      switch (company.id) {
-                        case 'digital_print': return <Printer size={13} style={{ flexShrink: 0 }} />;
-                        case 'stitching': return <Scissors size={13} style={{ flexShrink: 0 }} />;
-                        case 'elite_edition': return <Building size={13} style={{ flexShrink: 0 }} />;
-                        case 'elite_fabtex': return <Layers size={13} style={{ flexShrink: 0 }} />;
-                        case 'elite_online': return <Store size={13} style={{ flexShrink: 0 }} />;
-                        default: return null;
-                      }
-                    };
-
                     return (
                       <button
                         key={company.id}
                         onClick={() => handleSwitchDepartment(company.id)}
-                        className={`dept-switcher-btn ${isActive ? 'active' : ''}`}
-                        title={`Switch to ${company.name} (${company.code})`}
+                        className={`company-segment-pill ${isActive ? 'active' : ''}`}
+                        title={`${company.name} (${company.code})`}
                         type="button"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: isActive ? '#ffffff' : 'transparent',
+                          color: isActive ? '#1d4ed8' : '#64748b',
+                          fontWeight: isActive ? 800 : 600,
+                          fontSize: '0.74rem',
+                          cursor: 'pointer',
+                          boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                          transition: 'all 0.12s ease'
+                        }}
                       >
-                        {renderCompanyIcon()}
                         <span>{company.code || company.name}</span>
                       </button>
                     );
                   })}
-
-                  {visibleCompanies.length > 0 && (hasCommunicationAccess || hasTaskAccess) && (
-                    <div className="dept-switcher-divider" />
-                  )}
-                </>
+                </div>
               );
             })()}
 
             {(hasCommunicationAccess || hasTaskAccess) && (
-              <>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', borderLeft: '1px solid #e2e8f0', paddingLeft: '8px' }}>
                 {hasCommunicationAccess && (
                   <button
                     onClick={() => {
@@ -1902,9 +1912,10 @@ export default function App() {
                     className={`dept-switcher-btn comm-btn ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
                     title="Inter-Department Communication & Workforce Chat"
                     type="button"
+                    style={{ minHeight: '30px', height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
                   >
                     <MessageSquare size={13} style={{ flexShrink: 0 }} />
-                    <span>Communication</span>
+                    <span className="hidden sm:inline">Chat</span>
                     {chatUnreadCount > 0 && (
                       <span className="dept-switcher-badge">
                         {chatUnreadCount}
@@ -1922,12 +1933,13 @@ export default function App() {
                     className={`dept-switcher-btn comm-btn ${activeTab === 'task_management' ? 'active' : ''}`}
                     title="Task Management & Staff Workloads"
                     type="button"
+                    style={{ minHeight: '30px', height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
                   >
                     <CheckSquare size={13} style={{ flexShrink: 0 }} />
-                    <span>Tasks</span>
+                    <span className="hidden sm:inline">Tasks</span>
                   </button>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -2137,23 +2149,24 @@ export default function App() {
                 className="btn-secondary"
                 title="Global Search (Ctrl/Cmd+K)"
                 style={{
-                  minHeight: '34px',
-                  padding: '5px 10px',
-                  fontSize: 'var(--font-size-meta, 0.75rem)',
+                  minHeight: '30px',
+                  height: '30px',
+                  padding: '3px 8px',
+                  fontSize: '0.74rem',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '5px',
                   cursor: 'pointer'
                 }}
               >
-                <Search size={14} style={{ flexShrink: 0 }} />
+                <Search size={13} style={{ flexShrink: 0 }} />
                 <span>Search</span>
                 <kbd style={{
-                  fontSize: '10px',
+                  fontSize: '9px',
                   background: '#f1f5f9',
                   color: '#475569',
-                  padding: '1px 5px',
-                  borderRadius: '4px',
+                  padding: '1px 4px',
+                  borderRadius: '3px',
                   border: '1px solid #cbd5e1'
                 }}>⌘K</kbd>
               </button>
@@ -2163,7 +2176,7 @@ export default function App() {
                   onClick={handleInstallClick}
                   className="btn-primary"
                   title="Install Elite ERP App"
-                  style={{ minHeight: '34px', padding: '5px 12px', fontSize: 'var(--font-size-meta, 0.75rem)', fontWeight: 600 }}
+                  style={{ minHeight: '30px', height: '30px', padding: '3px 10px', fontSize: '0.74rem', fontWeight: 600 }}
                 >
                   Install App
                 </button>
@@ -2177,23 +2190,24 @@ export default function App() {
                 className="btn-secondary"
                 title="Notifications & Alerts"
                 style={{
-                  minHeight: '34px',
-                  padding: '5px 10px',
-                  fontSize: 'var(--font-size-meta, 0.75rem)',
+                  minHeight: '30px',
+                  height: '30px',
+                  padding: '3px 8px',
+                  fontSize: '0.74rem',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '5px'
                 }}
               >
-                <Bell size={14} style={{ flexShrink: 0 }} />
+                <Bell size={13} style={{ flexShrink: 0 }} />
                 <span>Alerts</span>
                 {unreadNotifCount > 0 && (
                   <span style={{
                     background: '#ef4444',
                     color: '#ffffff',
-                    padding: '1px 6px',
-                    borderRadius: '10px',
-                    fontSize: '0.68rem',
+                    padding: '1px 5px',
+                    borderRadius: '8px',
+                    fontSize: '0.65rem',
                     fontWeight: 800,
                     lineHeight: 1
                   }}>
@@ -2213,15 +2227,16 @@ export default function App() {
                 className="btn-secondary"
                 title="Refresh data"
                 style={{
-                  minHeight: '34px',
-                  padding: '5px 10px',
-                  fontSize: 'var(--font-size-meta, 0.75rem)',
+                  minHeight: '30px',
+                  height: '30px',
+                  padding: '3px 8px',
+                  fontSize: '0.74rem',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '5px'
                 }}
               >
-                <RefreshCw size={13} className={loading ? 'spin-loader' : ''} style={{ flexShrink: 0 }} />
+                <RefreshCw size={12} className={loading ? 'spin-loader' : ''} style={{ flexShrink: 0 }} />
                 <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
               </button>
 
@@ -2229,24 +2244,24 @@ export default function App() {
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
+                  gap: '8px',
                   paddingLeft: '6px',
                   borderLeft: '1px solid #e2e8f0'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <span style={{
-                      fontSize: '0.84rem',
+                      fontSize: '0.78rem',
                       fontWeight: 700,
                       color: 'var(--text-primary)',
-                      lineHeight: 1.2,
+                      lineHeight: 1.1,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px'
+                      gap: '3px'
                     }}>
                       {(currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') && <span>👑</span>}
                       {currentUser.name}
                     </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                    <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                       {(currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') ? 'Main Admin' : (currentUser.role || 'user')}
                     </span>
                   </div>
@@ -2255,15 +2270,16 @@ export default function App() {
                     className="btn-secondary"
                     title="Sign Out"
                     style={{
-                      minHeight: '34px',
-                      padding: '5px 10px',
-                      fontSize: 'var(--font-size-meta, 0.75rem)',
+                      minHeight: '30px',
+                      height: '30px',
+                      padding: '3px 8px',
+                      fontSize: '0.72rem',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '4px'
                     }}
                   >
-                    <LogOut size={13} style={{ flexShrink: 0 }} />
+                    <LogOut size={12} style={{ flexShrink: 0 }} />
                     <span>Sign Out</span>
                   </button>
                 </div>
@@ -2973,7 +2989,7 @@ export default function App() {
               padding: 0
             } : {})
           }}
-          className={['communication', 'workspace', 'task_management'].includes(activeTab) ? 'content-area-comm' : 'content-area-wrap'}
+          className={['communication', 'workspace', 'task_management'].includes(activeTab) ? 'content-area-comm' : 'content-area-wrap pb-28'}
         >
           {error && <div style={styles.globalError}>{error}</div>}
 
@@ -3699,10 +3715,10 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 12px',
+    padding: '4px 12px',
     borderBottom: '1px solid var(--border-color)',
     backgroundColor: 'var(--bg-card, #ffffff)',
-    minHeight: '52px',
+    minHeight: '44px',
     boxShadow: 'none',
     width: '100%',
     boxSizing: 'border-box',
@@ -3710,22 +3726,22 @@ const styles = {
   headerLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem',
+    gap: '0.6rem',
   },
   logoBadge: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '10px',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
     background: 'linear-gradient(135deg, var(--primary), #0891b2)',
     color: '#fff',
     fontWeight: '700',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '1.1rem',
+    fontSize: '0.95rem',
   },
   brandTitle: {
-    fontSize: '1.2rem',
+    fontSize: '1.05rem',
     fontWeight: '700',
     lineHeight: '1.2',
   },
