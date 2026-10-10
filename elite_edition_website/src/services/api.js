@@ -1208,15 +1208,22 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/analytics/returns-brand${qs}`);
   },
-  // MYNTRA API HELPERS
+  // MYNTRA PPMP 6-STAGE LIFECYCLE API HELPERS
   async getMyntraConfig() {
     return request('/myntra/config');
   },
 
-  async saveMyntraConfig(merchantId, secretKey) {
+  async saveMyntraConfig(payload) {
+    const body = typeof payload === 'object' && payload.merchantId ? payload : { merchantId: arguments[0], secretKey: arguments[1] };
     return request('/myntra/config', {
       method: 'POST',
-      body: JSON.stringify({ merchantId, secretKey })
+      body: JSON.stringify(body)
+    });
+  },
+
+  async refreshMyntraToken() {
+    return request('/myntra/authorization/refresh_token', {
+      method: 'POST'
     });
   },
 
@@ -1224,16 +1231,146 @@ export const api = {
     return request('/myntra/orders');
   },
 
-  async syncMyntraInventory() {
-    return request('/myntra/sync-inventory', {
+  async acceptMyntraOrder(id) {
+    return request(`/myntra/order/${id}/accept`, {
+      method: 'POST'
+    });
+  },
+
+  async bulkAcceptMyntraOrders(orderIds) {
+    return request('/myntra/orders/accept', {
       method: 'POST',
+      body: JSON.stringify({ orderIds })
+    });
+  },
+
+  async readyToDispatchMyntra(payload) {
+    return request('/myntra/order/readyToDispatch', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async readyToShipMyntra(barcodeOrPacketId) {
+    return request('/myntra/order/readyToShip', {
+      method: 'POST',
+      body: JSON.stringify({ barcode: barcodeOrPacketId, packetId: barcodeOrPacketId })
+    });
+  },
+
+  getMyntraShippingLabelUrl(packetId) {
+    const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
+    return `${base}/api/v1/myntra/packet/${packetId}/shippingLabel`;
+  },
+
+  getMyntraInvoiceUrl(packetId) {
+    const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
+    return `${base}/api/v1/myntra/packet/${packetId}/getDocument?type=invoice`;
+  },
+
+  async getMyntraCatalog() {
+    return request('/myntra/catalog');
+  },
+
+  async addMyntraSku(data) {
+    return request('/myntra/sku', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async mapMyntraWarehouse(data) {
+    return request('/myntra/warehouse', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async syncMyntraInventory(data) {
+    return request('/myntra/inventory/update', {
+      method: 'PUT',
+      body: JSON.stringify(data || {})
     });
   },
 
   async applyMyntraDiscount(data) {
-    return request('/myntra/discount', {
+    return request('/myntra/discount/override', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getMyntraShipments() {
+    return request('/myntra/shipments');
+  },
+
+  async markMyntraShipped(packetId) {
+    return request(`/myntra/mock/packet/${packetId}/shipped`, {
+      method: 'POST'
+    });
+  },
+
+  async markShipped(packetId) {
+    return this.markMyntraShipped(packetId);
+  },
+
+  async markMyntraDelivered(packetId) {
+    return request(`/myntra/mock/packet/${packetId}/delivered`, {
+      method: 'POST'
+    });
+  },
+
+  async markDelivered(packetId) {
+    return this.markMyntraDelivered(packetId);
+  },
+
+  async getMyntraReturns() {
+    return request('/myntra/returns');
+  },
+
+  async lookupMyntraReturn(packetId) {
+    return request(`/myntra/mock/return/${encodeURIComponent(packetId)}`);
+  },
+
+  async updateMyntraReturn(returnId, data) {
+    return request(`/myntra/mock/return/${returnId}/update`, {
       method: 'POST',
       body: JSON.stringify(data)
+    });
+  },
+
+  async injectMockMyntraOrder(data) {
+    return request('/myntra/mock/order', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async simulateMyntraCancellation(orderId) {
+    return request(`/myntra/mock/order/${orderId}/itemCancellation`, {
+      method: 'POST'
+    });
+  },
+
+  async simulateMyntraHold(orderId) {
+    return request(`/myntra/mock/order/${orderId}/onhold`, {
+      method: 'POST'
+    });
+  },
+
+  async simulateMyntraUnhold(orderId) {
+    return request(`/myntra/mock/order/${orderId}/unhold`, {
+      method: 'POST'
+    });
+  },
+
+  async getMyntraWebhookEvents() {
+    return request('/myntra/webhook/events');
+  },
+
+  async clearMyntraWebhookEvents() {
+    return request('/myntra/webhook/events', {
+      method: 'DELETE'
     });
   },
 
