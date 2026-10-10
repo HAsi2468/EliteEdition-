@@ -4,7 +4,7 @@ import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
   CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2,
   User, FileText, ArrowRight, Calendar, Wallet, TrendingUp, TrendingDown, DollarSign, CreditCard,
-  Users, Building2, CheckSquare, Square, ShoppingBag
+  Users, Building2, CheckSquare, Square, ShoppingBag, Settings, Landmark, ArrowUpRight, ArrowDownLeft
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -202,13 +202,42 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, totalVouchers: 0 });
   const [loading, setLoading] = useState(false);
 
+  // ── Chartered Ledger Balances State (Cash/Bank Opening, Movements & Closing) ──
+  const [ledgerBalances, setLedgerBalances] = useState({
+    cashOpening: 0,
+    bankOpening: 0,
+    cashIn: 0,
+    cashExpense: 0,
+    cashClosing: 0,
+    bankIn: 0,
+    bankExpense: 0,
+    bankClosing: 0,
+    totalTransactions: 0,
+    bankAccountName: 'KOTAK EDP',
+    effectiveDate: ''
+  });
+
+  // Settings Modal State
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    businessUnit: 'EDP',
+    companyEntity: companyEntity || 'Elite Digital Print',
+    initialCashOpening: 0,
+    initialBankOpening: 0,
+    effectiveDate: '2024-04-01',
+    bankAccountName: 'KOTAK EDP',
+    notes: ''
+  });
+
   // Dynamic Categories from PrintConfig
   const [inCategories, setInCategories] = useState(DEFAULT_IN_CATEGORIES);
   const [outCategories, setOutCategories] = useState(DEFAULT_OUT_CATEGORIES);
   const [paymentModes, setPaymentModes] = useState(DEFAULT_PAYMENT_MODES);
 
-  // Load Print Config
+  // Load Print Config & Ledger Settings
   useEffect(() => {
+    loadLedgerSettings();
     api.getPrintConfig(companyEntity)
       .then(cfg => {
         if (cfg) {
@@ -225,6 +254,47 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       })
       .catch(err => console.warn('Failed to load print config for expense categories:', err));
   }, [companyEntity]);
+
+  const loadLedgerSettings = async () => {
+    try {
+      const res = await api.getLedgerSettings({ companyEntity });
+      if (res && res.settings) {
+        setSettingsForm({
+          businessUnit: res.settings.businessUnit || 'EDP',
+          companyEntity: res.settings.companyEntity || companyEntity,
+          initialCashOpening: res.settings.initialCashOpening || 0,
+          initialBankOpening: res.settings.initialBankOpening || 0,
+          effectiveDate: res.settings.effectiveDate || '2024-04-01',
+          bankAccountName: res.settings.bankAccountName || 'KOTAK EDP',
+          notes: res.settings.notes || ''
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to load ledger settings:', err);
+    }
+  };
+
+  const handleSaveLedgerSettings = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setSavingSettings(true);
+    try {
+      await api.saveLedgerSettings({
+        ...settingsForm,
+        companyEntity,
+        initialCashOpening: Number(settingsForm.initialCashOpening) || 0,
+        initialBankOpening: Number(settingsForm.initialBankOpening) || 0
+      });
+      triggerEliteAlert('✅ Initial Opening Balances configured successfully!');
+      setShowSettingsModal(false);
+      triggerGlobalDataRefresh('expenses');
+      fetchExpenses();
+    } catch (err) {
+      console.error('Failed to save ledger settings:', err);
+      triggerEliteAlert(`Failed to save initial balances: ${err.message}`);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   // Trigger modal auto open if requested
   useEffect(() => {
@@ -276,6 +346,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     title: '',
     amount: '',
     paymentMode: 'Cash',
+    bankAccount: 'Cash in Hand',
     paidToOrReceivedFrom: '',
     billNo: '',
     description: '',
@@ -982,6 +1053,25 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
           netBalance: res.netBalance || 0,
           totalVouchers: res.total || (Array.isArray(res.data) ? res.data.length : 0)
         });
+        if (res.ledgerSummary) {
+          setLedgerBalances(res.ledgerSummary);
+        }
+      }
+
+      // If ledgerSummary wasn't returned in getExpenses, fetch directly via dedicated endpoint
+      if (!res?.ledgerSummary) {
+        try {
+          const lRes = await api.getLedgerSummary({
+            companyEntity,
+            dateStart,
+            dateEnd
+          });
+          if (lRes && lRes.cashClosing !== undefined) {
+            setLedgerBalances(lRes);
+          }
+        } catch (e) {
+          console.warn('Failed to load standalone ledger summary:', e);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch expense records:', err);
@@ -1016,6 +1106,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       title: '',
       amount: '',
       paymentMode: 'Cash',
+      bankAccount: 'Cash in Hand',
       paidToOrReceivedFrom: '',
       billNo: '',
       description: '',
@@ -1066,6 +1157,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       title: item.title || '',
       amount: item.amount || '',
       paymentMode: item.paymentMode || 'Cash',
+      bankAccount: item.bankAccount || (item.paymentMode === 'Cash' ? 'Cash in Hand' : (ledgerBalances.settings?.bankAccountName || 'KOTAK EDP')),
       paidToOrReceivedFrom: item.paidToOrReceivedFrom || '',
       billNo: item.billNo || '',
       description: item.description || '',
@@ -1475,70 +1567,171 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       {canViewDashboard ? (
         <>
           {/* Summary KPI Cards - Standard Enterprise Grid */}
-          <div className="ent-stat-grid">
-            {/* Cash IN */}
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Cash IN</span>
-                <TrendingUp size={14} color="#10b981" />
+          {/* ── Structured Balance Cards (Cash & Bank Ledger Groups) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mb-1">
+            {/* 1. Cash Ledger Group */}
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-200/90 dark:border-slate-800 p-3.5 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                    <Wallet size={16} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 m-0">
+                        Cash in Hand Ledger
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        Opening: ₹{Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400 font-medium">Physical Cash Flow & Petty Cash Movement</span>
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#10b981', marginTop: 2 }}>
-                ₹{(cashInAmount || 0).toLocaleString('en-IN')}
+
+              {/* 4 Cash Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {/* Cash Opening */}
+                <div className="p-2.5 rounded-lg bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Opening</span>
+                  <div className="text-sm font-extrabold text-slate-700 dark:text-slate-200 mt-0.5 truncate" title={`₹${Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN')}`}>
+                    ₹{Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] text-slate-400 block truncate">Pre-Period Balance</span>
+                </div>
+
+                {/* Cash In */}
+                <div className="p-2.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Cash IN</span>
+                    <TrendingUp size={12} className="text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                    +₹{Number(ledgerBalances.cashIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] text-emerald-600/80 font-medium block">Receipts / Advances</span>
+                </div>
+
+                {/* Cash Expense */}
+                <div className="p-2.5 rounded-lg bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Cash OUT</span>
+                    <TrendingDown size={12} className="text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <div className="text-sm font-black text-rose-600 dark:text-rose-400 mt-0.5 truncate">
+                    -₹{Number(ledgerBalances.cashExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] text-rose-600/80 font-medium block">Expenses / Outflows</span>
+                </div>
+
+                {/* Cash Closing */}
+                <div className={`p-2.5 rounded-lg border ${
+                  Number(ledgerBalances.cashClosing || 0) >= 0 
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300' 
+                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Closing</span>
+                    <Wallet size={12} />
+                  </div>
+                  <div className="text-sm font-black mt-0.5 truncate">
+                    ₹{Number(ledgerBalances.cashClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] font-bold opacity-80 block truncate">Net Cash Closing</span>
+                </div>
               </div>
             </div>
 
-            {/* Bank IN */}
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #06b6d4' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Bank IN</span>
-                <CreditCard size={14} color="#06b6d4" />
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0891b2', marginTop: 2 }}>
-                ₹{(bankInAmount || 0).toLocaleString('en-IN')}
-              </div>
-            </div>
+            {/* 2. Bank Ledger Group */}
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-200/90 dark:border-slate-800 p-3.5 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/60 flex items-center justify-center text-sky-600 dark:text-sky-400 border border-sky-200/60 dark:border-sky-800/40">
+                    <CreditCard size={16} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 m-0">
+                        Bank Ledger
+                      </h4>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                        {ledgerBalances.settings?.bankAccountName || 'KOTAK EDP'}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        Opening: ₹{Number(ledgerBalances.bankOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400 font-medium">NEFT / RTGS / UPI / Online Settlements</span>
+                  </div>
+                </div>
 
-            {/* Cash Expense OUT */}
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Cash Expense</span>
-                <TrendingDown size={14} color="#ef4444" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      loadLedgerSettings();
+                      setShowSettingsModal(true);
+                    }}
+                    className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Configure Initial Opening Balances & Bank Account"
+                  >
+                    <Settings size={12} className="text-slate-500" />
+                    <span>Setup Openings</span>
+                  </button>
+                </div>
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#dc2626', marginTop: 2 }}>
-                ₹{(cashOutAmount || 0).toLocaleString('en-IN')}
-              </div>
-            </div>
 
-            {/* Bank Expense OUT */}
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #6366f1' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Bank Expense</span>
-                <CreditCard size={14} color="#6366f1" />
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#4f46e5', marginTop: 2 }}>
-                ₹{(bankOutAmount || 0).toLocaleString('en-IN')}
-              </div>
-            </div>
+              {/* 4 Bank Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {/* Bank Opening */}
+                <div className="p-2.5 rounded-lg bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Opening</span>
+                  <div className="text-sm font-extrabold text-slate-700 dark:text-slate-200 mt-0.5 truncate" title={`₹${Number(ledgerBalances.bankOpening || 0).toLocaleString('en-IN')}`}>
+                    ₹{Number(ledgerBalances.bankOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] text-slate-400 block truncate">Pre-Period Balance</span>
+                </div>
 
-            {/* Net Balance */}
-            <div className="ent-stat-card" style={{ borderLeft: `4px solid ${summary.netBalance >= 0 ? '#2563eb' : '#d97706'}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Net Balance</span>
-                <Wallet size={14} color={summary.netBalance >= 0 ? '#2563eb' : '#d97706'} />
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: summary.netBalance >= 0 ? '#2563eb' : '#d97706', marginTop: 2 }}>
-                ₹{(summary.netBalance || 0).toLocaleString('en-IN')}
-              </div>
-            </div>
+                {/* Bank In */}
+                <div className="p-2.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Bank IN</span>
+                    <TrendingUp size={12} className="text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                    +₹{Number(ledgerBalances.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] text-emerald-600/80 font-medium block">Deposits / Credits</span>
+                </div>
 
-            {/* Total Vouchers Count */}
-            <div className="ent-stat-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Total Txns</span>
-                <FileText size={14} color="#8b5cf6" />
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>
-                {summary.totalVouchers || 0}
+                {/* Bank Expense */}
+                <div className="p-2.5 rounded-lg bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Bank OUT</span>
+                    <TrendingDown size={12} className="text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div className="text-sm font-black text-indigo-600 dark:text-indigo-400 mt-0.5 truncate">
+                    -₹{Number(ledgerBalances.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] text-indigo-600/80 font-medium block">Transfers / Debits</span>
+                </div>
+
+                {/* Bank Closing */}
+                <div className={`p-2.5 rounded-lg border ${
+                  Number(ledgerBalances.bankClosing || 0) >= 0 
+                    ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-800 dark:text-sky-300' 
+                    : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Closing</span>
+                    <CreditCard size={12} />
+                  </div>
+                  <div className="text-sm font-black mt-0.5 truncate">
+                    ₹{Number(ledgerBalances.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[9px] font-bold opacity-80 block truncate">Net Bank Closing</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1697,9 +1890,21 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                             {isIN ? '+' : '-'} ₹{(item.amount || 0).toLocaleString('en-IN')}
                           </td>
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
-                            <span style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem' }}>
-                              {item.paymentMode || 'Cash'}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                              <span style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem' }}>
+                                {item.paymentMode || 'Cash'}
+                              </span>
+                              {item.bankAccount && (
+                                <span style={{
+                                  fontSize: '0.64rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px',
+                                  background: item.bankAccount === 'Cash in Hand' ? 'rgba(16,185,129,0.1)' : 'rgba(2,132,199,0.1)',
+                                  color: item.bankAccount === 'Cash in Hand' ? '#10b981' : '#0284c7',
+                                  border: `1px solid ${item.bankAccount === 'Cash in Hand' ? 'rgba(16,185,129,0.3)' : 'rgba(2,132,199,0.3)'}`
+                                }}>
+                                  {item.bankAccount === 'Cash in Hand' ? '💵 Cash in Hand' : `🏦 ${item.bankAccount}`}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
                             {item.paidToOrReceivedFrom || 'N/A'}
@@ -2392,12 +2597,91 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Payment Mode</label>
                   <select
                     value={formVal.paymentMode}
-                    onChange={e => setFormVal(prev => ({ ...prev, paymentMode: e.target.value }))}
+                    onChange={e => {
+                      const newMode = e.target.value;
+                      const isCash = newMode === 'Cash';
+                      setFormVal(prev => ({
+                        ...prev,
+                        paymentMode: newMode,
+                        bankAccount: isCash ? 'Cash in Hand' : (prev.bankAccount === 'Cash in Hand' ? (ledgerBalances.settings?.bankAccountName || 'KOTAK EDP') : prev.bankAccount)
+                      }));
+                    }}
                     style={{ width: '100%', marginTop: 4 }}
                   >
                     {(paymentModes && paymentModes.length > 0 ? paymentModes : DEFAULT_PAYMENT_MODES).map(pm => <option key={pm} value={pm}>{pm}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Target Ledger / Bank Account Routing */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Landmark size={13} color="#38bdf8" /> Target Ledger / Bank Account *
+                  </label>
+                  {Number(formVal.amount) > 0 && (
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: formVal.bankAccount === 'Cash in Hand' ? '#10b981' : '#0284c7' }}>
+                      Routes to: {formVal.bankAccount === 'Cash in Hand' ? '💵 Cash Balance' : `🏦 ${formVal.bankAccount}`}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFormVal(prev => ({ ...prev, bankAccount: 'Cash in Hand', paymentMode: prev.paymentMode === 'Cash' ? prev.paymentMode : 'Cash' }))}
+                    style={{
+                      padding: '0.5rem 0.75rem', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 800,
+                      border: formVal.bankAccount === 'Cash in Hand' ? '2px solid #10b981' : '1px solid var(--border-light)',
+                      background: formVal.bankAccount === 'Cash in Hand' ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.02)',
+                      color: formVal.bankAccount === 'Cash in Hand' ? '#10b981' : 'var(--text-muted)',
+                      cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>💵</span>
+                    <div>
+                      <div>Cash in Hand</div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 500, opacity: 0.8 }}>Physical Cash / Petty Cash</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormVal(prev => ({
+                      ...prev,
+                      bankAccount: ledgerBalances.settings?.bankAccountName || 'KOTAK EDP',
+                      paymentMode: prev.paymentMode === 'Cash' ? 'UPI / GPay / PhonePe' : prev.paymentMode
+                    }))}
+                    style={{
+                      padding: '0.5rem 0.75rem', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 800,
+                      border: formVal.bankAccount !== 'Cash in Hand' ? '2px solid #0284c7' : '1px solid var(--border-light)',
+                      background: formVal.bankAccount !== 'Cash in Hand' ? 'rgba(2,132,199,0.15)' : 'rgba(255,255,255,0.02)',
+                      color: formVal.bankAccount !== 'Cash in Hand' ? '#0284c7' : 'var(--text-muted)',
+                      cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>🏦</span>
+                    <div>
+                      <div>{ledgerBalances.settings?.bankAccountName || 'KOTAK EDP'}</div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 500, opacity: 0.8 }}>Primary Business Bank</div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Real-Time Live Projected Closing Balance Impact */}
+                {Number(formVal.amount) > 0 && (
+                  <div style={{ fontSize: '0.68rem', padding: '5px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                    <span>
+                      Current {formVal.bankAccount === 'Cash in Hand' ? 'Cash' : 'Bank'} Closing: ₹{(formVal.bankAccount === 'Cash in Hand' ? Number(ledgerBalances.cashClosing || 0) : Number(ledgerBalances.bankClosing || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                      Projected Closing: ₹{(
+                        (formVal.bankAccount === 'Cash in Hand' ? Number(ledgerBalances.cashClosing || 0) : Number(ledgerBalances.bankClosing || 0)) +
+                        ((formVal.type === 'IN' || transactionMode === 'PARTY') ? Number(formVal.amount) : -Number(formVal.amount))
+                      ).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Paid To / Received From & Bill No */}
@@ -2514,6 +2798,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 <div><strong>Date:</strong> {showViewModal.date}</div>
                 <div><strong>Category:</strong> {showViewModal.category}</div>
                 <div><strong>Payment Mode:</strong> {showViewModal.paymentMode}</div>
+                <div><strong>Target Account:</strong> <span style={{ color: (showViewModal.bankAccount === 'Cash in Hand' || showViewModal.paymentMode === 'Cash') ? '#10b981' : '#0284c7', fontWeight: 700 }}>{showViewModal.bankAccount || (showViewModal.paymentMode === 'Cash' ? 'Cash in Hand' : 'Bank Account')}</span></div>
                 <div><strong>{showViewModal.type === 'IN' ? 'Received From:' : 'Paid To:'}</strong> {showViewModal.paidToOrReceivedFrom || 'N/A'}</div>
                 <div><strong>Bill/Invoice No:</strong> {showViewModal.billNo || 'N/A'}</div>
               </div>
@@ -2558,6 +2843,132 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SET INITIAL OPENING BALANCE MODAL (BUSINESS UNIT ONBOARDING) ── */}
+      {showSettingsModal && (
+        <div className="modal-backdrop" onClick={() => setShowSettingsModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+          <div className="glass-panel modal-content" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '520px', padding: '1.5rem', borderRadius: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 8, background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  <Settings size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                    Set Initial Opening Balances
+                  </h3>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    Baseline Ledger Onboarding for {companyEntity}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setShowSettingsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveLedgerSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Business Unit</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={companyEntity}
+                    style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', fontWeight: 700 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Primary Bank Account Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsForm.bankAccountName}
+                    onChange={e => setSettingsForm(prev => ({ ...prev, bankAccountName: e.target.value }))}
+                    placeholder="e.g. KOTAK EDP"
+                    style={{ width: '100%', marginTop: 4, fontWeight: 700 }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Effective Opening Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={settingsForm.effectiveDate}
+                  onChange={e => setSettingsForm(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                  style={{ width: '100%', marginTop: 4 }}
+                />
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: 3 }}>
+                  All historical vouchers logged after this date will adjust from this baseline opening.
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
+                    💵 Initial Cash Opening (₹) *
+                  </label>
+                  <StandardNumericInput
+                    mode="currency"
+                    decimals={2}
+                    prefix="₹"
+                    value={settingsForm.initialCashOpening}
+                    onChange={e => setSettingsForm(prev => ({ ...prev, initialCashOpening: e.target.value }))}
+                    placeholder="0.00"
+                    style={{ width: '100%', marginTop: 4, fontWeight: 800 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase' }}>
+                    🏦 Initial Bank Opening (₹) *
+                  </label>
+                  <StandardNumericInput
+                    mode="currency"
+                    decimals={2}
+                    prefix="₹"
+                    value={settingsForm.initialBankOpening}
+                    onChange={e => setSettingsForm(prev => ({ ...prev, initialBankOpening: e.target.value }))}
+                    placeholder="0.00"
+                    style={{ width: '100%', marginTop: 4, fontWeight: 800 }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Notes / CA Reference</label>
+                <textarea
+                  rows={2}
+                  value={settingsForm.notes}
+                  onChange={e => setSettingsForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="e.g. Audited balance sheet baseline verified by CA..."
+                  style={{ width: '100%', marginTop: 4, fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(false)}
+                  className="btn-secondary"
+                  style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSettings}
+                  className="btn-primary"
+                  style={{ padding: '0.45rem 1.2rem', fontSize: '0.8rem', fontWeight: 800 }}
+                >
+                  {savingSettings ? 'Saving...' : '💾 Save Opening Balances'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

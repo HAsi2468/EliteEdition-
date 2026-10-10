@@ -1123,6 +1123,21 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/expenses/analytics${qs}`);
   },
+  async getLedgerSummary(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/expenses/ledger-summary${qs}`);
+  },
+  async getLedgerSettings(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/expenses/ledger-settings${qs}`);
+  },
+  async saveLedgerSettings(payload) {
+    return request('/expenses/ledger-settings', { method: 'POST', body: JSON.stringify(payload) });
+  },
   async getNextExpenseVoucherNo(companyEntity) {
     const qs = companyEntity ? `?companyEntity=${encodeURIComponent(companyEntity)}` : '';
     return request(`/expenses/next-number${qs}`);

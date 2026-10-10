@@ -14,6 +14,8 @@ const expenseSchema = new mongoose.Schema(
     billNo: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
     receiptUrls: [{ type: String, trim: true }],
+    bankAccount: { type: String, default: '', trim: true },
+    status: { type: String, default: 'APPROVED', trim: true },
     department: { type: String, default: 'digital_print', trim: true },
     createdBy: { type: String, default: 'System', trim: true },
     createdByName: { type: String, default: 'System', trim: true },

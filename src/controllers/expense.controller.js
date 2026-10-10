@@ -2,15 +2,40 @@ const db = require('../db/models');
 const logger = require('../config/logger');
 const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
+const normalizeBusinessUnit = (bu) => {
+  if (!bu) return 'Elite Digital Print';
+  const u = String(bu).trim().toUpperCase();
+  if (u === 'EDP' || u === 'ELITE DIGITAL PRINT' || u === 'ELITE DIGITAL PRINTS') return 'Elite Digital Print';
+  if (u === 'ES' || u === 'ELITE STITCHING') return 'Elite Stitching';
+  if (u === 'EE' || u === 'ELITE EDITION') return 'Elite Edition';
+  if (u === 'EF' || u === 'ELITE FABTEX') return 'Elite Fabtex';
+  if (u === 'EON' || u === 'ELITE ONLINE') return 'Elite Online';
+  return bu;
+};
+
+const getBusinessUnitCode = (bu) => {
+  const norm = normalizeBusinessUnit(bu);
+  if (norm === 'Elite Digital Print') return 'EDP';
+  if (norm === 'Elite Stitching') return 'ES';
+  if (norm === 'Elite Edition') return 'EE';
+  if (norm === 'Elite Fabtex') return 'EF';
+  if (norm === 'Elite Online') return 'EON';
+  return 'EDP';
+};
+
 const buildExpenseCompFilter = (companyEntity) => {
-  if (companyEntity === 'Elite Stitching') {
+  const norm = normalizeBusinessUnit(companyEntity);
+  if (norm === 'Elite Stitching') {
     return { companyEntity: 'Elite Stitching' };
   }
-  if (companyEntity === 'Elite Edition') {
+  if (norm === 'Elite Edition') {
     return { companyEntity: 'Elite Edition' };
   }
-  if (companyEntity === 'Elite Fabtex') {
+  if (norm === 'Elite Fabtex') {
     return { companyEntity: 'Elite Fabtex' };
+  }
+  if (norm === 'Elite Online') {
+    return { companyEntity: 'Elite Online' };
   }
   return {
     $or: [
@@ -22,7 +47,148 @@ const buildExpenseCompFilter = (companyEntity) => {
   };
 };
 
-// Get All Expense / Income Records (with filters)
+const isCashTransaction = (item) => {
+  const account = String(item.bankAccount || '').trim().toLowerCase();
+  if (account === 'cash in hand' || account === 'cash' || account.includes('cash in hand') || account.includes('petty cash')) {
+    return true;
+  }
+  if (account && !account.includes('cash')) {
+    // Explicitly associated with a bank account (e.g. KOTAK EDP, HDFC Bank)
+    return false;
+  }
+  const mode = String(item.paymentMode || '').trim().toLowerCase();
+  return mode === 'cash' || mode.includes('petty cash');
+};
+
+/**
+ * Core Ledger Aggregation Pipeline
+ * Computes Historical Openings (Cash/Bank), Period Movements, and Closing Balances
+ */
+const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDate, endDate, dateStart, dateEnd }) => {
+  const effectiveBU = businessUnit || companyEntity || 'EDP';
+  const buCode = getBusinessUnitCode(effectiveBU);
+  const normEntity = normalizeBusinessUnit(effectiveBU);
+
+  const now = new Date();
+  const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const start = startDate || dateStart || currentMonthStart;
+  const end = endDate || dateEnd || todayDate;
+
+  // 1. Fetch LedgerSettings for initial opening configuration
+  const settings = await db.LedgerSettings.findOne({
+    $or: [
+      { businessUnit: buCode },
+      { companyEntity: normEntity },
+      { businessUnit: normEntity }
+    ]
+  }).lean();
+
+  const initialCashOpening = Number(settings?.initialCashOpening) || 0;
+  const initialBankOpening = Number(settings?.initialBankOpening) || 0;
+  const effectiveDate = (settings?.effectiveDate || '').trim();
+  const bankAccountName = settings?.bankAccountName || (buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`);
+
+  const compFilter = buildExpenseCompFilter(normEntity);
+
+  // 2. Calculate Historical Opening Balances (all approved transactions before `start`)
+  const histDateCond = {};
+  if (effectiveDate && effectiveDate < start) {
+    histDateCond.$gte = effectiveDate;
+    histDateCond.$lt = start;
+  } else {
+    histDateCond.$lt = start;
+  }
+
+  const historicalTxns = await db.Expense.find({
+    $and: [
+      compFilter,
+      { status: { $ne: 'REJECTED' } },
+      { date: histDateCond }
+    ]
+  }, { type: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
+
+  let histCashIn = 0;
+  let histCashOut = 0;
+  let histBankIn = 0;
+  let histBankOut = 0;
+
+  historicalTxns.forEach(item => {
+    const amt = Number(item.amount) || 0;
+    if (isCashTransaction(item)) {
+      if (item.type === 'IN') histCashIn += amt;
+      else if (item.type === 'OUT') histCashOut += amt;
+    } else {
+      if (item.type === 'IN') histBankIn += amt;
+      else if (item.type === 'OUT') histBankOut += amt;
+    }
+  });
+
+  const cashOpening = Number((initialCashOpening + histCashIn - histCashOut).toFixed(2));
+  const bankOpening = Number((initialBankOpening + histBankIn - histBankOut).toFixed(2));
+
+  // 3. Calculate Period Movements (transactions between `start` and `end`)
+  const periodTxns = await db.Expense.find({
+    $and: [
+      compFilter,
+      { status: { $ne: 'REJECTED' } },
+      { date: { $gte: start, $lte: end } }
+    ]
+  }, { type: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
+
+  let cashIn = 0;
+  let cashExpense = 0;
+  let bankIn = 0;
+  let bankExpense = 0;
+
+  periodTxns.forEach(item => {
+    const amt = Number(item.amount) || 0;
+    if (isCashTransaction(item)) {
+      if (item.type === 'IN') cashIn += amt;
+      else if (item.type === 'OUT') cashExpense += amt;
+    } else {
+      if (item.type === 'IN') bankIn += amt;
+      else if (item.type === 'OUT') bankExpense += amt;
+    }
+  });
+
+  cashIn = Number(cashIn.toFixed(2));
+  cashExpense = Number(cashExpense.toFixed(2));
+  bankIn = Number(bankIn.toFixed(2));
+  bankExpense = Number(bankExpense.toFixed(2));
+
+  // 4. Derive Closing Balances:
+  // cashClosing = cashOpening + cashIn - cashExpense
+  // bankClosing = bankOpening + bankIn - bankExpense
+  const cashClosing = Number((cashOpening + cashIn - cashExpense).toFixed(2));
+  const bankClosing = Number((bankOpening + bankIn - bankExpense).toFixed(2));
+
+  return {
+    cashOpening,
+    bankOpening,
+    cashIn,
+    cashExpense,
+    cashClosing,
+    bankIn,
+    bankExpense,
+    bankClosing,
+    totalTransactions: periodTxns.length,
+    businessUnit: buCode,
+    companyEntity: normEntity,
+    startDate: start,
+    endDate: end,
+    settings: {
+      initialCashOpening,
+      initialBankOpening,
+      effectiveDate,
+      bankAccountName,
+      notes: settings?.notes || ''
+    }
+  };
+};
+
+// Get All Expense / Income Records (with filters + ledger summary)
 const getAll = async (req, res) => {
   try {
     const {
@@ -32,14 +198,21 @@ const getAll = async (req, res) => {
       paymentMode = 'All',
       dateStart = '',
       dateEnd = '',
+      startDate = '',
+      endDate = '',
       page = 1,
       limit = 500,
-      companyEntity
+      companyEntity,
+      businessUnit
     } = req.query;
+
+    const effectiveDateStart = dateStart || startDate || '';
+    const effectiveDateEnd = dateEnd || endDate || '';
+    const effectiveBU = businessUnit || companyEntity;
 
     const conditions = [];
 
-    const compFilter = buildExpenseCompFilter(companyEntity);
+    const compFilter = buildExpenseCompFilter(effectiveBU);
     if (compFilter) {
       conditions.push(compFilter);
     }
@@ -71,10 +244,10 @@ const getAll = async (req, res) => {
       }
     }
 
-    if (dateStart || dateEnd) {
+    if (effectiveDateStart || effectiveDateEnd) {
       const dateCond = {};
-      if (dateStart) dateCond.$gte = dateStart;
-      if (dateEnd) dateCond.$lte = dateEnd;
+      if (effectiveDateStart) dateCond.$gte = effectiveDateStart;
+      if (effectiveDateEnd) dateCond.$lte = effectiveDateEnd;
       conditions.push({ date: dateCond });
     }
 
@@ -88,7 +261,8 @@ const getAll = async (req, res) => {
           { category: regex },
           { paidToOrReceivedFrom: regex },
           { billNo: regex },
-          { description: regex }
+          { description: regex },
+          { bankAccount: regex }
         ]
       });
     }
@@ -99,13 +273,19 @@ const getAll = async (req, res) => {
     const limitNum = parseInt(limit, 10) || 500;
     const skip = (pageNum - 1) * limitNum;
 
-    const [data, total] = await Promise.all([
+    const [data, total, ledgerSummary] = await Promise.all([
       db.Expense.find(filter)
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean(),
-      db.Expense.countDocuments(filter)
+      db.Expense.countDocuments(filter),
+      calculateLedgerAggregation({
+        businessUnit: effectiveBU,
+        companyEntity: effectiveBU,
+        startDate: effectiveDateStart,
+        endDate: effectiveDateEnd
+      })
     ]);
 
     // Calculate Summary Totals for filtered dataset
@@ -127,11 +307,111 @@ const getAll = async (req, res) => {
       totalOut,
       netBalance: totalIn - totalOut,
       page: pageNum,
-      pages: Math.ceil(total / limitNum) || 1
+      pages: Math.ceil(total / limitNum) || 1,
+      ledgerSummary
     });
   } catch (err) {
     logger.error('expense.getAll error: %o', err);
     res.status(500).json({ error: err.message || 'Failed to fetch expense records' });
+  }
+};
+
+// Standalone Ledger Aggregation Endpoint
+const getLedgerSummary = async (req, res) => {
+  try {
+    const { businessUnit, companyEntity, startDate, endDate, dateStart, dateEnd } = req.query;
+    const summary = await calculateLedgerAggregation({
+      businessUnit: businessUnit || companyEntity,
+      companyEntity: companyEntity || businessUnit,
+      startDate: startDate || dateStart,
+      endDate: endDate || dateEnd
+    });
+    res.json(summary);
+  } catch (err) {
+    logger.error('expense.getLedgerSummary error: %o', err);
+    res.status(500).json({ error: err.message || 'Failed to calculate ledger summary' });
+  }
+};
+
+// Get Ledger Initial Opening Settings
+const getLedgerSettings = async (req, res) => {
+  try {
+    const { businessUnit, companyEntity } = req.query;
+    const buCode = getBusinessUnitCode(companyEntity || businessUnit);
+    const normEntity = normalizeBusinessUnit(companyEntity || businessUnit);
+
+    let settings = await db.LedgerSettings.findOne({
+      $or: [
+        { businessUnit: buCode },
+        { companyEntity: normEntity },
+        { businessUnit: normEntity }
+      ]
+    }).lean();
+
+    if (!settings) {
+      settings = {
+        businessUnit: buCode,
+        companyEntity: normEntity,
+        initialCashOpening: 0,
+        initialBankOpening: 0,
+        effectiveDate: '2024-04-01',
+        bankAccountName: buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`,
+        notes: ''
+      };
+    }
+
+    res.json({ success: true, settings });
+  } catch (err) {
+    logger.error('expense.getLedgerSettings error: %o', err);
+    res.status(500).json({ error: 'Failed to fetch ledger settings' });
+  }
+};
+
+// Save Ledger Initial Opening Settings
+const saveLedgerSettings = async (req, res) => {
+  try {
+    const {
+      businessUnit,
+      companyEntity,
+      initialCashOpening = 0,
+      initialBankOpening = 0,
+      effectiveDate,
+      bankAccountName = 'KOTAK EDP',
+      notes = ''
+    } = req.body;
+
+    const buCode = getBusinessUnitCode(companyEntity || businessUnit);
+    const normEntity = normalizeBusinessUnit(companyEntity || businessUnit);
+    const activeUserName = req.headers['x-user-name'] || req.user?.name || 'Staff User';
+
+    const updated = await db.LedgerSettings.findOneAndUpdate(
+      {
+        $or: [
+          { businessUnit: buCode },
+          { companyEntity: normEntity }
+        ]
+      },
+      {
+        $set: {
+          businessUnit: buCode,
+          companyEntity: normEntity,
+          initialCashOpening: Number(initialCashOpening) || 0,
+          initialBankOpening: Number(initialBankOpening) || 0,
+          effectiveDate: effectiveDate || '2024-04-01',
+          bankAccountName: bankAccountName || (buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`),
+          notes: notes || '',
+          updatedBy: activeUserName
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    emitSocketEvent(req, 'ledger-settings-updated', updated);
+
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    logger.error('expense.saveLedgerSettings error: %o', err);
+    res.status(500).json({ error: err.message || 'Failed to save ledger settings' });
   }
 };
 
@@ -169,7 +449,7 @@ async function generateUniqueVoucherNo(companyEntity = 'Elite Digital Print') {
   return candidate;
 }
 
-// Get Next Voucher Number (e.g. EE-EXP-1001, EF-EXP-1001, EDP-EXP-1001)
+// Get Next Voucher Number
 const getNextVoucherNo = async (req, res) => {
   try {
     const { companyEntity } = req.query;
@@ -211,6 +491,21 @@ const create = async (req, res) => {
       payload.voucherNo = await generateUniqueVoucherNo(payload.companyEntity);
     }
 
+    // Default Bank Account routing
+    if (!payload.bankAccount || !payload.bankAccount.trim()) {
+      const pMode = String(payload.paymentMode || '').trim().toLowerCase();
+      if (pMode === 'cash' || pMode.includes('petty cash')) {
+        payload.bankAccount = 'Cash in Hand';
+      } else {
+        const buCode = getBusinessUnitCode(payload.companyEntity);
+        payload.bankAccount = buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`;
+      }
+    }
+
+    if (!payload.status) {
+      payload.status = 'APPROVED';
+    }
+
     const activeUserName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.createdBy || 'Staff User';
     payload.createdBy = activeUserName;
     payload.createdByName = activeUserName;
@@ -231,7 +526,7 @@ const create = async (req, res) => {
         recordId: created._id,
         permissionScope: 'finance_expenses',
         department: 'Finance',
-        description: `💸 **Expense Voucher #${created.voucherNo}** logged for Purpose: **"${created.title}"** | Category: **${created.category}** | Amount: **₹${created.amount}** (${created.type === 'IN' ? 'Income' : 'Expense'}) by **${uName}**.`
+        description: `💸 **Expense Voucher #${created.voucherNo}** logged for Purpose: **"${created.title}"** | Category: **${created.category}** | Amount: **₹${created.amount}** (${created.type === 'IN' ? 'Income' : 'Expense'}) [${created.bankAccount || created.paymentMode}] by **${uName}**.`
       }).catch(e => logger.warn('publishActivity expense create failed: %s', e.message));
     } catch (e) {
       logger.warn('Failed to publish activity for expense: %o', e);
@@ -255,6 +550,16 @@ const update = async (req, res) => {
 
     if (!payload.companyEntity) {
       payload.companyEntity = 'Elite Digital Print';
+    }
+
+    if (!payload.bankAccount || !payload.bankAccount.trim()) {
+      const pMode = String(payload.paymentMode || '').trim().toLowerCase();
+      if (pMode === 'cash' || pMode.includes('petty cash')) {
+        payload.bankAccount = 'Cash in Hand';
+      } else {
+        const buCode = getBusinessUnitCode(payload.companyEntity);
+        payload.bankAccount = buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`;
+      }
     }
 
     const editorName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.updatedBy || 'Staff User';
@@ -289,10 +594,11 @@ const remove = async (req, res) => {
 // Analytics KPI Summary
 const getAnalytics = async (req, res) => {
   try {
-    const { companyEntity, dateStart = '', dateEnd = '' } = req.query;
+    const { companyEntity, dateStart = '', dateEnd = '', businessUnit } = req.query;
+    const effectiveBU = businessUnit || companyEntity;
     const conditions = [];
 
-    const compFilter = buildExpenseCompFilter(companyEntity);
+    const compFilter = buildExpenseCompFilter(effectiveBU);
     if (compFilter) conditions.push(compFilter);
 
     if (dateStart || dateEnd) {
@@ -359,5 +665,8 @@ module.exports = {
   update,
   remove,
   clearAll,
-  getAnalytics
+  getAnalytics,
+  getLedgerSummary,
+  getLedgerSettings,
+  saveLedgerSettings
 };
