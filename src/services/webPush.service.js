@@ -317,6 +317,52 @@ class WebPushService {
     );
 
     return results;
+  /**
+   * Sends push notification payload to a specific user across all registered devices
+   */
+  async sendPushToUser(userId, payload, options = {}) {
+    if (!userId) return [];
+    const subscriptions = await PushSubscription.find({ user: userId });
+    if (!subscriptions || subscriptions.length === 0) return [];
+
+    const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    const ttl = options.TTL || 86400;
+    const urgency = options.urgency || (payload.priority === 'urgent' ? 'high' : 'normal');
+
+    return Promise.allSettled(
+      subscriptions.map(async (sub) => {
+        const pushConfig = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.keys.p256dh,
+            auth: sub.keys.auth,
+          },
+        };
+
+        try {
+          return await webpush.sendNotification(pushConfig, payloadString, {
+            TTL: ttl,
+            urgency,
+          });
+        } catch (err) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await this.pruneInvalidEndpoint(sub.endpoint, sub._id);
+          } else {
+            logger.warn(`[WebPush] Push error to ${sub.endpoint.slice(0, 30)}: ${err.message}`);
+          }
+          throw err;
+        }
+      })
+    );
+  }
+
+  /**
+   * Sends push notification payload to multiple users in parallel
+   */
+  async sendPushToUsers(userIds, payload, options = {}) {
+    if (!Array.isArray(userIds) || userIds.length === 0) return [];
+    const uniqueUserIds = Array.from(new Set(userIds.map(String).filter(Boolean)));
+    return Promise.allSettled(uniqueUserIds.map((uId) => this.sendPushToUser(uId, payload, options)));
   }
 }
 

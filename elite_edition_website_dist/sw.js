@@ -161,38 +161,47 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json();
   } catch (e) {
-    payload = { title: 'Elite Edition ERP', body: event.data.text() };
+    payload = { title: 'Elite ERP', body: event.data.text() };
   }
 
-  const title = payload.title || 'Elite Edition ERP Message';
+  const payloadData = payload.data || {};
+  const destinationUrl = payloadData.url || (payloadData.roomId ? `/communication?room=${payloadData.roomId}` : '/communication');
+  const tag = payload.tag || payloadData.tag || 'erp-message';
+
+  const title = payload.title || 'Elite ERP Notification';
   const notificationOptions = {
-    body: payload.body || 'You received a new message.',
+    body: payload.body || 'You received a new update.',
     icon: payload.icon || '/Logo.png',
     badge: payload.badge || '/Logo.png',
-    tag: payload.tag || 'elite-chat-default', // Collapses duplicate room notifications
+    tag: tag, // Collapses multiple alerts gracefully per thread without tray spam
     renotify: payload.renotify !== undefined ? payload.renotify : true,
-    data: payload.data || { url: '/communication' },
+    data: {
+      ...payloadData,
+      url: destinationUrl,
+    },
     vibrate: payload.priority === 'urgent' ? [200, 100, 200, 100, 400] : [100, 50, 100],
     actions: payload.actions || [
-      { action: 'open', title: 'Open Chat' },
+      { action: 'open', title: 'Open' },
       { action: 'dismiss', title: 'Dismiss' },
     ],
   };
 
   // Smart Focus & In-Tab Suppression:
-  // If the user already has an active, focused tab viewing this room, suppress OS push
+  // If the user already has an active, focused tab viewing this room, broadcast in-tab alert without external OS modal
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      const targetRoomId = payload.data?.roomId;
-      
+      const targetRoomId = payloadData.roomId;
+
       const isRoomFocused = clientList.some((client) => {
-        return client.visibilityState === 'visible' &&
-               client.focused &&
-               client.url.includes(`room=${targetRoomId}`);
+        return (
+          client.visibilityState === 'visible' &&
+          client.focused &&
+          targetRoomId &&
+          client.url.includes(`room=${targetRoomId}`)
+        );
       });
 
       if (isRoomFocused) {
-        // Tab is active; broadcast in-tab alert without popping external OS modal
         clientList.forEach((c) => c.postMessage({ type: 'IN_APP_MESSAGE_ALERT', payload }));
         return;
       }
@@ -203,27 +212,35 @@ self.addEventListener('push', (event) => {
 });
 
 self.addEventListener('notificationclick', (event) => {
+  // 1. Intercept and close notification immediately
   event.notification.close();
 
   if (event.action === 'dismiss') {
     return;
   }
 
-  const targetUrl = event.notification.data?.url || '/communication';
+  const destinationUrl = event.notification.data?.url || '/communication';
+  const targetUrl = new URL(destinationUrl, self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // 1. If an existing ERP tab is already open, focus it and navigate
+      // 2. Query existing clients: if matching window exists, focus and postMessage to route
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          if ('navigate' in client) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          client.focus();
+          client.postMessage({
+            type: 'NAVIGATE_TO_ROUTE',
+            url: destinationUrl,
+            data: event.notification.data,
+          });
+          if ('navigate' in client && client.url !== targetUrl) {
             client.navigate(targetUrl);
           }
-          return client.focus();
+          return;
         }
       }
 
-      // 2. If no tab is open, launch a new window directly to the thread
+      // 3. Otherwise, launch the target URL in a new standalone/browser window
       if (self.clients.openWindow) {
         return self.clients.openWindow(targetUrl);
       }

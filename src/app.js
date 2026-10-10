@@ -17,6 +17,7 @@ const routes = require('./routes/v1');
 require('./schedule/fetchFromAPISScheduler');
 require('./schedule/myntraScheduler').startMyntraScheduler();
 require('./schedule/eodExecutiveBriefingScheduler').startEodExecutiveBriefingScheduler();
+require('./schedule/infrastructureBillingScheduler').startInfrastructureBillingScheduler();
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const userModel = require('./db/models/user.model');
@@ -628,6 +629,7 @@ app.use(['/v1', '/api/v1'], approvalInterceptor);
 // v1 and api/v1 api routes
 app.use('/v1', routes);
 app.use('/api/v1', routes);
+app.use('/api/infrastructure', require('./routes/infrastructureRoutes'));
 
 // Public verification route for physical challan, job card, and tax invoice QR scanning (without /v1 prefix)
 app.use('/verify/challan', require('./routes/v1/challanVerification.route'));

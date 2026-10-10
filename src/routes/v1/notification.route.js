@@ -1,80 +1,31 @@
 const express = require('express');
-const httpStatus = require('http-status').default;
-const webPushService = require('../../services/webPush.service');
-const catchAsync = require('../../utils/catchAsync');
-const ApiError = require('../../utils/ApiError');
+const notificationController = require('../../controllers/notificationController');
 
 const router = express.Router();
 
 /**
  * Get VAPID Public Key for client subscription negotiation
  */
-router.get(
-  '/vapid-key',
-  catchAsync(async (req, res) => {
-    const publicKey = webPushService.getPublicKey();
-    res.send({ publicKey });
-  })
-);
+router.get('/vapid-key', notificationController.getVapidPublicKey);
 
 /**
  * Register/Update Push Subscription for current user
  */
-router.post(
-  '/subscribe',
-  catchAsync(async (req, res) => {
-    const userId = req.headers['x-user-id'] || req.user?.id || req.body.userId;
-    if (!userId) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, 'User authentication required for push registration');
-    }
-
-    const { subscription, deviceFingerprint } = req.body;
-    const userAgent = req.headers['user-agent'] || '';
-
-    const saved = await webPushService.saveSubscription(userId, subscription, userAgent, deviceFingerprint);
-    res.status(httpStatus.CREATED).send({ success: true, subscriptionId: saved._id });
-  })
-);
+router.post('/subscribe', notificationController.subscribe);
 
 /**
  * Unsubscribe / delete a push registration
  */
-router.post(
-  '/unsubscribe',
-  catchAsync(async (req, res) => {
-    const { endpoint } = req.body;
-    if (endpoint) {
-      await webPushService.removeSubscription(endpoint);
-    }
-    res.send({ success: true });
-  })
-);
+router.post('/unsubscribe', notificationController.unsubscribe);
 
 /**
  * Smart Focus State Beacon: Updates which room the user is actively viewing
  */
-router.post(
-  '/focus',
-  catchAsync(async (req, res) => {
-    const userId = req.headers['x-user-id'] || req.user?.id || req.body.userId;
-    if (userId) {
-      const { roomId } = req.body;
-      await webPushService.updateFocusState(userId, roomId || null);
-    }
-    res.send({ success: true });
-  })
-);
+router.post('/focus', notificationController.updateFocus);
 
 /**
  * Live test push notification dispatcher
  */
-router.post(
-  '/test-push',
-  catchAsync(async (req, res) => {
-    const userId = req.headers['x-user-id'] || req.user?.id || req.body?.userId;
-    await webPushService.dispatchTestNotification(userId);
-    res.send({ success: true, message: 'Test notification sent' });
-  })
-);
+router.post('/test-push', notificationController.sendTestNotification);
 
 module.exports = router;

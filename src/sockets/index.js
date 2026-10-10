@@ -5,6 +5,7 @@ const { verifyToken } = require('../utils/auth');
 const { normalizeCompanyId, COMPANIES } = require('../config/company.constants');
 const webPushService = require('../services/webPush.service');
 const { sanitizeChatMessage, validateAttachment } = require('../utils/sanitizeChat');
+const { dispatchChatMessage } = require('../controllers/chatController');
 
 const getMemberIdString = (m) => {
   if (!m) return '';
@@ -197,6 +198,24 @@ const setupSockets = (io) => {
       }
     });
 
+    // Cloudflare Tunnel 100-Second idle drop prevention heartbeat (bidirectional 25s ping/pong)
+    socket.on('ping-heartbeat', (data, callback) => {
+      socket.lastHeartbeat = Date.now();
+      if (typeof callback === 'function') {
+        callback({ pong: true, serverTime: Date.now() });
+      }
+    });
+
+    // Client Page Visibility / Tab Freezing reporting
+    socket.on('client-visibility', (data) => {
+      if (data && typeof data === 'object') {
+        socket.isBackgrounded = data.isVisible === false;
+        if (data.activeRoomId) {
+          socket.activeRoomId = String(data.activeRoomId);
+        }
+      }
+    });
+
     // 5. Join room with security enforcement (prevent joining arbitrary company rooms)
     socket.on('join-room', (roomId) => {
       if (typeof roomId !== 'string') return;
@@ -211,6 +230,18 @@ const setupSockets = (io) => {
         }
       }
       socket.join(roomId);
+      socket.activeRoomId = String(roomId);
+      socket.isBackgrounded = false;
+    });
+
+    // Leave room
+    socket.on('leave-room', (roomId) => {
+      if (typeof roomId === 'string') {
+        socket.leave(roomId);
+        if (socket.activeRoomId === String(roomId)) {
+          socket.activeRoomId = null;
+        }
+      }
     });
 
     // Register user to personal channel
@@ -347,42 +378,19 @@ const setupSockets = (io) => {
           })
           .populate('mentions', 'name username email');
 
-        // Broadcast to everyone in the room & personal channels of members
-        let broadcast = io.to(roomId);
-        if (targetRoom.members && targetRoom.members.length > 0) {
-          targetRoom.members.forEach((m) => {
-            const mIdStr = getMemberIdString(m);
-            if (mIdStr) {
-              broadcast = broadcast.to(`user_${mIdStr}`);
-            }
-          });
-        }
-        broadcast.emit('receive-message', populatedMessage);
+        // Intelligent Dispatch: Real-time WebSocket + Background Web Push only if recipient not active in room
+        await dispatchChatMessage({
+          io,
+          roomId,
+          populatedMessage,
+          targetRoom,
+          senderId: actualSenderId,
+          rawContent: content,
+          priority: priority === 'urgent' ? 'urgent' : 'normal',
+        });
 
         if (typeof callback === 'function') {
           callback({ success: true, message: populatedMessage });
-        }
-
-        // Dispatch Web Push Notification to backgrounded / unfocused room members
-        try {
-          const recipientIds = (targetRoom.members || [])
-            .map((m) => getMemberIdString(m))
-            .filter((id) => id && id !== String(senderId));
-
-          if (recipientIds.length > 0) {
-            const senderDisplayName = populatedMessage.senderId?.name || populatedMessage.senderId?.username || 'Team Member';
-            const cleanSnippet = (content || '').slice(0, 120) || (attachment ? `Sent attachment: ${attachment.name || 'file'}` : 'New message');
-            webPushService.dispatchChatNotification(recipientIds, {
-              senderName: senderDisplayName,
-              messagePreview: cleanSnippet,
-              roomId: String(roomId),
-              roomName: targetRoom.name || '',
-              priority: priority === 'urgent' ? 'urgent' : 'normal',
-              avatarUrl: '/Logo.png'
-            }).catch((err) => console.warn('[WebPush] Dispatch error:', err.message));
-          }
-        } catch (pushErr) {
-          console.warn('[WebPush] Error gathering recipients:', pushErr.message);
         }
 
         // Emit direct notification to each mentioned user

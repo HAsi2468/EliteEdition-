@@ -115,6 +115,11 @@ const userSchema = new mongoose.Schema(
 						trim: true,
 					},
 				},
+				deviceType: {
+					type: String,
+					enum: ['desktop', 'android', 'ios', 'unknown'],
+					default: 'desktop',
+				},
 				deviceFingerprint: {
 					type: String,
 					trim: true,
@@ -124,6 +129,10 @@ const userSchema = new mongoose.Schema(
 					type: String,
 					trim: true,
 					default: '',
+				},
+				createdAt: {
+					type: Date,
+					default: Date.now,
 				},
 				lastActiveAt: {
 					type: Date,

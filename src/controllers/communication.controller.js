@@ -4,6 +4,7 @@ const { syncCommunicationGroups } = require('../utils/syncCommunicationGroups');
 const { publishActivity } = require('../utils/activityEvent');
 const { sanitizeChatMessage, validateAttachment } = require('../utils/sanitizeChat');
 const webPushService = require('../services/webPush.service');
+const { dispatchChatMessage } = require('./chatController');
 
 const getMemberIdString = (m) => {
   if (!m) return '';
@@ -495,42 +496,16 @@ const postGroupMessage = async (req, res) => {
       })
       .populate('mentions', 'name username email');
 
-    // Broadcast via Socket.IO if available
-    const io = req.app.get('io') || req.app.get('socketio') || global.io;
-    if (io) {
-      let broadcast = io.to(String(groupId));
-      if (targetRoom.members && targetRoom.members.length > 0) {
-        targetRoom.members.forEach((m) => {
-          const mIdStr = getMemberIdString(m);
-          if (mIdStr) {
-            broadcast = broadcast.to(`user_${mIdStr}`);
-          }
-        });
-      }
-      broadcast.emit('receive-message', populatedMessage);
-    }
-
-    // Dispatch Web Push Notification to backgrounded / unfocused members
-    try {
-      const recipientIds = (targetRoom.members || [])
-        .map((m) => getMemberIdString(m))
-        .filter((id) => id && id !== String(strSender));
-
-      if (recipientIds.length > 0) {
-        const senderDisplayName = populatedMessage.senderId?.name || populatedMessage.senderId?.username || 'Team Member';
-        const cleanSnippet = (content || '').slice(0, 120) || (attachment ? `Sent attachment: ${attachment.name || 'file'}` : 'New message');
-        webPushService.dispatchChatNotification(recipientIds, {
-          senderName: senderDisplayName,
-          messagePreview: cleanSnippet,
-          roomId: String(groupId),
-          roomName: targetRoom.name || '',
-          priority: priority === 'urgent' ? 'urgent' : 'normal',
-          avatarUrl: '/Logo.png'
-        }).catch((err) => console.warn('[WebPush] Dispatch error in postGroupMessage:', err.message));
-      }
-    } catch (pushErr) {
-      console.warn('[WebPush] Error gathering recipients in postGroupMessage:', pushErr.message);
-    }
+    // Intelligent Dispatch: Real-time WebSocket + selective background Web Push
+    await dispatchChatMessage({
+      io,
+      roomId: groupId,
+      populatedMessage,
+      targetRoom,
+      senderId: strSender,
+      rawContent: content,
+      priority: priority === 'urgent' ? 'urgent' : 'normal',
+    });
 
     res.json({ success: true, data: populatedMessage });
   } catch (error) {

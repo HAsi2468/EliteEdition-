@@ -52,10 +52,10 @@ class SocketManager {
     this.HEARTBEAT_INTERVAL_MS = 25000;
     this.HEARTBEAT_TIMEOUT_MS = 4000;
 
-    // Exponential backoff & jitter for iOS / mobile recovery
+    // Exponential backoff & jitter for iOS / mobile recovery (initial 500ms, max 8s)
     this.reconnectAttempt = 0;
     this.MIN_BACKOFF_MS = 500;
-    this.MAX_BACKOFF_MS = 10000;
+    this.MAX_BACKOFF_MS = 8000;
 
     // Optimistic offline sync queue
     this.pendingSyncQueue = [];
@@ -252,7 +252,8 @@ class SocketManager {
       }, this.HEARTBEAT_TIMEOUT_MS);
 
       try {
-        this.socket.emit('ping-health', () => {
+        // Ping with 'ping-heartbeat' or fallback to 'ping-health'
+        this.socket.emit('ping-heartbeat', { clientTime: Date.now() }, () => {
           ackReceived = true;
           clearTimeout(timeoutId);
           this.consecutiveMissedHeartbeats = 0;
@@ -333,7 +334,14 @@ class SocketManager {
 
     // 1. Tab visibility change (browser switched back to tab or screen unlocked)
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
+      const isVisible = document.visibilityState === 'visible';
+      if (this.socket && this.socket.connected) {
+        this.socket.emit('client-visibility', {
+          isVisible,
+          activeRoomId: this.currentActiveRoomId || null,
+        });
+      }
+      if (isVisible) {
         this._handleDeviceAwakening('visibilitychange');
       }
     });

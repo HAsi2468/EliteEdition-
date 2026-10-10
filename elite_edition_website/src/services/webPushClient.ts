@@ -141,6 +141,8 @@ export class WebPushClientManager {
         if (m) csrfToken = decodeURIComponent(m[1]);
       } catch (e) {}
 
+      const deviceType = this.isIOS() ? 'ios' : (/Android/i.test(navigator.userAgent) ? 'android' : 'desktop');
+
       const saveResponse = await fetch('/v1/notifications/subscribe', {
         method: 'POST',
         credentials: 'include',
@@ -153,6 +155,8 @@ export class WebPushClientManager {
           userId: effectiveUserId,
           subscription: subscription.toJSON(),
           deviceFingerprint: `${navigator.platform}_${navigator.vendor}`,
+          deviceType,
+          userAgent: navigator.userAgent,
         }),
       });
 
@@ -255,3 +259,12 @@ export class WebPushClientManager {
 }
 
 export const webPushClient = new WebPushClientManager();
+
+/**
+ * Universal helper to subscribe user to push notifications
+ */
+export async function subscribeUserToPush(userId?: string): Promise<{ success: boolean; subscription?: PushSubscription; error?: string; message?: string }> {
+  return webPushClient.subscribeToPush(userId);
+}
+
+export default webPushClient;
