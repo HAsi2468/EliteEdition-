@@ -1568,169 +1568,192 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
         <>
           {/* Summary KPI Cards - Standard Enterprise Grid */}
           {/* ── Structured Balance Cards (Cash & Bank Ledger Groups) ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mb-1">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '0.85rem', marginBottom: '0.25rem' }}>
             {/* 1. Cash Ledger Group */}
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-200/90 dark:border-slate-800 p-3.5 shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
-                    <Wallet size={16} />
+            <div className="glass-panel" style={{ padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', background: 'var(--bg-card, #ffffff)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light, #f1f5f9)', paddingBottom: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', border: '1px solid #a7f3d0' }}>
+                    <Wallet size={18} />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 m-0">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
                         Cash in Hand Ledger
                       </h4>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
                         Opening: ₹{Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-400 font-medium">Physical Cash Flow & Petty Cash Movement</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 500 }}>
+                      Physical Cash Flow &amp; Petty Cash Movement
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* 4 Cash Metrics Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
                 {/* Cash Opening */}
-                <div className="p-2.5 rounded-lg bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Opening</span>
-                  <div className="text-sm font-extrabold text-slate-700 dark:text-slate-200 mt-0.5 truncate" title={`₹${Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN')}`}>
+                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Opening</span>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`₹${Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN')}`}>
                     ₹{Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] text-slate-400 block truncate">Pre-Period Balance</span>
+                  <span style={{ fontSize: '0.62rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pre-Period Bal</span>
                 </div>
 
                 {/* Cash In */}
-                <div className="p-2.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Cash IN</span>
-                    <TrendingUp size={12} className="text-emerald-600 dark:text-emerald-400" />
+                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Cash IN</span>
+                    <TrendingUp size={13} color="#16a34a" />
                   </div>
-                  <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     +₹{Number(ledgerBalances.cashIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] text-emerald-600/80 font-medium block">Receipts / Advances</span>
+                  <span style={{ fontSize: '0.62rem', color: '#15803d', fontWeight: 600 }}>Receipts</span>
                 </div>
 
-                {/* Cash Expense */}
-                <div className="p-2.5 rounded-lg bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Cash OUT</span>
-                    <TrendingDown size={12} className="text-rose-600 dark:text-rose-400" />
+                {/* Cash Out */}
+                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Cash OUT</span>
+                    <TrendingDown size={13} color="#dc2626" />
                   </div>
-                  <div className="text-sm font-black text-rose-600 dark:text-rose-400 mt-0.5 truncate">
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     -₹{Number(ledgerBalances.cashExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] text-rose-600/80 font-medium block">Expenses / Outflows</span>
+                  <span style={{ fontSize: '0.62rem', color: '#b91c1c', fontWeight: 600 }}>Outflows</span>
                 </div>
 
                 {/* Cash Closing */}
-                <div className={`p-2.5 rounded-lg border ${
-                  Number(ledgerBalances.cashClosing || 0) >= 0 
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300' 
-                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider">Closing</span>
-                    <Wallet size={12} />
+                <div style={{
+                  padding: '0.6rem',
+                  borderRadius: '8px',
+                  background: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#ecfdf5' : '#fef2f2',
+                  border: Number(ledgerBalances.cashClosing || 0) >= 0 ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c' }}>Closing</span>
+                    <Wallet size={13} color={Number(ledgerBalances.cashClosing || 0) >= 0 ? '#16a34a' : '#dc2626'} />
                   </div>
-                  <div className="text-sm font-black mt-0.5 truncate">
+                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     ₹{Number(ledgerBalances.cashClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] font-bold opacity-80 block truncate">Net Cash Closing</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#166534' : '#991b1b' }}>Net Cash</span>
                 </div>
               </div>
             </div>
 
             {/* 2. Bank Ledger Group */}
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-200/90 dark:border-slate-800 p-3.5 shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/60 flex items-center justify-center text-sky-600 dark:text-sky-400 border border-sky-200/60 dark:border-sky-800/40">
-                    <CreditCard size={16} />
+            <div className="glass-panel" style={{ padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', background: 'var(--bg-card, #ffffff)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light, #f1f5f9)', paddingBottom: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7', border: '1px solid #bae6fd' }}>
+                    <CreditCard size={18} />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 m-0">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
                         Bank Ledger
                       </h4>
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
                         {ledgerBalances.settings?.bankAccountName || 'KOTAK EDP'}
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
                         Opening: ₹{Number(ledgerBalances.bankOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-400 font-medium">NEFT / RTGS / UPI / Online Settlements</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 500 }}>
+                      NEFT / RTGS / UPI / Online Settlements
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      loadLedgerSettings();
-                      setShowSettingsModal(true);
-                    }}
-                    className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-                    title="Configure Initial Opening Balances & Bank Account"
-                  >
-                    <Settings size={12} className="text-slate-500" />
-                    <span>Setup Openings</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadLedgerSettings();
+                    setShowSettingsModal(true);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.3rem 0.65rem',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#334155',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                  }}
+                  title="Configure Initial Opening Balances & Bank Account"
+                >
+                  <Settings size={13} color="#64748b" />
+                  <span>Setup Openings</span>
+                </button>
               </div>
 
               {/* 4 Bank Metrics Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
                 {/* Bank Opening */}
-                <div className="p-2.5 rounded-lg bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Opening</span>
-                  <div className="text-sm font-extrabold text-slate-700 dark:text-slate-200 mt-0.5 truncate" title={`₹${Number(ledgerBalances.bankOpening || 0).toLocaleString('en-IN')}`}>
+                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Opening</span>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`₹${Number(ledgerBalances.bankOpening || 0).toLocaleString('en-IN')}`}>
                     ₹{Number(ledgerBalances.bankOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] text-slate-400 block truncate">Pre-Period Balance</span>
+                  <span style={{ fontSize: '0.62rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pre-Period Bal</span>
                 </div>
 
                 {/* Bank In */}
-                <div className="p-2.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Bank IN</span>
-                    <TrendingUp size={12} className="text-emerald-600 dark:text-emerald-400" />
+                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank IN</span>
+                    <TrendingUp size={13} color="#16a34a" />
                   </div>
-                  <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     +₹{Number(ledgerBalances.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] text-emerald-600/80 font-medium block">Deposits / Credits</span>
+                  <span style={{ fontSize: '0.62rem', color: '#15803d', fontWeight: 600 }}>Deposits</span>
                 </div>
 
-                {/* Bank Expense */}
-                <div className="p-2.5 rounded-lg bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/40">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Bank OUT</span>
-                    <TrendingDown size={12} className="text-indigo-600 dark:text-indigo-400" />
+                {/* Bank Out */}
+                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#eef2ff', border: '1px solid #c7d2fe', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank OUT</span>
+                    <TrendingDown size={13} color="#4f46e5" />
                   </div>
-                  <div className="text-sm font-black text-indigo-600 dark:text-indigo-400 mt-0.5 truncate">
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#4f46e5', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     -₹{Number(ledgerBalances.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] text-indigo-600/80 font-medium block">Transfers / Debits</span>
+                  <span style={{ fontSize: '0.62rem', color: '#4338ca', fontWeight: 600 }}>Transfers</span>
                 </div>
 
                 {/* Bank Closing */}
-                <div className={`p-2.5 rounded-lg border ${
-                  Number(ledgerBalances.bankClosing || 0) >= 0 
-                    ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-800 dark:text-sky-300' 
-                    : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider">Closing</span>
-                    <CreditCard size={12} />
+                <div style={{
+                  padding: '0.6rem',
+                  borderRadius: '8px',
+                  background: Number(ledgerBalances.bankClosing || 0) >= 0 ? '#f0f9ff' : '#fffbeb',
+                  border: Number(ledgerBalances.bankClosing || 0) >= 0 ? '1.5px solid #7dd3fc' : '1.5px solid #fcd34d',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(ledgerBalances.bankClosing || 0) >= 0 ? '#0369a1' : '#b45309' }}>Closing</span>
+                    <CreditCard size={13} color={Number(ledgerBalances.bankClosing || 0) >= 0 ? '#0284c7' : '#d97706'} />
                   </div>
-                  <div className="text-sm font-black mt-0.5 truncate">
+                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: Number(ledgerBalances.bankClosing || 0) >= 0 ? '#0369a1' : '#b45309', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     ₹{Number(ledgerBalances.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[9px] font-bold opacity-80 block truncate">Net Bank Closing</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: Number(ledgerBalances.bankClosing || 0) >= 0 ? '#075985' : '#92400e' }}>Net Bank</span>
                 </div>
               </div>
             </div>

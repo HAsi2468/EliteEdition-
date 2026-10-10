@@ -26,6 +26,7 @@ import {
   Filter,
 } from 'lucide-react';
 import infrastructureService from '../services/infrastructureService';
+import '../styles/infrastructureBilling.css';
 
 export function InfrastructureBilling() {
   const [bills, setBills] = useState([]);
@@ -284,7 +285,7 @@ export function InfrastructureBilling() {
   const totalUnpaidInr = rows.filter((r) => !r.isPaid).reduce((acc, r) => acc + (r.amountInr || 0), 0);
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 font-sans">
+    <div className="infra-billing-root w-full min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 font-sans">
       {/* Toast Notification */}
       {toast && (
         <div
