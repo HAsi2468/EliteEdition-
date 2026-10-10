@@ -385,6 +385,7 @@ export default function EliteBillingDepartment({
   const [purchaseDateEnd, setPurchaseDateEnd] = useState('');
   const [purchaseVendorFilter, setPurchaseVendorFilter] = useState('ALL');
   const [purchaseGstFilter, setPurchaseGstFilter] = useState('ALL');
+  const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('ALL');
   const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
 
@@ -430,6 +431,7 @@ export default function EliteBillingDepartment({
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
     purchaseNo: 'PUR-2026-001',
+    purchaseType: 'inventory', // 'inventory' (Inventory Purchase) or 'expense' (Expense Purchase)
     ourChallanNo: '',
     date: new Date().toISOString().split('T')[0],
     vendor: {
@@ -743,6 +745,7 @@ export default function EliteBillingDepartment({
 
     setPurchaseForm({
       purchaseNo: p.purchaseNo || '',
+      purchaseType: p.purchaseType || 'inventory',
       ourChallanNo: p.ourChallanNo || '',
       date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : new Date().toISOString().split('T')[0],
       vendor: {
@@ -1110,6 +1113,7 @@ export default function EliteBillingDepartment({
 
     const payload = {
       purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
+      purchaseType: purchaseForm.purchaseType || 'inventory',
       ourChallanNo: purchaseForm.ourChallanNo || '',
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
       dueDate: purchaseForm.dueDate || undefined,
@@ -1217,6 +1221,7 @@ export default function EliteBillingDepartment({
     setShowPurchaseModal(false);
     setPurchaseForm({
       purchaseNo: `PUR-2026-00${purchases.length + 2}`,
+      purchaseType: 'inventory',
       ourChallanNo: '',
       date: new Date().toISOString().split('T')[0],
       vendor: {
@@ -1334,7 +1339,8 @@ export default function EliteBillingDepartment({
     (purchaseSearch && purchaseSearch.trim()) ||
     purchaseDatePreset !== 'all' ||
     purchaseVendorFilter !== 'ALL' ||
-    purchaseGstFilter !== 'ALL'
+    purchaseGstFilter !== 'ALL' ||
+    purchaseTypeFilter !== 'ALL'
   );
 
   const filteredPurchases = useMemo(() => {
@@ -1359,6 +1365,12 @@ export default function EliteBillingDepartment({
         if (Number(p.gstRate || 0) !== Number(purchaseGstFilter)) return false;
       }
 
+      // 3.5. Purchase Type Filter
+      if (purchaseTypeFilter && purchaseTypeFilter !== 'ALL') {
+        const pType = p.purchaseType || 'inventory';
+        if (pType !== purchaseTypeFilter) return false;
+      }
+
       // 4. Date Range Filter
       if (purchaseDateRange.start || purchaseDateRange.end) {
         if (!p.date) return false;
@@ -1371,7 +1383,7 @@ export default function EliteBillingDepartment({
 
       return true;
     });
-  }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseDateRange]);
+  }, [purchases, purchaseSearch, purchaseVendorFilter, purchaseGstFilter, purchaseTypeFilter, purchaseDateRange]);
 
   const totalPurchaseValue = filteredPurchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
   const totalInwardQty = filteredPurchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
@@ -5145,6 +5157,20 @@ export default function EliteBillingDepartment({
                 </select>
               </div>
 
+              {/* Purchase Type Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <Package size={12} style={{ color: '#4f46e5' }} />
+                <select
+                  value={purchaseTypeFilter}
+                  onChange={e => setPurchaseTypeFilter(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="ALL">All Types</option>
+                  <option value="inventory">📦 Inventory Purchase</option>
+                  <option value="expense">💼 Expense Purchase</option>
+                </select>
+              </div>
+
               {/* Clear Filters Button & Badge */}
               {hasActivePurchaseFilters && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -5157,6 +5183,7 @@ export default function EliteBillingDepartment({
                       setPurchaseDateEnd('');
                       setPurchaseVendorFilter('ALL');
                       setPurchaseGstFilter('ALL');
+                      setPurchaseTypeFilter('ALL');
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 9px',
@@ -5205,6 +5232,7 @@ export default function EliteBillingDepartment({
                   setEditingPurchaseId(null);
                   setPurchaseForm({
                     purchaseNo: `PUR-2026-00${purchases.length + 1}`,
+                    purchaseType: 'inventory',
                     ourChallanNo: '',
                     date: new Date().toISOString().split('T')[0],
                     vendor: {
@@ -5301,7 +5329,20 @@ export default function EliteBillingDepartment({
                     return (
                       <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
-                          <span style={{ fontWeight: 800, color: '#4f46e5' }}>{p.purchaseNo}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 800, color: '#4f46e5' }}>{p.purchaseNo}</span>
+                            <span style={{
+                              fontSize: '0.67rem',
+                              fontWeight: 700,
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              background: p.purchaseType === 'expense' ? '#fef3c7' : '#eff6ff',
+                              color: p.purchaseType === 'expense' ? '#b45309' : '#1d4ed8',
+                              border: p.purchaseType === 'expense' ? '1px solid #fde68a' : '1px solid #bfdbfe'
+                            }}>
+                              {p.purchaseType === 'expense' ? '💼 Expense' : '📦 Inventory'}
+                            </span>
+                          </div>
                           {p.ourChallanNo && (
                             <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
                               Challan: <strong style={{ color: '#0284c7' }}>{p.ourChallanNo}</strong>
@@ -5502,6 +5543,25 @@ export default function EliteBillingDepartment({
                     }}
                   >
                     <option value={companyEntity || 'Elite Digital Prints'}>🏢 {companyEntity || 'Elite Digital Prints'}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Type of Purchase</label>
+                  <select
+                    value={purchaseForm.purchaseType || 'inventory'}
+                    onChange={e => setPurchaseForm(f => ({ ...f, purchaseType: e.target.value }))}
+                    style={{
+                      ...inputStyle,
+                      fontWeight: 700,
+                      color: purchaseForm.purchaseType === 'expense' ? '#d97706' : '#2563eb',
+                      background: purchaseForm.purchaseType === 'expense' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(37, 99, 235, 0.08)',
+                      border: purchaseForm.purchaseType === 'expense' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(37, 99, 235, 0.35)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="inventory">📦 Inventory Purchase</option>
+                    <option value="expense">💼 Expense Purchase</option>
                   </select>
                 </div>
 
@@ -6024,6 +6084,9 @@ export default function EliteBillingDepartment({
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE BILL DETAILS</div>
                   <div style={{ fontSize: '1rem', fontWeight: 900, color: '#4f46e5' }}>{viewPurchaseModal.purchaseNo}</div>
+                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: viewPurchaseModal.purchaseType === 'expense' ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
+                    Type: {viewPurchaseModal.purchaseType === 'expense' ? '💼 Expense Purchase' : '📦 Inventory Purchase'}
+                  </div>
                   {viewPurchaseModal.ourChallanNo && (
                     <div style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
                       Challan / Ref: {viewPurchaseModal.ourChallanNo}
