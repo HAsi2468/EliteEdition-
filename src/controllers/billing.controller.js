@@ -3009,9 +3009,48 @@ const getPurchases = async (req, res) => {
   }
 };
 
+const getNextPurchaseNo = async (req, res) => {
+  try {
+    const { companyEntity = 'Elite Digital Prints' } = req.query;
+    const purchases = await BillingPurchase.find({}, 'purchaseNo').lean();
+    let maxNum = 0;
+    const prefix = 'DP-';
+
+    purchases.forEach(p => {
+      if (p.purchaseNo) {
+        const match = String(p.purchaseNo).trim().match(/^DP[-_]?(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+
+    const nextSeq = maxNum + 1;
+    const purchaseNo = `${prefix}${String(nextSeq).padStart(2, '0')}`;
+    res.json({ success: true, nextSeq, prefix, purchaseNo });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 const createPurchase = async (req, res) => {
   try {
     const purchaseData = { ...req.body };
+    if (!purchaseData.purchaseNo || !purchaseData.purchaseNo.trim()) {
+      const purchases = await BillingPurchase.find({}, 'purchaseNo').lean();
+      let maxNum = 0;
+      purchases.forEach(p => {
+        if (p.purchaseNo) {
+          const match = String(p.purchaseNo).trim().match(/^DP[-_]?(\d+)/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      });
+      purchaseData.purchaseNo = `DP-${String(maxNum + 1).padStart(2, '0')}`;
+    }
     if (purchaseData.date) {
       purchaseData.date = new Date(purchaseData.date);
     }
@@ -3292,6 +3331,7 @@ module.exports = {
   getCompanySettings,
   updateCompanySettings,
   getPurchases,
+  getNextPurchaseNo,
   createPurchase,
   updatePurchase,
   deletePurchase,

@@ -408,6 +408,21 @@ export default function EliteBillingDepartment({
     return false;
   });
 
+  const computeNextPurchaseNo = (list = purchases) => {
+    let maxNum = 0;
+    (list || []).forEach(p => {
+      if (p && p.purchaseNo) {
+        const match = String(p.purchaseNo).trim().match(/^DP[-_]?(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+    const nextSeq = maxNum + 1;
+    return `DP-${String(nextSeq).padStart(2, '0')}`;
+  };
+
   const createEmptyPurchaseItem = () => ({
     id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     itemName: '',
@@ -902,7 +917,7 @@ export default function EliteBillingDepartment({
                 PURCHASE INWARD VOUCHER
               </span>
               <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-top: 6px;">
-                Bill #${purchase.purchaseNo || '-'}
+                Purchase No: #${purchase.purchaseNo || '-'}
               </div>
             </div>
           </div>
@@ -1101,8 +1116,8 @@ export default function EliteBillingDepartment({
     if (!purchaseForm.purchaseNo || !purchaseForm.purchaseNo.trim()) {
       errs.push({
         fieldId: 'purchase-bill-no',
-        label: 'Bill / Invoice No.',
-        message: 'Please enter Bill / Invoice Number'
+        label: 'Purchase No.',
+        message: 'Please enter Purchase Number (e.g. DP-01, DP-02)'
       });
     }
 
@@ -1163,7 +1178,7 @@ export default function EliteBillingDepartment({
     clearValidationErrors();
 
     const payload = {
-      purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
+      purchaseNo: (purchaseForm.purchaseNo && purchaseForm.purchaseNo.trim()) || computeNextPurchaseNo(purchases),
       purchaseType: purchaseForm.purchaseType || 'inventory',
       ourChallanNo: purchaseForm.ourChallanNo || '',
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
@@ -1299,7 +1314,7 @@ export default function EliteBillingDepartment({
       notes: 'Vendor purchase bill recorded in ERP.'
     });
 
-    triggerPushNotification('Purchase Recorded 📥', `Purchase Bill #${payload.purchaseNo} saved successfully!`, 'success');
+    triggerPushNotification('Purchase Recorded 📥', `Purchase No #${payload.purchaseNo} saved successfully!`, 'success');
   };
 
   const handleDeletePurchase = async (id, purchaseNo, vendorName) => {
@@ -5168,7 +5183,7 @@ export default function EliteBillingDepartment({
                 <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input
                   type="text"
-                  placeholder="Search Bill No, Vendor, Item..."
+                  placeholder="Search Purchase No (DP-01), Vendor, Item..."
                   value={purchaseSearch}
                   onChange={e => setPurchaseSearch(e.target.value)}
                   style={{ width: '100%', paddingLeft: 32, paddingRight: 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
@@ -5321,10 +5336,19 @@ export default function EliteBillingDepartment({
               </button>
 
               <button
-                onClick={() => {
+                onClick={async () => {
                   setEditingPurchaseId(null);
+                  let nextNo = computeNextPurchaseNo(purchases);
+                  try {
+                    const res = await api.getNextPurchaseNo(companyEntity);
+                    if (res && res.purchaseNo) {
+                      nextNo = res.purchaseNo;
+                    }
+                  } catch (e) {
+                    console.warn('Using client calculated next purchase no', e);
+                  }
                   setPurchaseForm({
-                    purchaseNo: '',
+                    purchaseNo: nextNo,
                     purchaseType: 'inventory',
                     ourChallanNo: '',
                     date: new Date().toISOString().split('T')[0],
@@ -5370,7 +5394,7 @@ export default function EliteBillingDepartment({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.72rem' }}>
-                  <th style={{ padding: '0.85rem 0.8rem' }}>Bill / Invoice No</th>
+                  <th style={{ padding: '0.85rem 0.8rem' }}>Purchase No</th>
                   <th style={{ padding: '0.85rem 0.8rem' }}>Date & Due</th>
                   <th style={{ padding: '0.85rem 0.8rem' }}>Vendor / Supplier</th>
                   <th style={{ padding: '0.85rem 0.8rem' }}>Items Breakdown</th>
@@ -5605,7 +5629,7 @@ export default function EliteBillingDepartment({
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
                     <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
-                      {editingPurchaseId ? `Edit Vendor Purchase Bill — ${purchaseForm.purchaseNo}` : 'New Vendor Purchase Inward Generator'}
+                      {editingPurchaseId ? `Edit Vendor Purchase Bill — ${purchaseForm.purchaseNo}` : `New Vendor Purchase Inward Generator (${purchaseForm.purchaseNo || 'DP-01'})`}
                     </h3>
                     <EntityBrandBadge entityId={companyEntity} />
                   </div>
@@ -5660,15 +5684,36 @@ export default function EliteBillingDepartment({
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Bill / Invoice No. *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Purchase No. *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextNo = computeNextPurchaseNo(purchases);
+                        setPurchaseForm(f => ({ ...f, purchaseNo: nextNo }));
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#4f46e5',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                      title="Auto-generate next DP series purchase number"
+                    >
+                      ⚡ Auto DP Number
+                    </button>
+                  </div>
                   <input
                     id="purchase-bill-no"
                     type="text"
                     required
                     value={purchaseForm.purchaseNo}
                     onChange={e => setPurchaseForm(f => ({ ...f, purchaseNo: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="Enter Bill / Invoice No."
+                    style={{ ...inputStyle, fontWeight: 700, letterSpacing: '0.02em' }}
+                    placeholder="e.g. DP-01, DP-02"
                   />
                 </div>
 
@@ -6377,8 +6422,8 @@ export default function EliteBillingDepartment({
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE BILL DETAILS</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#4f46e5' }}>{viewPurchaseModal.purchaseNo}</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE NO / BILL DETAILS</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#4f46e5' }}>{viewPurchaseModal.purchaseNo}</div>
                   <div style={{ fontSize: '0.76rem', fontWeight: 700, color: viewPurchaseModal.purchaseType === 'asset' ? '#7c3aed' : viewPurchaseModal.purchaseType === 'expense' ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
                     Type: {viewPurchaseModal.purchaseType === 'asset' ? '🏛️ Asset Purchase' : viewPurchaseModal.purchaseType === 'expense' ? '💼 Expense Purchase' : '📦 Inventory Purchase'}
                   </div>

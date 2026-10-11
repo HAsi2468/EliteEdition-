@@ -43,6 +43,7 @@ router.put('/company-settings', billingController.updateCompanySettings);
 
 // Purchases CRUD
 router.get('/purchases', billingController.getPurchases);
+router.get('/purchases/next-no', billingController.getNextPurchaseNo);
 router.post('/purchases', billingController.createPurchase);
 router.post('/purchases/bulk-sync', billingController.bulkSyncPurchases);
 router.put('/purchases/:id', billingController.updatePurchase);

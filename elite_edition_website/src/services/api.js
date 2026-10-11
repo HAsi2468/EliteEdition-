@@ -2198,6 +2198,10 @@ export const api = {
   },
 
   // Purchases CRUD
+  async getNextPurchaseNo(companyEntity = 'Elite Digital Prints') {
+    return request(`/billing/purchases/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
+  },
+
   async getBillingPurchases(companyEntity = '', search = '') {
     const query = new URLSearchParams();
     if (companyEntity) query.append('companyEntity', companyEntity);
