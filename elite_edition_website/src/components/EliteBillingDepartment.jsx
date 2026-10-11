@@ -430,7 +430,7 @@ export default function EliteBillingDepartment({
 
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
-    purchaseNo: 'PUR-2026-001',
+    purchaseNo: '',
     purchaseType: 'inventory', // 'inventory' (Inventory Purchase) or 'expense' (Expense Purchase)
     ourChallanNo: '',
     date: new Date().toISOString().split('T')[0],
@@ -489,12 +489,15 @@ export default function EliteBillingDepartment({
     } else {
       discountTotal = discVal;
     }
+    // Prevent negative or excessive discount
+    discountTotal = Math.min(subtotal, Math.max(0, discountTotal));
 
     const netSubtotal = Math.max(0, subtotal - discountTotal);
+    const discountRatio = subtotal > 0 ? netSubtotal / subtotal : 1;
 
-    // Calculate Tax based on items individual tax rates or default to purchaseForm.gstRate or 5%
+    // Calculate Tax based on items individual tax rates or default to purchaseForm.gstRate or 5% (pro-rated by discount)
     const totalTax = updatedItems.reduce((sum, i) => {
-      const taxable = i.totalAmount || 0;
+      const taxable = (i.totalAmount || 0) * discountRatio;
       const rate = parseFloat(i.taxRate !== undefined && i.taxRate !== null && i.taxRate !== '' ? i.taxRate : (purchaseForm.gstRate || 5));
       return sum + (taxable * rate / 100);
     }, 0);
@@ -1055,6 +1058,14 @@ export default function EliteBillingDepartment({
     const vendorFinalName = purchaseForm.vendor?.businessName || purchaseForm.vendor?.name || purchaseForm.vendorName;
     const errs = [];
 
+    if (!purchaseForm.purchaseNo || !purchaseForm.purchaseNo.trim()) {
+      errs.push({
+        fieldId: 'purchase-bill-no',
+        label: 'Bill / Invoice No.',
+        message: 'Please enter Bill / Invoice Number'
+      });
+    }
+
     if (!vendorFinalName || !vendorFinalName.trim()) {
       errs.push({
         fieldId: 'purchase-vendor-name',
@@ -1220,7 +1231,7 @@ export default function EliteBillingDepartment({
 
     setShowPurchaseModal(false);
     setPurchaseForm({
-      purchaseNo: `PUR-2026-00${purchases.length + 2}`,
+      purchaseNo: '',
       purchaseType: 'inventory',
       ourChallanNo: '',
       date: new Date().toISOString().split('T')[0],
@@ -5231,7 +5242,7 @@ export default function EliteBillingDepartment({
                 onClick={() => {
                   setEditingPurchaseId(null);
                   setPurchaseForm({
-                    purchaseNo: `PUR-2026-00${purchases.length + 1}`,
+                    purchaseNo: '',
                     purchaseType: 'inventory',
                     ourChallanNo: '',
                     date: new Date().toISOString().split('T')[0],
@@ -5568,12 +5579,13 @@ export default function EliteBillingDepartment({
                 <div>
                   <label style={labelStyle}>Bill / Invoice No. *</label>
                   <input
+                    id="purchase-bill-no"
                     type="text"
                     required
                     value={purchaseForm.purchaseNo}
                     onChange={e => setPurchaseForm(f => ({ ...f, purchaseNo: e.target.value }))}
                     style={inputStyle}
-                    placeholder="e.g. PUR-2026-001"
+                    placeholder="Enter Bill / Invoice No."
                   />
                 </div>
 
@@ -5791,22 +5803,21 @@ export default function EliteBillingDepartment({
 
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '880px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #cbd5e1', fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>
-                      <th style={{ padding: '0.5rem' }}>Item Description & Details</th>
-                      <th style={{ padding: '0.5rem', width: '90px' }}>HSN</th>
-                      <th style={{ padding: '0.5rem', width: '80px' }}>Qty</th>
-                      <th style={{ padding: '0.5rem', width: '95px' }}>Unit</th>
-                      <th style={{ padding: '0.5rem', width: '100px' }}>Price (₹)</th>
-                      <th style={{ padding: '0.5rem', width: '75px' }}>Disc %</th>
-                      <th style={{ padding: '0.5rem', width: '75px' }}>GST %</th>
-                      <th style={{ padding: '0.5rem', width: '105px', textAlign: 'right' }}>Total (₹)</th>
-                      <th style={{ padding: '0.5rem', width: '40px' }}></th>
+                    <tr style={{ borderBottom: '2px solid #cbd5e1', fontSize: '0.74rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <th style={{ padding: '0.6rem 0.5rem' }}>Item Description & Details</th>
+                      <th style={{ padding: '0.6rem 0.5rem', width: '120px' }}>HSN / SAC</th>
+                      <th style={{ padding: '0.6rem 0.5rem', width: '85px', textAlign: 'center' }}>Qty</th>
+                      <th style={{ padding: '0.6rem 0.5rem', width: '115px' }}>Unit</th>
+                      <th style={{ padding: '0.6rem 0.5rem', width: '115px', textAlign: 'right' }}>Price (₹)</th>
+                      <th style={{ padding: '0.6rem 0.5rem', width: '95px', textAlign: 'center' }}>GST %</th>
+                      <th style={{ padding: '0.6rem 0.5rem', width: '120px', textAlign: 'right' }}>Total (₹)</th>
+                      <th style={{ padding: '0.6rem 0.5rem', width: '40px' }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {calculatedPurchase.items.map((it, idx) => (
                       <tr key={it.id || idx} style={{ borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
-                        <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                           <input
                             id={`purchase-item-name-${idx}`}
                             type="text"
@@ -5814,7 +5825,18 @@ export default function EliteBillingDepartment({
                             value={it.itemName}
                             onChange={e => handlePurchaseItemChange(idx, 'itemName', e.target.value)}
                             placeholder="Type item or select from catalog..."
-                            style={inputStyle}
+                            style={{
+                              width: '100%',
+                              padding: '0.45rem 0.6rem',
+                              fontSize: '0.84rem',
+                              fontWeight: 600,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#1e293b',
+                              boxSizing: 'border-box',
+                              outline: 'none'
+                            }}
                             required
                           />
                           <datalist id={`purchase-items-list-${idx}`}>
@@ -5826,18 +5848,42 @@ export default function EliteBillingDepartment({
                             value={it.description || ''}
                             onChange={e => handlePurchaseItemChange(idx, 'description', e.target.value)}
                             placeholder="Description (optional)..."
-                            style={{ ...inputStyle, fontSize: '0.78rem', padding: '0.3rem 0.5rem', color: '#475569' }}
+                            style={{
+                              width: '100%',
+                              padding: '0.35rem 0.5rem',
+                              fontSize: '0.78rem',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '5px',
+                              color: '#475569',
+                              boxSizing: 'border-box',
+                              outline: 'none'
+                            }}
                           />
                         </td>
-                        <td style={{ padding: '0.4rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem' }}>
                           <input
                             type="text"
                             value={it.hsnCode}
                             onChange={e => handlePurchaseItemChange(idx, 'hsnCode', e.target.value)}
-                            style={inputStyle}
+                            placeholder="HSN"
+                            style={{
+                              width: '100%',
+                              padding: '0.45rem 0.5rem',
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#1e293b',
+                              boxSizing: 'border-box',
+                              textAlign: 'center',
+                              letterSpacing: '0.4px',
+                              outline: 'none'
+                            }}
                           />
                         </td>
-                        <td style={{ padding: '0.4rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem' }}>
                           <input
                             id={`purchase-item-qty-${idx}`}
                             data-primary-qty={idx === 0 ? "true" : undefined}
@@ -5845,14 +5891,38 @@ export default function EliteBillingDepartment({
                             step="any"
                             value={it.qty}
                             onChange={e => handlePurchaseItemChange(idx, 'qty', e.target.value)}
-                            style={inputStyle}
+                            style={{
+                              width: '100%',
+                              padding: '0.45rem 0.4rem',
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#1e293b',
+                              boxSizing: 'border-box',
+                              textAlign: 'center',
+                              outline: 'none'
+                            }}
                           />
                         </td>
-                        <td style={{ padding: '0.4rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem' }}>
                           <select
                             value={it.unit}
                             onChange={e => handlePurchaseItemChange(idx, 'unit', e.target.value)}
-                            style={inputStyle}
+                            style={{
+                              width: '100%',
+                              padding: '0.45rem 0.4rem',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#1e293b',
+                              boxSizing: 'border-box',
+                              cursor: 'pointer',
+                              outline: 'none'
+                            }}
                           >
                             <option value="Meters">Meters</option>
                             <option value="Mtr">Mtr</option>
@@ -5867,30 +5937,46 @@ export default function EliteBillingDepartment({
                             <option value="Hours">Hours</option>
                           </select>
                         </td>
-                        <td style={{ padding: '0.4rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem' }}>
                           <input
                             id={`purchase-item-price-${idx}`}
                             type="number"
                             step="any"
                             value={it.unitPrice}
                             onChange={e => handlePurchaseItemChange(idx, 'unitPrice', e.target.value)}
-                            style={inputStyle}
+                            style={{
+                              width: '100%',
+                              padding: '0.45rem 0.5rem',
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#1e293b',
+                              boxSizing: 'border-box',
+                              textAlign: 'right',
+                              outline: 'none'
+                            }}
                           />
                         </td>
-                        <td style={{ padding: '0.4rem' }}>
-                          <input
-                            type="number"
-                            step="any"
-                            value={it.discountPct}
-                            onChange={e => handlePurchaseItemChange(idx, 'discountPct', e.target.value)}
-                            style={inputStyle}
-                          />
-                        </td>
-                        <td style={{ padding: '0.4rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem' }}>
                           <select
                             value={it.taxRate}
                             onChange={e => handlePurchaseItemChange(idx, 'taxRate', e.target.value)}
-                            style={inputStyle}
+                            style={{
+                              width: '100%',
+                              padding: '0.45rem 0.35rem',
+                              fontSize: '0.82rem',
+                              fontWeight: 700,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#4f46e5',
+                              boxSizing: 'border-box',
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              outline: 'none'
+                            }}
                           >
                             <option value={0}>0%</option>
                             <option value={5}>5%</option>
@@ -5899,18 +5985,18 @@ export default function EliteBillingDepartment({
                             <option value={28}>28%</option>
                           </select>
                         </td>
-                        <td style={{ padding: '0.4rem', textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
+                        <td style={{ padding: '0.5rem 0.4rem', textAlign: 'right', fontWeight: 800, color: '#1e293b', fontSize: '0.88rem' }}>
                           ₹ {(it.totalAmount || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '0.4rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.5rem 0.2rem', textAlign: 'center' }}>
                           {(purchaseForm.items || []).length > 1 && (
                             <button
                               type="button"
                               onClick={() => handleRemovePurchaseItem(idx)}
-                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
+                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
                               title="Remove Row"
                             >
-                              <X size={15} />
+                              <X size={16} />
                             </button>
                           )}
                         </td>
@@ -5935,16 +6021,72 @@ export default function EliteBillingDepartment({
                   </div>
                 </div>
 
-                <div style={{ padding: '1.1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#64748b' }}>Subtotal:</span>
-                    <span style={{ fontWeight: 700 }}>₹ {calculatedPurchase.subtotal.toFixed(2)}</span>
+                <div style={{ padding: '1.1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Subtotal:</span>
+                    <span style={{ fontWeight: 800, color: '#1e293b' }}>₹ {calculatedPurchase.subtotal.toFixed(2)}</span>
+                  </div>
+
+                  {/* Bottom Level Discount Configuration Row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', background: 'rgba(22, 163, 74, 0.05)', padding: '0.4rem 0.6rem', borderRadius: '7px', border: '1px solid rgba(22, 163, 74, 0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ color: '#15803d', fontWeight: 800 }}>Discount:</span>
+                      <select
+                        value={purchaseForm.discountType || 'flat'}
+                        onChange={e => setPurchaseForm(f => ({ ...f, discountType: e.target.value }))}
+                        style={{
+                          padding: '0.2rem 0.45rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          borderRadius: '5px',
+                          border: '1px solid #86efac',
+                          background: '#ffffff',
+                          color: '#15803d',
+                          cursor: 'pointer',
+                          outline: 'none'
+                        }}
+                        title="Choose Flat Amount or Percentage Discount"
+                      >
+                        <option value="flat">₹ Flat (Cash)</option>
+                        <option value="percentage">% Percentage</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="0"
+                        value={purchaseForm.discountValue === 0 || purchaseForm.discountValue === '0' ? '' : purchaseForm.discountValue}
+                        onChange={e => {
+                          const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                          setPurchaseForm(f => ({ ...f, discountValue: val }));
+                        }}
+                        style={{
+                          width: '90px',
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
+                          background: '#ffffff',
+                          border: '1px solid #86efac',
+                          borderRadius: '5px',
+                          color: '#15803d',
+                          textAlign: 'right',
+                          outline: 'none'
+                        }}
+                      />
+                      {calculatedPurchase.discountTotal > 0 && (
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#15803d', minWidth: '75px', textAlign: 'right' }}>
+                          - ₹{calculatedPurchase.discountTotal.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {calculatedPurchase.discountTotal > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#16a34a' }}>
-                      <span>Discount:</span>
-                      <span>- ₹ {calculatedPurchase.discountTotal.toFixed(2)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#475569', paddingTop: '0.1rem' }}>
+                      <span style={{ color: '#64748b' }}>Taxable Net Subtotal:</span>
+                      <span style={{ fontWeight: 700 }}>₹ {calculatedPurchase.netSubtotal.toFixed(2)}</span>
                     </div>
                   )}
 
