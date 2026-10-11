@@ -27,7 +27,7 @@ const billingPurchaseSchema = new mongoose.Schema(
   {
     companyEntity: { type: String, default: 'Elite Digital Prints', index: true },
     purchaseNo: { type: String, required: true, trim: true, index: true },
-    purchaseType: { type: String, default: 'inventory', index: true }, // 'inventory' (Inventory Purchase) or 'expense' (Expense Purchase)
+    purchaseType: { type: String, default: 'inventory', index: true }, // 'inventory' (Inventory Purchase), 'expense' (Expense Purchase), or 'asset' (Asset Purchase)
     ourChallanNo: { type: String, default: '' },
     date: { type: Date, default: Date.now },
     dueDate: { type: Date },

@@ -3058,6 +3058,39 @@ const createPurchase = async (req, res) => {
       ).catch(() => {});
     }
 
+    // Auto-upsert into BillingItem catalog so any newly entered line item is saved with its details
+    if (Array.isArray(purchaseData.items) && purchaseData.items.length > 0) {
+      const compEntity = purchaseData.companyEntity || 'Elite Digital Prints';
+      for (const it of purchaseData.items) {
+        if (!it.itemName || !it.itemName.trim()) continue;
+        const cleanName = it.itemName.trim();
+        const escaped = cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        BillingItem.findOne({
+          $or: [
+            { companyEntity: compEntity, itemName: { $regex: `^${escaped}$`, $options: 'i' } },
+            { itemName: { $regex: `^${escaped}$`, $options: 'i' } }
+          ]
+        }).then(existing => {
+          if (!existing) {
+            const defaultCat = purchaseData.purchaseType === 'asset'
+              ? 'Capital Assets'
+              : purchaseData.purchaseType === 'expense'
+                ? 'Operating Expenses'
+                : 'Raw Materials';
+            return BillingItem.create({
+              companyEntity: compEntity,
+              itemName: cleanName,
+              hsnCode: it.hsnCode || '998821',
+              unitPrice: parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0,
+              unit: it.unit || 'Meters',
+              taxRate: parseFloat(it.taxRate) != null ? parseFloat(it.taxRate) : 5,
+              category: defaultCat
+            });
+          }
+        }).catch(e => console.warn('Auto-upsert BillingItem error:', e.message));
+      }
+    }
+
     res.status(201).json({ success: true, data: purchase });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -3111,6 +3144,39 @@ const updatePurchase = async (req, res) => {
         },
         { upsert: true, new: true }
       ).catch(() => {});
+    }
+
+    // Auto-upsert into BillingItem catalog so any newly entered line item is saved with its details
+    if (Array.isArray(purchaseData.items) && purchaseData.items.length > 0) {
+      const compEntity = purchaseData.companyEntity || 'Elite Digital Prints';
+      for (const it of purchaseData.items) {
+        if (!it.itemName || !it.itemName.trim()) continue;
+        const cleanName = it.itemName.trim();
+        const escaped = cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        BillingItem.findOne({
+          $or: [
+            { companyEntity: compEntity, itemName: { $regex: `^${escaped}$`, $options: 'i' } },
+            { itemName: { $regex: `^${escaped}$`, $options: 'i' } }
+          ]
+        }).then(existing => {
+          if (!existing) {
+            const defaultCat = purchaseData.purchaseType === 'asset'
+              ? 'Capital Assets'
+              : purchaseData.purchaseType === 'expense'
+                ? 'Operating Expenses'
+                : 'Raw Materials';
+            return BillingItem.create({
+              companyEntity: compEntity,
+              itemName: cleanName,
+              hsnCode: it.hsnCode || '998821',
+              unitPrice: parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0,
+              unit: it.unit || 'Meters',
+              taxRate: parseFloat(it.taxRate) != null ? parseFloat(it.taxRate) : 5,
+              category: defaultCat
+            });
+          }
+        }).catch(e => console.warn('Auto-upsert BillingItem error:', e.message));
+      }
     }
 
     res.json({ success: true, data: purchase });

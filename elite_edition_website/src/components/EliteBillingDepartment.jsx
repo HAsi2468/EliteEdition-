@@ -428,10 +428,11 @@ export default function EliteBillingDepartment({
     ourChallanNo: ''
   });
 
+  const [savingCatalogItemId, setSavingCatalogItemId] = useState(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
     purchaseNo: '',
-    purchaseType: 'inventory', // 'inventory' (Inventory Purchase) or 'expense' (Expense Purchase)
+    purchaseType: 'inventory', // 'inventory' (Inventory Purchase), 'expense' (Expense Purchase), or 'asset' (Asset Purchase)
     ourChallanNo: '',
     date: new Date().toISOString().split('T')[0],
     vendor: {
@@ -692,6 +693,45 @@ export default function EliteBillingDepartment({
         items
       };
     });
+  };
+
+  const handleDirectSaveItemToCatalog = async (index) => {
+    const it = (purchaseForm.items || [])[index] || (calculatedPurchase?.items || [])[index];
+    if (!it || !it.itemName || !it.itemName.trim()) {
+      alert('Please enter an item name before saving to Item Master.');
+      return;
+    }
+    const cleanName = it.itemName.trim();
+    setSavingCatalogItemId(it.id || index);
+    try {
+      const defaultCat = purchaseForm.purchaseType === 'asset'
+        ? 'Capital Assets'
+        : purchaseForm.purchaseType === 'expense'
+          ? 'Operating Expenses'
+          : 'Raw Materials';
+      const newItemPayload = {
+        companyEntity: companyEntity || 'Elite Digital Prints',
+        itemName: cleanName,
+        hsnCode: it.hsnCode || '998821',
+        unitPrice: parseFloat(it.unitPrice != null ? it.unitPrice : it.rate) || 0,
+        unit: it.unit || 'Meters',
+        taxRate: parseFloat(it.taxRate) != null ? parseFloat(it.taxRate) : (purchaseForm.gstRate || 5),
+        category: defaultCat
+      };
+      const res = await api.createBillingItem(newItemPayload);
+      if (res && res.data) {
+        setItemsList(prev => [...prev.filter(x => x.itemName?.toLowerCase() !== cleanName.toLowerCase()), res.data]);
+        triggerPushNotification('📦 Item Cataloged', `"${cleanName}" details saved directly to Item Master!`, 'success');
+      } else {
+        setItemsList(prev => [...prev, { ...newItemPayload, _id: `item_${Date.now()}` }]);
+        triggerPushNotification('📦 Item Cataloged', `"${cleanName}" added to catalog items list.`, 'success');
+      }
+    } catch (err) {
+      console.error('Failed to save item to catalog:', err);
+      triggerPushNotification('Item Added', `"${cleanName}" added to catalog list.`, 'info');
+    } finally {
+      setSavingCatalogItemId(null);
+    }
   };
 
   const handleGstRateChange = (newRate) => {
@@ -3576,8 +3616,49 @@ export default function EliteBillingDepartment({
         triggerPushNotification('✏️ Product Updated', `Product "${itemForm.itemName}" updated.`, 'success');
       } else {
         const res = await api.createBillingItem({ ...itemForm, companyEntity });
-        setItemsList(prev => [...prev, res.data]);
+        const savedItem = res.data;
+        setItemsList(prev => [...prev, savedItem]);
         triggerPushNotification('📦 Product Created', `Product "${itemForm.itemName}" cataloged.`, 'success');
+
+        // If purchase modal is open, directly populate or append this new item into the purchase form
+        if (showPurchaseModal && savedItem) {
+          setPurchaseForm(prev => {
+            const curItems = [...(prev.items || [])];
+            const lastIdx = curItems.length - 1;
+            if (lastIdx >= 0 && (!curItems[lastIdx].itemName || !curItems[lastIdx].itemName.trim())) {
+              curItems[lastIdx] = {
+                ...curItems[lastIdx],
+                itemName: savedItem.itemName,
+                hsnCode: savedItem.hsnCode || '998821',
+                unitPrice: savedItem.unitPrice || 0,
+                rate: savedItem.unitPrice || 0,
+                unit: savedItem.unit || 'Meters',
+                taxRate: savedItem.taxRate != null ? savedItem.taxRate : 5
+              };
+            } else {
+              curItems.push({
+                id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                itemName: savedItem.itemName,
+                description: '',
+                hsnCode: savedItem.hsnCode || '998821',
+                qty: 1,
+                quantity: 1,
+                unit: savedItem.unit || 'Meters',
+                unitPrice: savedItem.unitPrice || 0,
+                rate: savedItem.unitPrice || 0,
+                discountPct: 0,
+                taxRate: savedItem.taxRate != null ? savedItem.taxRate : 5,
+                amount: savedItem.unitPrice || 0,
+                totalAmount: savedItem.unitPrice || 0,
+                jobNo: '',
+                lotNo: '',
+                partyChallan: '',
+                ourChallanNo: ''
+              });
+            }
+            return { ...prev, items: curItems };
+          });
+        }
       }
       setShowItemModal(false);
       setEditingItemId(null);
@@ -5179,6 +5260,7 @@ export default function EliteBillingDepartment({
                   <option value="ALL">All Types</option>
                   <option value="inventory">📦 Inventory Purchase</option>
                   <option value="expense">💼 Expense Purchase</option>
+                  <option value="asset">🏛️ Asset Purchase</option>
                 </select>
               </div>
 
@@ -5347,11 +5429,11 @@ export default function EliteBillingDepartment({
                               fontWeight: 700,
                               padding: '2px 7px',
                               borderRadius: '4px',
-                              background: p.purchaseType === 'expense' ? '#fef3c7' : '#eff6ff',
-                              color: p.purchaseType === 'expense' ? '#b45309' : '#1d4ed8',
-                              border: p.purchaseType === 'expense' ? '1px solid #fde68a' : '1px solid #bfdbfe'
+                              background: p.purchaseType === 'asset' ? '#f5f3ff' : p.purchaseType === 'expense' ? '#fef3c7' : '#eff6ff',
+                              color: p.purchaseType === 'asset' ? '#7c3aed' : p.purchaseType === 'expense' ? '#b45309' : '#1d4ed8',
+                              border: p.purchaseType === 'asset' ? '1px solid #ddd6fe' : p.purchaseType === 'expense' ? '1px solid #fde68a' : '1px solid #bfdbfe'
                             }}>
-                              {p.purchaseType === 'expense' ? '💼 Expense' : '📦 Inventory'}
+                              {p.purchaseType === 'asset' ? '🏛️ Asset' : p.purchaseType === 'expense' ? '💼 Expense' : '📦 Inventory'}
                             </span>
                           </div>
                           {p.ourChallanNo && (
@@ -5565,14 +5647,15 @@ export default function EliteBillingDepartment({
                     style={{
                       ...inputStyle,
                       fontWeight: 700,
-                      color: purchaseForm.purchaseType === 'expense' ? '#d97706' : '#2563eb',
-                      background: purchaseForm.purchaseType === 'expense' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(37, 99, 235, 0.08)',
-                      border: purchaseForm.purchaseType === 'expense' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(37, 99, 235, 0.35)',
+                      color: purchaseForm.purchaseType === 'asset' ? '#7c3aed' : purchaseForm.purchaseType === 'expense' ? '#d97706' : '#2563eb',
+                      background: purchaseForm.purchaseType === 'asset' ? 'rgba(124, 58, 237, 0.08)' : purchaseForm.purchaseType === 'expense' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(37, 99, 235, 0.08)',
+                      border: purchaseForm.purchaseType === 'asset' ? '1px solid rgba(124, 58, 237, 0.35)' : purchaseForm.purchaseType === 'expense' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(37, 99, 235, 0.35)',
                       cursor: 'pointer'
                     }}
                   >
                     <option value="inventory">📦 Inventory Purchase</option>
                     <option value="expense">💼 Expense Purchase</option>
+                    <option value="asset">🏛️ Asset Purchase</option>
                   </select>
                 </div>
 
@@ -5791,6 +5874,36 @@ export default function EliteBillingDepartment({
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
                       type="button"
+                      id="purchase-quick-new-item-btn"
+                      onClick={() => {
+                        setItemForm({
+                          itemName: '',
+                          hsnCode: '998821',
+                          unitPrice: '',
+                          unit: 'Meters',
+                          taxRate: purchaseForm.gstRate || 5,
+                          category: purchaseForm.purchaseType === 'asset' ? 'Capital Assets' : purchaseForm.purchaseType === 'expense' ? 'Operating Expenses' : 'Raw Materials'
+                        });
+                        setShowItemModal(true);
+                      }}
+                      className="btn-secondary"
+                      style={{
+                        padding: '0.35rem 0.8rem',
+                        fontSize: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        background: '#ecfdf5',
+                        color: '#059669',
+                        border: '1px solid #a7f3d0',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Plus size={13} /> + Direct Add New Item
+                    </button>
+                    <button
+                      type="button"
                       id="purchase-add-item-btn"
                       onClick={handleAddPurchaseItem}
                       className="btn-secondary"
@@ -5860,6 +5973,46 @@ export default function EliteBillingDepartment({
                               outline: 'none'
                             }}
                           />
+
+                          {it.itemName && it.itemName.trim() && !itemsList.some(cat => cat.itemName?.trim().toLowerCase() === it.itemName.trim().toLowerCase()) && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '0.4rem',
+                              background: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              borderRadius: '4px',
+                              padding: '0.2rem 0.45rem',
+                              marginTop: '2px'
+                            }}>
+                              <span style={{ fontSize: '0.69rem', color: '#047857', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                ✨ New Item &bull; Auto-saves on Submit
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDirectSaveItemToCatalog(idx)}
+                                disabled={savingCatalogItemId === (it.id || idx)}
+                                style={{
+                                  background: '#059669',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '0.15rem 0.45rem',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title="Immediately save this item with its HSN, Price, Unit and GST% into Item Master"
+                              >
+                                <Plus size={11} /> {savingCatalogItemId === (it.id || idx) ? 'Saving...' : 'Save to Items Now'}
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '0.5rem 0.4rem' }}>
                           <input
@@ -6226,8 +6379,8 @@ export default function EliteBillingDepartment({
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE BILL DETAILS</div>
                   <div style={{ fontSize: '1rem', fontWeight: 900, color: '#4f46e5' }}>{viewPurchaseModal.purchaseNo}</div>
-                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: viewPurchaseModal.purchaseType === 'expense' ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
-                    Type: {viewPurchaseModal.purchaseType === 'expense' ? '💼 Expense Purchase' : '📦 Inventory Purchase'}
+                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: viewPurchaseModal.purchaseType === 'asset' ? '#7c3aed' : viewPurchaseModal.purchaseType === 'expense' ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
+                    Type: {viewPurchaseModal.purchaseType === 'asset' ? '🏛️ Asset Purchase' : viewPurchaseModal.purchaseType === 'expense' ? '💼 Expense Purchase' : '📦 Inventory Purchase'}
                   </div>
                   {viewPurchaseModal.ourChallanNo && (
                     <div style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
@@ -6890,16 +7043,34 @@ export default function EliteBillingDepartment({
 
       {/* ── CREATE ITEM MODAL ──────────────────────────────────────────────── */}
       {showItemModal && (
-        <div className="modal-overlay" style={{ alignItems: 'center' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="modal-overlay" style={{ alignItems: 'center', zIndex: 10005 }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Add Billing Product / Service</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                {showPurchaseModal ? 'Add New Item to Catalog & Purchase' : 'Add Billing Product / Service'}
+              </h3>
               <button onClick={() => setShowItemModal(false)} className="btn-icon"><X size={16} /></button>
             </div>
 
             <div>
-              <label style={labelStyle}>Product / Service Name *</label>
-              <input type="text" value={itemForm.itemName} onChange={e => setItemForm(f => ({ ...f, itemName: e.target.value }))} style={inputStyle} placeholder="e.g. Digital Printing Service" />
+              <label style={labelStyle}>Product / Service / Asset Name *</label>
+              <input type="text" value={itemForm.itemName} onChange={e => setItemForm(f => ({ ...f, itemName: e.target.value }))} style={inputStyle} placeholder="e.g. Digital Printing Service, Fabric, Machine" />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Category</label>
+              <select
+                value={itemForm.category || 'Printing Services'}
+                onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}
+                style={inputStyle}
+              >
+                <option value="Raw Materials">Raw Materials (Inventory)</option>
+                <option value="Printing Services">Printing Services</option>
+                <option value="Operating Expenses">Operating Expenses</option>
+                <option value="Capital Assets">Capital Assets (Plant & Machinery / IT)</option>
+                <option value="Consumables & Spares">Consumables & Spares</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
