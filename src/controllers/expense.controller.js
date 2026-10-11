@@ -69,12 +69,8 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
   const buCode = getBusinessUnitCode(effectiveBU);
   const normEntity = normalizeBusinessUnit(effectiveBU);
 
-  const now = new Date();
-  const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-  const start = startDate || dateStart || currentMonthStart;
-  const end = endDate || dateEnd || todayDate;
+  const start = (startDate || dateStart || '').trim();
+  const end = (endDate || dateEnd || '').trim();
 
   // 1. Fetch LedgerSettings for initial opening configuration
   const settings = await db.LedgerSettings.findOne({
@@ -92,49 +88,69 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
 
   const compFilter = buildExpenseCompFilter(normEntity);
 
+  let cashOpening = initialCashOpening;
+  let bankOpening = initialBankOpening;
+
   // 2. Calculate Historical Opening Balances (all approved transactions before `start`)
-  const histDateCond = {};
-  if (effectiveDate && effectiveDate < start) {
-    histDateCond.$gte = effectiveDate;
-    histDateCond.$lt = start;
-  } else {
-    histDateCond.$lt = start;
+  // Only applicable when a period start is defined; for "All Time" (empty start), opening is the initial opening
+  if (start) {
+    const histDateCond = {};
+    if (effectiveDate && effectiveDate < start) {
+      histDateCond.$gte = effectiveDate;
+      histDateCond.$lt = start;
+    } else {
+      histDateCond.$lt = start;
+    }
+
+    const historicalTxns = await db.Expense.find({
+      $and: [
+        compFilter,
+        { status: { $ne: 'REJECTED' } },
+        { date: histDateCond }
+      ]
+    }, { type: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
+
+    let histCashIn = 0;
+    let histCashOut = 0;
+    let histBankIn = 0;
+    let histBankOut = 0;
+
+    historicalTxns.forEach(item => {
+      const amt = Number(item.amount) || 0;
+      if (isCashTransaction(item)) {
+        if (item.type === 'IN') histCashIn += amt;
+        else if (item.type === 'OUT') histCashOut += amt;
+      } else {
+        if (item.type === 'IN') histBankIn += amt;
+        else if (item.type === 'OUT') histBankOut += amt;
+      }
+    });
+
+    cashOpening = Number((initialCashOpening + histCashIn - histCashOut).toFixed(2));
+    bankOpening = Number((initialBankOpening + histBankIn - histBankOut).toFixed(2));
   }
 
-  const historicalTxns = await db.Expense.find({
-    $and: [
-      compFilter,
-      { status: { $ne: 'REJECTED' } },
-      { date: histDateCond }
-    ]
-  }, { type: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
+  // 3. Calculate Period Movements (transactions between `start` and `end`, or all time if unbounded)
+  const periodDateCond = {};
+  if (start && end) {
+    periodDateCond.$gte = start;
+    periodDateCond.$lte = end;
+  } else if (start) {
+    periodDateCond.$gte = start;
+  } else if (end) {
+    periodDateCond.$lte = end;
+  }
 
-  let histCashIn = 0;
-  let histCashOut = 0;
-  let histBankIn = 0;
-  let histBankOut = 0;
+  const periodConditions = [
+    compFilter,
+    { status: { $ne: 'REJECTED' } }
+  ];
+  if (Object.keys(periodDateCond).length > 0) {
+    periodConditions.push({ date: periodDateCond });
+  }
 
-  historicalTxns.forEach(item => {
-    const amt = Number(item.amount) || 0;
-    if (isCashTransaction(item)) {
-      if (item.type === 'IN') histCashIn += amt;
-      else if (item.type === 'OUT') histCashOut += amt;
-    } else {
-      if (item.type === 'IN') histBankIn += amt;
-      else if (item.type === 'OUT') histBankOut += amt;
-    }
-  });
-
-  const cashOpening = Number((initialCashOpening + histCashIn - histCashOut).toFixed(2));
-  const bankOpening = Number((initialBankOpening + histBankIn - histBankOut).toFixed(2));
-
-  // 3. Calculate Period Movements (transactions between `start` and `end`)
   const periodTxns = await db.Expense.find({
-    $and: [
-      compFilter,
-      { status: { $ne: 'REJECTED' } },
-      { date: { $gte: start, $lte: end } }
-    ]
+    $and: periodConditions
   }, { type: 1, amount: 1, paymentMode: 1, bankAccount: 1 }).lean();
 
   let cashIn = 0;
