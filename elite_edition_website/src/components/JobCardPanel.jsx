@@ -35,6 +35,7 @@ import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/im
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import QRCode from 'qrcode';
 import { buildTpAndWasteGrid } from '../utils/jobCardTpHelper';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 
 export function JobCardQrBadge({ card, size = 32 }) {
   const [qrUrl, setQrUrl] = useState('');
@@ -109,7 +110,6 @@ import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
-import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import JobCardTooltip from './JobCardTooltip';
 import AIMeasurementAgentModal from './common/AIMeasurementAgentModal';
@@ -929,27 +929,8 @@ function DetailCell({ label, value, highlight, color, fullWidth, extra }) {
 function JobCardPrintView({ card, onClose, onShare }) {
   if (!card) return null;
 
-  const formatDateSafe = (dateVal) => {
-    if (!dateVal) return '—';
-    try {
-      const d = new Date(dateVal);
-      if (isNaN(d.getTime())) return String(dateVal);
-      return d.toLocaleDateString();
-    } catch {
-      return String(dateVal);
-    }
-  };
-
-  const formatDateTimeSafe = (dateVal) => {
-    if (!dateVal) return '—';
-    try {
-      const d = new Date(dateVal);
-      if (isNaN(d.getTime())) return String(dateVal);
-      return d.toLocaleString();
-    } catch {
-      return String(dateVal);
-    }
-  };
+  const formatDateSafe = (dateVal) => formatDateDDMMYYYY(dateVal, '—');
+  const formatDateTimeSafe = (dateVal) => formatDateTimeDDMMYYYY(dateVal, '—');
 
   const [resolvedImages, setResolvedImages] = useState({
     imageUrl1: card.imageUrl1 || '',

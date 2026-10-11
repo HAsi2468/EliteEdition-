@@ -10,12 +10,14 @@ import { setupGlobalCrashListeners } from './utils/globalCrashListeners'
 import { initERPTelemetry } from './telemetry/deviceTelemetry'
 import './services/telemetryService.ts'
 import { initCrossTabSync } from './utils/crossTabSync'
+import { enforceGlobalDDMMYYYYFormat } from './utils/dateUtils'
 
 // Initialize device & hardware telemetry, enterprise dialog, global error and cross-tab sync listeners
 initERPTelemetry()
 installGlobalDialogInterceptors()
 setupGlobalCrashListeners()
 initCrossTabSync()
+enforceGlobalDDMMYYYYFormat()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -13,6 +13,7 @@ import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import { triggerGlobalDataRefresh } from './NotificationToast';
 import { SmartThumbnail } from './common/SmartThumbnail';
 import { StandardNumericInput } from './common/StandardNumericInput';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -1472,7 +1473,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
               return `
                 <tr>
                   <td><strong>${e.voucherNo || ''}</strong></td>
-                  <td>${e.date ? new Date(e.date).toLocaleDateString('en-IN') : ''}</td>
+                  <td>${formatDateDDMMYYYY(e.date, '')}</td>
                   <td><span class="${isIN ? 'badge-in' : 'badge-out'}">${isIN ? 'IN' : 'OUT'}</span></td>
                   <td>${e.title || ''}${e.billNo ? `<br><small style="color:#64748b">Bill: ${e.billNo}</small>` : ''}</td>
                   <td>${e.category || ''}</td>
@@ -1868,7 +1869,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                             {item.voucherNo}
                           </td>
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
-                            {item.date ? new Date(item.date).toLocaleDateString('en-IN') : ''}
+                            {formatDateDDMMYYYY(item.date, '')}
                           </td>
                           <td style={{ padding: '0.75rem 1rem' }}>
                             <span style={{
@@ -2180,8 +2181,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                             const due = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0));
                             const isPaid = inv.paymentStatus === 'PAID' || due <= 0;
                             const payingAmt = selectedInvoicesMap[inv._id]?.payingAmount ?? (isSelected ? due : '');
-                            const invDate = inv.invoiceDate ? new Date(inv.invoiceDate) : (inv.createdAt ? new Date(inv.createdAt) : null);
-                            const formattedDate = invDate ? invDate.toLocaleDateString('en-IN') : 'No Date';
+                            const invDate = inv.invoiceDate || inv.createdAt;
+                            const formattedDate = invDate ? formatDateDDMMYYYY(invDate) : 'No Date';
 
                             return (
                               <div
@@ -2413,7 +2414,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                               : (pur.itemName || 'Material Inward');
 
                             const purDate = pur.billDate || pur.purchaseDate || pur.date || pur.createdAt;
-                            const formattedDate = purDate ? new Date(purDate).toLocaleDateString('en-IN') : 'No Date';
+                            const formattedDate = purDate ? formatDateDDMMYYYY(purDate) : 'No Date';
 
                             return (
                               <div
