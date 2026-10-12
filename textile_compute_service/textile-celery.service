@@ -1,0 +1,24 @@
+[Unit]
+Description=Elite Edition Python Textile Celery Async Worker
+After=network.target redis-server.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/EliteEditionMongo/textile_compute_service
+Environment="PATH=/home/ubuntu/EliteEditionMongo/textile_compute_service/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="REDIS_URL=redis://127.0.0.1:6379/1"
+ExecStart=/home/ubuntu/EliteEditionMongo/textile_compute_service/venv/bin/celery -A celery_worker.celery_app worker --concurrency=1 --loglevel=info --max-tasks-per-child=5 --max-memory-per-child=1500000
+
+# Strict OS Protection
+MemoryAccounting=true
+MemoryHigh=1.3G
+MemoryMax=1.5G
+
+Restart=always
+RestartSec=5
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

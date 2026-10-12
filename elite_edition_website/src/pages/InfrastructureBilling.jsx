@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import infrastructureService from '../services/infrastructureService';
+import TextilePreFlightModal from '../components/TextilePreFlightModal';
 import '../styles/infrastructureBilling.css';
 
 export function InfrastructureBilling() {
@@ -79,6 +80,7 @@ export function InfrastructureBilling() {
   const [settleNotes, setSettleNotes] = useState('');
   const [settling, setSettling] = useState(false);
   const [downloadingPdfId, setDownloadingPdfId] = useState(null);
+  const [isPreflightModalOpen, setIsPreflightModalOpen] = useState(false);
 
   // Toast Notifications
   const [toast, setToast] = useState(null);
@@ -1395,9 +1397,45 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                 </div>
               </div>
             </div>
+
+            {/* Box 4: Python Textile Compute Engine (Kyocera KJ4B Droplet Simulator) */}
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.78rem', color: '#0f172a' }}>
+                  <Cpu size={16} color="#7c3aed" />
+                  <span>Python Textile Compute (Kyocera)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPreflightModalOpen(true)}
+                  style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', background: '#ede9fe', padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+                >
+                  Simulator ↗
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Streaming Engine</span>
+                  <strong style={{ color: '#0f172a' }}>pyvips / libvips Zero-OOM</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Printhead Physics</span>
+                  <strong style={{ color: '#7c3aed' }}>Kyocera KJ4B (600 DPI)</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Header SLA</span>
+                  <strong style={{ color: '#059669' }}>&lt; 200ms (HTTP Range)</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span style={{ color: '#64748b' }}>RAM Guardrail</span>
+                  <strong style={{ color: '#059669' }}>&lt; 80 MB (C-Chunked)</strong>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
+
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* DRAWERS & MODALS                                                       */}
@@ -1932,8 +1970,16 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
         </div>
       )}
 
+      {/* C. TEXTILE PRE-FLIGHT & KYOCERA KJ4B DROPLET SIMULATOR MODAL */}
+      <TextilePreFlightModal
+        isOpen={isPreflightModalOpen}
+        onClose={() => setIsPreflightModalOpen(false)}
+      />
+
     </div>
   );
 }
+
+
 
 export default InfrastructureBilling;

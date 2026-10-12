@@ -80,6 +80,7 @@ router.use('/verify/invoice', require('./invoiceVerification.route'));
 router.use('/telemetry', require('./telemetry.route'));
 router.use('/jobs', require('./jobs.route').router);
 router.use('/change-approvals', require('./changeApproval.route'));
+router.use('/textile-compute', require('./textileCompute.route'));
 
 module.exports = router;
 

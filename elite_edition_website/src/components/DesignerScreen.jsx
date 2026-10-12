@@ -44,12 +44,14 @@ import {
   Send,
   Building2,
   UploadCloud,
-  FolderPlus
+  FolderPlus,
+  Cpu
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { triggerEliteConfirm } from './EliteModalDialog';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignImage from './DesignImage';
+import TextilePreFlightModal from './TextilePreFlightModal';
 import { getDisplayImageUrl, isTiffFile, ACCEPTED_IMAGE_FORMATS, validateImageFile } from '../utils/imageUrlHelper';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 
@@ -384,8 +386,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [colorFilter, setColorFilter] = useState('All');
   const [partyFilter, setPartyFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('Active');
   const [categories, setCategories] = useState([]);
+  const [isPreflightModalOpen, setIsPreflightModalOpen] = useState(false);
+  const [preflightSelectedUrl, setPreflightSelectedUrl] = useState('');
 
   // Dynamically compute filter options strictly from tasks present in this screen
   const availableCategories = useMemo(() => {
@@ -2542,6 +2545,31 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 }}>
                   {filteredTasks.length}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreflightSelectedUrl('');
+                    setIsPreflightModalOpen(true);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '3px 10px',
+                    borderRadius: '8px',
+                    background: '#ede9fe',
+                    border: '1px solid #ddd6fe',
+                    color: '#7c3aed',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    marginLeft: '8px',
+                  }}
+                  title="Run Python Pre-Flight Inspection & Kyocera KJ4B Droplet Simulation"
+                >
+                  <Cpu size={13} />
+                  <span>AI Pre-Flight & Droplets</span>
+                </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Quick Sort:</span>
@@ -6412,8 +6440,20 @@ const DesignerScreen = forwardRef(function DesignerScreen(
           </div>
         </div>
       )}
+
+      {/* Textile Pre-Flight & Kyocera KJ4B Droplet Simulator Modal */}
+      <TextilePreFlightModal
+        isOpen={isPreflightModalOpen}
+        initialUrl={preflightSelectedUrl}
+        onClose={() => {
+          setIsPreflightModalOpen(false);
+          setPreflightSelectedUrl('');
+        }}
+      />
     </div>
   );
 });
+
+
 
 export default DesignerScreen;

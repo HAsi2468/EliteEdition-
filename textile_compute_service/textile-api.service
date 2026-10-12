@@ -1,0 +1,26 @@
+[Unit]
+Description=Elite Edition Python Textile Compute FastAPI Engine
+After=network.target redis-server.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/EliteEditionMongo/textile_compute_service
+Environment="PATH=/home/ubuntu/EliteEditionMongo/textile_compute_service/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="VIPS_CONCURRENCY=2"
+Environment="VIPS_DISC_THRESHOLD=64m"
+ExecStart=/home/ubuntu/EliteEditionMongo/textile_compute_service/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001 --workers 1
+
+# EC2 t3.medium Memory Hard Limits
+MemoryAccounting=true
+MemoryHigh=1.4G
+MemoryMax=1.6G
+CPUQuota=150%
+
+Restart=always
+RestartSec=3
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
