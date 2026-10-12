@@ -2902,9 +2902,10 @@ export default function EliteBillingDepartment({
     ],
     isButterPaperUsed: false,
     enableRoundOff: true,
-    enableTds: false,
+    enableTds: true,
     tdsSection: '194C',
-    tdsRate: 1,
+    tdsRate: 2,
+    _tdsPreset: '194C_2',
     tdsAmount: 0,
     manualTdsAmount: undefined,
     discountType: 'flat',
@@ -3014,9 +3015,10 @@ export default function EliteBillingDepartment({
         items: lockedItems,
         isButterPaperUsed: false,
         enableRoundOff: true,
-        enableTds: false,
+        enableTds: true,
         tdsSection: '194C',
-        tdsRate: 1,
+        tdsRate: 2,
+        _tdsPreset: '194C_2',
         tdsAmount: 0,
         manualTdsAmount: undefined,
         discountType: 'flat',
@@ -3065,7 +3067,8 @@ export default function EliteBillingDepartment({
         ...invoiceToEdit,
         enableTds: !!invoiceToEdit.enableTds,
         tdsSection: invoiceToEdit.tdsSection || '194C',
-        tdsRate: invoiceToEdit.tdsRate != null ? invoiceToEdit.tdsRate : 1,
+        tdsRate: invoiceToEdit.tdsRate != null ? Number(invoiceToEdit.tdsRate) : 2,
+        _tdsPreset: (invoiceToEdit.tdsSection === '194C' && Number(invoiceToEdit.tdsRate) === 1) ? '194C_1' : (invoiceToEdit.tdsSection === '194C' ? '194C_2' : undefined),
         tdsAmount: invoiceToEdit.tdsAmount || 0,
         manualTdsAmount: invoiceToEdit.tdsAmount != null ? invoiceToEdit.tdsAmount : undefined,
         items: cleanedItems,
@@ -3093,9 +3096,10 @@ export default function EliteBillingDepartment({
             { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, totalAmount: 4500 }
           ],
           enableRoundOff: true,
-          enableTds: false,
+          enableTds: true,
           tdsSection: '194C',
-          tdsRate: 1,
+          tdsRate: 2,
+          _tdsPreset: '194C_2',
           tdsAmount: 0,
           manualTdsAmount: undefined,
           discountType: 'flat',
@@ -4932,10 +4936,10 @@ export default function EliteBillingDepartment({
                     <input
                       type="checkbox"
                       checked={!!invoiceForm.enableTds}
-                      onChange={e => setInvoiceForm(f => ({ ...f, enableTds: e.target.checked, manualTdsAmount: undefined }))}
+                      onChange={e => setInvoiceForm(f => ({ ...f, enableTds: e.target.checked, manualTdsAmount: undefined, tdsRate: f.tdsRate || 2, _tdsPreset: f._tdsPreset || '194C_2' }))}
                       style={{ accentColor: '#d97706' }}
                     />
-                    <span>Deduct TDS (Income Tax)</span>
+                    <span>TDS</span>
                     <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: 4, background: invoiceForm.enableTds ? '#fef3c7' : '#e2e8f0', color: invoiceForm.enableTds ? '#b45309' : '#64748b', border: invoiceForm.enableTds ? '1px solid #fde68a' : 'none', fontWeight: 700 }}>
                       CBDT
                     </span>
@@ -4952,17 +4956,17 @@ export default function EliteBillingDepartment({
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1.8fr) minmax(65px, 0.75fr) minmax(95px, 1.15fr)', gap: '0.5rem', alignItems: 'center' }}>
                       <div>
                         <select
-                          value={invoiceForm._tdsPreset || (invoiceForm.tdsSection === '194C' ? (invoiceForm.tdsRate === 2 ? '194C_2' : '194C_1') : invoiceForm.tdsSection === '194Q' ? '194Q' : invoiceForm.tdsSection === '194J' ? (invoiceForm.tdsRate === 10 ? '194J_10' : '194J_2') : 'CUSTOM')}
+                          value={invoiceForm._tdsPreset || (invoiceForm.tdsSection === '194C' ? (Number(invoiceForm.tdsRate) === 1 ? '194C_1' : '194C_2') : invoiceForm.tdsSection === '194Q' ? '194Q' : invoiceForm.tdsSection === '194J' ? (Number(invoiceForm.tdsRate) === 10 ? '194J_10' : '194J_2') : '194C_2')}
                           onChange={e => {
                             const val = e.target.value;
-                            let rate = 1;
+                            let rate = 2;
                             let sec = '194C';
                             if (val === '194C_1') { sec = '194C'; rate = 1; }
                             else if (val === '194C_2') { sec = '194C'; rate = 2; }
                             else if (val === '194Q') { sec = '194Q'; rate = 0.1; }
                             else if (val === '194J_2') { sec = '194J'; rate = 2; }
                             else if (val === '194J_10') { sec = '194J'; rate = 10; }
-                            else if (val === 'CUSTOM') { sec = 'Custom'; }
+                            else if (val === 'CUSTOM') { sec = 'Custom'; rate = invoiceForm.tdsRate || 2; }
                             setInvoiceForm(f => ({ ...f, tdsSection: sec, tdsRate: rate, manualTdsAmount: undefined, _tdsPreset: val }));
                           }}
                           style={{
@@ -4976,8 +4980,8 @@ export default function EliteBillingDepartment({
                             color: '#0f172a'
                           }}
                         >
-                          <option value="194C_1">Sec 194C (1% - Indv / HUF)</option>
                           <option value="194C_2">Sec 194C (2% - Company / Firm)</option>
+                          <option value="194C_1">Sec 194C (1% - Indv / HUF)</option>
                           <option value="194Q">Sec 194Q (0.1% - Goods Sale)</option>
                           <option value="194J_2">Sec 194J (2% - Tech Services)</option>
                           <option value="194J_10">Sec 194J (10% - Professional)</option>
@@ -4990,7 +4994,7 @@ export default function EliteBillingDepartment({
                           type="number"
                           step="0.01"
                           placeholder="Rate"
-                          value={invoiceForm.tdsRate !== undefined ? invoiceForm.tdsRate : 1}
+                          value={invoiceForm.tdsRate !== undefined ? invoiceForm.tdsRate : 2}
                           onChange={e => setInvoiceForm(f => ({ ...f, tdsRate: e.target.value === '' ? 0 : parseFloat(e.target.value), manualTdsAmount: undefined, _tdsPreset: 'CUSTOM' }))}
                           style={{
                             width: '100%',
