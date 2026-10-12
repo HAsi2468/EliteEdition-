@@ -78,13 +78,19 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [lastScannedItem, setLastScannedItem] = useState(null);
   const scannedTimeoutRef = useRef(null);
   const scanDebounceRef = useRef(null);
+  const lastScanTimestampRef = useRef({ code: '', time: 0 });
 
   // Auto-listen to physical hardware USB/Bluetooth barcode scanners globally
   useHardwareBarcodeSniffer((scanData) => {
     if (scanData && scanData.code) {
+      if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+      setScanInput('');
       processBarcodeScan(scanData.code);
       setTimeout(() => {
-        if (scanInputRef.current) scanInputRef.current.focus();
+        if (scanInputRef.current) {
+          scanInputRef.current.value = '';
+          scanInputRef.current.focus();
+        }
       }, 50);
     }
   });
@@ -247,6 +253,16 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     const cleanSku = (scannedCode || '').trim();
     if (!cleanSku) return;
 
+    // Deduplicate rapid duplicate scans of the same code within 800ms (prevents double-increment from dual listener)
+    const now = Date.now();
+    if (
+      lastScanTimestampRef.current.code.toLowerCase() === cleanSku.toLowerCase() &&
+      now - lastScanTimestampRef.current.time < 800
+    ) {
+      return;
+    }
+    lastScanTimestampRef.current = { code: cleanSku, time: now };
+
     // 1. Search in current inventory items
     let foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, cleanSku));
     
@@ -332,42 +348,38 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     const val = e.target.value;
     setScanInput(val);
     if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
-    // Instant auto-add: when a barcode scanner types characters in rapid succession (e.g. 4+ chars), auto-commit after 150ms idle
-    if (val && val.trim().length >= 4) {
-      scanDebounceRef.current = setTimeout(() => {
-        processBarcodeScan(val.trim());
-        setScanInput('');
-        setTimeout(() => {
-          if (scanInputRef.current) scanInputRef.current.focus();
-        }, 30);
-      }, 160);
-    }
   };
 
   const handleScanInputKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
-      if (scanInput && scanInput.trim()) {
-        processBarcodeScan(scanInput.trim());
-        setScanInput('');
-        setTimeout(() => {
-          if (scanInputRef.current) scanInputRef.current.focus();
-        }, 30);
+      const val = (scanInput || scanInputRef.current?.value || '').trim();
+      setScanInput('');
+      if (scanInputRef.current) scanInputRef.current.value = '';
+      if (val) {
+        processBarcodeScan(val);
       }
+      setTimeout(() => {
+        if (scanInputRef.current) scanInputRef.current.focus();
+      }, 30);
     }
   };
 
   const handleManualScanSubmit = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
-    if (scanInput && scanInput.trim()) {
-      processBarcodeScan(scanInput.trim());
-      setScanInput('');
-      setTimeout(() => {
-        if (scanInputRef.current) scanInputRef.current.focus();
-      }, 30);
+    const val = (scanInput || scanInputRef.current?.value || '').trim();
+    setScanInput('');
+    if (scanInputRef.current) scanInputRef.current.value = '';
+    if (val) {
+      processBarcodeScan(val);
     }
+    setTimeout(() => {
+      if (scanInputRef.current) scanInputRef.current.focus();
+    }, 30);
   };
 
   // Add a new row

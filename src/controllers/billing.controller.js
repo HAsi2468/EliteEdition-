@@ -484,7 +484,8 @@ const createInvoice = async (req, res) => {
     // Auto-calculate balance due (deducting TDS if enabled)
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const tdsAmount = invoiceData.enableTds ? (parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    const tdsAmount = invoiceData.enableTds ? Math.round(parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    invoiceData.tdsAmount = tdsAmount;
     const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
     invoiceData.balanceDue = balanceDue;
@@ -804,7 +805,8 @@ const updateInvoice = async (req, res) => {
 
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const tdsAmount = invoiceData.enableTds ? (parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    const tdsAmount = invoiceData.enableTds ? Math.round(parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    invoiceData.tdsAmount = tdsAmount;
     const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
     invoiceData.balanceDue = balanceDue;
@@ -1117,7 +1119,7 @@ const recordPayment = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
 
-    const effectiveTds = invoice.enableTds ? (parseFloat(invoice.tdsAmount) || 0) : 0;
+    const effectiveTds = invoice.enableTds ? Math.round(parseFloat(invoice.tdsAmount) || 0) : 0;
     invoice.paidAmount = parseFloat(((invoice.paidAmount || 0) + paymentAmt).toFixed(2));
     invoice.balanceDue = Math.max(0, parseFloat((invoice.grandTotal - effectiveTds - invoice.paidAmount).toFixed(2)));
 
@@ -1895,7 +1897,7 @@ const downloadInvoicePdf = async (req, res) => {
           doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
             .text(`Less: TDS${tdsSec}${tdsRate}`, colX[6] - 40, Y + 4, { width: COL[6] + COL[7] + 36, align: 'right' });
           doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
-            .text(`- ${Number(invoice.tdsAmount).toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+            .text(`- ${Math.round(Number(invoice.tdsAmount || 0))}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
           Y += tdsH;
 
           const netH = 20;
@@ -2686,7 +2688,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             const tdsRate = invoice.tdsRate ? ` @ ${invoice.tdsRate}%` : '';
             doc.rect(PAD, Y, CW, 16).fill(PRPL).stroke(S200);
             doc.fillColor(PRPM).fontSize(8).font('Helvetica-Bold')
-              .text(`Less: TDS${tdsSec}${tdsRate}: - Rs. ${Number(invoice.tdsAmount).toFixed(2)}`, PAD + 5, Y + 3);
+              .text(`Less: TDS${tdsSec}${tdsRate}: - Rs. ${Math.round(Number(invoice.tdsAmount || 0))}`, PAD + 5, Y + 3);
             const netPayable = Math.max(0, Number(grandTotalVal) - Number(invoice.tdsAmount || 0));
             doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
               .text(`Net Receivable: Rs. ${netPayable.toFixed(2)}`, PAD + CW - 160, Y + 3, { width: 155, align: 'right' });

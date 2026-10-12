@@ -75,6 +75,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const [scanSkuInput, setScanSkuInput] = useState('');
   const scanInputRef = useRef(null);
   const scanDebounceRef = useRef(null);
+  const lastScanTimestampRef = useRef({ code: '', time: 0 });
 
   useEffect(() => {
     if (scanInputRef.current) {
@@ -85,9 +86,14 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   // Auto-listen to physical hardware USB/Bluetooth barcode scanners globally
   useHardwareBarcodeSniffer((scanData) => {
     if (scanData && scanData.code) {
+      if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+      setScanSkuInput('');
       processScannedSku(scanData.code);
       setTimeout(() => {
-        if (scanInputRef.current) scanInputRef.current.focus();
+        if (scanInputRef.current) {
+          scanInputRef.current.value = '';
+          scanInputRef.current.focus();
+        }
       }, 50);
     }
   });
@@ -307,6 +313,16 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     const cleanSku = (skuRaw || '').trim();
     if (!cleanSku) return;
 
+    // Deduplicate rapid duplicate scans of the same code within 800ms (prevents double-increment from dual listener)
+    const now = Date.now();
+    if (
+      lastScanTimestampRef.current.code.toLowerCase() === cleanSku.toLowerCase() &&
+      now - lastScanTimestampRef.current.time < 800
+    ) {
+      return;
+    }
+    lastScanTimestampRef.current = { code: cleanSku, time: now };
+
     playSuccessBeep();
 
     setFormRows(prev => {
@@ -385,47 +401,43 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     });
   };
 
-  // Barcode / SKU Form Handlers with instant auto-add
+  // Barcode / SKU Form Handlers
   const handleScanInputChange = (e) => {
     const val = e.target.value;
     setScanSkuInput(val);
     if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
-    // Auto-commit on rapid scanner burst or 4+ characters after 160ms idle
-    if (val && val.trim().length >= 4) {
-      scanDebounceRef.current = setTimeout(() => {
-        processScannedSku(val.trim());
-        setScanSkuInput('');
-        setTimeout(() => {
-          if (scanInputRef.current) scanInputRef.current.focus();
-        }, 30);
-      }, 160);
-    }
   };
 
   const handleScanInputKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
-      if (scanSkuInput && scanSkuInput.trim()) {
-        processScannedSku(scanSkuInput.trim());
-        setScanSkuInput('');
-        setTimeout(() => {
-          if (scanInputRef.current) scanInputRef.current.focus();
-        }, 30);
+      const val = (scanSkuInput || scanInputRef.current?.value || '').trim();
+      setScanSkuInput('');
+      if (scanInputRef.current) scanInputRef.current.value = '';
+      if (val) {
+        processScannedSku(val);
       }
+      setTimeout(() => {
+        if (scanInputRef.current) scanInputRef.current.focus();
+      }, 30);
     }
   };
 
   const handleScanSubmit = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
-    if (scanSkuInput && scanSkuInput.trim()) {
-      processScannedSku(scanSkuInput.trim());
-      setScanSkuInput('');
-      setTimeout(() => {
-        if (scanInputRef.current) scanInputRef.current.focus();
-      }, 30);
+    const val = (scanSkuInput || scanInputRef.current?.value || '').trim();
+    setScanSkuInput('');
+    if (scanInputRef.current) scanInputRef.current.value = '';
+    if (val) {
+      processScannedSku(val);
     }
+    setTimeout(() => {
+      if (scanInputRef.current) scanInputRef.current.focus();
+    }, 30);
   };
 
   // Quick Apply Settings to all rows
