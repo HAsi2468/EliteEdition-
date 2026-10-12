@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
@@ -168,7 +168,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   };
 
   // Dynamically resolve metrics for the currently selected bank dropdown
-  const currentBankData = useMemo(() => {
+  const currentBankData = React.useMemo(() => {
     if (selectedBank === 'ALL') {
       return {
         name: 'All Banks (Consolidated)',
