@@ -7,11 +7,13 @@ const {
   settleInfrastructureBill,
   downloadTaxInvoice,
   syncAllProviders,
+  getSystemHealth,
 } = require('../controllers/infrastructureController');
 
 const router = express.Router();
 
 // 1. Live Telemetry & Usage Metrics Endpoints
+router.get('/health', getSystemHealth);
 router.get('/metrics/aws', getAwsMetrics);
 router.get('/metrics/mongodb', getMongoClusterMetrics);
 router.get('/metrics/cloudflare-r2', getCloudflareR2Metrics);

@@ -749,6 +749,57 @@ const syncAllProviders = async (req, res) => {
   }
 };
 
+const getSystemHealth = async (req, res) => {
+  try {
+    const uptimeSec = process.uptime();
+    const days = Math.floor(uptimeSec / 86400);
+    const hours = Math.floor((uptimeSec % 86400) / 3600);
+    const mins = Math.floor((uptimeSec % 3600) / 60);
+    const uptimeFormatted = `${days > 0 ? days + 'd ' : ''}${hours}h ${mins}m`;
+
+    const mem = process.memoryUsage();
+    const rssMb = Number((mem.rss / 1024 / 1024).toFixed(1));
+    const heapUsedMb = Number((mem.heapUsed / 1024 / 1024).toFixed(1));
+    const heapTotalMb = Number((mem.heapTotal / 1024 / 1024).toFixed(1));
+
+    const mongoReady = mongoose.connection.readyState;
+    const mongoStatusMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+
+    res.status(httpStatus.OK).json({
+      status: 'healthy',
+      server: {
+        status: 'online',
+        region: 'ap-south-1 (Mumbai)',
+        instanceType: 'AWS EC2 t3.medium (2 vCPU, 4 GiB RAM)',
+        nodeVersion: process.version,
+        uptimeSeconds: Math.floor(uptimeSec),
+        uptimeFormatted,
+        memory: {
+          rssMb,
+          heapUsedMb,
+          heapTotalMb,
+        },
+      },
+      database: {
+        status: mongoStatusMap[mongoReady] || 'unknown',
+        cluster: 'MongoDB Atlas M10 Dedicated (ap-south-1)',
+        readyState: mongoReady,
+        dbName: mongoose.connection.name || 'elite_edition',
+      },
+      storage: {
+        provider: 'Cloudflare R2 Object Storage',
+        status: 'active',
+        bucket: 'elite-edition-backups',
+        egressCost: 'Free ($0.00)',
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error('getSystemHealth error: %o', error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ status: 'error', error: error.message });
+  }
+};
+
 module.exports = {
   getAwsMetrics,
   getMongoClusterMetrics,
@@ -758,5 +809,6 @@ module.exports = {
   downloadTaxInvoice,
   syncAllProviders,
   performAllProvidersSync,
+  getSystemHealth,
 };
 

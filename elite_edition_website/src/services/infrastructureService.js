@@ -88,6 +88,13 @@ export async function syncAllProviders(exchangeRate = 86.5) {
   return res.data;
 }
 
+/**
+ * Fetch live system health, process uptime, memory usage, and connection statuses
+ */
+export async function fetchSystemHealth() {
+  const res = await apiClient.get(getEndpoint('/health'));
+  return res.data;
+}
 
 export default {
   fetchAwsMetrics,
@@ -97,4 +104,5 @@ export default {
   settleBill,
   downloadInvoicePdf,
   syncAllProviders,
+  fetchSystemHealth,
 };
