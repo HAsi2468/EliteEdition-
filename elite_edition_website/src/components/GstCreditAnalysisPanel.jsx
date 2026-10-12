@@ -389,7 +389,7 @@ export default function GstCreditAnalysisPanel({
           taxableAmount: inv.taxable,
           grossAmount: inv.grandTotal,
           tdsAmount: inv.tdsAmount,
-          status: 'Tax Credit Asset (26AS)',
+          status: 'Your Tax Credit (Form 26AS)',
           itemRef: inv._raw
         });
       }
@@ -411,7 +411,7 @@ export default function GstCreditAnalysisPanel({
           taxableAmount: pur.taxable,
           grossAmount: pur.grandTotal,
           tdsAmount: pur.tdsAmount,
-          status: 'TDS Payable to Govt (Challan 281)',
+          status: 'To Pay to Govt (Challan 281)',
           itemRef: pur._raw
         });
       }
@@ -457,50 +457,50 @@ export default function GstCreditAnalysisPanel({
 
       // 1. Summary Sheet
       const summaryData = [
-        ['ELITE EDITION ERP — GST & TAX CREDIT RECONCILIATION REPORT'],
-        ['Entity:', entityFilter === 'ALL' ? 'All Operating Entities' : entityFilter],
-        ['Reporting Period:', dateRange.labelText],
+        ['ELITE EDITION — GST & TAX REPORT'],
+        ['Company:', entityFilter === 'ALL' ? 'All Companies' : entityFilter],
+        ['Period:', dateRange.labelText],
         ['Generated On:', new Date().toLocaleString('en-IN')],
         [],
-        ['1. EXECUTIVE GST POSITION SUMMARY'],
-        ['Tax Component', 'Outward Liability (Sales)', 'Input Tax Credit (ITC Purchases)', 'Direct Balance (Net)', 'Status'],
+        ['1. GST SUMMARY'],
+        ['Tax Type', 'Sales GST', 'Purchase GST Credit', 'Balance', 'Status'],
         [
           'Integrated Tax (IGST)',
           aggregates.outward.igst,
           aggregates.inward.igst,
           aggregates.igstNet,
-          aggregates.igstNet > 0 ? 'Payable' : 'Surplus Credit'
+          aggregates.igstNet > 0 ? 'Need to Pay' : 'Extra Credit'
         ],
         [
           'Central Tax (CGST)',
           aggregates.outward.cgst,
           aggregates.inward.cgst,
           aggregates.cgstNet,
-          aggregates.cgstNet > 0 ? 'Payable' : 'Surplus Credit'
+          aggregates.cgstNet > 0 ? 'Need to Pay' : 'Extra Credit'
         ],
         [
           'State Tax (SGST)',
           aggregates.outward.sgst,
           aggregates.inward.sgst,
           aggregates.sgstNet,
-          aggregates.sgstNet > 0 ? 'Payable' : 'Surplus Credit'
+          aggregates.sgstNet > 0 ? 'Need to Pay' : 'Extra Credit'
         ],
         [
           'TOTAL GST',
           aggregates.outward.totalTax,
           aggregates.inward.totalTax,
           aggregates.totalGstNet,
-          aggregates.totalGstNet > 0 ? 'NET GST PAYABLE (CASH)' : 'SURPLUS ITC CARRY-FORWARD'
+          aggregates.totalGstNet > 0 ? 'GST TO PAY' : 'EXTRA GST CREDIT'
         ],
         [],
-        ['2. RULE 88A SET-OFF ESTIMATE'],
-        ['Estimated Net Cash Payable (PMT-06 Challan):', aggregates.netCashPayable],
-        ['Surplus ITC Credit to Carry Forward:', aggregates.netCreditCarryForward],
+        ['2. ESTIMATED GST CALCULATION'],
+        ['Estimated GST to Pay to Govt:', aggregates.netCashPayable],
+        ['Extra GST Credit Saved for Next Month:', aggregates.netCreditCarryForward],
         [],
-        ['3. TDS / TDC TAX CREDIT SUMMARY (SEC 194C / 194Q)'],
-        ['Total TDS Deducted by Clients on Sales (Asset / 26AS Credit):', aggregates.outward.tdsReceivable],
-        ['Total TDS Withheld on Vendor Purchases (Payable to Govt):', aggregates.inward.tdsWithheld],
-        ['Net TDS Credit Receivable Balance:', aggregates.tdsNetCredit]
+        ['3. TDS SUMMARY'],
+        ['TDS Cut by Customers (Your Credit):', aggregates.outward.tdsReceivable],
+        ['TDS Cut from Vendors (To Pay to Govt):', aggregates.inward.tdsWithheld],
+        ['Remaining TDS Balance:', aggregates.tdsNetCredit]
       ];
       const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, wsSummary, 'GST_Executive_Summary');
@@ -561,7 +561,7 @@ export default function GstCreditAnalysisPanel({
       // 4. TDS Credit Ledger
       if (mode === 'comprehensive' || mode === 'tds') {
         const tdsRows = tdsLedger.map((t) => ({
-          'Credit / Flow Type': t.type === 'RECEIVABLE' ? 'TDS Asset (Client Deducted)' : 'TDS Liability (Withheld on Vendor)',
+          'Type': t.type === 'RECEIVABLE' ? 'TDS Cut by Customer' : 'TDS Cut from Vendor',
           'Doc Type': t.source,
           'Document Ref': t.docNo,
           'Document Date': t.docDate,
@@ -569,16 +569,16 @@ export default function GstCreditAnalysisPanel({
           'Party GSTIN': t.gstin || '-',
           'TDS Section': t.section,
           'TDS Rate (%)': `${t.rate}%`,
-          'Taxable / Base Value (₹)': t.taxableAmount,
-          'Gross Transaction (₹)': t.grossAmount,
+          'Amount (Without Tax) (₹)': t.taxableAmount,
+          'Total Bill (₹)': t.grossAmount,
           'TDS Amount (₹)': t.tdsAmount,
-          'Compliance Classification': t.status
+          'Status': t.status
         }));
         const wsTds = XLSX.utils.json_to_sheet(tdsRows);
         XLSX.utils.book_append_sheet(wb, wsTds, 'TDS_Tax_Credit_Ledger');
       }
 
-      const fileName = `GST_ITC_Audit_Report_${entityFilter}_${periodLabel}.xlsx`;
+      const fileName = `GST_Tax_Report_${entityFilter}_${periodLabel}.xlsx`;
       XLSX.writeFile(wb, fileName);
     } catch (err) {
       console.error('Failed to export GST spreadsheet:', err);
@@ -629,10 +629,10 @@ export default function GstCreditAnalysisPanel({
               </div>
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary, #0f172a)' }}>
-                  GST & Tax Credit Hub
+                  GST & Tax Details
                 </h2>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', fontWeight: 500 }}>
-                  Automated GSTR-1 (Outward Sales), GSTR-2B (Inward ITC Purchases), and TDS Credit Reconciliation
+                  Sales GST, Purchase GST Credit, and TDS Details
                 </div>
               </div>
             </div>
@@ -702,10 +702,10 @@ export default function GstCreditAnalysisPanel({
                 boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
                 cursor: isExporting ? 'not-allowed' : 'pointer'
               }}
-              title="Download CA-Ready Combined GST & TDS Audit Excel Spreadsheet"
+              title="Download Complete GST & TDS Excel File"
             >
               <FileSpreadsheet size={15} />
-              {isExporting ? 'Exporting...' : 'Export Audit Excel (.xlsx)'}
+              {isExporting ? 'Exporting...' : 'Download Excel'}
             </button>
           </div>
         </div>
@@ -740,7 +740,7 @@ export default function GstCreditAnalysisPanel({
 
           {/* Operating Entity Pill Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Entity:</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Company:</span>
             {['ALL', 'Elite Edition', 'Elite Fabtex'].map((ent) => {
               const active = entityFilter === ent;
               return (
@@ -760,7 +760,7 @@ export default function GstCreditAnalysisPanel({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  {ent === 'ALL' ? '🏢 All Operating Entities' : ent}
+                  {ent === 'ALL' ? '🏢 All Companies' : ent}
                 </button>
               );
             })}
@@ -801,29 +801,29 @@ export default function GstCreditAnalysisPanel({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.76rem', color: '#64748b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <span>
-              Active Filter: <strong>{dateRange.labelText}</strong>
+              Period: <strong>{dateRange.labelText}</strong>
             </span>
             <span>•</span>
             <span>
-              Invoices: <strong>{filteredInvoices.length}</strong> (of {parsedInvoices.length})
+              Sales Bills: <strong>{filteredInvoices.length}</strong> (of {parsedInvoices.length})
             </span>
             <span>•</span>
             <span>
-              Purchases: <strong>{filteredPurchases.length}</strong> (of {parsedPurchases.length})
+              Purchase Bills: <strong>{filteredPurchases.length}</strong> (of {parsedPurchases.length})
             </span>
             <span>•</span>
             <span>
-              TDS Records: <strong>{tdsLedger.length}</strong>
+              TDS Entries: <strong>{tdsLedger.length}</strong>
             </span>
           </div>
 
           {/* Party Type Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontWeight: 600 }}>Party:</span>
+            <span style={{ fontWeight: 600 }}>Type:</span>
             {[
               { id: 'ALL', label: 'All' },
-              { id: 'B2B', label: 'B2B (with GSTIN)' },
-              { id: 'B2C', label: 'B2C (Unregistered)' }
+              { id: 'B2B', label: 'With GST Number' },
+              { id: 'B2C', label: 'Without GST Number' }
             ].map((p) => (
               <button
                 key={p.id}
@@ -870,7 +870,7 @@ export default function GstCreditAnalysisPanel({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                OUTWARD GST LIABILITY (SALES)
+                SALES GST (TAX ON SALES)
               </div>
               <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#4c1d95', marginTop: '0.2rem', fontVariantNumeric: 'tabular-nums' }}>
                 {fmtINR(aggregates.outward.totalTax)}
@@ -882,7 +882,7 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           <div style={{ fontSize: '0.78rem', color: '#6d28d9', marginTop: '0.5rem', fontWeight: 600 }}>
-            Taxable Turnover: <strong>{fmtINR(aggregates.outward.taxable)}</strong>
+            Sales Amount (Without Tax): <strong>{fmtINR(aggregates.outward.taxable)}</strong>
           </div>
 
           <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.65rem', flexWrap: 'wrap' }}>
@@ -898,7 +898,7 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           <div style={{ fontSize: '0.72rem', color: '#7c3aed', opacity: 0.85, marginTop: '0.5rem' }}>
-            Based on {filteredInvoices.length} invoices ({aggregates.outward.b2bCount} B2B, {aggregates.outward.b2cCount} B2C)
+            From {filteredInvoices.length} sales bills ({aggregates.outward.b2bCount} with GST, {aggregates.outward.b2cCount} without GST)
           </div>
         </div>
 
@@ -917,7 +917,7 @@ export default function GstCreditAnalysisPanel({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                ELIGIBLE INPUT TAX CREDIT (ITC)
+                PURCHASE GST CREDIT (ITC)
               </div>
               <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#064e3b', marginTop: '0.2rem', fontVariantNumeric: 'tabular-nums' }}>
                 {fmtINR(aggregates.inward.totalTax)}
@@ -929,7 +929,7 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           <div style={{ fontSize: '0.78rem', color: '#047857', marginTop: '0.5rem', fontWeight: 600 }}>
-            Taxable Inward: <strong>{fmtINR(aggregates.inward.taxable)}</strong>
+            Purchase Amount (Without Tax): <strong>{fmtINR(aggregates.inward.taxable)}</strong>
           </div>
 
           <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.65rem', flexWrap: 'wrap' }}>
@@ -945,7 +945,7 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           <div style={{ fontSize: '0.72rem', color: '#059669', opacity: 0.85, marginTop: '0.5rem' }}>
-            Based on {filteredPurchases.length} vendor purchase bills (GSTR-2B)
+            From {filteredPurchases.length} purchase bills
           </div>
         </div>
 
@@ -974,7 +974,7 @@ export default function GstCreditAnalysisPanel({
                   letterSpacing: '0.04em'
                 }}
               >
-                {aggregates.totalGstNet > 0 ? 'NET GST PAYABLE (CHALLAN)' : 'SURPLUS ITC (CARRY FORWARD)'}
+                {aggregates.totalGstNet > 0 ? 'GST TO PAY TO GOVT' : 'EXTRA GST CREDIT (SAVED)'}
               </div>
               <div
                 style={{
@@ -1006,9 +1006,9 @@ export default function GstCreditAnalysisPanel({
 
           <div style={{ fontSize: '0.78rem', color: aggregates.totalGstNet > 0 ? '#be123c' : '#166534', marginTop: '0.5rem', fontWeight: 600 }}>
             {aggregates.totalGstNet > 0 ? (
-              <span>⚠️ Output GST exceeds Input ITC. Pay via PMT-06 challan.</span>
+              <span>⚠️ Sales GST is more than Purchase GST credit. You need to pay the remaining GST.</span>
             ) : (
-              <span>✅ Input ITC covers all Output Tax. Surplus carried forward.</span>
+              <span>✅ Purchase GST credit covers your Sales GST. Extra credit will be used next month.</span>
             )}
           </div>
 
@@ -1055,7 +1055,7 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.5rem' }}>
-            Statutory monthly GSTR-3B set-off calculation
+            Monthly calculation for GSTR-3B
           </div>
         </div>
 
@@ -1074,7 +1074,7 @@ export default function GstCreditAnalysisPanel({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                TDS / TDC CREDIT RECONCILIATION
+                TDS SUMMARY (TAX CUT)
               </div>
               <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#1e40af', marginTop: '0.2rem', fontVariantNumeric: 'tabular-nums' }}>
                 {fmtINR(aggregates.outward.tdsReceivable)}
@@ -1086,20 +1086,20 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           <div style={{ fontSize: '0.78rem', color: '#1d4ed8', marginTop: '0.5rem', fontWeight: 600 }}>
-            TDS Deducted by Clients: <strong>Form 26AS / AIS Tax Credit</strong>
+            TDS cut by customers: <strong>Your Credit with Govt (Form 26AS)</strong>
           </div>
 
           <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.65rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: '#ffffff', borderRadius: '4px', border: '1px solid #bfdbfe', color: '#1e40af', fontWeight: 700 }}>
-              Client Deducted: {fmtINR(aggregates.outward.tdsReceivable)}
+              Cut by Customers: {fmtINR(aggregates.outward.tdsReceivable)}
             </span>
             <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: '#ffffff', borderRadius: '4px', border: '1px solid #bfdbfe', color: '#b45309', fontWeight: 700 }}>
-              Vendor Withheld: {fmtINR(aggregates.inward.tdsWithheld)}
+              Cut from Vendors: {fmtINR(aggregates.inward.tdsWithheld)}
             </span>
           </div>
 
           <div style={{ fontSize: '0.72rem', color: '#2563eb', opacity: 0.85, marginTop: '0.5rem' }}>
-            Sec 194C (Jobwork 1-2%) & 194Q (Goods 0.1%)
+            Jobwork (1-2%) & Goods (0.1%) TDS
           </div>
         </div>
       </div>
@@ -1116,10 +1116,10 @@ export default function GstCreditAnalysisPanel({
         }}
       >
         {[
-          { id: 'summary', label: '📊 Credit Analysis & GSTR-3B Matrix', icon: Scale },
-          { id: 'outward', label: `🧾 Outward Sales / Invoices (${filteredInvoices.length})`, icon: ArrowUpRight },
-          { id: 'inward', label: `📦 Inward Purchases / ITC (${filteredPurchases.length})`, icon: ArrowDownLeft },
-          { id: 'tds', label: `💳 TDS Credit Ledger (${tdsLedger.length})`, icon: ShieldCheck }
+          { id: 'summary', label: '📊 GST Summary & Calculation', icon: Scale },
+          { id: 'outward', label: `🧾 Sales Bills (${filteredInvoices.length})`, icon: ArrowUpRight },
+          { id: 'inward', label: `📦 Purchase Bills (${filteredPurchases.length})`, icon: ArrowDownLeft },
+          { id: 'tds', label: `💳 TDS List (${tdsLedger.length})`, icon: ShieldCheck }
         ].map((tab) => {
           const active = activeTab === tab.id;
           const TabIcon = tab.icon;
@@ -1170,10 +1170,10 @@ export default function GstCreditAnalysisPanel({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                  GST Set-Off & Reconciliation Matrix (GSTR-3B Table 4 & 5)
+                  GST Calculation & Summary (GSTR-3B)
                 </h3>
                 <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  Component-wise comparison of Outward Tax Liability vs. Inward Eligible Input Tax Credit
+                  Sales GST compared with Purchase GST credit (IGST, CGST, SGST)
                 </div>
               </div>
 
@@ -1194,7 +1194,7 @@ export default function GstCreditAnalysisPanel({
                   cursor: 'pointer'
                 }}
               >
-                <FileSpreadsheet size={13} /> Export Matrix
+                <FileSpreadsheet size={13} /> Download Summary
               </button>
             </div>
 
@@ -1202,17 +1202,17 @@ export default function GstCreditAnalysisPanel({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
-                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Tax Head / Component</th>
+                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Tax Type</th>
                     <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 800, color: '#7c3aed' }}>
-                      (A) Outward Tax Liability (Invoices)
+                      (A) Sales GST (To Pay)
                     </th>
                     <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 800, color: '#059669' }}>
-                      (B) Input Tax Credit (Purchases)
+                      (B) Purchase GST Credit (Got)
                     </th>
                     <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 800, color: '#0284c7' }}>
-                      Direct Balance (A - B)
+                      Balance (A - B)
                     </th>
-                    <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 800 }}>Statutory Status</th>
+                    <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 800 }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1220,7 +1220,7 @@ export default function GstCreditAnalysisPanel({
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '10px 14px', fontWeight: 700, color: '#1e293b' }}>
                       Integrated Tax (IGST)
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Inter-State Supply</div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Outside Gujarat Sales / Purchases</div>
                     </td>
                     <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#7c3aed', fontVariantNumeric: 'tabular-nums' }}>
                       {fmtINR(aggregates.outward.igst)}
@@ -1251,7 +1251,7 @@ export default function GstCreditAnalysisPanel({
                           border: `1px solid ${aggregates.igstNet > 0 ? '#fecaca' : '#a7f3d0'}`
                         }}
                       >
-                        {aggregates.igstNet > 0 ? 'Payable' : 'Surplus Credit'}
+                        {aggregates.igstNet > 0 ? 'Need to Pay' : 'Extra Credit'}
                       </span>
                     </td>
                   </tr>
@@ -1260,7 +1260,7 @@ export default function GstCreditAnalysisPanel({
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '10px 14px', fontWeight: 700, color: '#1e293b' }}>
                       Central Tax (CGST)
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Intra-State Central</div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Inside Gujarat Central</div>
                     </td>
                     <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#7c3aed', fontVariantNumeric: 'tabular-nums' }}>
                       {fmtINR(aggregates.outward.cgst)}
@@ -1291,7 +1291,7 @@ export default function GstCreditAnalysisPanel({
                           border: `1px solid ${aggregates.cgstNet > 0 ? '#fecaca' : '#a7f3d0'}`
                         }}
                       >
-                        {aggregates.cgstNet > 0 ? 'Payable' : 'Surplus Credit'}
+                        {aggregates.cgstNet > 0 ? 'Need to Pay' : 'Extra Credit'}
                       </span>
                     </td>
                   </tr>
@@ -1300,7 +1300,7 @@ export default function GstCreditAnalysisPanel({
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '10px 14px', fontWeight: 700, color: '#1e293b' }}>
                       State Tax (SGST)
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Intra-State Gujarat</div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Inside Gujarat State</div>
                     </td>
                     <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#7c3aed', fontVariantNumeric: 'tabular-nums' }}>
                       {fmtINR(aggregates.outward.sgst)}
@@ -1331,7 +1331,7 @@ export default function GstCreditAnalysisPanel({
                           border: `1px solid ${aggregates.sgstNet > 0 ? '#fecaca' : '#a7f3d0'}`
                         }}
                       >
-                        {aggregates.sgstNet > 0 ? 'Payable' : 'Surplus Credit'}
+                        {aggregates.sgstNet > 0 ? 'Need to Pay' : 'Extra Credit'}
                       </span>
                     </td>
                   </tr>
@@ -1339,7 +1339,7 @@ export default function GstCreditAnalysisPanel({
                   {/* TOTAL ROW */}
                   <tr style={{ background: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 900 }}>
                     <td style={{ padding: '12px 14px', color: '#0f172a', fontSize: '0.92rem' }}>
-                      TOTAL GST POSITION
+                      TOTAL GST
                     </td>
                     <td style={{ padding: '12px 14px', textAlign: 'right', color: '#6d28d9', fontSize: '1rem', fontVariantNumeric: 'tabular-nums' }}>
                       {fmtINR(aggregates.outward.totalTax)}
@@ -1370,7 +1370,7 @@ export default function GstCreditAnalysisPanel({
                           boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
                         }}
                       >
-                        {aggregates.totalGstNet > 0 ? 'NET TAX TO PAY' : 'CREDIT SURPLUS'}
+                        {aggregates.totalGstNet > 0 ? 'NET GST TO PAY' : 'EXTRA CREDIT'}
                       </span>
                     </td>
                   </tr>
@@ -1393,8 +1393,8 @@ export default function GstCreditAnalysisPanel({
             >
               <Scale size={20} color="#4f46e5" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.5 }}>
-                <strong style={{ color: '#4f46e5' }}>Rule 88A GST Set-Off Advisory:</strong> Under the Indian GST system, IGST credit must be completely exhausted before utilizing CGST or SGST credits. 
-                Based on your current numbers, estimated cash payment required via <strong>PMT-06 challan is {fmtINR(aggregates.netCashPayable)}</strong>, and carry-forward surplus credit to next period is <strong>{fmtINR(aggregates.netCreditCarryForward)}</strong>.
+                <strong style={{ color: '#4f46e5' }}>💡 Simple Tip:</strong> IGST credit is used first, then CGST and SGST credit. 
+                Based on your bills, estimated payment required to government is <strong>{fmtINR(aggregates.netCashPayable)}</strong>, and extra credit left for next month is <strong>{fmtINR(aggregates.netCreditCarryForward)}</strong>.
               </div>
             </div>
           </div>
@@ -1413,20 +1413,20 @@ export default function GstCreditAnalysisPanel({
               }}
             >
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.2rem' }}>
-                Tax Rate-Wise Distribution
+                GST Rate Wise Total
               </h3>
               <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: '0.85rem' }}>
-                Breakdown across 0% (Nil/Exempt), 5% (Fabrics), 12%, 18% (Printing/Jobwork), 28%
+                Total amounts separated by GST rates (0%, 5%, 12%, 18%, 28%)
               </div>
 
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', color: '#475569' }}>
                     <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700 }}>Rate</th>
-                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#7c3aed' }}>Sales Taxable</th>
-                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#7c3aed' }}>Output GST</th>
-                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#059669' }}>Purch Taxable</th>
-                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#059669' }}>Input ITC</th>
+                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#7c3aed' }}>Sales Amount</th>
+                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#7c3aed' }}>Sales GST</th>
+                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#059669' }}>Purchase Amount</th>
+                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: '#059669' }}>Purchase GST</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1458,31 +1458,31 @@ export default function GstCreditAnalysisPanel({
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.2rem' }}>
-                  TDS / TDC Compliance & Due Dates
+                  TDS & Monthly Filing Dates
                 </h3>
                 <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                  Tax credit receivable ledger and statutory tax filing calendar
+                  TDS details and important monthly government dates
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.75rem' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>TDS CREDIT (CLIENTS)</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>TDS CUT BY CUSTOMERS</div>
                   <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#14532d', marginTop: '0.2rem', fontVariantNumeric: 'tabular-nums' }}>
                     {fmtINR(aggregates.outward.tdsReceivable)}
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#166534', marginTop: '0.3rem' }}>
-                    Form 26AS credit offset against advance tax
+                    Your tax credit with govt (Form 26AS)
                   </div>
                 </div>
 
                 <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>TDS WITHHELD (VENDORS)</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>TDS CUT FROM VENDORS</div>
                   <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#78350f', marginTop: '0.2rem', fontVariantNumeric: 'tabular-nums' }}>
                     {fmtINR(aggregates.inward.tdsWithheld)}
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#92400e', marginTop: '0.3rem' }}>
-                    Deposit via Challan 281 before 7th of next month
+                    TDS to pay to govt by 7th of next month
                   </div>
                 </div>
               </div>
@@ -1490,24 +1490,24 @@ export default function GstCreditAnalysisPanel({
               {/* Statutory Calendar Dates */}
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem' }}>
                 <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-                  📅 Statutory Tax Compliance Deadlines
+                  📅 Important Monthly Dates
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.76rem', color: '#334155' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>GSTR-1 (Outward Sales Filing):</span>
-                    <strong>11th of succeeding month</strong>
+                    <span>GSTR-1 (Sales bills):</span>
+                    <strong>By 11th of every month</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>GSTR-2B (Inward ITC Auto-Drafting):</span>
-                    <strong>14th of succeeding month</strong>
+                    <span>GSTR-2B (Purchase credit):</span>
+                    <strong>By 14th of every month</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>GSTR-3B (Tax Payment & Return):</span>
-                    <strong style={{ color: '#4f46e5' }}>20th of succeeding month</strong>
+                    <span>GSTR-3B (Pay GST & file return):</span>
+                    <strong style={{ color: '#4f46e5' }}>By 20th of every month</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>TDS Deposit (Challan 281):</span>
-                    <strong style={{ color: '#d97706' }}>7th of succeeding month</strong>
+                    <span>Pay TDS to Govt (Challan 281):</span>
+                    <strong style={{ color: '#d97706' }}>By 7th of every month</strong>
                   </div>
                 </div>
               </div>
@@ -1532,10 +1532,10 @@ export default function GstCreditAnalysisPanel({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                Outward Tax Register (Sales Invoices / GSTR-1)
+                Sales Bills List (Invoices & Sales GST)
               </h3>
               <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                Listing all sales invoices in the selected period with outward GST liability and client TDS deductions
+                All sales bills in this period with GST and TDS cut by customers
               </div>
             </div>
 
@@ -1557,7 +1557,7 @@ export default function GstCreditAnalysisPanel({
                   cursor: 'pointer'
                 }}
               >
-                <FileSpreadsheet size={13} /> Export GSTR-1 (.xlsx)
+                <FileSpreadsheet size={13} /> Download Sales GST (Excel)
               </button>
             </div>
           </div>
@@ -1566,26 +1566,26 @@ export default function GstCreditAnalysisPanel({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Invoice #</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Bill #</th>
                   <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Date</th>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Customer / Party</th>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>GSTIN</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Taxable (₹)</th>
-                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Rate</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Customer Name</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>GST Number</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Bill Amount (Without Tax) (₹)</th>
+                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>GST %</th>
                   <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#7c3aed' }}>CGST (₹)</th>
                   <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#7c3aed' }}>SGST (₹)</th>
                   <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#7c3aed' }}>IGST (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#6d28d9' }}>Total Tax (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#2563eb' }}>TDS Deducted (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Grand Total (₹)</th>
-                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Action</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#6d28d9' }}>Total GST (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#2563eb' }}>TDS Cut (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Total Bill Amount (₹)</th>
+                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>View</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredInvoices.length === 0 ? (
                   <tr>
                     <td colSpan={13} style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
-                      No sales invoices found matching the selected period and filters.
+                      No sales bills found for this period.
                     </td>
                   </tr>
                 ) : (
@@ -1692,10 +1692,10 @@ export default function GstCreditAnalysisPanel({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                Inward Purchase & Input Tax Credit Register (GSTR-2B)
+                Purchase Bills List (Purchases & GST Credit)
               </h3>
               <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                Listing all vendor inward bills with eligible ITC (Input CGST, SGST, IGST) and TDS withholding
+                All purchase bills from vendors with GST credit and TDS
               </div>
             </div>
 
@@ -1717,7 +1717,7 @@ export default function GstCreditAnalysisPanel({
                   cursor: 'pointer'
                 }}
               >
-                <FileSpreadsheet size={13} /> Export GSTR-2B (.xlsx)
+                <FileSpreadsheet size={13} /> Download Purchase GST (Excel)
               </button>
             </div>
           </div>
@@ -1726,26 +1726,26 @@ export default function GstCreditAnalysisPanel({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Pur # / Bill No</th>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Inward Date</th>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Vendor / Supplier</th>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Vendor GSTIN</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Taxable (₹)</th>
-                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Rate</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#059669' }}>Input CGST (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#059669' }}>Input SGST (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#059669' }}>Input IGST (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#047857' }}>Total ITC (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#b45309' }}>TDS Withheld (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Total Bill (₹)</th>
-                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Action</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Purchase # / Bill #</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Bill Date</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Supplier / Vendor</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Vendor GST Number</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Purchase Amount (Without Tax) (₹)</th>
+                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>GST %</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#059669' }}>CGST Credit (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#059669' }}>SGST Credit (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#059669' }}>IGST Credit (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#047857' }}>Total GST Credit (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#b45309' }}>TDS Cut (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Total Bill Amount (₹)</th>
+                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>View</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPurchases.length === 0 ? (
                   <tr>
                     <td colSpan={13} style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
-                      No vendor purchases recorded in the selected period.
+                      No purchase bills found for this period.
                     </td>
                   </tr>
                 ) : (
@@ -1855,10 +1855,10 @@ export default function GstCreditAnalysisPanel({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                TDS / TDC Tax Credit & Withholding Ledger
+                TDS List (Tax Cut Details)
               </h3>
               <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                Tracking client TDS deductions (Asset - Form 26AS/AIS) and vendor TDS withheld (Liability - Challan 281)
+                TDS cut by customers (credit for you) and TDS cut from vendor payments (to pay to govt)
               </div>
             </div>
 
@@ -1880,7 +1880,7 @@ export default function GstCreditAnalysisPanel({
                   cursor: 'pointer'
                 }}
               >
-                <FileSpreadsheet size={13} /> Export TDS Register (.xlsx)
+                <FileSpreadsheet size={13} /> Download TDS List (Excel)
               </button>
             </div>
           </div>
@@ -1889,24 +1889,24 @@ export default function GstCreditAnalysisPanel({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Flow / Credit Type</th>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Document Ref</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Type</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Bill / Ref #</th>
                   <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Date</th>
                   <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Party Name</th>
-                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>GSTIN / PAN</th>
-                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Section</th>
-                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Rate</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Taxable Base (₹)</th>
-                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Gross Total (₹)</th>
+                  <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>GST / PAN Number</th>
+                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>TDS Section</th>
+                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>TDS %</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Amount (Without Tax) (₹)</th>
+                  <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800 }}>Total Bill (₹)</th>
                   <th style={{ textAlign: 'right', padding: '9px 10px', fontWeight: 800, color: '#2563eb' }}>TDS Amount (₹)</th>
-                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Compliance Status</th>
+                  <th style={{ textAlign: 'center', padding: '9px 10px', fontWeight: 800 }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {tdsLedger.length === 0 ? (
                   <tr>
                     <td colSpan={11} style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
-                      No TDS transactions found in the selected period.
+                      No TDS entries found for this period.
                     </td>
                   </tr>
                 ) : (
@@ -1929,7 +1929,7 @@ export default function GstCreditAnalysisPanel({
                             border: `1px solid ${t.type === 'RECEIVABLE' ? '#bfdbfe' : '#fde68a'}`
                           }}
                         >
-                          {t.type === 'RECEIVABLE' ? '📥 Deducted by Client' : '📤 Withheld on Vendor'}
+                          {t.type === 'RECEIVABLE' ? '📥 Cut by Customer' : '📤 Cut from Vendor'}
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px', fontWeight: 800, color: '#4f46e5' }}>

@@ -80,8 +80,8 @@ export default function QuickActionMenu({
     ...(onGstReports ? [{
       id: 'gst',
       icon: Calculator,
-      label: 'GST & ITC Analysis',
-      subtitle: 'Reconcile Outward GSTR-1, Inward ITC & TDS',
+      label: 'GST & Tax Details',
+      subtitle: 'Sales GST, Purchase GST Credit & TDS',
       iconColor: '#7c3aed',
       iconBg: '#f5f3ff',
       action: onGstReports
