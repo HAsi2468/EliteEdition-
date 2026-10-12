@@ -8,12 +8,12 @@ import {
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
-import DateRangePicker from './DateRangePicker';
+import DateRangePicker, { getDatePresetRange, DATE_PRESETS } from './DateRangePicker';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import { triggerGlobalDataRefresh } from './NotificationToast';
 import { SmartThumbnail } from './common/SmartThumbnail';
 import { StandardNumericInput } from './common/StandardNumericInput';
-import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -38,157 +38,7 @@ const DEFAULT_OUT_CATEGORIES = [
 
 const DEFAULT_PAYMENT_MODES = ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other'];
 
-const PRESET_OPTIONS = [
-  { id: 'today', name: 'Today' },
-  { id: 'yesterday', name: 'Yesterday' },
-  { id: 'this_week', name: 'This Week' },
-  { id: 'last_week', name: 'Last Week' },
-  { id: 'last_7_days', name: 'Last 7 Days' },
-  { id: 'this_month', name: 'This Month' },
-  { id: 'previous_month', name: 'Previous Month' },
-  { id: 'last_30_days', name: 'Last 30 Days' },
-  { id: 'this_quarter', name: 'This Quarter' },
-  { id: 'previous_quarter', name: 'Previous Quarter' },
-  { id: 'current_fiscal_year', name: 'Current Fiscal Year' },
-  { id: 'previous_fiscal_year', name: 'Previous Fiscal Year' },
-  { id: 'last_365_days', name: 'Last 365 Days' },
-  { id: 'all', name: 'All Time' },
-  { id: 'custom', name: 'Custom' }
-];
-
-function getDatePresetRange(preset, customStart = '', customEnd = '') {
-  const now = new Date();
-  let start = null;
-  let end = null;
-  let labelText = '';
-
-  const formatDate = (d) => {
-    if (!d) return '';
-    const day = String(d.getDate()).padStart(2, '0');
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  };
-
-  switch (preset) {
-    case 'today': {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'yesterday': {
-      const y = new Date(now);
-      y.setDate(now.getDate() - 1);
-      start = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0);
-      end = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'this_week': {
-      const dayOfWeek = now.getDay();
-      const distToMonday = (dayOfWeek + 6) % 7;
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0);
-      const sun = new Date(start);
-      sun.setDate(start.getDate() + 6);
-      end = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_week': {
-      const dayOfWeek = now.getDay();
-      const distToMonday = (dayOfWeek + 6) % 7;
-      const prevMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday - 7, 0, 0, 0);
-      start = prevMon;
-      const prevSun = new Date(prevMon);
-      prevSun.setDate(prevMon.getDate() + 6);
-      end = new Date(prevSun.getFullYear(), prevSun.getMonth(), prevSun.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_7_days': {
-      const d7 = new Date(now);
-      d7.setDate(now.getDate() - 6);
-      start = new Date(d7.getFullYear(), d7.getMonth(), d7.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'this_month': {
-      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'previous_month': {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_30_days': {
-      const d30 = new Date(now);
-      d30.setDate(now.getDate() - 29);
-      start = new Date(d30.getFullYear(), d30.getMonth(), d30.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'this_quarter': {
-      const m = now.getMonth();
-      const qStartMonth = Math.floor(m / 3) * 3;
-      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'previous_quarter': {
-      const m = now.getMonth();
-      const qStartMonth = Math.floor(m / 3) * 3 - 3;
-      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'current_fiscal_year': {
-      const yr = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-      start = new Date(yr, 3, 1, 0, 0, 0);
-      end = new Date(yr + 1, 2, 31, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'previous_fiscal_year': {
-      const yr = (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) - 1;
-      start = new Date(yr, 3, 1, 0, 0, 0);
-      end = new Date(yr + 1, 2, 31, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_365_days': {
-      const d365 = new Date(now);
-      d365.setDate(now.getDate() - 364);
-      start = new Date(d365.getFullYear(), d365.getMonth(), d365.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'custom': {
-      if (customStart) start = new Date(`${customStart}T00:00:00`);
-      if (customEnd) end = new Date(`${customEnd}T23:59:59`);
-      labelText = start && end ? `${formatDate(start)} - ${formatDate(end)}` : 'Custom Range';
-      break;
-    }
-    default: {
-      start = null;
-      end = null;
-      labelText = 'All Time Ledger';
-      break;
-    }
-  }
-
-  return { start, end, labelText };
-}
+const PRESET_OPTIONS = DATE_PRESETS;
 
 function formatDateISO(d) {
   if (!d) return '';
@@ -314,8 +164,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
   const activeRange = getDatePresetRange(datePreset, customDateStart, customDateEnd);
-  const dateStart = activeRange.start ? formatDateISO(activeRange.start) : '';
-  const dateEnd = activeRange.end ? formatDateISO(activeRange.end) : '';
+  const dateStart = activeRange?.dateStart || (activeRange?.start ? toLocalYMD(activeRange.start) : '');
+  const dateEnd = activeRange?.dateEnd || (activeRange?.end ? toLocalYMD(activeRange.end) : '');
 
   // Modals
   const [showModal, setShowModal] = useState(false);

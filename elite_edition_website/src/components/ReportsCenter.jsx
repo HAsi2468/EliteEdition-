@@ -449,8 +449,8 @@ export default function ReportsCenter({ department }) {
                 preset={datePreset}
                 onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
                   setDatePreset(p);
-                  if (ds) setDateStart(ds);
-                  if (de) setDateEnd(de);
+                  setDateStart(ds || '');
+                  setDateEnd(de || '');
                 }}
                 customStart={customDateStart}
                 customEnd={customDateEnd}

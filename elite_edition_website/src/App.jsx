@@ -3381,8 +3381,8 @@ export default function App() {
         )}
       </Suspense>
 
-      {/* Content-Shaped Skeleton Screen for Initial Database Load */}
-      {loading && items.length === 0 && sales.length === 0 && (
+      {/* Content-Shaped Skeleton Screen for Initial Database Load (only on dashboard screens) */}
+      {loading && items.length === 0 && sales.length === 0 && (activeTab === 'dashboard' || activeTab === 'elite_online') && (
         <div style={{ ...styles.loadingOverlay, backgroundColor: 'var(--bg-main, #f8fafc)', padding: '16px', overflowY: 'auto' }}>
           <DashboardSkeleton />
         </div>

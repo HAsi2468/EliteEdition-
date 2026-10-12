@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
-import { formatDateDDMMYYYY, formatForInputDate } from '../utils/dateUtils';
+import { formatDateDDMMYYYY, formatForInputDate, toLocalYMD } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import FabricInventoryPanel from './FabricInventoryPanel';
@@ -12,7 +12,7 @@ import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { openPrintOptionsDialog } from '../utils/printService';
-import DateRangePicker from './DateRangePicker';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 import QuickActionMenu from './common/QuickActionMenu';
@@ -181,140 +181,6 @@ const PRESET_OPTIONS = [
   { id: 'custom', name: 'Custom' }
 ];
 
-function getDatePresetRange(preset, customStart = '', customEnd = '') {
-  const now = new Date();
-  let start = null;
-  let end = null;
-  let labelText = '';
-
-  const formatDate = (d) => {
-    if (!d) return '';
-    const day = String(d.getDate()).padStart(2, '0');
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  };
-
-  switch (preset) {
-    case 'today': {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'yesterday': {
-      const y = new Date(now);
-      y.setDate(now.getDate() - 1);
-      start = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0);
-      end = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'this_week': {
-      const dayOfWeek = now.getDay();
-      const distToMonday = (dayOfWeek + 6) % 7;
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0);
-      const sun = new Date(start);
-      sun.setDate(start.getDate() + 6);
-      end = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_week': {
-      const dayOfWeek = now.getDay();
-      const distToMonday = (dayOfWeek + 6) % 7;
-      const prevMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday - 7, 0, 0, 0);
-      start = prevMon;
-      const prevSun = new Date(prevMon);
-      prevSun.setDate(prevMon.getDate() + 6);
-      end = new Date(prevSun.getFullYear(), prevSun.getMonth(), prevSun.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_7_days': {
-      const d7 = new Date(now);
-      d7.setDate(now.getDate() - 6);
-      start = new Date(d7.getFullYear(), d7.getMonth(), d7.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'this_month': {
-      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'previous_month': {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_30_days': {
-      const d30 = new Date(now);
-      d30.setDate(now.getDate() - 29);
-      start = new Date(d30.getFullYear(), d30.getMonth(), d30.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'this_quarter': {
-      const m = now.getMonth();
-      const qStartMonth = Math.floor(m / 3) * 3;
-      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'previous_quarter': {
-      const m = now.getMonth();
-      const qStartMonth = Math.floor(m / 3) * 3 - 3;
-      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'current_fiscal_year': {
-      const yr = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-      start = new Date(yr, 3, 1, 0, 0, 0);
-      end = new Date(yr + 1, 2, 31, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'previous_fiscal_year': {
-      const yr = (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) - 1;
-      start = new Date(yr, 3, 1, 0, 0, 0);
-      end = new Date(yr + 1, 2, 31, 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'last_365_days': {
-      const d365 = new Date(now);
-      d365.setDate(now.getDate() - 364);
-      start = new Date(d365.getFullYear(), d365.getMonth(), d365.getDate(), 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      labelText = `${formatDate(start)} - ${formatDate(end)}`;
-      break;
-    }
-    case 'custom': {
-      if (customStart) start = new Date(`${customStart}T00:00:00`);
-      if (customEnd) end = new Date(`${customEnd}T23:59:59`);
-      labelText = start && end ? `${formatDate(start)} - ${formatDate(end)}` : 'Custom Range';
-      break;
-    }
-    case 'all':
-    default: {
-      start = null;
-      end = null;
-      labelText = 'All Time Records';
-      break;
-    }
-  }
-
-  return { start, end, labelText };
-}
 
 export default function EliteBillingDepartment({ 
   initialChallanData = null, 
@@ -1526,13 +1392,13 @@ export default function EliteBillingDepartment({
       }
 
       // 4. Date Range Filter
-      if (purchaseDateRange.start || purchaseDateRange.end) {
+      const pDs = purchaseDateRange?.dateStart || (purchaseDateRange?.start ? toLocalYMD(purchaseDateRange.start) : '');
+      const pDe = purchaseDateRange?.dateEnd || (purchaseDateRange?.end ? toLocalYMD(purchaseDateRange.end) : '');
+      if (pDs || pDe) {
         if (!p.date) return false;
-        const pDate = new Date(p.date);
-        if (!isNaN(pDate.getTime())) {
-          if (purchaseDateRange.start && pDate < purchaseDateRange.start) return false;
-          if (purchaseDateRange.end && pDate > purchaseDateRange.end) return false;
-        }
+        const pDateStr = toLocalYMD(p.date);
+        if (pDs && pDateStr && pDateStr < pDs) return false;
+        if (pDe && pDateStr && pDateStr > pDe) return false;
       }
 
       return true;
@@ -2703,13 +2569,15 @@ export default function EliteBillingDepartment({
   }, [datePreset, customDateStart, customDateEnd]);
 
   const periodInvoices = useMemo(() => {
-    if (!activeRange.start && !activeRange.end) return invoices;
+    const ds = activeRange?.dateStart || (activeRange?.start ? toLocalYMD(activeRange.start) : '');
+    const de = activeRange?.dateEnd || (activeRange?.end ? toLocalYMD(activeRange.end) : '');
+    if (!ds && !de) return invoices;
     return invoices.filter(inv => {
       const dateVal = inv.invoiceDate || inv.date || inv.createdAt;
       if (!dateVal) return true;
-      const d = new Date(dateVal);
-      if (activeRange.start && d < activeRange.start) return false;
-      if (activeRange.end && d > activeRange.end) return false;
+      const invDateStr = toLocalYMD(dateVal);
+      if (ds && invDateStr && invDateStr < ds) return false;
+      if (de && invDateStr && invDateStr > de) return false;
       return true;
     });
   }, [invoices, activeRange]);

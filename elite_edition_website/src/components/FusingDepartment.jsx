@@ -1357,16 +1357,23 @@ export default function FusingDepartment() {
   // Dynamic Date Range calculation from DateRangePicker presets
   const activeDateRange = useMemo(() => {
     if (datePreset === 'custom') {
-      return { start: customDateStart, end: customDateEnd };
+      const ds = toLocalYMD(customDateStart) || '';
+      const de = toLocalYMD(customDateEnd) || '';
+      return { start: ds, end: de, dateStart: ds, dateEnd: de };
     }
     if (datePreset && datePreset !== 'all') {
       try {
-        return getDatePresetRange(datePreset) || { start: '', end: '' };
+        const range = getDatePresetRange(datePreset);
+        const ds = range?.dateStart || (range?.start ? toLocalYMD(range.start) : '');
+        const de = range?.dateEnd || (range?.end ? toLocalYMD(range.end) : '');
+        return { start: ds, end: de, dateStart: ds, dateEnd: de };
       } catch (e) {
-        return { start: '', end: '' };
+        return { start: '', end: '', dateStart: '', dateEnd: '' };
       }
     }
-    return { start: dateStart || '', end: dateEnd || '' };
+    const ds = toLocalYMD(dateStart) || '';
+    const de = toLocalYMD(dateEnd) || '';
+    return { start: ds, end: de, dateStart: ds, dateEnd: de };
   }, [datePreset, customDateStart, customDateEnd, dateStart, dateEnd]);
 
   // Filtered Cards with full debouncing & enterprise status filters
@@ -1432,9 +1439,9 @@ export default function FusingDepartment() {
       if (fusingFilters.party && fusingFilters.party.length > 0) {
         if (!fusingFilters.party.includes(c.party || '')) return false;
       }
-      const cDate = c.fusingDate || c.date;
-      if (activeDateRange.start && cDate && cDate < activeDateRange.start) return false;
-      if (activeDateRange.end && cDate && cDate > activeDateRange.end) return false;
+      const cDateStr = toLocalYMD(c.fusingDate || c.date || c.created_date_time);
+      if (activeDateRange.dateStart && cDateStr && cDateStr < activeDateRange.dateStart) return false;
+      if (activeDateRange.dateEnd && cDateStr && cDateStr > activeDateRange.dateEnd) return false;
 
       return true;
     });

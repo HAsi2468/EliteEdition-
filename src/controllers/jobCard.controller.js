@@ -134,7 +134,7 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 const getAllJobCards = async (req, res) => {
   try {
-    const { status, printStatus, fusingStatus, deliveryStatus, party, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
+    const { status, printStatus, fusingStatus, deliveryStatus, party, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department, dateField } = req.query;
     const baseFilter = {};
     const baseAndClauses = [];
 
@@ -184,41 +184,77 @@ const getAllJobCards = async (req, res) => {
       if (minMs !== null) dateQuery.$gte = new Date(minMs);
       if (maxMs !== null) dateQuery.$lte = new Date(maxMs);
 
-      // Find all Job Card IDs that have print logs in this date range
-      const printLogQuery = {};
-      if (minMs !== null) printLogQuery.$gte = new Date(minMs);
-      if (maxMs !== null) printLogQuery.$lte = new Date(maxMs);
+      const strQuery = {};
+      if (dsStr) strQuery.$gte = dsStr;
+      if (deStr) strQuery.$lte = deStr;
 
-      let matchingLogIds = [];
-      try {
-        matchingLogIds = await db.JobPrintLog.distinct('jobCardId', {
-          $or: [
-            { date: printLogQuery },
-            { createdAt: printLogQuery }
-          ]
-        });
-      } catch (e) {
-        logger.warn('Failed to query JobPrintLog distinct IDs: %s', e.message);
+      const dateOr = [];
+
+      // If querying specifically for print, fusing, or delivery stage, filter accordingly
+      const isPrintStage = dateField === 'printDate' || (!dateField && printStatus && !fusingStatus && !deliveryStatus);
+      const isFusingStage = dateField === 'fusingDate' || (!dateField && fusingStatus && !printStatus && !deliveryStatus);
+      const isDeliveryStage = dateField === 'deliveryDate' || (!dateField && deliveryStatus && !printStatus && !fusingStatus);
+      const isAllStages = dateField === 'all';
+
+      if (isPrintStage) {
+        if (Object.keys(strQuery).length > 0) dateOr.push({ printDate: strQuery });
+        if (Object.keys(dateQuery).length > 0) dateOr.push({ printDate: dateQuery });
+        try {
+          const matchingLogIds = await db.JobPrintLog.distinct('jobCardId', {
+            $or: [
+              { date: dateQuery },
+              { createdAt: dateQuery }
+            ]
+          });
+          if (matchingLogIds && matchingLogIds.length > 0) {
+            dateOr.push({ _id: { $in: matchingLogIds } });
+          }
+        } catch (e) {
+          logger.warn('Failed to query JobPrintLog distinct IDs: %s', e.message);
+        }
+      } else if (isFusingStage) {
+        if (Object.keys(strQuery).length > 0) dateOr.push({ fusingDate: strQuery });
+        if (Object.keys(dateQuery).length > 0) dateOr.push({ fusingDate: dateQuery });
+      } else if (isDeliveryStage) {
+        if (Object.keys(strQuery).length > 0) dateOr.push({ deliveryDate: strQuery });
+        if (Object.keys(dateQuery).length > 0) dateOr.push({ deliveryDate: dateQuery });
+      } else if (isAllStages) {
+        // Broad search across all stages if explicitly requested
+        if (Object.keys(strQuery).length > 0) {
+          dateOr.push(
+            { date: strQuery },
+            { printDate: strQuery },
+            { fusingDate: strQuery },
+            { deliveryDate: strQuery }
+          );
+        }
+        if (Object.keys(dateQuery).length > 0) {
+          dateOr.push(
+            { date: dateQuery },
+            { printDate: dateQuery },
+            { fusingDate: dateQuery },
+            { deliveryDate: dateQuery },
+            { createdAt: dateQuery },
+            { created_date_time: dateQuery }
+          );
+        }
+      } else {
+        // Standard Job Cards List / Overview: Filter strictly by creation/job card date
+        if (Object.keys(strQuery).length > 0) {
+          dateOr.push({ date: strQuery });
+        }
+        if (Object.keys(dateQuery).length > 0) {
+          dateOr.push(
+            { date: dateQuery },
+            { createdAt: dateQuery },
+            { created_date_time: dateQuery }
+          );
+        }
       }
 
-      const dateOr = [
-        { date: dateQuery },
-        { date: { $gte: dsStr, $lte: deStr } },
-        { printDate: { $gte: dsStr, $lte: deStr } },
-        { printDate: dateQuery },
-        { fusingDate: { $gte: dsStr, $lte: deStr } },
-        { fusingDate: dateQuery },
-        { deliveryDate: { $gte: dsStr, $lte: deStr } },
-        { deliveryDate: dateQuery },
-        { createdAt: dateQuery },
-        { created_date_time: dateQuery }
-      ];
-
-      if (matchingLogIds && matchingLogIds.length > 0) {
-        dateOr.push({ _id: { $in: matchingLogIds } });
+      if (dateOr.length > 0) {
+        baseAndClauses.push({ $or: dateOr });
       }
-
-      baseAndClauses.push({ $or: dateOr });
     }
 
     if (search) {

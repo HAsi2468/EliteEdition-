@@ -19,6 +19,7 @@ export const PRESET_OPTIONS = [
   { id: 'all', name: 'All Time' },
   { id: 'custom', name: 'Custom Range' }
 ];
+export const DATE_PRESETS = PRESET_OPTIONS;
 
 export function getDatePresetRange(preset, customStart = '', customEnd = '') {
   const now = new Date();
@@ -146,9 +147,46 @@ export function getDatePresetRange(preset, customStart = '', customEnd = '') {
       break;
     }
     case 'custom': {
-      if (customStart) start = new Date(`${customStart}T00:00:00`);
-      if (customEnd) end = new Date(`${customEnd}T23:59:59`);
-      labelText = start && end ? `${formatDate(start)} - ${formatDate(end)}` : 'Custom Range';
+      const parseCustomBoundary = (val, isEnd = false) => {
+        if (!val) return null;
+        if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+        const str = String(val).trim().split('T')[0];
+        const ymd = str.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+        if (ymd) {
+          const yr = parseInt(ymd[1], 10);
+          const mo = parseInt(ymd[2], 10) - 1;
+          const dy = parseInt(ymd[3], 10);
+          return isEnd ? new Date(yr, mo, dy, 23, 59, 59, 999) : new Date(yr, mo, dy, 0, 0, 0, 0);
+        }
+        const dmy = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+        if (dmy) {
+          const dy = parseInt(dmy[1], 10);
+          const mo = parseInt(dmy[2], 10) - 1;
+          const yr = parseInt(dmy[3], 10);
+          return isEnd ? new Date(yr, mo, dy, 23, 59, 59, 999) : new Date(yr, mo, dy, 0, 0, 0, 0);
+        }
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+      };
+
+      start = parseCustomBoundary(customStart, false);
+      end = parseCustomBoundary(customEnd, true);
+
+      if (start && end && start > end) {
+        const temp = start;
+        start = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0, 0);
+        end = new Date(temp.getFullYear(), temp.getMonth(), temp.getDate(), 23, 59, 59, 999);
+      }
+
+      if (start && end) {
+        labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      } else if (start) {
+        labelText = `From ${formatDate(start)}`;
+      } else if (end) {
+        labelText = `Until ${formatDate(end)}`;
+      } else {
+        labelText = 'Custom Range';
+      }
       break;
     }
     case 'all':
@@ -167,19 +205,30 @@ export function getDatePresetRange(preset, customStart = '', customEnd = '') {
 }
 
 export default function DateRangePicker({
-  preset = 'this_month',
+  preset,
+  datePreset,
   onChange,
-  customStart = '',
-  customEnd = '',
+  setDatePreset,
+  customStart,
+  customDateStart,
+  customEnd,
+  customDateEnd,
   onCustomChange,
+  setCustomDateStart,
+  setCustomDateEnd,
   theme = 'light', // 'light' (default white style) | 'dark'
   align = 'auto',  // 'auto' | 'left' | 'right'
   style = {},
   buttonStyle = {}
 }) {
+  const effectivePreset = datePreset !== undefined ? datePreset : (preset !== undefined ? preset : 'this_month');
+  const effectiveCustomStart = customDateStart !== undefined ? customDateStart : (customStart !== undefined ? customStart : '');
+  const effectiveCustomEnd = customDateEnd !== undefined ? customDateEnd : (customEnd !== undefined ? customEnd : '');
+
   const [isOpen, setIsOpen] = useState(false);
-  const [localCustomStart, setLocalCustomStart] = useState(customStart);
-  const [localCustomEnd, setLocalCustomEnd] = useState(customEnd);
+  const [localCustomStart, setLocalCustomStart] = useState(effectiveCustomStart);
+  const [localCustomEnd, setLocalCustomEnd] = useState(effectiveCustomEnd);
+  const [selectedPresetId, setSelectedPresetId] = useState(effectivePreset);
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, width: 360 });
 
   const containerRef = useRef(null);
@@ -187,19 +236,23 @@ export default function DateRangePicker({
   const popoverRef = useRef(null);
 
   useEffect(() => {
-    setLocalCustomStart(customStart);
-  }, [customStart]);
+    setLocalCustomStart(effectiveCustomStart);
+  }, [effectiveCustomStart]);
 
   useEffect(() => {
-    setLocalCustomEnd(customEnd);
-  }, [customEnd]);
+    setLocalCustomEnd(effectiveCustomEnd);
+  }, [effectiveCustomEnd]);
+
+  useEffect(() => {
+    setSelectedPresetId(effectivePreset);
+  }, [effectivePreset]);
 
   // Recalculate popover position to float above/below smartly without clipping
   const updatePosition = useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       const popoverWidth = Math.min(360, window.innerWidth - 24);
-      const popoverHeight = 400;
+      const popoverHeight = 420;
       const windowHeight = window.innerHeight;
       const windowWidth = window.innerWidth;
 
@@ -252,36 +305,46 @@ export default function DateRangePicker({
     }
   }, [isOpen]);
 
-  const activeRange = getDatePresetRange(preset, localCustomStart, localCustomEnd);
-  const activePresetObj = PRESET_OPTIONS.find(p => p.id === preset) || PRESET_OPTIONS[5];
+  const activeRange = getDatePresetRange(effectivePreset, localCustomStart, localCustomEnd);
+  const activePresetObj = PRESET_OPTIONS.find(p => p.id === effectivePreset) || PRESET_OPTIONS[5];
 
   const handleSelectPreset = (optId) => {
+    setSelectedPresetId(optId);
     if (optId === 'custom') {
+      const range = getDatePresetRange('custom', localCustomStart, localCustomEnd);
+      if (setDatePreset) setDatePreset('custom');
       if (onChange) {
-        const range = getDatePresetRange('custom', localCustomStart, localCustomEnd);
         onChange({ preset: 'custom', ...range });
       }
-    } else {
-      const range = getDatePresetRange(optId, '', '');
-      if (onChange) {
-        onChange({ preset: optId, ...range });
-      }
-      setIsOpen(false);
+      return;
     }
+
+    const range = getDatePresetRange(optId, '', '');
+    if (setDatePreset) setDatePreset(optId);
+    if (setCustomDateStart) setCustomDateStart('');
+    if (setCustomDateEnd) setCustomDateEnd('');
+    if (onCustomChange) onCustomChange('', '');
+    if (onChange) {
+      onChange({ preset: optId, ...range });
+    }
+    setIsOpen(false);
   };
 
   const handleApplyCustom = () => {
+    const range = getDatePresetRange('custom', localCustomStart, localCustomEnd);
     if (onCustomChange) {
       onCustomChange(localCustomStart, localCustomEnd);
     }
-    const range = getDatePresetRange('custom', localCustomStart, localCustomEnd);
+    if (setCustomDateStart) setCustomDateStart(localCustomStart);
+    if (setCustomDateEnd) setCustomDateEnd(localCustomEnd);
+    if (setDatePreset) setDatePreset('custom');
     if (onChange) {
       onChange({ preset: 'custom', ...range });
     }
     setIsOpen(false);
   };
 
-  const isDark = theme === 'dark';
+  const isCustomActive = selectedPresetId === 'custom' || effectivePreset === 'custom';
 
   const popoverMenu = isOpen ? (
     <div
@@ -291,7 +354,7 @@ export default function DateRangePicker({
         top: `${popoverPos.top}px`,
         left: `${popoverPos.left}px`,
         width: `${popoverPos.width}px`,
-        maxHeight: '400px',
+        maxHeight: '440px',
         overflowY: 'auto',
         background: '#ffffff',
         color: '#0f172a',
@@ -305,7 +368,7 @@ export default function DateRangePicker({
     >
       {PRESET_OPTIONS.map(opt => {
         const rangeInfo = getDatePresetRange(opt.id, localCustomStart, localCustomEnd);
-        const isSelected = preset === opt.id;
+        const isSelected = effectivePreset === opt.id || selectedPresetId === opt.id;
         return (
           <div
             key={opt.id}
@@ -313,7 +376,7 @@ export default function DateRangePicker({
             style={{
               display: 'flex',
               alignItems: 'center',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               gap: '0.85rem',
               padding: '0.6rem 0.95rem',
               cursor: 'pointer',
@@ -362,7 +425,7 @@ export default function DateRangePicker({
         );
       })}
 
-      {preset === 'custom' && (
+      {isCustomActive && (
         <div
           style={{
             padding: '0.75rem 1rem',
@@ -472,7 +535,7 @@ export default function DateRangePicker({
         }}
       >
         <Calendar size={15} color="#4f46e5" />
-        <span>{activePresetObj.name}</span>
+        <span>{effectivePreset === 'custom' && activeRange.labelText ? activeRange.labelText : activePresetObj.name}</span>
         <ChevronDown size={14} color="#64748b" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </button>
 
