@@ -101,7 +101,9 @@ import {
   Filter,
   RotateCcw,
   Percent,
-  Copy
+  Copy,
+  Calculator,
+  ShieldCheck
 } from 'lucide-react';
 
 import { cloneDocumentPayload, focusPrimaryQuantityInput } from '../utils/documentCloneUtility';
@@ -4347,25 +4349,50 @@ export default function EliteBillingDepartment({
 
       {/* ── TAB 2: INVOICE GENERATOR / EDITOR (myBillBook style) ────────────── */}
       {activeTab === 'create' && (
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', position: 'relative' }}>
-          <ScrollSpyMiniMap sections={INVOICE_FORM_SECTIONS} />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', position: 'relative', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.04)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <FeatureCoachmark
-                id="zen-focus-mode-tip"
-                title="Zen Focus Mode"
-                content="Press Alt+Z anytime to hide headers and sidebars for 100% full-screen table focus."
-              >
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                  {editingInvoiceId ? `Edit Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #7c3aed, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)' }}>
+                <Receipt size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {editingInvoiceId ? `Edit Tax Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
                 </h3>
-              </FeatureCoachmark>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
+                  Official B2B Tax Invoice with automated GST & TDS deductions
+                </div>
+              </div>
               <EntityBrandBadge entityId={companyEntity} />
             </div>
-            <div style={{ display: 'flex', gap: '0.6rem' }}>
-              <button className="btn-secondary" onClick={() => setActiveTab('invoices')}>Cancel</button>
-              <button className="btn-primary" onClick={handleSaveInvoice} disabled={loading} style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)' }}>
+            <div style={{ display: 'flex', gap: '0.65rem' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setActiveTab('invoices')}
+                style={{ padding: '0.5rem 1.1rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleSaveInvoice}
+                disabled={loading}
+                style={{
+                  padding: '0.55rem 1.3rem',
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                  color: '#ffffff',
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.3)',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <CheckCircle size={16} />
                 {loading ? 'Saving...' : editingInvoiceId ? 'Update Invoice' : 'Save & Issue Invoice'}
               </button>
             </div>
@@ -4759,207 +4786,381 @@ export default function EliteBillingDepartment({
           </div>
 
           {/* Financial Summary & Tax Breakdown Box */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '0.5rem' }}>
-            <div id="inv-sec-notes" data-form-section="true" data-section-title="Notes & Terms" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginTop: '1rem', alignItems: 'start' }}>
+            {/* Left Card: Customer Notes & Contractual Terms */}
+            <div id="inv-sec-notes" data-form-section="true" data-section-title="Notes & Terms" className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.6rem' }}>
+                <FileText size={17} style={{ color: '#818cf8' }} />
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)' }}>Customer Notes & Supply Terms</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Printed at bottom of official tax invoice PDF</div>
+                </div>
+              </div>
+
               <div>
-                <label style={labelStyle}>Notes for Customer</label>
+                <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Notes for Customer</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>Optional</span>
+                </label>
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={invoiceForm.notes}
                   onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
-                  style={inputStyle}
+                  placeholder="e.g. Thank you for your business! Please quote invoice number during NEFT/RTGS payment transfer."
+                  style={{ ...inputStyle, resize: 'vertical' }}
                 />
               </div>
+
               <div>
-                <label style={labelStyle}>Terms & Conditions</label>
+                <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Terms & Conditions</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>Contractual</span>
+                </label>
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={invoiceForm.terms}
                   onChange={e => setInvoiceForm(f => ({ ...f, terms: e.target.value }))}
-                  style={inputStyle}
+                  placeholder="e.g. 1. Goods once sold will not be taken back. 2. Interest @ 18% p.a. will be charged after due date. 3. Subject to Surat jurisdiction only."
+                  style={{ ...inputStyle, resize: 'vertical' }}
                 />
+              </div>
+
+              <div style={{ fontSize: '0.73rem', color: '#64748b', background: 'rgba(255,255,255,0.03)', padding: '0.5rem 0.75rem', borderRadius: 6, border: '1px dashed var(--border-light)' }}>
+                💡 <strong>Audit Note:</strong> Standard legal declaration will accompany bank account details on the PDF.
               </div>
             </div>
 
-            <div id="inv-sec-totals" data-form-section="true" data-section-title="Summary & Total" className="glass-panel" style={{ padding: '1.1rem', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Subtotal:</span>
-                <span style={{ fontWeight: 700 }}>₹ {calculatedInvoice.subtotal.toFixed(2)}</span>
+            {/* Right Card: Financial Summary, Taxes, TDS & Settlement */}
+            <div id="inv-sec-totals" data-form-section="true" data-section-title="Summary & Total" className="glass-panel" style={{ padding: '1.25rem', background: 'linear-gradient(180deg, rgba(124,58,237,0.06) 0%, rgba(30,27,75,0.18) 100%)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.7rem', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}>
+              
+              {/* Financial Dock Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(124,58,237,0.2)', paddingBottom: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Calculator size={18} style={{ color: '#a78bfa' }} />
+                  <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '0.02em' }}>Tax & Financial Summary</span>
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '12px', background: 'rgba(124,58,237,0.2)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.4)' }}>
+                  {invoiceForm.taxType === 'IGST' ? '⚡ IGST 5%' : '⚡ CGST 2.5% + SGST 2.5%'}
+                </span>
               </div>
 
+              {/* Subtotal */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Taxable Subtotal:</span>
+                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>₹ {calculatedInvoice.subtotal.toFixed(2)}</span>
+              </div>
+
+              {/* Discount if any */}
               {calculatedInvoice.discountTotal > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#34d399' }}>
-                  <span>Discount:</span>
-                  <span>- ₹ {calculatedInvoice.discountTotal.toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.86rem', color: '#34d399' }}>
+                  <span>Trade Discount:</span>
+                  <span style={{ fontWeight: 700 }}>- ₹ {calculatedInvoice.discountTotal.toFixed(2)}</span>
                 </div>
               )}
 
+              {/* GST Breakdown */}
               {invoiceForm.taxType === 'IGST' ? (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.86rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>
-                    IGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal) * 100).toFixed(1) : 5}%):
+                    IGST ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal) * 100).toFixed(1) : 5}%):
                   </span>
-                  <span>₹ {calculatedInvoice.igstAmount.toFixed(2)}</span>
+                  <span style={{ fontWeight: 600 }}>₹ {calculatedInvoice.igstAmount.toFixed(2)}</span>
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.86rem' }}>
                     <span style={{ color: 'var(--text-muted)' }}>
-                      CGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                      CGST ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
                     </span>
-                    <span>₹ {calculatedInvoice.cgstAmount.toFixed(2)}</span>
+                    <span style={{ fontWeight: 600 }}>₹ {calculatedInvoice.cgstAmount.toFixed(2)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.86rem' }}>
                     <span style={{ color: 'var(--text-muted)' }}>
-                      SGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                      SGST ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
                     </span>
-                    <span>₹ {calculatedInvoice.sgstAmount.toFixed(2)}</span>
+                    <span style={{ fontWeight: 600 }}>₹ {calculatedInvoice.sgstAmount.toFixed(2)}</span>
                   </div>
                 </>
               )}
 
-              {/* Round Off Checkbox & Editable Value */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#a78bfa', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dashed var(--border-light)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600 }}>
+              {/* Round Off Adjustment */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.84rem', color: '#c4b5fd', paddingTop: '0.4rem', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 600 }}>
                   <input
                     type="checkbox"
                     checked={invoiceForm.enableRoundOff !== false}
                     onChange={e => setInvoiceForm(f => ({ ...f, enableRoundOff: e.target.checked, manualRoundOff: undefined }))}
+                    style={{ accentColor: '#7c3aed' }}
                   />
                   Round Off Total
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  disabled={invoiceForm.enableRoundOff === false}
-                  value={invoiceForm.manualRoundOff !== undefined ? invoiceForm.manualRoundOff : calculatedInvoice.roundOff}
-                  onChange={e => setInvoiceForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
-                  onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualRoundOff: undefined })); }}
-                  style={{ width: '90px', padding: '0.25rem 0.5rem', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '5px', color: '#a78bfa', textAlign: 'right' }}
-                  title="Auto-calculated. Edit to set manually."
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    disabled={invoiceForm.enableRoundOff === false}
+                    value={invoiceForm.manualRoundOff !== undefined ? invoiceForm.manualRoundOff : calculatedInvoice.roundOff}
+                    onChange={e => setInvoiceForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
+                    onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualRoundOff: undefined })); }}
+                    style={{
+                      width: '85px',
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      background: invoiceForm.enableRoundOff === false ? 'rgba(255,255,255,0.03)' : 'rgba(167,139,250,0.12)',
+                      border: '1px solid rgba(167,139,250,0.4)',
+                      borderRadius: '6px',
+                      color: '#c4b5fd',
+                      textAlign: 'right'
+                    }}
+                    title="Auto-calculated. Edit to override round off."
+                  />
+                </div>
               </div>
 
-              {/* TDS (Tax Deducted at Source) Row */}
-              <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed var(--border-light)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600, color: invoiceForm.enableTds ? '#f59e0b' : 'var(--text-muted)' }}>
+              {/* TDS (Tax Deducted at Source) Enterprise Card */}
+              <div style={{
+                marginTop: '0.2rem',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                background: invoiceForm.enableTds ? 'rgba(245, 158, 11, 0.09)' : 'rgba(255, 255, 255, 0.02)',
+                border: `1px solid ${invoiceForm.enableTds ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.06)'}`,
+                transition: 'all 0.2s ease'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.84rem', color: invoiceForm.enableTds ? '#f59e0b' : 'var(--text-muted)' }}>
                     <input
                       type="checkbox"
                       checked={!!invoiceForm.enableTds}
                       onChange={e => setInvoiceForm(f => ({ ...f, enableTds: e.target.checked, manualTdsAmount: undefined }))}
+                      style={{ accentColor: '#f59e0b' }}
                     />
-                    Deduct TDS (Income Tax)
+                    <span>Deduct TDS (Income Tax)</span>
+                    <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem', borderRadius: 4, background: invoiceForm.enableTds ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)', color: invoiceForm.enableTds ? '#fbbf24' : '#64748b' }}>
+                      CBDT
+                    </span>
                   </label>
                   {invoiceForm.enableTds && (
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#f59e0b' }}>
                       - ₹ {calculatedInvoice.tdsAmount.toFixed(2)}
                     </span>
                   )}
                 </div>
 
                 {invoiceForm.enableTds && (
-                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', alignItems: 'center', background: 'rgba(245, 158, 11, 0.08)', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.25)', flexWrap: 'wrap' }}>
-                    <div style={{ flex: '1 1 140px' }}>
-                      <select
-                        value={invoiceForm._tdsPreset || (invoiceForm.tdsSection === '194C' ? (invoiceForm.tdsRate === 2 ? '194C_2' : '194C_1') : invoiceForm.tdsSection === '194Q' ? '194Q' : invoiceForm.tdsSection === '194J' ? (invoiceForm.tdsRate === 10 ? '194J_10' : '194J_2') : 'CUSTOM')}
-                        onChange={e => {
-                          const val = e.target.value;
-                          let rate = 1;
-                          let sec = '194C';
-                          if (val === '194C_1') { sec = '194C'; rate = 1; }
-                          else if (val === '194C_2') { sec = '194C'; rate = 2; }
-                          else if (val === '194Q') { sec = '194Q'; rate = 0.1; }
-                          else if (val === '194J_2') { sec = '194J'; rate = 2; }
-                          else if (val === '194J_10') { sec = '194J'; rate = 10; }
-                          else if (val === 'CUSTOM') { sec = 'Custom'; }
-                          setInvoiceForm(f => ({ ...f, tdsSection: sec, tdsRate: rate, manualTdsAmount: undefined, _tdsPreset: val }));
-                        }}
-                        style={{ width: '100%', padding: '0.2rem 0.35rem', fontSize: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a' }}
-                      >
-                        <option value="194C_1">Sec 194C (1% - Indv/HUF)</option>
-                        <option value="194C_2">Sec 194C (2% - Company/Firm)</option>
-                        <option value="194Q">Sec 194Q (0.1% - Goods)</option>
-                        <option value="194J_2">Sec 194J (2% - Tech Service)</option>
-                        <option value="194J_10">Sec 194J (10% - Professional)</option>
-                        <option value="CUSTOM">Custom % / Manual Amount</option>
-                      </select>
+                  <div style={{ marginTop: '0.55rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1.8fr) minmax(65px, 0.8fr) minmax(90px, 1.1fr)', gap: '0.4rem', alignItems: 'center' }}>
+                      <div>
+                        <select
+                          value={invoiceForm._tdsPreset || (invoiceForm.tdsSection === '194C' ? (invoiceForm.tdsRate === 2 ? '194C_2' : '194C_1') : invoiceForm.tdsSection === '194Q' ? '194Q' : invoiceForm.tdsSection === '194J' ? (invoiceForm.tdsRate === 10 ? '194J_10' : '194J_2') : 'CUSTOM')}
+                          onChange={e => {
+                            const val = e.target.value;
+                            let rate = 1;
+                            let sec = '194C';
+                            if (val === '194C_1') { sec = '194C'; rate = 1; }
+                            else if (val === '194C_2') { sec = '194C'; rate = 2; }
+                            else if (val === '194Q') { sec = '194Q'; rate = 0.1; }
+                            else if (val === '194J_2') { sec = '194J'; rate = 2; }
+                            else if (val === '194J_10') { sec = '194J'; rate = 10; }
+                            else if (val === 'CUSTOM') { sec = 'Custom'; }
+                            setInvoiceForm(f => ({ ...f, tdsSection: sec, tdsRate: rate, manualTdsAmount: undefined, _tdsPreset: val }));
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.3rem 0.4rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            borderRadius: '5px',
+                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                            background: '#0f172a',
+                            color: '#f8fafc'
+                          }}
+                        >
+                          <option value="194C_1">Sec 194C (1% - Indv / HUF)</option>
+                          <option value="194C_2">Sec 194C (2% - Company / Firm)</option>
+                          <option value="194Q">Sec 194Q (0.1% - Goods Sale)</option>
+                          <option value="194J_2">Sec 194J (2% - Tech Services)</option>
+                          <option value="194J_10">Sec 194J (10% - Professional)</option>
+                          <option value="CUSTOM">Custom % / Manual Amount</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', background: '#0f172a', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: 5, padding: '0 0.35rem' }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Rate"
+                          value={invoiceForm.tdsRate !== undefined ? invoiceForm.tdsRate : 1}
+                          onChange={e => setInvoiceForm(f => ({ ...f, tdsRate: e.target.value === '' ? 0 : parseFloat(e.target.value), manualTdsAmount: undefined, _tdsPreset: 'CUSTOM' }))}
+                          style={{
+                            width: '100%',
+                            padding: '0.3rem 0',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            textAlign: 'right',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#f8fafc',
+                            outline: 'none'
+                          }}
+                          title="TDS Rate %"
+                        />
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: 2 }}>%</span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', background: '#0f172a', border: '1px solid rgba(245, 158, 11, 0.6)', borderRadius: 5, padding: '0 0.35rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#f59e0b', marginRight: 2 }}>₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Amount"
+                          value={invoiceForm.manualTdsAmount !== undefined ? invoiceForm.manualTdsAmount : calculatedInvoice.tdsAmount}
+                          onChange={e => setInvoiceForm(f => ({ ...f, manualTdsAmount: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                          onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualTdsAmount: undefined })); }}
+                          style={{
+                            width: '100%',
+                            padding: '0.3rem 0',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            textAlign: 'right',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#fbbf24',
+                            outline: 'none'
+                          }}
+                          title="Auto-calculated from taxable value. Type to override."
+                        />
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="%"
-                        value={invoiceForm.tdsRate !== undefined ? invoiceForm.tdsRate : 1}
-                        onChange={e => setInvoiceForm(f => ({ ...f, tdsRate: e.target.value === '' ? 0 : parseFloat(e.target.value), manualTdsAmount: undefined, _tdsPreset: 'CUSTOM' }))}
-                        style={{ width: '45px', padding: '0.2rem 0.25rem', fontSize: '0.75rem', textAlign: 'right', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a' }}
-                        title="TDS % Rate"
-                      />
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>%</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>₹</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="Amt"
-                        value={invoiceForm.manualTdsAmount !== undefined ? invoiceForm.manualTdsAmount : calculatedInvoice.tdsAmount}
-                        onChange={e => setInvoiceForm(f => ({ ...f, manualTdsAmount: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
-                        onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualTdsAmount: undefined })); }}
-                        style={{ width: '70px', padding: '0.2rem 0.3rem', fontSize: '0.75rem', textAlign: 'right', fontWeight: 700, borderRadius: '4px', border: '1px solid #f59e0b', color: '#b45309', background: '#ffffff' }}
-                        title="Auto-calculated from taxable value. Edit to set manually."
-                      />
+                    <div style={{ fontSize: '0.7rem', color: '#fbbf24', opacity: 0.85, paddingLeft: 2 }}>
+                      ℹ️ Calculated on Taxable Subtotal (₹{calculatedInvoice.subtotal.toFixed(2)}). Deducted by customer on payment.
                     </div>
                   </div>
                 )}
               </div>
 
-              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#a78bfa' }}>
-                <span>Grand Total:</span>
-                <span key={calculatedInvoice.grandTotal} className="reactive-value-pulse" style={{ padding: '0 4px', borderRadius: 4 }}>
+              {/* Grand Total Banner */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(124,58,237,0.25) 0%, rgba(99,102,241,0.2) 100%)',
+                border: '1px solid rgba(167,139,250,0.5)',
+                borderRadius: '10px',
+                padding: '0.85rem 1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                boxShadow: '0 4px 15px rgba(124,58,237,0.2)'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    INVOICE GRAND TOTAL
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Inclusive of all taxes</div>
+                </div>
+                <div key={calculatedInvoice.grandTotal} className="reactive-value-pulse" style={{ fontSize: '1.45rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em' }}>
                   ₹ {calculatedInvoice.grandTotal.toFixed(2)}
-                </span>
+                </div>
               </div>
 
+              {/* Net Receivable Banner (if TDS is active) */}
               {invoiceForm.enableTds && calculatedInvoice.tdsAmount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.25rem', background: 'rgba(245, 158, 11, 0.08)', padding: '0.25rem 0.5rem', borderRadius: 4 }}>
-                  <span>Net Receivable (After TDS):</span>
-                  <span>₹ {(calculatedInvoice.grandTotal - calculatedInvoice.tdsAmount).toFixed(2)}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  borderRadius: '8px',
+                  padding: '0.55rem 0.85rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <ShieldCheck size={16} style={{ color: '#f59e0b' }} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fbbf24' }}>Net Amount Receivable:</span>
+                  </div>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fbbf24' }}>
+                    ₹ {(calculatedInvoice.grandTotal - calculatedInvoice.tdsAmount).toFixed(2)}
+                  </span>
                 </div>
               )}
 
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
-                Amount in Words: {numToWords(calculatedInvoice.grandTotal)}
+              {/* Amount in Words */}
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.35rem 0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <strong style={{ color: '#cbd5e1' }}>In Words:</strong> {numToWords(calculatedInvoice.grandTotal)}
               </div>
 
-              <div style={{ marginTop: '0.8rem', paddingTop: '0.6rem', borderTop: '1px dashed var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Advance / Paid (₹)</label>
+              {/* Advance Paid & Balance Due */}
+              <div style={{ marginTop: '0.3rem', paddingTop: '0.7rem', borderTop: '1px dashed rgba(255,255,255,0.1)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', alignItems: 'center' }}>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: '0.72rem' }}>Advance / Paid (₹)</label>
                   <input
                     type="number"
                     value={invoiceForm.paidAmount}
                     onChange={e => setInvoiceForm(f => ({ ...f, paidAmount: e.target.value }))}
-                    style={inputStyle}
+                    placeholder="0.00"
+                    style={{ ...inputStyle, fontWeight: 700 }}
                   />
                 </div>
-                <div style={{ flex: 1, textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>BALANCE DUE</div>
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>
+                    BALANCE DUE
+                  </div>
                   <div
                     key={calculatedInvoice.balanceDue}
                     className="reactive-value-pulse"
                     style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 800,
+                      fontSize: '1.25rem',
+                      fontWeight: 900,
                       color: calculatedInvoice.balanceDue > 0 ? '#f87171' : '#34d399',
-                      padding: '0 4px',
-                      borderRadius: 4,
-                      display: 'inline-block'
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
                   >
-                    ₹ {calculatedInvoice.balanceDue.toFixed(2)}
+                    {calculatedInvoice.balanceDue <= 0 ? (
+                      <span style={{ fontSize: '0.78rem', background: 'rgba(52,211,153,0.15)', color: '#34d399', padding: '0.2rem 0.5rem', borderRadius: 4, border: '1px solid rgba(52,211,153,0.3)', fontWeight: 800 }}>
+                        ✓ PAID IN FULL
+                      </span>
+                    ) : (
+                      `₹ ${calculatedInvoice.balanceDue.toFixed(2)}`
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* Bottom Quick Actions */}
+              <div style={{ marginTop: '0.6rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(124,58,237,0.25)', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setActiveTab('invoices')}
+                  style={{ padding: '0.55rem 1.1rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleSaveInvoice}
+                  disabled={loading}
+                  style={{
+                    padding: '0.6rem 1.4rem',
+                    borderRadius: 8,
+                    fontWeight: 800,
+                    fontSize: '0.88rem',
+                    background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                    color: '#ffffff',
+                    border: 'none',
+                    boxShadow: '0 4px 16px rgba(124, 58, 237, 0.4)',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <CheckCircle size={16} />
+                  {loading ? 'Saving...' : editingInvoiceId ? 'Update Invoice' : 'Save & Issue Invoice'}
+                </button>
+              </div>
+
             </div>
           </div>
 
