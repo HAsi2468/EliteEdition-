@@ -318,36 +318,36 @@ const getNextInvoiceNo = async (req, res) => {
  * A delivery challan cannot be billed a 2nd time.
  */
 const assertChallansNotAlreadyBilled = async (invoiceData, currentInvoiceId = null) => {
-  const challanIdsToCheck = new Set();
-  const challanNosToCheck = new Set();
+  const rawChallanIds = new Set();
+  const rawChallanNos = new Set();
 
   if (Array.isArray(invoiceData.linkedChallanIds)) {
-    invoiceData.linkedChallanIds.forEach(id => id && challanIdsToCheck.add(String(id)));
+    invoiceData.linkedChallanIds.forEach(id => id && rawChallanIds.add(String(id)));
   }
   if (Array.isArray(invoiceData.linkedChallanNos)) {
     invoiceData.linkedChallanNos.forEach(no => {
       const num = parseInt(String(no).replace(/[^0-9]/g, ''), 10);
-      if (num) challanNosToCheck.add(num);
+      if (num) rawChallanNos.add(num);
     });
   }
   if (invoiceData.ourChallanNo) {
     String(invoiceData.ourChallanNo).split(/[,;\s]+/).forEach(p => {
       const num = parseInt(p.replace(/[^0-9]/g, ''), 10);
-      if (num) challanNosToCheck.add(num);
+      if (num) rawChallanNos.add(num);
     });
   }
   if (Array.isArray(invoiceData.items)) {
     invoiceData.items.forEach(it => {
-      if (it.challanId) challanIdsToCheck.add(String(it.challanId));
+      if (it.challanId) rawChallanIds.add(String(it.challanId));
       if (it.ourChallanNo) {
         const num = parseInt(String(it.ourChallanNo).replace(/[^0-9]/g, ''), 10);
-        if (num) challanNosToCheck.add(num);
+        if (num) rawChallanNos.add(num);
       }
     });
   }
 
-  const activeChallanIdList = Array.from(challanIdsToCheck).filter(id => mongoose.Types.ObjectId.isValid(id));
-  const activeChallanNoList = Array.from(challanNosToCheck);
+  const activeChallanIdList = Array.from(rawChallanIds).filter(id => mongoose.Types.ObjectId.isValid(id));
+  const activeChallanNoList = Array.from(rawChallanNos);
 
   let preexistingChallanNos = new Set();
   let preexistingChallanIds = new Set();
