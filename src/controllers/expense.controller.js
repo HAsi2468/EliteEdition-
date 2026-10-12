@@ -53,11 +53,26 @@ const isCashTransaction = (item) => {
     return true;
   }
   if (account && !account.includes('cash')) {
-    // Explicitly associated with a bank account (e.g. KOTAK EDP, HDFC Bank)
+    // Explicitly associated with a bank account (e.g. KOTAK EDP, ELITE ICICI)
     return false;
   }
   const mode = String(item.paymentMode || '').trim().toLowerCase();
   return mode === 'cash' || mode.includes('petty cash');
+};
+
+const identifyBankName = (item, defaultBank = 'KOTAK EDP') => {
+  const account = String(item.bankAccount || '').trim();
+  const accUpper = account.toUpperCase();
+  if (accUpper.includes('ICICI')) return 'ELITE ICICI';
+  if (accUpper.includes('KOTAK')) return 'KOTAK EDP';
+  if (account && !accUpper.includes('CASH')) return account;
+
+  const mode = String(item.paymentMode || '').trim();
+  const modeUpper = mode.toUpperCase();
+  if (modeUpper.includes('ICICI')) return 'ELITE ICICI';
+  if (modeUpper.includes('KOTAK')) return 'KOTAK EDP';
+
+  return defaultBank || 'KOTAK EDP';
 };
 
 /**
@@ -85,6 +100,27 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
   const initialBankOpening = Number(settings?.initialBankOpening) || 0;
   const effectiveDate = (settings?.effectiveDate || '').trim();
   const bankAccountName = settings?.bankAccountName || (buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`);
+
+  const KNOWN_BANKS = ['KOTAK EDP', 'ELITE ICICI'];
+  const allBanksSet = new Set(KNOWN_BANKS);
+  if (settings?.bankOpenings && typeof settings.bankOpenings === 'object') {
+    Object.keys(settings.bankOpenings).forEach(b => { if (b && b.trim()) allBanksSet.add(b.trim()); });
+  }
+
+  const bankStats = {};
+  allBanksSet.forEach(b => {
+    bankStats[b] = { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+  });
+
+  const getBankInitialOpening = (bankName) => {
+    if (settings?.bankOpenings && settings.bankOpenings[bankName] !== undefined) {
+      return Number(settings.bankOpenings[bankName]) || 0;
+    }
+    if (bankName === 'KOTAK EDP' || bankName === bankAccountName) {
+      return initialBankOpening;
+    }
+    return 0;
+  };
 
   const compFilter = buildExpenseCompFilter(normEntity);
 
@@ -121,8 +157,16 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
         if (item.type === 'IN') histCashIn += amt;
         else if (item.type === 'OUT') histCashOut += amt;
       } else {
-        if (item.type === 'IN') histBankIn += amt;
-        else if (item.type === 'OUT') histBankOut += amt;
+        const bank = identifyBankName(item, bankAccountName);
+        allBanksSet.add(bank);
+        if (!bankStats[bank]) bankStats[bank] = { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+        if (item.type === 'IN') {
+          histBankIn += amt;
+          bankStats[bank].histIn += amt;
+        } else if (item.type === 'OUT') {
+          histBankOut += amt;
+          bankStats[bank].histOut += amt;
+        }
       }
     });
 
@@ -164,8 +208,16 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
       if (item.type === 'IN') cashIn += amt;
       else if (item.type === 'OUT') cashExpense += amt;
     } else {
-      if (item.type === 'IN') bankIn += amt;
-      else if (item.type === 'OUT') bankExpense += amt;
+      const bank = identifyBankName(item, bankAccountName);
+      allBanksSet.add(bank);
+      if (!bankStats[bank]) bankStats[bank] = { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+      if (item.type === 'IN') {
+        bankIn += amt;
+        bankStats[bank].periodIn += amt;
+      } else if (item.type === 'OUT') {
+        bankExpense += amt;
+        bankStats[bank].periodOut += amt;
+      }
     }
   });
 
@@ -180,6 +232,26 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
   const cashClosing = Number((cashOpening + cashIn - cashExpense).toFixed(2));
   const bankClosing = Number((bankOpening + bankIn - bankExpense).toFixed(2));
 
+  // 5. Derive Per-Bank Breakdown:
+  const bankBreakdown = {};
+  allBanksSet.forEach(bank => {
+    const st = bankStats[bank] || { histIn: 0, histOut: 0, periodIn: 0, periodOut: 0 };
+    const bInit = getBankInitialOpening(bank);
+    const bOpening = Number((bInit + st.histIn - st.histOut).toFixed(2));
+    const bIn = Number(st.periodIn.toFixed(2));
+    const bOut = Number(st.periodOut.toFixed(2));
+    const bClosing = Number((bOpening + bIn - bOut).toFixed(2));
+
+    bankBreakdown[bank] = {
+      name: bank,
+      initialOpening: bInit,
+      opening: bOpening,
+      bankIn: bIn,
+      bankExpense: bOut,
+      bankClosing: bClosing
+    };
+  });
+
   return {
     cashOpening,
     bankOpening,
@@ -189,6 +261,8 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
     bankIn,
     bankExpense,
     bankClosing,
+    banks: bankBreakdown,
+    availableBanks: Array.from(allBanksSet),
     totalTransactions: periodTxns.length,
     businessUnit: buCode,
     companyEntity: normEntity,
@@ -197,6 +271,10 @@ const calculateLedgerAggregation = async ({ businessUnit, companyEntity, startDa
     settings: {
       initialCashOpening,
       initialBankOpening,
+      bankOpenings: settings?.bankOpenings || {
+        'KOTAK EDP': initialBankOpening,
+        'ELITE ICICI': 0
+      },
       effectiveDate,
       bankAccountName,
       notes: settings?.notes || ''
@@ -254,9 +332,19 @@ const getAll = async (req, res) => {
     if (paymentMode && paymentMode !== 'All') {
       const modes = String(paymentMode).split(',').map(m => m.trim()).filter(Boolean);
       if (modes.length > 1) {
-        conditions.push({ paymentMode: { $in: modes } });
+        conditions.push({
+          $or: [
+            { paymentMode: { $in: modes } },
+            { bankAccount: { $in: modes } }
+          ]
+        });
       } else if (modes.length === 1) {
-        conditions.push({ paymentMode: modes[0] });
+        conditions.push({
+          $or: [
+            { paymentMode: modes[0] },
+            { bankAccount: modes[0] }
+          ]
+        });
       }
     }
 
@@ -370,9 +458,18 @@ const getLedgerSettings = async (req, res) => {
         companyEntity: normEntity,
         initialCashOpening: 0,
         initialBankOpening: 0,
+        bankOpenings: {
+          'KOTAK EDP': 0,
+          'ELITE ICICI': 0
+        },
         effectiveDate: '2024-04-01',
         bankAccountName: buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`,
         notes: ''
+      };
+    } else if (!settings.bankOpenings || Object.keys(settings.bankOpenings).length === 0) {
+      settings.bankOpenings = {
+        'KOTAK EDP': settings.initialBankOpening || 0,
+        'ELITE ICICI': 0
       };
     }
 
@@ -391,6 +488,7 @@ const saveLedgerSettings = async (req, res) => {
       companyEntity,
       initialCashOpening = 0,
       initialBankOpening = 0,
+      bankOpenings = {},
       effectiveDate,
       bankAccountName = 'KOTAK EDP',
       notes = ''
@@ -399,6 +497,17 @@ const saveLedgerSettings = async (req, res) => {
     const buCode = getBusinessUnitCode(companyEntity || businessUnit);
     const normEntity = normalizeBusinessUnit(companyEntity || businessUnit);
     const activeUserName = req.headers['x-user-name'] || req.user?.name || 'Staff User';
+
+    let effBankOpenings = (bankOpenings && typeof bankOpenings === 'object') ? bankOpenings : {};
+    let computedBankTotal = Number(initialBankOpening) || 0;
+    if (Object.keys(effBankOpenings).length > 0) {
+      computedBankTotal = Object.values(effBankOpenings).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    } else {
+      effBankOpenings = {
+        'KOTAK EDP': computedBankTotal,
+        'ELITE ICICI': 0
+      };
+    }
 
     const updated = await db.LedgerSettings.findOneAndUpdate(
       {
@@ -412,7 +521,8 @@ const saveLedgerSettings = async (req, res) => {
           businessUnit: buCode,
           companyEntity: normEntity,
           initialCashOpening: Number(initialCashOpening) || 0,
-          initialBankOpening: Number(initialBankOpening) || 0,
+          initialBankOpening: Number(computedBankTotal) || 0,
+          bankOpenings: effBankOpenings,
           effectiveDate: effectiveDate || '2024-04-01',
           bankAccountName: bankAccountName || (buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`),
           notes: notes || '',
@@ -507,14 +617,31 @@ const create = async (req, res) => {
       payload.voucherNo = await generateUniqueVoucherNo(payload.companyEntity);
     }
 
-    // Default Bank Account routing
+    // Default Bank Account routing & synchronization
+    const rawMode = String(payload.paymentMode || '').trim();
+    const modeUpper = rawMode.toUpperCase();
+
     if (!payload.bankAccount || !payload.bankAccount.trim()) {
-      const pMode = String(payload.paymentMode || '').trim().toLowerCase();
-      if (pMode === 'cash' || pMode.includes('petty cash')) {
+      if (rawMode.toLowerCase() === 'cash' || rawMode.toLowerCase().includes('petty cash')) {
         payload.bankAccount = 'Cash in Hand';
+      } else if (modeUpper.includes('ICICI')) {
+        payload.bankAccount = 'ELITE ICICI';
+      } else if (modeUpper.includes('KOTAK')) {
+        payload.bankAccount = 'KOTAK EDP';
       } else {
         const buCode = getBusinessUnitCode(payload.companyEntity);
         payload.bankAccount = buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`;
+      }
+    } else {
+      const accUpper = String(payload.bankAccount || '').trim().toUpperCase();
+      if (modeUpper === 'ELITE ICICI') {
+        payload.bankAccount = 'ELITE ICICI';
+      } else if (modeUpper === 'KOTAK EDP') {
+        payload.bankAccount = 'KOTAK EDP';
+      } else if (accUpper === 'ELITE ICICI' && (modeUpper === 'KOTAK EDP' || modeUpper === 'CASH')) {
+        payload.paymentMode = 'ELITE ICICI';
+      } else if (accUpper === 'KOTAK EDP' && (modeUpper === 'ELITE ICICI' || modeUpper === 'CASH')) {
+        payload.paymentMode = 'KOTAK EDP';
       }
     }
 
@@ -568,13 +695,30 @@ const update = async (req, res) => {
       payload.companyEntity = 'Elite Digital Print';
     }
 
+    const rawMode = String(payload.paymentMode || '').trim();
+    const modeUpper = rawMode.toUpperCase();
+
     if (!payload.bankAccount || !payload.bankAccount.trim()) {
-      const pMode = String(payload.paymentMode || '').trim().toLowerCase();
-      if (pMode === 'cash' || pMode.includes('petty cash')) {
+      if (rawMode.toLowerCase() === 'cash' || rawMode.toLowerCase().includes('petty cash')) {
         payload.bankAccount = 'Cash in Hand';
+      } else if (modeUpper.includes('ICICI')) {
+        payload.bankAccount = 'ELITE ICICI';
+      } else if (modeUpper.includes('KOTAK')) {
+        payload.bankAccount = 'KOTAK EDP';
       } else {
         const buCode = getBusinessUnitCode(payload.companyEntity);
         payload.bankAccount = buCode === 'EDP' ? 'KOTAK EDP' : `${buCode} Bank Account`;
+      }
+    } else {
+      const accUpper = String(payload.bankAccount || '').trim().toUpperCase();
+      if (modeUpper === 'ELITE ICICI') {
+        payload.bankAccount = 'ELITE ICICI';
+      } else if (modeUpper === 'KOTAK EDP') {
+        payload.bankAccount = 'KOTAK EDP';
+      } else if (accUpper === 'ELITE ICICI' && (modeUpper === 'KOTAK EDP' || modeUpper === 'CASH')) {
+        payload.paymentMode = 'ELITE ICICI';
+      } else if (accUpper === 'KOTAK EDP' && (modeUpper === 'ELITE ICICI' || modeUpper === 'CASH')) {
+        payload.paymentMode = 'KOTAK EDP';
       }
     }
 
