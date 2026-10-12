@@ -396,6 +396,76 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
   };
 }
 
+// ── Helper: Validate that each lot has sufficient available stock for this challan ──
+// Checks that required raw meters (dispatched + proportional fusing waste + shortage)
+// does not exceed the lot's available balance (totalInward - totalOutward).
+// Prevents lot inventory from dropping into negative values.
+async function validateLotStockSufficiency({
+  lotGroups,
+  totalMtr,
+  challanProportionalWaste = 0,
+  shortagePct = null,
+  shortageMtr = null,
+  shortageMode = 'pct',
+  excludeChallanNo = null,
+}) {
+  if (!lotGroups || Object.keys(lotGroups).length === 0 || totalMtr <= 0) {
+    return { valid: true };
+  }
+
+  for (const [lot, groupMtr] of Object.entries(lotGroups)) {
+    const lotNum = parseLotNo(lot);
+    if (!lotNum) {
+      continue;
+    }
+
+    let lotShortage = shortagePct != null ? shortagePct : 0;
+    const lotWasteShare = totalMtr > 0
+      ? parseFloat(((groupMtr / totalMtr) * challanProportionalWaste).toFixed(3))
+      : 0;
+    const lotFinishedMtr = parseFloat((groupMtr + lotWasteShare).toFixed(3));
+
+    let rawMtr = computeRawMeters(lotFinishedMtr, lotShortage, shortageMtr, shortageMode);
+
+    // Query inward and outward transactions for this lot
+    const inwardTxs = await FabricTransaction.find({ type: 'INWARD', lotNo: lotNum }).lean();
+    const outwardQuery = { type: 'OUTWARD', lotNo: lotNum };
+    if (excludeChallanNo) {
+      outwardQuery.challanNo = { $ne: excludeChallanNo };
+    }
+    const outwardTxs = await FabricTransaction.find(outwardQuery).lean();
+
+    const totalIn = inwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
+    const totalOut = outwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
+    const availRaw = Math.max(0, totalIn - totalOut);
+
+    if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null && !isNaN(parseFloat(inwardTxs[0].shortagePct))) {
+      lotShortage = parseFloat(inwardTxs[0].shortagePct) || 0;
+      rawMtr = computeRawMeters(lotFinishedMtr, lotShortage, shortageMtr, shortageMode);
+    }
+
+    // Exact zeroing tolerance: if availRaw is positive and within 2.0m, it safely clamps to zero out perfectly
+    const isExactZeroing = (availRaw > 0 && Math.abs(rawMtr - availRaw) <= 2.0);
+
+    if (!isExactZeroing && rawMtr > (availRaw + 0.05)) {
+      const deficit = Math.round((rawMtr - availRaw) * 100) / 100;
+      const wasteStr = lotWasteShare > 0 ? ` + Westage: ${lotWasteShare.toFixed(2)}m` : '';
+      const shortageStr = (rawMtr - lotFinishedMtr) > 0 ? ` + Shortage: ${(rawMtr - lotFinishedMtr).toFixed(2)}m` : '';
+
+      return {
+        valid: false,
+        lotNo: lotNum,
+        availableStock: availRaw,
+        requiredStock: rawMtr,
+        deficit,
+        error: `❌ Cannot create Delivery Challan: Fabric required exceeds available stock in Lot #${lotNum}! Available stock in lot: ${availRaw.toFixed(2)}m raw, but required: ${rawMtr.toFixed(2)}m raw (Dispatched: ${groupMtr.toFixed(2)}m${wasteStr}${shortageStr}). Deficit: ${deficit.toFixed(2)}m. Please select an additional lot or adjust meter quantity so Lot #${lotNum} balance does not go into negative.`
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
 // ── Helper: normalize fabric and panna widths ─────────────────────────────
 const normalizeFabric = (val, pannaVal = '') => {
   if (!val) return '';
@@ -486,6 +556,51 @@ const createChallan = async (req, res) => {
     );
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
+    const effectiveTotalMtr = totalMtr > 0 ? totalMtr : (parseFloat(req.body.totalMtr) || parseFloat(req.body.pcs) || 0);
+
+    // If details array was empty but effectiveTotalMtr > 0 and a lot is specified, register lot group
+    if (Object.keys(lotGroups).length === 0 && effectiveTotalMtr > 0 && (lotNo || finalLotNoStr)) {
+      const primaryLot = String(lotNo || finalLotNoStr).split(',')[0].trim();
+      if (primaryLot) {
+        lotGroups[primaryLot] = effectiveTotalMtr;
+      }
+    }
+
+    // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
+    let challanProportionalWaste = 0;
+    if (jobNo && effectiveTotalMtr > 0) {
+      try {
+        const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(jobNo);
+        if (totalWaste > 0) {
+          const baseFresh = totalFresh > 0 ? totalFresh : effectiveTotalMtr;
+          const ratio = Math.min(1.0, effectiveTotalMtr / baseFresh);
+          challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
+        }
+      } catch (wErr) {
+        console.warn('Failed to calculate proportional fusing wastage for challan:', wErr.message);
+      }
+    }
+
+    // ── Stock Sufficiency Validation: Selected lot(s) must have enough fabric with wastage & shortage ──
+    const stockCheck = await validateLotStockSufficiency({
+      lotGroups,
+      totalMtr: effectiveTotalMtr,
+      challanProportionalWaste,
+      shortagePct: parsedPct,
+      shortageMtr: parsedMtr,
+      shortageMode: sMode,
+    });
+
+    if (!stockCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        error: stockCheck.error,
+        lotNo: stockCheck.lotNo,
+        availableStock: stockCheck.availableStock,
+        requiredStock: stockCheck.requiredStock,
+        deficit: stockCheck.deficit
+      });
+    }
 
     // ── Workflow Pipeline Validation: Job Card -> Printing -> Fusing -> Delivery Challan ──
     const userRole = String(req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
@@ -723,7 +838,7 @@ const createChallan = async (req, res) => {
             partyName: partyName || '',
             billTo: billTo || partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            forceAllowNegative: true,
+            forceAllowNegative: false,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
@@ -918,10 +1033,58 @@ const updateChallan = async (req, res) => {
     );
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
+    const effectiveTotalMtr = totalMtr > 0 ? totalMtr : (parseFloat(req.body.totalMtr) || parseFloat(req.body.pcs) || challan.totalMtr || 0);
+
+    // If details array was empty but effectiveTotalMtr > 0 and a lot is specified, register lot group
+    if (Object.keys(lotGroups).length === 0 && effectiveTotalMtr > 0 && (rawLotStr || finalLotNoStr)) {
+      const primaryLot = String(rawLotStr || finalLotNoStr).split(',')[0].trim();
+      if (primaryLot) {
+        lotGroups[primaryLot] = effectiveTotalMtr;
+      }
+    }
+
+    // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
+    let challanProportionalWaste = 0;
+    if (challan.jobNo && effectiveTotalMtr > 0) {
+      try {
+        const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(challan.jobNo);
+        if (totalWaste > 0) {
+          const baseFresh = totalFresh > 0 ? totalFresh : effectiveTotalMtr;
+          const ratio = Math.min(1.0, effectiveTotalMtr / baseFresh);
+          challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
+        }
+      } catch (wErr) {
+        console.warn('Failed to calculate proportional fusing wastage for challan on update:', wErr.message);
+      }
+    }
+
+    // ── Stock Sufficiency Validation: Selected lot(s) must have enough fabric with wastage & shortage ──
+    const stockCheck = await validateLotStockSufficiency({
+      lotGroups,
+      totalMtr: effectiveTotalMtr,
+      challanProportionalWaste,
+      shortagePct: challan.shortagePct,
+      shortageMtr: challan.shortageMtr,
+      shortageMode: challan.shortageMode,
+      excludeChallanNo: challan.challanNo ? 'EDP-' + challan.challanNo : null
+    });
+
+    if (!stockCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        error: stockCheck.error,
+        lotNo: stockCheck.lotNo,
+        availableStock: stockCheck.availableStock,
+        requiredStock: stockCheck.requiredStock,
+        deficit: stockCheck.deficit
+      });
+    }
+
     challan.tpDetails = sanitizedDetails;
     challan.lotNo = finalLotNoStr;
     challan.totalMtr = totalMtr;
     challan.totalTp = totalTp;
+    challan.proportionalWasteMtr = challanProportionalWaste;
 
     await challan.save();
 
@@ -1005,7 +1168,7 @@ const updateChallan = async (req, res) => {
             partyName: challan.partyName || '',
             billTo: challan.billTo || challan.partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            forceAllowNegative: true,
+            forceAllowNegative: false,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();

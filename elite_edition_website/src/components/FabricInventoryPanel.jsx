@@ -1808,6 +1808,67 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
       const matchedJobs = rawTokens.map(tok => findMatchingJobCard(tok)).filter(Boolean);
 
+      // ── Client-side Lot Stock Validation (Prevent Negative Lot Stock) ──
+      const selectedLots = String(challanForm.lotNo || '')
+        .split(/[,\s&]+/)
+        .map(x => x.trim())
+        .filter(Boolean);
+
+      if (selectedLots.length > 0 && !editingChallan) {
+        const availableLotsStock = selectedLots.reduce((sum, lotNo) => {
+          const lotStockItem = lotRecords.find(l => String(l.lotNo) === lotNo) || availableLots.find(l => String(l.lotNo) === lotNo);
+          return sum + (lotStockItem ? (lotStockItem.currentStock || 0) : 0);
+        }, 0);
+
+        const dispatchedMtr = challanTotalMtr > 0 ? challanTotalMtr : (parseFloat(challanForm.totalMtr) || 0);
+
+        let totalFresh = 0;
+        let totalWest = 0;
+        matchedJobs.forEach(j => {
+          const fresh = parseFloat(j.freshMtr || 0);
+          const waste = parseFloat(
+            j.totalWastageMtr ||
+            j.fabricWastageMtr ||
+            ((parseFloat(j.fabricFaultMtr) || 0) +
+             (parseFloat(j.fusingFaultMtr) || 0) +
+             (parseFloat(j.printFaultMtr) || 0) +
+             (parseFloat(j.genuineFaultMtr) || 0)) ||
+            0
+          );
+          const fused = parseFloat(j.fusingMtr || 0);
+          totalFresh += fresh > 0 ? fresh : (fused > 0 && waste === 0 ? fused : 0);
+          totalWest += waste;
+        });
+
+        let propWasteMtr = 0;
+        if (totalFresh > 0 && totalWest > 0) {
+          const ratio = Math.min(1.0, dispatchedMtr / totalFresh);
+          propWasteMtr = parseFloat((ratio * totalWest).toFixed(2));
+        }
+
+        const fabricWithWaste = dispatchedMtr + propWasteMtr;
+        let shortageVal = 0;
+        if (challanForm.shortageMode === 'mtr') {
+          shortageVal = parseFloat(challanForm.shortageMtr) || 0;
+        } else if (challanForm.shortagePct !== '' && challanForm.shortagePct != null) {
+          const p = parseFloat(challanForm.shortagePct) || 0;
+          shortageVal = (fabricWithWaste * p) / 100;
+        }
+        const totalRequiredRaw = fabricWithWaste + shortageVal;
+
+        // If total required exceeds available stock in selected lot(s) by more than 2.0m tolerance
+        if (totalRequiredRaw > (availableLotsStock + 2.0)) {
+          setLoading(false);
+          const deficit = (totalRequiredRaw - availableLotsStock).toFixed(2);
+          await triggerEliteAlert(
+            '❌ Insufficient Fabric in Lot',
+            `Cannot create Delivery Challan!\n\nTotal fabric required with wastage & shortage (${totalRequiredRaw.toFixed(2)}m) exceeds available stock in selected Lot(s) #${selectedLots.join(', #')} (${availableLotsStock.toFixed(2)}m)!\n\n• Available in Selected Lot(s): ${availableLotsStock.toFixed(2)} mtr\n• Required Raw Meters: ${totalRequiredRaw.toFixed(2)} mtr (Dispatched: ${dispatchedMtr.toFixed(2)}m${propWasteMtr > 0 ? ` + Westage: ${propWasteMtr.toFixed(2)}m` : ''} + Shortage: ${shortageVal.toFixed(2)}m)\n• Deficit: ${deficit} mtr\n\nPlease select an additional lot or reduce meter quantity so the lot stock does not go negative.`,
+            'error'
+          );
+          return;
+        }
+      }
+
       let needsOverride = false;
       let overrideReasons = [];
 
@@ -2654,6 +2715,50 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       jobLabels: matched.map(j => `#${j.jobNo}`).join(', ')
     };
   }, [challanForm.jobNo, inProgressJobCards]);
+
+  // Proportional lot stock fulfillment calculation (including fusing waste & shortage)
+  const challanStockFulfillment = React.useMemo(() => {
+    if (selectedLotsList.length === 0) return null;
+    const dispatchedMtr = challanTotalMtr > 0 ? challanTotalMtr : (parseFloat(challanForm.totalMtr) || 0);
+
+    let proportionalWasteMtr = 0;
+    if (challanFusingStats && challanFusingStats.freshMtr > 0 && challanFusingStats.westMtr > 0) {
+      const baseFresh = challanFusingStats.freshMtr;
+      const ratio = Math.min(1.0, dispatchedMtr / baseFresh);
+      proportionalWasteMtr = parseFloat((ratio * challanFusingStats.westMtr).toFixed(2));
+    }
+
+    const fabricWithWasteMtr = dispatchedMtr + proportionalWasteMtr;
+    let shortageMtrVal = 0;
+    if (challanForm.shortageMode === 'mtr') {
+      shortageMtrVal = parseFloat(challanForm.shortageMtr) || 0;
+    } else if (challanForm.shortagePct !== '' && challanForm.shortagePct != null) {
+      const p = parseFloat(challanForm.shortagePct) || 0;
+      shortageMtrVal = (fabricWithWasteMtr * p) / 100;
+    }
+    const effectiveTakenMtr = fabricWithWasteMtr + shortageMtrVal;
+    const hasStock = selectedLotsTotalStock > 0;
+    const realPct = hasStock ? Math.round((effectiveTakenMtr / selectedLotsTotalStock) * 100) : (effectiveTakenMtr > 0 ? 999 : 0);
+    const fillWidth = Math.min(100, realPct);
+    const isOver = !editingChallan && effectiveTakenMtr > (selectedLotsTotalStock + 2.0);
+    let balance = selectedLotsTotalStock - effectiveTakenMtr;
+    if (Math.abs(balance) < 0.01) balance = 0;
+    const deficit = isOver ? Math.abs(balance) : 0;
+
+    return {
+      dispatchedMtr,
+      proportionalWasteMtr,
+      fabricWithWasteMtr,
+      shortageMtrVal,
+      effectiveTakenMtr,
+      hasStock,
+      realPct,
+      fillWidth,
+      isOver,
+      balance,
+      deficit
+    };
+  }, [selectedLotsList, selectedLotsTotalStock, challanTotalMtr, challanForm.totalMtr, challanForm.shortageMode, challanForm.shortageMtr, challanForm.shortagePct, challanFusingStats, editingChallan]);
 
   return (
     <div className="fabric-container">
@@ -6375,6 +6480,26 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </div>
 
                   {/* Action Buttons Bar */}
+                  {challanStockFulfillment?.isOver && (
+                    <div style={{
+                      padding: '0.65rem 0.85rem',
+                      background: '#fef2f2',
+                      border: '1.5px solid #ef4444',
+                      borderRadius: '8px',
+                      color: '#991b1b',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>🚫</span>
+                      <span>
+                        <strong>Cannot Save Challan:</strong> Fabric required ({challanStockFulfillment.effectiveTakenMtr.toFixed(2)}m raw with waste & shortage) exceeds available stock in selected lot(s) ({selectedLotsTotalStock.toFixed(2)}m) by <strong>{challanStockFulfillment.deficit.toFixed(2)}m</strong>! Please select an additional lot or reduce meters so lot stock does not go negative.
+                      </span>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button
                       type="button"
@@ -6397,7 +6522,24 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700, background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '8px' }} onClick={closeChallanModal}>
                       Cancel
                     </button>
-                    <button type="submit" className="btn-primary" style={{ flex: 1.8, padding: '0.65rem 1rem', fontSize: '0.95rem', fontWeight: 900, background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#ffffff', border: 'none', borderRadius: '8px', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)', cursor: 'pointer' }}>
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                      disabled={challanStockFulfillment?.isOver}
+                      style={{
+                        flex: 1.8,
+                        padding: '0.65rem 1rem',
+                        fontSize: '0.95rem',
+                        fontWeight: 900,
+                        background: challanStockFulfillment?.isOver ? '#94a3b8' : 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        boxShadow: challanStockFulfillment?.isOver ? 'none' : '0 4px 14px rgba(37, 99, 235, 0.35)',
+                        cursor: challanStockFulfillment?.isOver ? 'not-allowed' : 'pointer',
+                        opacity: challanStockFulfillment?.isOver ? 0.75 : 1
+                      }}
+                    >
                       {editingChallan ? '💾 Save Changes' : '🚀 Save Challan'}
                     </button>
                   </div>
