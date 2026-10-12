@@ -739,6 +739,51 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     jobNo: '', challanNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: ''
   });
 
+  // Real-time Duplicate Inward Match (Option B: Vendor + Challan No + Fabric Quality + Panna, or all parameters if Challan is absent)
+  const duplicateInwardMatch = useMemo(() => {
+    if (!isInwardOpen) return null;
+    const vName = (inwardForm.vendorName || '').trim().toLowerCase();
+    const cNo = (inwardForm.challanNo || '').trim().toLowerCase();
+    const rawFab = (inwardForm.fabricQuality || '').trim();
+    if (!vName || !rawFab) return null;
+    const cleanFab = (normalizeFabricName(rawFab, inwardForm.panna) || rawFab).trim().toLowerCase();
+    const pWidth = (inwardForm.panna ? String(inwardForm.panna).replace(/['"]/g, '').trim() : '').toLowerCase();
+    const enteredQty = parseFloat(inwardForm.qty);
+    const enteredDate = inwardForm.date ? new Date(inwardForm.date).toISOString().split('T')[0] : '';
+
+    return (transactions || []).find(tx => {
+      if (tx.type !== 'INWARD') return false;
+      if (editingTransaction && (tx._id === editingTransaction._id || tx.lotNo === editingTransaction.lotNo)) return false;
+
+      const txVendor = (tx.vendorName || '').trim().toLowerCase();
+      if (txVendor !== vName) return false;
+
+      const txChallan = (tx.challanNo || '').trim().toLowerCase();
+      const txFabric = (normalizeFabricName(tx.fabricQuality, tx.panna) || tx.fabricQuality || '').trim().toLowerCase();
+      const txPanna = (tx.panna ? String(tx.panna).replace(/['"]/g, '').trim() : '').toLowerCase();
+      const txQty = parseFloat(tx.qty);
+      const txDate = tx.date ? new Date(tx.date).toISOString().split('T')[0] : '';
+
+      // Option B: If challan number is provided, check Vendor + Challan No + Fabric Quality (+ Panna)
+      if (cNo && txChallan && cNo !== '-' && cNo !== 'na' && cNo !== 'n/a') {
+        if (txChallan === cNo && txFabric === cleanFab) {
+          if (pWidth && txPanna && pWidth !== txPanna) return false;
+          return true;
+        }
+      } else if (!cNo || cNo === '-' || cNo === 'na' || cNo === 'n/a') {
+        // Fallback: If Challan No is absent, check all parameters (Vendor, Fabric, Panna, Qty, Date)
+        if (txFabric === cleanFab && (!pWidth || !txPanna || pWidth === txPanna)) {
+          if (!isNaN(enteredQty) && enteredQty > 0 && Math.abs(txQty - enteredQty) < 0.01) {
+            if (enteredDate && txDate && enteredDate === txDate) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    });
+  }, [isInwardOpen, inwardForm.vendorName, inwardForm.challanNo, inwardForm.fabricQuality, inwardForm.panna, inwardForm.qty, inwardForm.date, transactions, editingTransaction]);
+
   const fetchData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     setError('');
@@ -925,6 +970,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const handleInwardSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // Prevent double submissions
+    if (duplicateInwardMatch) {
+      alert(`⚠️ Duplicate Inward Blocked: Lot #${duplicateInwardMatch.lotNo} already exists for Vendor "${duplicateInwardMatch.vendorName}", Challan #${duplicateInwardMatch.challanNo || 'N/A'}, Fabric "${duplicateInwardMatch.fabricQuality}" (${duplicateInwardMatch.panna || 'Standard'}" - ${duplicateInwardMatch.qty}m on ${duplicateInwardMatch.date ? new Date(duplicateInwardMatch.date).toLocaleDateString('en-GB') : 'N/A'}). Duplicate entries are not permitted.`);
+      return;
+    }
     setLoading(true);
     const cleanFabric = normalizeFabricName(inwardForm.fabricQuality, inwardForm.panna);
     const payload = { ...inwardForm, fabricQuality: cleanFabric || inwardForm.fabricQuality, department: department || 'digital_print' };
@@ -6440,9 +6490,63 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <input type="text" value={inwardForm.notes} onChange={e => setInwardForm({ ...inwardForm, notes: e.target.value })} style={inputStyle} placeholder="Optional notes..." />
               </div>
 
+              {duplicateInwardMatch && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.45)',
+                  borderRadius: '8px',
+                  padding: '0.85rem 1rem',
+                  color: '#f87171',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: '#ef4444' }}>
+                    <AlertTriangle size={18} />
+                    <span>Duplicate Inward Entry Detected!</span>
+                  </div>
+                  <div style={{ color: 'var(--text-secondary, #cbd5e1)', fontSize: '0.8rem', lineHeight: 1.4 }}>
+                    An inward entry matching these parameters already exists in the system:
+                  </div>
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.25)',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.8rem',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '0.35rem',
+                    color: '#e2e8f0'
+                  }}>
+                    <div><strong>Lot No:</strong> #{duplicateInwardMatch.lotNo}</div>
+                    <div><strong>Vendor:</strong> {duplicateInwardMatch.vendorName}</div>
+                    <div><strong>Challan No:</strong> {duplicateInwardMatch.challanNo || 'None'}</div>
+                    <div><strong>Fabric:</strong> {duplicateInwardMatch.fabricQuality}</div>
+                    <div><strong>Panna:</strong> {duplicateInwardMatch.panna || 'Standard'}&quot;</div>
+                    <div><strong>Quantity:</strong> {duplicateInwardMatch.qty} mtr</div>
+                    <div style={{ gridColumn: 'span 2' }}><strong>Date:</strong> {duplicateInwardMatch.date ? new Date(duplicateInwardMatch.date).toLocaleDateString('en-GB') : 'N/A'}</div>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#fca5a5' }}>
+                    ⚠️ Saving is blocked to prevent double-counting inventory.
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={closeInwardModal}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{ flex: 1 }}>{editingTransaction ? 'Save Changes' : 'Save Inward'}</button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{
+                    flex: 1,
+                    opacity: (loading || !!duplicateInwardMatch) ? 0.6 : 1,
+                    cursor: (loading || !!duplicateInwardMatch) ? 'not-allowed' : 'pointer'
+                  }}
+                  disabled={loading || !!duplicateInwardMatch}
+                >
+                  {loading ? 'Saving...' : duplicateInwardMatch ? '⚠️ Duplicate Inward' : editingTransaction ? 'Save Changes' : 'Save Inward'}
+                </button>
               </div>
             </form>
           </div>

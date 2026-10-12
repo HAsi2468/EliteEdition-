@@ -79,6 +79,60 @@ const createInward = async (req, res) => {
     const normFabric = normalizeFabric(fabricQuality);
     const normP = normalizePanna(panna, normFabric);
 
+    // ── Duplicate Inward Guard (Option B: Vendor + Challan No + Fabric Quality + Panna) ──
+    const vName = (vendorName || '').trim();
+    const cNo = (challanNo || '').trim();
+    const fQuality = normFabric.trim();
+    const pWidth = normP ? String(normP).trim() : '';
+
+    if (vName && cNo && fQuality) {
+      const dupQuery = {
+        type: 'INWARD',
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        challanNo: { $regex: new RegExp(`^${cNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        fabricQuality: { $regex: new RegExp(`^${fQuality.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      };
+      if (pWidth) {
+        dupQuery.panna = { $regex: new RegExp(`^${pWidth.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+      }
+
+      const existingDup = await FabricTransaction.findOne(dupQuery);
+      if (existingDup) {
+        const dupDate = existingDup.date ? new Date(existingDup.date).toLocaleDateString('en-GB') : 'N/A';
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Inward Blocked: Lot #${existingDup.lotNo} already exists for Vendor "${existingDup.vendorName}", Challan #${existingDup.challanNo}, Fabric "${existingDup.fabricQuality}" (${existingDup.panna || 'Standard'}" - ${existingDup.qty}m entered on ${dupDate}). Duplicate inward entries are not permitted.`
+        });
+      }
+    } else if (vName && !cNo && fQuality && qty > 0) {
+      // If no challan number was given, check identical vendor + fabric + panna + qty on the same date
+      const txDate = date ? new Date(date) : new Date();
+      const startOfDay = new Date(txDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(txDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const dupQuery = {
+        type: 'INWARD',
+        challanNo: { $in: [null, '', '-'] },
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        fabricQuality: { $regex: new RegExp(`^${fQuality.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        qty: Number(qty),
+        date: { $gte: startOfDay, $lte: endOfDay }
+      };
+      if (pWidth) {
+        dupQuery.panna = { $regex: new RegExp(`^${pWidth.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+      }
+
+      const existingDup = await FabricTransaction.findOne(dupQuery);
+      if (existingDup) {
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Inward Blocked: Lot #${existingDup.lotNo} with identical Vendor "${existingDup.vendorName}", Fabric "${existingDup.fabricQuality}", and ${qty}m already exists for this date.`
+        });
+      }
+    }
+
     const sMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
     let parsedPct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
     let parsedMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;
@@ -973,6 +1027,61 @@ const updateTransaction = async (req, res) => {
     const transaction = await FabricTransaction.findById(id);
     if (!transaction) {
       return res.status(404).json({ success: false, error: 'Transaction not found.' });
+    }
+
+    // Duplicate Inward check on edit
+    if (transaction.type === 'INWARD') {
+      const vName = (vendorName !== undefined ? vendorName : transaction.vendorName || '').trim();
+      const cNo = (challanNo !== undefined ? challanNo : transaction.challanNo || '').trim();
+      const effFabric = fabricQuality !== undefined ? normalizeFabric(fabricQuality) : transaction.fabricQuality;
+      const effPanna = panna !== undefined ? normalizePanna(panna, effFabric) : transaction.panna;
+
+      if (vName && cNo && effFabric) {
+        const dupQuery = {
+          _id: { $ne: transaction._id },
+          type: 'INWARD',
+          vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          challanNo: { $regex: new RegExp(`^${cNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          fabricQuality: { $regex: new RegExp(`^${effFabric.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        };
+        if (effPanna) {
+          dupQuery.panna = { $regex: new RegExp(`^${String(effPanna).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+        }
+        const existingDup = await FabricTransaction.findOne(dupQuery);
+        if (existingDup) {
+          return res.status(409).json({
+            success: false,
+            error: `Duplicate Inward Blocked: Lot #${existingDup.lotNo} already exists for Vendor "${existingDup.vendorName}", Challan #${existingDup.challanNo}, Fabric "${existingDup.fabricQuality}".`
+          });
+        }
+      } else if (vName && !cNo && effFabric) {
+        const effQty = qty !== undefined ? Number(qty) : transaction.qty;
+        const effDate = date !== undefined ? new Date(date) : (transaction.date || new Date());
+        const startOfDay = new Date(effDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(effDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const dupQuery = {
+          _id: { $ne: transaction._id },
+          type: 'INWARD',
+          challanNo: { $in: [null, '', '-'] },
+          vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          fabricQuality: { $regex: new RegExp(`^${effFabric.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          qty: effQty,
+          date: { $gte: startOfDay, $lte: endOfDay }
+        };
+        if (effPanna) {
+          dupQuery.panna = { $regex: new RegExp(`^${String(effPanna).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+        }
+        const existingDup = await FabricTransaction.findOne(dupQuery);
+        if (existingDup) {
+          return res.status(409).json({
+            success: false,
+            error: `Duplicate Inward Blocked: Lot #${existingDup.lotNo} with identical Vendor "${existingDup.vendorName}", Fabric "${existingDup.fabricQuality}", and ${effQty}m already exists for this date.`
+          });
+        }
+      }
     }
 
     // Update fields
