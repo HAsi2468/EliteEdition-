@@ -4677,208 +4677,325 @@ export default function EliteBillingDepartment({
               </div>
             </div>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '920px' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '0.5rem' }}>Item Description & Details</th>
-                  <th style={{ padding: '0.5rem', width: '90px' }}>HSN</th>
-                  <th style={{ padding: '0.5rem', width: '80px' }}>Qty</th>
-                  <th style={{ padding: '0.5rem', width: '90px' }}>Unit</th>
-                  <th style={{ padding: '0.5rem', width: '100px' }}>Price (₹)</th>
-                  <th style={{ padding: '0.5rem', width: '65px', textAlign: 'center' }}>🧈 Butter</th>
-                  <th style={{ padding: '0.5rem', width: '75px' }}>Disc %</th>
-                  <th style={{ padding: '0.5rem', width: '75px' }}>GST %</th>
-                  <th style={{ padding: '0.5rem', width: '105px', textAlign: 'right' }}>Total (₹)</th>
-                  <th style={{ padding: '0.5rem', width: '40px' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {calculatedInvoice.items.map((it, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)', verticalAlign: 'top' }}>
-                    <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                        {it.imageUrl && (
-                          <img src={convertDriveUrl(it.imageUrl, it.itemName)} alt="Design" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} onError={e => { e.target.style.display = 'none'; }} />
-                        )}
-                        <input
-                          id={`invoice-item-name-${idx}`}
-                          type="text"
-                          list={`items-list-${idx}`}
-                          value={it.itemName}
-                          onChange={e => handleItemChange(idx, 'itemName', e.target.value)}
-                          placeholder="Type item or select..."
-                          style={inputStyle}
-                        />
-                        <datalist id={`items-list-${idx}`}>
-                          {itemsList.map(item => <option key={item._id} value={item.itemName} />)}
-                        </datalist>
-                      </div>
-
-                      {/* Visible Fabric & Description badge so the user sees the fabric name! */}
-                      {(it.fabric || it.fabricName || it.description) && (
-                        <div style={{ fontSize: '0.72rem', color: '#4f46e5', background: '#eef2ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #c7d2fe', display: 'flex', alignItems: 'center', gap: 5, width: 'fit-content' }}>
-                          <span>🧵</span>
-                          <span style={{ fontWeight: 700 }}>
-                            {it.fabric || it.fabricName ? `Fabric: ${it.fabric || it.fabricName}` : it.description}
-                          </span>
-                          {it.description && !it.description.includes(it.fabric || it.fabricName || '') && (
-                            <span style={{ color: '#64748b', fontWeight: 500 }}>({it.description})</span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Sub-inputs: Job No, Lot No, Party Challan, Our Challan, Image URL */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1.5fr', gap: '0.3rem' }}>
-                        <input
-                          type="text"
-                          value={it.jobNo || ''}
-                          onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
-                          placeholder="Job Card"
-                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                        />
-                        <input
-                          type="text"
-                          value={it.lotNo || ''}
-                          onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
-                          placeholder="Lot No"
-                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                        />
-                        <input
-                          type="text"
-                          value={it.partyChallan || ''}
-                          onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
-                          placeholder="Vendor Challan"
-                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                        />
-                        <input
-                          type="text"
-                          value={it.ourChallanNo || ''}
-                          onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
-                          placeholder="Challan"
-                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                        />
-                        <input
-                          type="text"
-                          value={it.imageUrl || ''}
-                          onChange={e => handleItemChange(idx, 'imageUrl', e.target.value)}
-                          placeholder="Design Image Link..."
-                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
-                        />
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.4rem' }}>
-                      <input
-                        type="text"
-                        value={it.hsnCode}
-                        onChange={e => handleItemChange(idx, 'hsnCode', e.target.value)}
-                        style={inputStyle}
-                      />
-                    </td>
-                    <td style={{ padding: '0.4rem' }}>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <input
-                          id={`invoice-item-qty-${idx}`}
-                          data-primary-qty={idx === 0 ? "true" : undefined}
-                          type="number"
-                          step="0.01"
-                          value={it.qty}
-                          onChange={e => handleItemChange(idx, 'qty', e.target.value)}
-                          style={{
-                            ...inputStyle,
-                            backgroundColor: it.isLocked ? 'rgba(251, 191, 36, 0.08)' : undefined,
-                            borderColor: it.isLocked ? 'rgba(251, 191, 36, 0.5)' : undefined
-                          }}
-                        />
-                        {it.isLocked && (
-                          <Lock size={12} style={{ position: 'absolute', right: 6, color: '#fbbf24', pointerEvents: 'none' }} title="Imported from Delivery Challan (editable anytime)" />
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.4rem' }}>
-                      <select
-                        value={it.unit}
-                        onChange={e => handleItemChange(idx, 'unit', e.target.value)}
-                        style={inputStyle}
-                      >
-                        <option value="Meters">Meters</option>
-                        <option value="KG">KG</option>
-                        <option value="Kg">Kg</option>
-                        <option value="Pcs">Pcs</option>
-                        <option value="Rolls">Rolls</option>
-                        <option value="Ltr">Ltr</option>
-                        <option value="Boxes">Boxes</option>
-                        <option value="Bags">Bags</option>
-                        <option value="Set">Set</option>
-                        <option value="Hours">Hours</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: '0.4rem' }}>
-                      <input
-                        id={`invoice-item-price-${idx}`}
-                        type="number"
-                        value={it.unitPrice}
-                        onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
-                        style={inputStyle}
-                      />
-                      {it.butterPaper && (
-                        <span style={{ fontSize: '0.62rem', color: '#fbbf24', fontWeight: 700, display: 'block', textAlign: 'center', marginTop: '2px' }}>
-                          Eff: ₹{(parseFloat(it.unitPrice || 0) + 3).toFixed(2)}
-                        </span>
-                      )}
-                    </td>
-                    {/* Per-item Butter Paper Toggle */}
-                    <td style={{ padding: '0.4rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                      <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' }} title="Toggle Butter Paper (+₹3/m)">
-                        <input
-                          type="checkbox"
-                          checked={!!it.butterPaper}
-                          onChange={e => {
-                            const checked = e.target.checked;
-                            setInvoiceForm(f => ({
-                              ...f,
-                              items: f.items.map((item, i) => i === idx ? { ...item, butterPaper: checked } : item)
-                            }));
-                          }}
-                          style={{ cursor: 'pointer', width: 14, height: 14 }}
-                        />
-                        <span style={{ fontSize: '0.6rem', color: it.butterPaper ? '#fbbf24' : 'var(--text-muted)', fontWeight: 700 }}>
-                          {it.butterPaper ? '+₹3' : 'None'}
-                        </span>
-                      </label>
-                    </td>
-                    <td style={{ padding: '0.4rem' }}>
-                      <input
-                        type="number"
-                        value={it.discountPct}
-                        onChange={e => handleItemChange(idx, 'discountPct', e.target.value)}
-                        style={inputStyle}
-                      />
-                    </td>
-                    <td style={{ padding: '0.4rem' }}>
-                      <select
-                        value={it.taxRate}
-                        onChange={e => handleItemChange(idx, 'taxRate', e.target.value)}
-                        style={inputStyle}
-                      >
-                        <option value={0}>0%</option>
-                        <option value={5}>5%</option>
-                        <option value={12}>12%</option>
-                        <option value={18}>18%</option>
-                        <option value={28}>28%</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: '0.4rem', textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      ₹ {(it.totalAmount || 0).toFixed(2)}
-                    </td>
-                    <td style={{ padding: '0.4rem', textAlign: 'center' }}>
-                      <button type="button" onClick={() => handleRemoveItemRow(idx)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}>
-                        <X size={14} />
-                      </button>
-                    </td>
+            {/* Invoice Line Items Table with aligned heights and generous column widths */}
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1060px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-light, #cbd5e1)', fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '0.5rem 0.4rem', minWidth: '290px' }}>Item Description & Details</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '105px', minWidth: '105px' }}>HSN</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '95px', minWidth: '95px' }}>Qty</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '105px', minWidth: '105px' }}>Unit</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '105px', minWidth: '105px' }}>Price (₹)</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '80px', minWidth: '80px', textAlign: 'center' }}>🧈 Butter</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '75px', minWidth: '75px' }}>Disc %</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '90px', minWidth: '90px' }}>GST %</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '120px', minWidth: '120px', textAlign: 'right' }}>Total (₹)</th>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '38px', minWidth: '38px', textAlign: 'center' }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {calculatedInvoice.items.map((it, idx) => {
+                    const rowInputStyle = {
+                      width: '100%',
+                      height: '36px',
+                      padding: '0.35rem 0.5rem',
+                      fontSize: '0.84rem',
+                      fontWeight: 600,
+                      background: 'var(--bg-input, #ffffff)',
+                      border: '1px solid var(--border-light, #cbd5e1)',
+                      borderRadius: '6px',
+                      color: 'var(--text-primary, #0f172a)',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    };
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, #e2e8f0)', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', height: '36px' }}>
+                              {it.imageUrl && (
+                                <img
+                                  src={convertDriveUrl(it.imageUrl, it.itemName)}
+                                  alt="Design"
+                                  style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light, #cbd5e1)', flexShrink: 0 }}
+                                  onError={e => { e.target.style.display = 'none'; }}
+                                />
+                              )}
+                              <input
+                                id={`invoice-item-name-${idx}`}
+                                type="text"
+                                list={`items-list-${idx}`}
+                                value={it.itemName}
+                                onChange={e => handleItemChange(idx, 'itemName', e.target.value)}
+                                placeholder="Type item or select..."
+                                style={{ ...rowInputStyle, fontWeight: 700 }}
+                              />
+                              <datalist id={`items-list-${idx}`}>
+                                {itemsList.map(item => <option key={item._id} value={item.itemName} />)}
+                              </datalist>
+                            </div>
+
+                            {/* Visible Fabric & Description badge */}
+                            {(it.fabric || it.fabricName || it.description) && (
+                              <div style={{ fontSize: '0.72rem', color: '#4f46e5', background: '#eef2ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #c7d2fe', display: 'flex', alignItems: 'center', gap: 5, width: 'fit-content' }}>
+                                <span>🧵</span>
+                                <span style={{ fontWeight: 700 }}>
+                                  {it.fabric || it.fabricName ? `Fabric: ${it.fabric || it.fabricName}` : it.description}
+                                </span>
+                                {it.description && !it.description.includes(it.fabric || it.fabricName || '') && (
+                                  <span style={{ color: '#64748b', fontWeight: 500 }}>({it.description})</span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Sub-inputs: Job No, Lot No, Party Challan, Our Challan, Image URL with clear tags */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', marginTop: '1px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Job</span>
+                                <input
+                                  type="text"
+                                  value={it.jobNo || ''}
+                                  onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
+                                  placeholder="Job No"
+                                  title="Job Card No"
+                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '65px', color: '#0f172a', background: 'transparent' }}
+                                />
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Lot</span>
+                                <input
+                                  type="text"
+                                  value={it.lotNo || ''}
+                                  onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
+                                  placeholder="Lot No"
+                                  title="Lot No"
+                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '60px', color: '#0f172a', background: 'transparent' }}
+                                />
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Party Ch.</span>
+                                <input
+                                  type="text"
+                                  value={it.partyChallan || ''}
+                                  onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
+                                  placeholder="Party Challan"
+                                  title="Party / Vendor Challan"
+                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                />
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Our Ch.</span>
+                                <input
+                                  type="text"
+                                  value={it.ourChallanNo || ''}
+                                  onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
+                                  placeholder="Delivery Ch."
+                                  title="Our Delivery Challan No"
+                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                />
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden', flex: '1 1 110px' }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Design URL</span>
+                                <input
+                                  type="text"
+                                  value={it.imageUrl || ''}
+                                  onChange={e => handleItemChange(idx, 'imageUrl', e.target.value)}
+                                  placeholder="Paste design link..."
+                                  title={it.imageUrl || 'Design Image URL'}
+                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#0f172a', background: 'transparent' }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                          <input
+                            type="text"
+                            value={it.hsnCode}
+                            onChange={e => handleItemChange(idx, 'hsnCode', e.target.value)}
+                            placeholder="HSN"
+                            style={{ ...rowInputStyle, textAlign: 'center' }}
+                          />
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '36px' }}>
+                            <input
+                              id={`invoice-item-qty-${idx}`}
+                              data-primary-qty={idx === 0 ? "true" : undefined}
+                              type="number"
+                              step="0.01"
+                              value={it.qty}
+                              onChange={e => handleItemChange(idx, 'qty', e.target.value)}
+                              placeholder="0"
+                              style={{
+                                ...rowInputStyle,
+                                textAlign: 'right',
+                                paddingRight: it.isLocked ? '24px' : '0.5rem',
+                                backgroundColor: it.isLocked ? 'rgba(251, 191, 36, 0.08)' : undefined,
+                                borderColor: it.isLocked ? 'rgba(251, 191, 36, 0.5)' : undefined
+                              }}
+                            />
+                            {it.isLocked && (
+                              <Lock size={12} style={{ position: 'absolute', right: 6, color: '#fbbf24', pointerEvents: 'none' }} title="Imported from Delivery Challan (editable anytime)" />
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                          <select
+                            value={it.unit}
+                            onChange={e => handleItemChange(idx, 'unit', e.target.value)}
+                            style={{ ...rowInputStyle, padding: '0.35rem 0.35rem', cursor: 'pointer' }}
+                          >
+                            <option value="Meters">Meters</option>
+                            <option value="KG">KG</option>
+                            <option value="Kg">Kg</option>
+                            <option value="Pcs">Pcs</option>
+                            <option value="Rolls">Rolls</option>
+                            <option value="Ltr">Ltr</option>
+                            <option value="Boxes">Boxes</option>
+                            <option value="Bags">Bags</option>
+                            <option value="Set">Set</option>
+                            <option value="Hours">Hours</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                          <input
+                            id={`invoice-item-price-${idx}`}
+                            type="number"
+                            value={it.unitPrice}
+                            onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
+                            placeholder="0.00"
+                            style={{ ...rowInputStyle, textAlign: 'right' }}
+                          />
+                          {it.butterPaper && (
+                            <span style={{ fontSize: '0.66rem', color: '#d97706', fontWeight: 800, display: 'block', textAlign: 'right', marginTop: '2px' }}>
+                              Eff: ₹{(parseFloat(it.unitPrice || 0) + 3).toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        {/* Per-item Butter Paper Toggle - Perfectly in-line horizontally */}
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'center' }}>
+                          <div style={{
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: it.butterPaper ? 'rgba(251, 191, 36, 0.12)' : 'rgba(241, 245, 249, 0.7)',
+                            border: `1px solid ${it.butterPaper ? '#f59e0b' : 'var(--border-light, #cbd5e1)'}`,
+                            borderRadius: '6px',
+                            padding: '0 4px',
+                            boxSizing: 'border-box'
+                          }}>
+                            <label
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer',
+                                margin: 0,
+                                userSelect: 'none'
+                              }}
+                              title="Toggle Butter Paper (+₹3/m)"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!it.butterPaper}
+                                onChange={e => {
+                                  const checked = e.target.checked;
+                                  setInvoiceForm(f => ({
+                                    ...f,
+                                    items: f.items.map((item, i) => i === idx ? { ...item, butterPaper: checked } : item)
+                                  }));
+                                }}
+                                style={{
+                                  cursor: 'pointer',
+                                  width: '16px',
+                                  height: '16px',
+                                  accentColor: '#d97706',
+                                  margin: 0
+                                }}
+                              />
+                              <span style={{ fontSize: '0.68rem', color: it.butterPaper ? '#b45309' : '#64748b', fontWeight: 800 }}>
+                                {it.butterPaper ? '+₹3' : 'No'}
+                              </span>
+                            </label>
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                          <input
+                            type="number"
+                            value={it.discountPct}
+                            onChange={e => handleItemChange(idx, 'discountPct', e.target.value)}
+                            placeholder="0"
+                            style={{ ...rowInputStyle, textAlign: 'right' }}
+                          />
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                          <select
+                            value={it.taxRate}
+                            onChange={e => handleItemChange(idx, 'taxRate', e.target.value)}
+                            style={{ ...rowInputStyle, padding: '0.35rem 0.35rem', cursor: 'pointer', textAlign: 'center' }}
+                          >
+                            <option value={0}>0%</option>
+                            <option value={5}>5%</option>
+                            <option value={12}>12%</option>
+                            <option value={18}>18%</option>
+                            <option value={28}>28%</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'right' }}>
+                          <div style={{
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            fontSize: '0.92rem',
+                            fontWeight: 900,
+                            color: 'var(--text-primary, #0f172a)',
+                            fontVariantNumeric: 'tabular-nums',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            ₹ {(it.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'center' }}>
+                          <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItemRow(idx)}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: '6px',
+                                background: 'none',
+                                border: 'none',
+                                color: '#f87171',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'background 0.15s'
+                              }}
+                              title="Remove line item"
+                              onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Financial Summary & Tax Breakdown Box */}
