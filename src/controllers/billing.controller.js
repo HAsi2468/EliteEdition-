@@ -349,14 +349,69 @@ const assertChallansNotAlreadyBilled = async (invoiceData, currentInvoiceId = nu
   const activeChallanIdList = Array.from(challanIdsToCheck).filter(id => mongoose.Types.ObjectId.isValid(id));
   const activeChallanNoList = Array.from(challanNosToCheck);
 
-  if (activeChallanIdList.length === 0 && activeChallanNoList.length === 0) {
-    return; // No challans to check
+  let preexistingChallanNos = new Set();
+  let preexistingChallanIds = new Set();
+  let currentInvoiceNo = invoiceData.invoiceNo || null;
+  let excludeCurrentInv = {};
+
+  if (currentInvoiceId) {
+    const currentObjId = mongoose.Types.ObjectId.isValid(currentInvoiceId)
+      ? new mongoose.Types.ObjectId(currentInvoiceId)
+      : currentInvoiceId;
+    excludeCurrentInv = { _id: { $ne: currentObjId } };
+
+    try {
+      const existingCurrent = await BillingInvoice.findById(currentInvoiceId).lean();
+      if (existingCurrent) {
+        if (existingCurrent.invoiceNo) {
+          currentInvoiceNo = existingCurrent.invoiceNo;
+          excludeCurrentInv.invoiceNo = { $ne: existingCurrent.invoiceNo };
+        }
+        if (Array.isArray(existingCurrent.linkedChallanIds)) {
+          existingCurrent.linkedChallanIds.forEach(id => id && preexistingChallanIds.add(String(id)));
+        }
+        if (Array.isArray(existingCurrent.linkedChallanNos)) {
+          existingCurrent.linkedChallanNos.forEach(no => {
+            const num = parseInt(String(no).replace(/[^0-9]/g, ''), 10);
+            if (num) preexistingChallanNos.add(num);
+          });
+        }
+        if (existingCurrent.ourChallanNo) {
+          String(existingCurrent.ourChallanNo).split(/[,;\s]+/).forEach(p => {
+            const num = parseInt(p.replace(/[^0-9]/g, ''), 10);
+            if (num) preexistingChallanNos.add(num);
+          });
+        }
+        if (Array.isArray(existingCurrent.items)) {
+          existingCurrent.items.forEach(it => {
+            if (it.challanId) preexistingChallanIds.add(String(it.challanId));
+            if (it.ourChallanNo) {
+              const num = parseInt(String(it.ourChallanNo).replace(/[^0-9]/g, ''), 10);
+              if (num) preexistingChallanNos.add(num);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      logger.warn('Error reading existing current invoice for challan guard: %s', e.message);
+    }
   }
 
-  const excludeCurrentInv = currentInvoiceId ? { _id: { $ne: currentInvoiceId } } : {};
+  // When updating an existing invoice, ONLY check challans that are newly added to this invoice.
+  // Pre-existing challans already belong to this invoice, so updating image/notes/rates shouldn't be blocked.
+  const challanNosToCheck = currentInvoiceId
+    ? activeChallanNoList.filter(num => !preexistingChallanNos.has(num))
+    : activeChallanNoList;
+  const challanIdsToCheck = currentInvoiceId
+    ? activeChallanIdList.filter(id => !preexistingChallanIds.has(String(id)))
+    : activeChallanIdList;
+
+  if (challanNosToCheck.length === 0 && challanIdsToCheck.length === 0) {
+    return; // No new challans to check
+  }
 
   // 1. Direct active BillingInvoice check
-  for (const num of activeChallanNoList) {
+  for (const num of challanNosToCheck) {
     const numStr = String(num);
     const existingInv = await BillingInvoice.findOne({
       ...excludeCurrentInv,
@@ -374,13 +429,13 @@ const assertChallansNotAlreadyBilled = async (invoiceData, currentInvoiceId = nu
     }
   }
 
-  if (activeChallanIdList.length > 0) {
+  if (challanIdsToCheck.length > 0) {
     const existingInvById = await BillingInvoice.findOne({
       ...excludeCurrentInv,
       invoiceStatus: { $ne: 'CANCELLED' },
       $or: [
-        { linkedChallanIds: { $in: activeChallanIdList } },
-        { 'items.challanId': { $in: activeChallanIdList } }
+        { linkedChallanIds: { $in: challanIdsToCheck } },
+        { 'items.challanId': { $in: challanIdsToCheck } }
       ]
     }).lean();
 
@@ -392,15 +447,15 @@ const assertChallansNotAlreadyBilled = async (invoiceData, currentInvoiceId = nu
   // 2. Check FabricChallan database state
   const billedFabricChallans = await FabricChallan.find({
     $or: [
-      ...(activeChallanIdList.length > 0 ? [{ _id: { $in: activeChallanIdList } }] : []),
-      ...(activeChallanNoList.length > 0 ? [{ challanNo: { $in: activeChallanNoList } }] : [])
+      ...(challanIdsToCheck.length > 0 ? [{ _id: { $in: challanIdsToCheck } }] : []),
+      ...(challanNosToCheck.length > 0 ? [{ challanNo: { $in: challanNosToCheck } }] : [])
     ],
     status: 'INVOICED',
     invoiceNo: { $exists: true, $ne: '' }
   }).lean();
 
   for (const fc of billedFabricChallans) {
-    if (fc.invoiceNo) {
+    if (fc.invoiceNo && fc.invoiceNo !== currentInvoiceNo) {
       const activeInv = await BillingInvoice.findOne({
         ...excludeCurrentInv,
         invoiceNo: fc.invoiceNo,
@@ -415,15 +470,15 @@ const assertChallansNotAlreadyBilled = async (invoiceData, currentInvoiceId = nu
   // 3. Check StitchingChallan database state
   const billedStitchingChallans = await StitchingChallan.find({
     $or: [
-      ...(activeChallanIdList.length > 0 ? [{ _id: { $in: activeChallanIdList } }] : []),
-      ...(activeChallanNoList.length > 0 ? [{ challanNo: { $in: activeChallanNoList } }] : [])
+      ...(challanIdsToCheck.length > 0 ? [{ _id: { $in: challanIdsToCheck } }] : []),
+      ...(challanNosToCheck.length > 0 ? [{ challanNo: { $in: challanNosToCheck } }] : [])
     ],
     status: 'INVOICED',
     invoiceNo: { $exists: true, $ne: '' }
   }).lean();
 
   for (const sc of billedStitchingChallans) {
-    if (sc.invoiceNo) {
+    if (sc.invoiceNo && sc.invoiceNo !== currentInvoiceNo) {
       const activeInv = await BillingInvoice.findOne({
         ...excludeCurrentInv,
         invoiceNo: sc.invoiceNo,
