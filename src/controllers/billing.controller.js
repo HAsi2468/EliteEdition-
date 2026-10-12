@@ -2987,6 +2987,7 @@ const getPurchases = async (req, res) => {
       const s = search.trim();
       const searchConditions = [
         { purchaseNo: { $regex: s, $options: 'i' } },
+        { billNo: { $regex: s, $options: 'i' } },
         { vendorName: { $regex: s, $options: 'i' } },
         { itemName: { $regex: s, $options: 'i' } },
         { 'items.itemName': { $regex: s, $options: 'i' } }

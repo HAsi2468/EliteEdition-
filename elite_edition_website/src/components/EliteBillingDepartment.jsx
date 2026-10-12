@@ -447,6 +447,7 @@ export default function EliteBillingDepartment({
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
     purchaseNo: '',
+    billNo: '',
     purchaseType: 'inventory', // 'inventory' (Inventory Purchase), 'expense' (Expense Purchase), or 'asset' (Asset Purchase)
     ourChallanNo: '',
     date: new Date().toISOString().split('T')[0],
@@ -803,6 +804,7 @@ export default function EliteBillingDepartment({
 
     setPurchaseForm({
       purchaseNo: p.purchaseNo || '',
+      billNo: p.billNo || '',
       purchaseType: p.purchaseType || 'inventory',
       ourChallanNo: p.ourChallanNo || '',
       date: p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : p.date)) : new Date().toISOString().split('T')[0],
@@ -919,6 +921,7 @@ export default function EliteBillingDepartment({
               <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-top: 6px;">
                 Purchase No: #${purchase.purchaseNo || '-'}
               </div>
+              ${purchase.billNo ? `<div style="font-size: 12px; color: #475569; margin-top: 2px;">Vendor Bill: <strong>${purchase.billNo}</strong></div>` : ''}
             </div>
           </div>
 
@@ -1179,6 +1182,7 @@ export default function EliteBillingDepartment({
 
     const payload = {
       purchaseNo: (purchaseForm.purchaseNo && purchaseForm.purchaseNo.trim()) || computeNextPurchaseNo(purchases),
+      billNo: (purchaseForm.billNo || '').trim(),
       purchaseType: purchaseForm.purchaseType || 'inventory',
       ourChallanNo: purchaseForm.ourChallanNo || '',
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
@@ -1287,6 +1291,7 @@ export default function EliteBillingDepartment({
     setShowPurchaseModal(false);
     setPurchaseForm({
       purchaseNo: '',
+      billNo: '',
       purchaseType: 'inventory',
       ourChallanNo: '',
       date: new Date().toISOString().split('T')[0],
@@ -1414,7 +1419,7 @@ export default function EliteBillingDepartment({
       // 1. Text Search
       if (purchaseSearch && purchaseSearch.trim()) {
         const q = purchaseSearch.toLowerCase().trim();
-        const matchNo = p.purchaseNo && p.purchaseNo.toLowerCase().includes(q);
+        const matchNo = (p.purchaseNo && p.purchaseNo.toLowerCase().includes(q)) || (p.billNo && p.billNo.toLowerCase().includes(q));
         const matchVendor = p.vendorName && p.vendorName.toLowerCase().includes(q);
         const matchItem = p.itemName && p.itemName.toLowerCase().includes(q);
         const matchChildItems = Array.isArray(p.items) && p.items.some(it => (it.itemName && it.itemName.toLowerCase().includes(q)) || (it.description && it.description.toLowerCase().includes(q)));
@@ -5349,6 +5354,7 @@ export default function EliteBillingDepartment({
                   }
                   setPurchaseForm({
                     purchaseNo: nextNo,
+                    billNo: '',
                     purchaseType: 'inventory',
                     ourChallanNo: '',
                     date: new Date().toISOString().split('T')[0],
@@ -5447,7 +5453,7 @@ export default function EliteBillingDepartment({
                       <tr key={p._id || p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
                         <td style={{ padding: '0.85rem 0.8rem', verticalAlign: 'top' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 800, color: '#4f46e5' }}>{p.purchaseNo}</span>
+                            <span style={{ fontWeight: 800, color: '#4f46e5', fontSize: '0.92rem' }}>{p.purchaseNo}</span>
                             <span style={{
                               fontSize: '0.67rem',
                               fontWeight: 700,
@@ -5460,6 +5466,11 @@ export default function EliteBillingDepartment({
                               {p.purchaseType === 'asset' ? '🏛️ Asset' : p.purchaseType === 'expense' ? '💼 Expense' : '📦 Inventory'}
                             </span>
                           </div>
+                          {p.billNo && (
+                            <div style={{ fontSize: '0.74rem', color: '#334155', marginTop: 3 }}>
+                              Bill: <strong style={{ color: '#0f172a' }}>{p.billNo}</strong>
+                            </div>
+                          )}
                           {p.ourChallanNo && (
                             <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>
                               Challan: <strong style={{ color: '#0284c7' }}>{p.ourChallanNo}</strong>
@@ -5712,8 +5723,19 @@ export default function EliteBillingDepartment({
                     required
                     value={purchaseForm.purchaseNo}
                     onChange={e => setPurchaseForm(f => ({ ...f, purchaseNo: e.target.value }))}
-                    style={{ ...inputStyle, fontWeight: 700, letterSpacing: '0.02em' }}
+                    style={{ ...inputStyle, fontWeight: 700, letterSpacing: '0.02em', color: '#4f46e5' }}
                     placeholder="e.g. DP-01, DP-02"
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Vendor Bill / Invoice No.</label>
+                  <input
+                    type="text"
+                    value={purchaseForm.billNo || ''}
+                    onChange={e => setPurchaseForm(f => ({ ...f, billNo: e.target.value }))}
+                    placeholder="e.g. 2092/26-27 or 1881/26-27"
+                    style={inputStyle}
                   />
                 </div>
 
@@ -6424,6 +6446,11 @@ export default function EliteBillingDepartment({
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>PURCHASE NO / BILL DETAILS</div>
                   <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#4f46e5' }}>{viewPurchaseModal.purchaseNo}</div>
+                  {viewPurchaseModal.billNo && (
+                    <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: 2 }}>
+                      Vendor Bill: <strong style={{ color: '#0f172a' }}>{viewPurchaseModal.billNo}</strong>
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.76rem', fontWeight: 700, color: viewPurchaseModal.purchaseType === 'asset' ? '#7c3aed' : viewPurchaseModal.purchaseType === 'expense' ? '#b45309' : '#1d4ed8', marginTop: 2 }}>
                     Type: {viewPurchaseModal.purchaseType === 'asset' ? '🏛️ Asset Purchase' : viewPurchaseModal.purchaseType === 'expense' ? '💼 Expense Purchase' : '📦 Inventory Purchase'}
                   </div>
