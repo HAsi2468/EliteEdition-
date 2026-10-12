@@ -198,7 +198,7 @@ async function getLinkedJobFusingMetrics(jobNoStr) {
 // Automatically allocates lot numbers across TP details sequentially:
 // First lot is consumed until stock becomes EXACTLY ZERO (accounting for shortage),
 // then the second lot, then the third lot.
-async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails, defaultShortagePct = 0) {
+async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails, defaultShortagePct = 0, excludeChallanNo = null) {
   const details = Array.isArray(tpDetails) ? tpDetails : [];
   if (details.length === 0) {
     return {
@@ -218,6 +218,9 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
   let availableLots = [];
   try {
     const matchFilter = { lotNo: { $ne: null } };
+    if (excludeChallanNo) {
+      matchFilter.challanNo = { $ne: excludeChallanNo };
+    }
     if (specifiedLots.length > 0) {
       const lotNums = specifiedLots.map(s => parseInt(s, 10)).filter(n => !isNaN(n));
       if (lotNums.length > 0) {
@@ -720,6 +723,7 @@ const createChallan = async (req, res) => {
             partyName: partyName || '',
             billTo: billTo || partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
+            forceAllowNegative: true,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
@@ -903,13 +907,14 @@ const updateChallan = async (req, res) => {
     const rawLotStr = lotNo !== undefined ? String(lotNo) : challan.lotNo;
     const effShortage = challan.shortagePct != null ? challan.shortagePct : (challan.shortageMtr && challan.totalMtr > 0 ? (challan.shortageMtr / challan.totalMtr) * 100 : 0);
 
-    // Run program-side automated lot allocation
+    // Run program-side automated lot allocation (excluding current challan's own outward txs)
     const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
       challan.fabricName,
       challan.panna,
       rawLotStr,
       details,
-      effShortage
+      effShortage,
+      challan.challanNo ? 'EDP-' + challan.challanNo : null
     );
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
@@ -1000,6 +1005,7 @@ const updateChallan = async (req, res) => {
             partyName: challan.partyName || '',
             billTo: challan.billTo || challan.partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
+            forceAllowNegative: true,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
