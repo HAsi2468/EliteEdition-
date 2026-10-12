@@ -45,7 +45,11 @@ function parseDateSafe(dateVal) {
   const str = String(dateVal).trim();
   const ddmmyyyy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if (ddmmyyyy) {
-    return new Date(parseInt(ddmmyyyy[3], 10), parseInt(ddmmyyyy[2], 10) - 1, parseInt(ddmmyyyy[1], 10));
+    return new Date(parseInt(ddmmyyyy[3], 10), parseInt(ddmmyyyy[2], 10) - 1, parseInt(ddmmyyyy[1], 10), 12, 0, 0);
+  }
+  const yyyymmdd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (yyyymmdd) {
+    return new Date(parseInt(yyyymmdd[1], 10), parseInt(yyyymmdd[2], 10) - 1, parseInt(yyyymmdd[3], 10), 12, 0, 0);
   }
   const d = new Date(str);
   return isNaN(d.getTime()) ? null : d;
@@ -146,7 +150,7 @@ export default function GstCreditAnalysisPanel({
   // ── PURCHASE (INWARD ITC) PARSER & FILTER ──────────────────────────────────
   const parsedPurchases = useMemo(() => {
     return (purchases || []).map((pur) => {
-      const parsedDate = parseDateSafe(pur.date || pur.billDate || pur.createdAt);
+      const parsedDate = parseDateSafe(pur.date || pur.billDate || pur.purchaseDate || pur.createdAt);
       const party = pur.vendor?.businessName || pur.vendor?.name || pur.vendorName || (typeof pur.vendor === 'string' ? pur.vendor : '') || 'Vendor';
       const gstin = (pur.vendor?.gstin || pur.vendorGstin || pur.gstin || '').trim();
       const state = pur.vendor?.state || pur.state || 'Gujarat';
@@ -212,7 +216,7 @@ export default function GstCreditAnalysisPanel({
   // ── FILTERING LOGIC (PERIOD, ENTITY, SEARCH, PARTY TYPE, TAX RATE) ─────────
   const matchesPeriod = (itemDate) => {
     if (!dateRange.start && !dateRange.end) return true;
-    if (!itemDate) return false;
+    if (!itemDate) return true;
     const time = itemDate.getTime();
     if (dateRange.start && time < dateRange.start.getTime()) return false;
     if (dateRange.end && time > dateRange.end.getTime()) return false;
@@ -730,11 +734,19 @@ export default function GstCreditAnalysisPanel({
             </div>
             <DateRangePicker
               preset={datePreset}
-              onPresetChange={(newPreset) => setDatePreset(newPreset)}
+              onChange={({ preset: p, dateStart, dateEnd }) => {
+                setDatePreset(p);
+                if (p === 'custom' && dateStart && dateEnd) {
+                  setCustomStart(dateStart);
+                  setCustomEnd(dateEnd);
+                }
+              }}
               customStart={customStart}
-              onCustomStartChange={(val) => setCustomStart(val)}
               customEnd={customEnd}
-              onCustomEndChange={(val) => setCustomEnd(val)}
+              onCustomChange={(s, e) => {
+                setCustomStart(s);
+                setCustomEnd(e);
+              }}
             />
           </div>
 
