@@ -24,10 +24,6 @@ import {
   ExternalLink,
   Search,
   Filter,
-  Mail,
-  Send,
-  Zap,
-  Terminal,
   Copy,
   Check,
   Sliders,
@@ -36,11 +32,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import infrastructureService from '../services/infrastructureService';
-import { api } from '../services/api';
 import '../styles/infrastructureBilling.css';
 
 export function InfrastructureBilling() {
-  // Navigation Sub-Tabs: 'bills' | 'health' | 'safety'
+  // Navigation Sub-Tabs: 'bills' | 'health'
   const [activeTab, setActiveTab] = useState('bills');
 
   // Billing History & Live Metrics States
@@ -73,11 +68,6 @@ export function InfrastructureBilling() {
   const [pingLatency, setPingLatency] = useState(null);
   const [pinging, setPinging] = useState(false);
   const [copiedReport, setCopiedReport] = useState(false);
-
-  // Backup Action States
-  const [sendingBackupEmail, setSendingBackupEmail] = useState(false);
-  const [triggeringR2Backup, setTriggeringR2Backup] = useState(false);
-  const [downloadingSnapshot, setDownloadingSnapshot] = useState(false);
 
   // Drawers & Modals
   const [activeDrawer, setActiveDrawer] = useState(null); // 'aws' | 'mongodb' | 'cloudflare' | null
@@ -205,65 +195,7 @@ export function InfrastructureBilling() {
     }
   };
 
-  // 6. Send Backup Email Trigger
-  const handleSendBackupEmail = async () => {
-    setSendingBackupEmail(true);
-    try {
-      const res = await api.sendBackupEmail({
-        recipients: ['parth6070@gmail.com', 'harshtsidapara2468@gmail.com'],
-      });
-      showToast(res.message || 'Backup archive emailed to parth6070@gmail.com and harshtsidapara2468@gmail.com');
-    } catch (err) {
-      showToast('Failed to dispatch backup email: ' + err.message, 'error');
-    } finally {
-      setSendingBackupEmail(false);
-    }
-  };
-
-  // 7. Trigger Cloudflare R2 Backup
-  const handleTriggerR2Backup = async () => {
-    setTriggeringR2Backup(true);
-    try {
-      const res = await api.triggerR2Backup();
-      showToast(res.message || 'Offsite R2 backup executed and synced safely!');
-    } catch (err) {
-      showToast('R2 Backup trigger failed: ' + err.message, 'error');
-    } finally {
-      setTriggeringR2Backup(false);
-    }
-  };
-
-  // 8. Download Emergency Local Snapshot JSON
-  const handleDownloadSnapshot = async () => {
-    setDownloadingSnapshot(true);
-    try {
-      const snapshot = {
-        exportDate: new Date().toISOString(),
-        systemHealth,
-        latestBills: bills.slice(0, 5),
-        awsMetrics,
-        mongoMetrics,
-        cfMetrics,
-        note: 'Elite Edition ERP Emergency Configuration & State Snapshot',
-      };
-      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Elite-ERP-Snapshot-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showToast('Emergency snapshot downloaded safely to your device.');
-    } catch (err) {
-      showToast('Failed to generate snapshot: ' + err.message, 'error');
-    } finally {
-      setDownloadingSnapshot(false);
-    }
-  };
-
-  // 9. Copy System Diagnostics Report
+  // 6. Copy System Diagnostics Report
   const handleCopyDiagnostics = () => {
     const report = `=====================================================
 ELITE EDITION ERP — INFRASTRUCTURE DIAGNOSTICS REPORT
@@ -558,20 +490,6 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
           <Activity size={15} />
           <span>Server & System Health</span>
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('safety')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'safety'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          <ShieldCheck size={15} />
-          <span>Data Safety & Auto-Backups</span>
-          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">PITR Active</span>
         </button>
       </div>
 
@@ -1273,152 +1191,6 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* TAB 3: DATA SAFETY & AUTO-BACKUPS                                      */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'safety' && (
-        <div className="space-y-6">
-          {/* Top 3 Resilience Cards */}
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1: Automated Midnight Backup Cron */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm border-l-4 border-l-emerald-500">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <Clock size={20} />
-                </div>
-                <div>
-                  <div className="text-[11px] font-extrabold text-emerald-700 uppercase">DAILY CRON JOB</div>
-                  <div className="text-sm font-black text-slate-900">12:00 AM Midnight IST</div>
-                </div>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Full MongoDB database snapshot + 900+ uploaded challan & fabric images with 30-day rolling local disk retention on EC2.
-              </p>
-              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Cron Status:</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Active & Verified</span>
-              </div>
-            </div>
-
-            {/* Card 2: Multi-Cloud Offsite Vault */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm border-l-4 border-l-blue-600">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Cloud size={20} />
-                </div>
-                <div>
-                  <div className="text-[11px] font-extrabold text-blue-700 uppercase">OFFSITE REPLICATION</div>
-                  <div className="text-sm font-black text-slate-900">AWS S3 & Cloudflare R2</div>
-                </div>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Replicated to secure cloud vaults in Mumbai (AWS S3) and offsite encrypted Cloudflare R2 bucket: <code className="text-blue-700 bg-blue-50 px-1 py-0.5 rounded">elite-edition-backups</code>.
-              </p>
-              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Offsite Vault:</span>
-                <span className="text-blue-700 font-bold">100% Redundant</span>
-              </div>
-            </div>
-
-            {/* Card 3: Automated Email Notification */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm border-l-4 border-l-purple-600">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <Mail size={20} />
-                </div>
-                <div>
-                  <div className="text-[11px] font-extrabold text-purple-700 uppercase">EMAIL DISPATCH</div>
-                  <div className="text-sm font-black text-slate-900">Every Night at 12 AM</div>
-                </div>
-              </div>
-              <div className="text-xs text-slate-600 space-y-1">
-                <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                  <span>•</span> <span>parth6070@gmail.com</span>
-                </div>
-                <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                  <span>•</span> <span>harshtsidapara2468@gmail.com</span>
-                </div>
-              </div>
-              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Direct Download:</span>
-                <span className="text-purple-700 font-bold">Included in Email</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Action Center: Manual Backup Triggers */}
-          <section className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="text-sm font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-              <Zap size={16} className="text-amber-500" />
-              <span>Admin On-Demand Backup & Safety Actions</span>
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Trigger instant backups or download raw snapshots without waiting for the midnight cron job.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSendBackupEmail}
-                disabled={sendingBackupEmail}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all cursor-pointer disabled:opacity-60"
-              >
-                {sendingBackupEmail ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
-                <span>{sendingBackupEmail ? 'Dispatching Email...' : '✉️ Send Backup to Admin Email Now'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleTriggerR2Backup}
-                disabled={triggeringR2Backup}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-60"
-              >
-                {triggeringR2Backup ? <RefreshCw size={14} className="animate-spin" /> : <Cloud size={14} />}
-                <span>{triggeringR2Backup ? 'Syncing to R2...' : '☁️ Sync to Cloudflare R2 Vault'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDownloadSnapshot}
-                disabled={downloadingSnapshot}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-60"
-              >
-                {downloadingSnapshot ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-                <span>{downloadingSnapshot ? 'Exporting...' : '📥 Download Emergency JSON Snapshot'}</span>
-              </button>
-            </div>
-          </section>
-
-          {/* Zero-Downtime Disaster Recovery Playbook Banner */}
-          <section className="bg-slate-900 text-white rounded-2xl p-6 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-sky-400 font-extrabold text-sm mb-1">
-                <Terminal size={17} />
-                <span>Zero-Downtime Disaster Recovery: 1-Click Restore in &lt; 2 Minutes</span>
-              </div>
-              <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-                If any hardware crash or disaster occurs on server, run a single command in terminal to restore all database collections and unpack all images:
-              </p>
-            </div>
-
-            <div className="bg-black/60 border border-slate-700/80 rounded-xl px-4 py-2.5 font-mono text-xs text-emerald-400 font-bold flex items-center justify-between gap-3">
-              <span>node src/scripts/restore_all_data.js</span>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText('node src/scripts/restore_all_data.js');
-                  showToast('Restore command copied to clipboard!');
-                }}
-                className="text-slate-400 hover:text-white cursor-pointer"
-                title="Copy Command"
-              >
-                <Copy size={14} />
-              </button>
-            </div>
-          </section>
         </div>
       )}
 
