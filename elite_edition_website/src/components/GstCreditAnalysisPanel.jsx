@@ -54,7 +54,7 @@ function parseDateSafe(dateVal) {
 export default function GstCreditAnalysisPanel({
   invoices = [],
   purchases = [],
-  companyEntity = 'Elite Edition',
+  companyEntity = 'Elite Digital Prints',
   onViewInvoice,
   onViewPurchase,
   refreshData
@@ -65,7 +65,7 @@ export default function GstCreditAnalysisPanel({
   const [customEnd, setCustomEnd] = useState('');
   const [activeTab, setActiveTab] = useState('summary'); // 'summary', 'outward', 'inward', 'tds'
   const [searchQuery, setSearchQuery] = useState('');
-  const [entityFilter, setEntityFilter] = useState(companyEntity || 'ALL');
+  const [entityFilter, setEntityFilter] = useState(companyEntity || 'Elite Digital Prints');
   const [partyTypeFilter, setPartyTypeFilter] = useState('ALL'); // 'ALL', 'B2B', 'B2C'
   const [taxRateFilter, setTaxRateFilter] = useState('ALL'); // 'ALL', '0', '5', '12', '18', '28'
   const [isExporting, setIsExporting] = useState(false);
@@ -138,7 +138,7 @@ export default function GstCreditAnalysisPanel({
         tdsSection,
         tdsRate,
         gstRate,
-        companyEntity: inv.companyEntity || 'Elite Edition'
+        companyEntity: inv.companyEntity || companyEntity || 'Elite Digital Prints'
       };
     });
   }, [invoices]);
@@ -204,7 +204,7 @@ export default function GstCreditAnalysisPanel({
         tdsSection,
         tdsRate,
         gstRate,
-        companyEntity: pur.companyEntity || 'Elite Edition'
+        companyEntity: pur.companyEntity || companyEntity || 'Elite Digital Prints'
       };
     });
   }, [purchases]);
@@ -457,8 +457,8 @@ export default function GstCreditAnalysisPanel({
 
       // 1. Summary Sheet
       const summaryData = [
-        ['ELITE EDITION — GST & TAX REPORT'],
-        ['Company:', entityFilter === 'ALL' ? 'All Companies' : entityFilter],
+        [`${(companyEntity || 'Elite Digital Prints').toUpperCase()} — GST & TAX REPORT`],
+        ['Company:', companyEntity || 'Elite Digital Prints'],
         ['Period:', dateRange.labelText],
         ['Generated On:', new Date().toLocaleString('en-IN')],
         [],
@@ -578,7 +578,7 @@ export default function GstCreditAnalysisPanel({
         XLSX.utils.book_append_sheet(wb, wsTds, 'TDS_Tax_Credit_Ledger');
       }
 
-      const fileName = `GST_Tax_Report_${entityFilter}_${periodLabel}.xlsx`;
+      const fileName = `GST_Tax_Report_${(companyEntity || 'Company').replace(/[^a-zA-Z0-9]/g, '_')}_${periodLabel}.xlsx`;
       XLSX.writeFile(wb, fileName);
     } catch (err) {
       console.error('Failed to export GST spreadsheet:', err);
@@ -738,32 +738,25 @@ export default function GstCreditAnalysisPanel({
             />
           </div>
 
-          {/* Operating Entity Pill Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          {/* Active Company Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Company:</span>
-            {['ALL', 'Elite Edition', 'Elite Fabtex'].map((ent) => {
-              const active = entityFilter === ent;
-              return (
-                <button
-                  key={ent}
-                  type="button"
-                  onClick={() => setEntityFilter(ent)}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    borderRadius: '20px',
-                    border: active ? '1.5px solid #4f46e5' : '1px solid #cbd5e1',
-                    background: active ? 'rgba(79, 70, 229, 0.1)' : '#ffffff',
-                    color: active ? '#4f46e5' : '#475569',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {ent === 'ALL' ? '🏢 All Companies' : ent}
-                </button>
-              );
-            })}
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 12px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                borderRadius: '20px',
+                background: 'rgba(79, 70, 229, 0.08)',
+                color: '#4f46e5',
+                border: '1.5px solid #c7d2fe'
+              }}
+            >
+              🏢 {companyEntity || 'Elite Digital Prints'}
+            </span>
           </div>
 
           {/* Search Box */}
