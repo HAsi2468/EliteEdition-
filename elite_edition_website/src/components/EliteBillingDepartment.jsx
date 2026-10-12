@@ -81,6 +81,7 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
+  AlertTriangle,
   CreditCard,
   Building,
   RefreshCw,
@@ -447,6 +448,7 @@ export default function EliteBillingDepartment({
 
   const [savingCatalogItemId, setSavingCatalogItemId] = useState(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [isSavingPurchase, setIsSavingPurchase] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
     purchaseNo: '',
     billNo: '',
@@ -567,6 +569,71 @@ export default function EliteBillingDepartment({
       balanceDue: parseFloat(balanceDue.toFixed(2))
     };
   }, [purchaseForm.items, purchaseForm.enableRoundOff, purchaseForm.manualRoundOff, purchaseForm.discountType, purchaseForm.discountValue, purchaseForm.taxType, purchaseForm.gstRate, purchaseForm.paidAmount]);
+
+  // Real-time Duplicate Purchase Entry Guard (Vendor + Bill No, or complete details)
+  const duplicatePurchaseMatch = useMemo(() => {
+    if (!showPurchaseModal) return null;
+    const vName = (purchaseForm.vendorName || purchaseForm.vendor?.businessName || purchaseForm.vendor?.name || '').trim().toLowerCase();
+    const bNo = (purchaseForm.billNo || '').trim().toLowerCase();
+    const chNo = (purchaseForm.ourChallanNo || '').trim().toLowerCase();
+    const enteredDate = purchaseForm.date ? (typeof purchaseForm.date === 'string' && purchaseForm.date.includes('T') ? purchaseForm.date.split('T')[0] : (purchaseForm.date instanceof Date ? purchaseForm.date.toISOString().split('T')[0] : String(purchaseForm.date))) : '';
+    const enteredTotal = calculatedPurchase ? calculatedPurchase.grandTotal : 0;
+    const enteredItems = (purchaseForm.items || []).filter(it => it.itemName && it.itemName.trim());
+
+    if (!vName) return null;
+
+    return (purchases || []).find(p => {
+      // Exclude current purchase if editing
+      if (editingPurchaseId && (p._id === editingPurchaseId || p.id === editingPurchaseId)) return false;
+
+      const pVendor = (p.vendorName || p.vendor?.businessName || p.vendor?.name || '').trim().toLowerCase();
+      if (pVendor !== vName) return false;
+
+      const pBillNo = (p.billNo || '').trim().toLowerCase();
+      const pChallanNo = (p.ourChallanNo || '').trim().toLowerCase();
+      const pTotal = Number(p.grandTotal || p.totalAmount || 0);
+      const pDate = p.date ? (typeof p.date === 'string' && p.date.includes('T') ? p.date.split('T')[0] : (p.date instanceof Date ? p.date.toISOString().split('T')[0] : String(p.date))) : '';
+
+      // Check 1: Vendor Bill / Invoice No match (Standard GST Bill rule)
+      if (bNo && pBillNo && bNo !== '-' && bNo !== 'na' && bNo !== 'n/a') {
+        if (pBillNo === bNo) {
+          return true;
+        }
+      }
+
+      // Check 2: Challan No match (when billNo is absent or matches)
+      if (chNo && pChallanNo && chNo !== '-' && chNo !== 'na' && chNo !== 'n/a') {
+        if (pChallanNo === chNo) {
+          if (!bNo || !pBillNo || bNo === pBillNo) {
+            return true;
+          }
+        }
+      }
+
+      // Check 3: Complete details match (Vendor + Total Amount + Date + matching items)
+      if (enteredTotal > 0 && Math.abs(pTotal - enteredTotal) < 1.0) {
+        if (enteredDate && pDate && enteredDate === pDate) {
+          const pItems = Array.isArray(p.items) ? p.items : [];
+          if (enteredItems.length > 0 && pItems.length > 0) {
+            const hasCommonItem = enteredItems.some(ei => {
+              const eiName = (ei.itemName || ei.fabric || '').trim().toLowerCase();
+              const eiQty = parseFloat(ei.qty) || 0;
+              return pItems.some(pi => {
+                const piName = (pi.itemName || pi.fabric || pi.fabricName || '').trim().toLowerCase();
+                const piQty = parseFloat(pi.qty || pi.quantity) || 0;
+                return (eiName === piName || eiName.includes(piName) || piName.includes(eiName)) && (eiQty === 0 || piQty === 0 || Math.abs(eiQty - piQty) < 0.1);
+              });
+            });
+            if (hasCommonItem) return true;
+          } else {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    });
+  }, [showPurchaseModal, purchaseForm.vendorName, purchaseForm.vendor, purchaseForm.billNo, purchaseForm.ourChallanNo, purchaseForm.date, purchaseForm.items, calculatedPurchase?.grandTotal, purchases, editingPurchaseId]);
 
   const handlePurchaseVendorSelect = (selectedName) => {
     if (!selectedName) {
@@ -1115,6 +1182,11 @@ export default function EliteBillingDepartment({
 
   const handleCreatePurchase = async (e) => {
     e.preventDefault();
+    if (isSavingPurchase) return; // Double-click submission guard
+    if (duplicatePurchaseMatch) {
+      alert(`⚠️ Duplicate Purchase Blocked: Purchase #${duplicatePurchaseMatch.purchaseNo} already exists for Vendor "${duplicatePurchaseMatch.vendorName || duplicatePurchaseMatch.vendor?.businessName || duplicatePurchaseMatch.vendor?.name}", Bill #${duplicatePurchaseMatch.billNo || 'N/A'} (Total: ₹${(Number(duplicatePurchaseMatch.grandTotal || duplicatePurchaseMatch.totalAmount || 0)).toFixed(2)} on ${duplicatePurchaseMatch.date ? new Date(duplicatePurchaseMatch.date).toLocaleDateString('en-GB') : 'N/A'}). Duplicate purchase bills are not permitted.`);
+      return;
+    }
     const vendorFinalName = purchaseForm.vendor?.businessName || purchaseForm.vendor?.name || purchaseForm.vendorName;
     const errs = [];
 
@@ -1255,6 +1327,7 @@ export default function EliteBillingDepartment({
       terms: purchaseForm.terms || ''
     };
 
+    setIsSavingPurchase(true);
     try {
       if (editingPurchaseId) {
         const isMongoId = /^[0-9a-fA-F]{24}$/.test(editingPurchaseId);
@@ -1278,6 +1351,11 @@ export default function EliteBillingDepartment({
       }
     } catch (err) {
       console.error('Error saving purchase to DB:', err);
+      if (err.message && (err.message.includes('Duplicate') || err.message.includes('already exists'))) {
+        alert(err.message);
+        setIsSavingPurchase(false);
+        return;
+      }
       const fallbackPur = {
         ...payload,
         id: editingPurchaseId || `pur_${Date.now()}`
@@ -1288,6 +1366,8 @@ export default function EliteBillingDepartment({
       } else {
         setPurchases(prev => [fallbackPur, ...prev]);
       }
+    } finally {
+      setIsSavingPurchase(false);
     }
 
     setShowPurchaseModal(false);
@@ -6737,12 +6817,92 @@ export default function EliteBillingDepartment({
                 </div>
               </div>
 
+              {/* Duplicate Purchase Bill Alert Banner */}
+              {duplicatePurchaseMatch && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1.5px solid #ef4444',
+                  borderRadius: '10px',
+                  padding: '1rem 1.25rem',
+                  color: '#b91c1c',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.12)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 800, fontSize: '0.95rem', color: '#dc2626' }}>
+                      <AlertTriangle size={20} />
+                      <span>Duplicate Purchase Bill Detected!</span>
+                    </div>
+                    <span style={{
+                      background: '#fee2e2',
+                      color: '#991b1b',
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.04em'
+                    }}>
+                      ENTRY BLOCKED
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.4 }}>
+                    A vendor purchase entry with these matching parameters already exists in the system:
+                  </div>
+
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.82rem',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '0.5rem',
+                    color: '#1e293b'
+                  }}>
+                    <div><strong>Purchase No:</strong> <span style={{ color: '#4f46e5', fontWeight: 800 }}>{duplicatePurchaseMatch.purchaseNo}</span></div>
+                    <div><strong>Vendor:</strong> {duplicatePurchaseMatch.vendorName || duplicatePurchaseMatch.vendor?.businessName || duplicatePurchaseMatch.vendor?.name}</div>
+                    <div><strong>Vendor Bill No:</strong> <span style={{ color: '#dc2626', fontWeight: 700 }}>{duplicatePurchaseMatch.billNo || 'None'}</span></div>
+                    <div><strong>Challan No / Ref:</strong> {duplicatePurchaseMatch.ourChallanNo || 'None'}</div>
+                    <div><strong>Bill Date:</strong> {duplicatePurchaseMatch.date ? new Date(duplicatePurchaseMatch.date).toLocaleDateString('en-GB') : 'N/A'}</div>
+                    <div><strong>Total Amount:</strong> <span style={{ fontWeight: 800, color: '#16a34a' }}>₹ {(Number(duplicatePurchaseMatch.grandTotal || duplicatePurchaseMatch.totalAmount || 0)).toFixed(2)}</span></div>
+                    <div style={{ gridColumn: '1 / -1', fontSize: '0.78rem', color: '#64748b', borderTop: '1px dashed #e2e8f0', paddingTop: '0.4rem' }}>
+                      <strong>Items on Existing Bill:</strong>{' '}
+                      {Array.isArray(duplicatePurchaseMatch.items) && duplicatePurchaseMatch.items.length > 0
+                        ? duplicatePurchaseMatch.items.map(it => `${it.itemName || it.fabric || 'Item'} (${it.qty || it.quantity || 0} ${it.unit || 'm'} @ ₹${it.rate || it.unitPrice || 0})`).join('; ')
+                        : duplicatePurchaseMatch.itemName || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 600 }}>
+                    ⚠️ Saving is blocked to prevent duplicate GST input tax credit and double-booked vendor payables.
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem' }}>
                 <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.55rem 1.2rem', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" style={{ padding: '0.6rem 1.6rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}>
-                  Save Purchase Inward Entry
+                <button
+                  type="submit"
+                  disabled={isSavingPurchase || !!duplicatePurchaseMatch}
+                  style={{
+                    padding: '0.6rem 1.6rem',
+                    background: (isSavingPurchase || !!duplicatePurchaseMatch) ? '#94a3b8' : 'linear-gradient(135deg, #4f46e5, #3b82f6)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: 800,
+                    cursor: (isSavingPurchase || !!duplicatePurchaseMatch) ? 'not-allowed' : 'pointer',
+                    boxShadow: (isSavingPurchase || !!duplicatePurchaseMatch) ? 'none' : '0 4px 12px rgba(79, 70, 229, 0.3)',
+                    opacity: (isSavingPurchase || !!duplicatePurchaseMatch) ? 0.7 : 1
+                  }}
+                >
+                  {isSavingPurchase ? 'Saving...' : duplicatePurchaseMatch ? '⚠️ Duplicate Purchase Bill Detected' : editingPurchaseId ? 'Update Purchase Entry' : 'Save Purchase Inward Entry'}
                 </button>
               </div>
             </form>

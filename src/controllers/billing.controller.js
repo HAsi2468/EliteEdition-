@@ -3104,6 +3104,63 @@ const createPurchase = async (req, res) => {
       delete purchaseData._id;
     }
 
+    // ── Duplicate Purchase Bill Guard (Vendor + Bill No, or complete details) ──
+    const vName = (purchaseData.vendorName || purchaseData.vendor?.businessName || purchaseData.vendor?.name || '').trim();
+    const bNo = (purchaseData.billNo || '').trim();
+    const chNo = (purchaseData.ourChallanNo || '').trim();
+    const cEntity = (purchaseData.companyEntity || '').trim();
+    const gTotal = Number(purchaseData.grandTotal || purchaseData.totalAmount || 0);
+    const pDate = purchaseData.date ? new Date(purchaseData.date) : new Date();
+
+    if (vName && bNo && bNo !== '-' && bNo.toLowerCase() !== 'na' && bNo.toLowerCase() !== 'n/a') {
+      const dupQuery = {
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        billNo: { $regex: new RegExp(`^${bNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      };
+      if (cEntity) {
+        dupQuery.companyEntity = { $regex: new RegExp(`^${cEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+      }
+      const existing = await BillingPurchase.findOne(dupQuery);
+      if (existing) {
+        const dupDate = existing.date ? new Date(existing.date).toLocaleDateString('en-GB') : 'N/A';
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Bill #${existing.billNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} (dated ${dupDate}). Duplicate purchase bills are not permitted.`
+        });
+      }
+    } else if (vName && chNo && chNo !== '-' && chNo.toLowerCase() !== 'na' && chNo.toLowerCase() !== 'n/a') {
+      const dupQuery = {
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        ourChallanNo: { $regex: new RegExp(`^${chNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      };
+      const existing = await BillingPurchase.findOne(dupQuery);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Challan #${existing.ourChallanNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)}.`
+        });
+      }
+    } else if (vName && gTotal > 0) {
+      const startOfDay = new Date(pDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(pDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const dupQuery = {
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        billNo: { $in: [null, '', '-', 'NA', 'N/A', 'na', 'n/a'] },
+        grandTotal: { $gte: gTotal - 1, $lte: gTotal + 1 },
+        date: { $gte: startOfDay, $lte: endOfDay }
+      };
+      const existing = await BillingPurchase.findOne(dupQuery);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} with identical Vendor "${existing.vendorName}" and Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} already exists for this date.`
+        });
+      }
+    }
+
     const purchase = await BillingPurchase.create(purchaseData);
 
     // Auto-upsert into BillingVendor if vendor info is present so user never loses entered vendor
@@ -3189,6 +3246,66 @@ const updatePurchase = async (req, res) => {
       purchaseData.vendorName = purchaseData.vendor.businessName || purchaseData.vendor.name || '';
     }
     delete purchaseData._id;
+
+    // ── Duplicate Purchase Bill Guard on Edit ──
+    const vName = (purchaseData.vendorName || purchaseData.vendor?.businessName || purchaseData.vendor?.name || '').trim();
+    const bNo = (purchaseData.billNo || '').trim();
+    const chNo = (purchaseData.ourChallanNo || '').trim();
+    const cEntity = (purchaseData.companyEntity || '').trim();
+    const gTotal = Number(purchaseData.grandTotal || purchaseData.totalAmount || 0);
+    const pDate = purchaseData.date ? new Date(purchaseData.date) : new Date();
+
+    if (vName && bNo && bNo !== '-' && bNo.toLowerCase() !== 'na' && bNo.toLowerCase() !== 'n/a') {
+      const dupQuery = {
+        _id: { $ne: req.params.id },
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        billNo: { $regex: new RegExp(`^${bNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      };
+      if (cEntity) {
+        dupQuery.companyEntity = { $regex: new RegExp(`^${cEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+      }
+      const existing = await BillingPurchase.findOne(dupQuery);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Bill #${existing.billNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)}.`
+        });
+      }
+    } else if (vName && chNo && chNo !== '-' && chNo.toLowerCase() !== 'na' && chNo.toLowerCase() !== 'n/a') {
+      const dupQuery = {
+        _id: { $ne: req.params.id },
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        ourChallanNo: { $regex: new RegExp(`^${chNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      };
+      const existing = await BillingPurchase.findOne(dupQuery);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} already exists for Vendor "${existing.vendorName}", Challan #${existing.ourChallanNo} with Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)}.`
+        });
+      }
+    } else if (vName && gTotal > 0) {
+      const startOfDay = new Date(pDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(pDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const dupQuery = {
+        _id: { $ne: req.params.id },
+        vendorName: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        billNo: { $in: [null, '', '-', 'NA', 'N/A', 'na', 'n/a'] },
+        grandTotal: { $gte: gTotal - 1, $lte: gTotal + 1 },
+        date: { $gte: startOfDay, $lte: endOfDay }
+      };
+      const existing = await BillingPurchase.findOne(dupQuery);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: `Duplicate Purchase Blocked: Purchase #${existing.purchaseNo} with identical Vendor "${existing.vendorName}" and Total ₹${(Number(existing.grandTotal || existing.totalAmount || 0)).toFixed(2)} already exists for this date.`
+        });
+      }
+    }
+
     const purchase = await BillingPurchase.findByIdAndUpdate(req.params.id, purchaseData, { new: true });
     if (!purchase) {
       return res.status(404).json({ success: false, error: 'Purchase record not found' });
