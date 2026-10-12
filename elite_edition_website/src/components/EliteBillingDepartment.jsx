@@ -2667,14 +2667,15 @@ export default function EliteBillingDepartment({
     periodInvoices.forEach(inv => {
       const amountExclGst = getAmountWithoutGst(inv);
       const paid = Number(inv.paidAmount || 0);
-      const balance = Math.max(0, amountExclGst - paid);
+      const balance = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, amountExclGst - paid);
 
       totalInvoiced += amountExclGst;
       totalPaid += paid;
       totalBalanceDue += balance;
 
       const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
-      if (inv.paymentStatus === 'PAID' || (grandTotal - paid) <= 0) {
+      const effectiveTds = inv.enableTds ? Number(inv.tdsAmount || 0) : 0;
+      if (inv.paymentStatus === 'PAID' || (grandTotal - effectiveTds - paid) <= 0) {
         paidCount++;
       } else {
         unpaidCount++;
@@ -2899,6 +2900,11 @@ export default function EliteBillingDepartment({
     ],
     isButterPaperUsed: false,
     enableRoundOff: true,
+    enableTds: false,
+    tdsSection: '194C',
+    tdsRate: 1,
+    tdsAmount: 0,
+    manualTdsAmount: undefined,
     discountType: 'flat',
     discountValue: 0,
     taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
@@ -3006,6 +3012,11 @@ export default function EliteBillingDepartment({
         items: lockedItems,
         isButterPaperUsed: false,
         enableRoundOff: true,
+        enableTds: false,
+        tdsSection: '194C',
+        tdsRate: 1,
+        tdsAmount: 0,
+        manualTdsAmount: undefined,
         discountType: 'flat',
         discountValue: 0,
         taxType: custData.stateCode && custData.stateCode !== '24' ? 'IGST' : 'CGST_SGST',
@@ -3050,6 +3061,11 @@ export default function EliteBillingDepartment({
       });
       setInvoiceForm({
         ...invoiceToEdit,
+        enableTds: !!invoiceToEdit.enableTds,
+        tdsSection: invoiceToEdit.tdsSection || '194C',
+        tdsRate: invoiceToEdit.tdsRate != null ? invoiceToEdit.tdsRate : 1,
+        tdsAmount: invoiceToEdit.tdsAmount || 0,
+        manualTdsAmount: invoiceToEdit.tdsAmount != null ? invoiceToEdit.tdsAmount : undefined,
         items: cleanedItems,
         invoiceDate: invoiceToEdit.invoiceDate ? invoiceToEdit.invoiceDate.split('T')[0] : '',
         dueDate: invoiceToEdit.dueDate ? invoiceToEdit.dueDate.split('T')[0] : ''
@@ -3074,6 +3090,12 @@ export default function EliteBillingDepartment({
           items: [
             { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, totalAmount: 4500 }
           ],
+          enableRoundOff: true,
+          enableTds: false,
+          tdsSection: '194C',
+          tdsRate: 1,
+          tdsAmount: 0,
+          manualTdsAmount: undefined,
           discountType: 'flat',
           discountValue: 0,
           taxType: 'CGST_SGST',
@@ -3183,8 +3205,20 @@ export default function EliteBillingDepartment({
       roundOff = 0;
     }
 
+    // TDS (Tax Deducted at Source) Calculation
+    let tdsAmount = 0;
+    if (invoiceForm.enableTds) {
+      if (invoiceForm.manualTdsAmount !== undefined && invoiceForm.manualTdsAmount !== '') {
+        tdsAmount = parseFloat(invoiceForm.manualTdsAmount) || 0;
+      } else {
+        const rate = parseFloat(invoiceForm.tdsRate) || 0;
+        // In India, TDS is standardly computed on taxable subtotal (excluding GST)
+        tdsAmount = parseFloat(((netSubtotal * rate) / 100).toFixed(2));
+      }
+    }
+
     const paid = parseFloat(invoiceForm.paidAmount) || 0;
-    const balanceDue = Math.max(0, grandTotal - paid);
+    const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paid).toFixed(2)));
 
     return {
       items: updatedItems,
@@ -3198,9 +3232,23 @@ export default function EliteBillingDepartment({
       roundOff,
       rawGrandTotal: parseFloat(rawGrandTotal.toFixed(2)),
       grandTotal,
+      tdsAmount,
       balanceDue: parseFloat(balanceDue.toFixed(2))
     };
-  }, [invoiceForm.items, invoiceForm.isButterPaperUsed, invoiceForm.enableRoundOff, invoiceForm.discountType, invoiceForm.discountValue, invoiceForm.taxType, invoiceForm.paidAmount]);
+  }, [
+    invoiceForm.items,
+    invoiceForm.isButterPaperUsed,
+    invoiceForm.enableRoundOff,
+    invoiceForm.manualRoundOff,
+    invoiceForm.enableTds,
+    invoiceForm.tdsSection,
+    invoiceForm.tdsRate,
+    invoiceForm.manualTdsAmount,
+    invoiceForm.discountType,
+    invoiceForm.discountValue,
+    invoiceForm.taxType,
+    invoiceForm.paidAmount
+  ]);
 
   // Handle Dynamic Line Item Change with HSN Auto-Sync
   const handleItemChange = async (index, field, value) => {
@@ -3463,7 +3511,7 @@ export default function EliteBillingDepartment({
     setLoading(true);
     try {
       // Strip UI-only fields and build clean payload
-      const { manualRoundOff, ...formRest } = invoiceForm;
+      const { manualRoundOff, manualTdsAmount, _tdsPreset, ...formRest } = invoiceForm;
       const payload = {
         ...formRest,
         companyEntity: companyEntity || 'Elite Online',
@@ -3476,6 +3524,10 @@ export default function EliteBillingDepartment({
         totalTax: calculatedInvoice.totalTax,
         roundOff: calculatedInvoice.roundOff,
         grandTotal: calculatedInvoice.grandTotal,
+        enableTds: !!invoiceForm.enableTds,
+        tdsSection: invoiceForm.tdsSection || '194C',
+        tdsRate: invoiceForm.enableTds ? (parseFloat(invoiceForm.tdsRate) || 0) : 0,
+        tdsAmount: calculatedInvoice.tdsAmount,
         balanceDue: calculatedInvoice.balanceDue
       };
 
@@ -4068,12 +4120,17 @@ export default function EliteBillingDepartment({
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {fmtINR(getAmountWithoutGst(inv))}
+                              {inv.enableTds && Number(inv.tdsAmount) > 0 && (
+                                <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600, marginTop: 2 }}>
+                                  TDS: -{fmtINR(inv.tdsAmount)} ({inv.tdsSection || '194C'})
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {fmtINR(inv.paidAmount)}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)))}
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: (inv.balanceDue != null ? inv.balanceDue : Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0))) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(inv.balanceDue != null ? inv.balanceDue : Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)))}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
                               <span style={{
@@ -4783,12 +4840,93 @@ export default function EliteBillingDepartment({
                 />
               </div>
 
+              {/* TDS (Tax Deducted at Source) Row */}
+              <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600, color: invoiceForm.enableTds ? '#f59e0b' : 'var(--text-muted)' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!invoiceForm.enableTds}
+                      onChange={e => setInvoiceForm(f => ({ ...f, enableTds: e.target.checked, manualTdsAmount: undefined }))}
+                    />
+                    Deduct TDS (Income Tax)
+                  </label>
+                  {invoiceForm.enableTds && (
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
+                      - ₹ {calculatedInvoice.tdsAmount.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+
+                {invoiceForm.enableTds && (
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', alignItems: 'center', background: 'rgba(245, 158, 11, 0.08)', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.25)', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 140px' }}>
+                      <select
+                        value={invoiceForm._tdsPreset || (invoiceForm.tdsSection === '194C' ? (invoiceForm.tdsRate === 2 ? '194C_2' : '194C_1') : invoiceForm.tdsSection === '194Q' ? '194Q' : invoiceForm.tdsSection === '194J' ? (invoiceForm.tdsRate === 10 ? '194J_10' : '194J_2') : 'CUSTOM')}
+                        onChange={e => {
+                          const val = e.target.value;
+                          let rate = 1;
+                          let sec = '194C';
+                          if (val === '194C_1') { sec = '194C'; rate = 1; }
+                          else if (val === '194C_2') { sec = '194C'; rate = 2; }
+                          else if (val === '194Q') { sec = '194Q'; rate = 0.1; }
+                          else if (val === '194J_2') { sec = '194J'; rate = 2; }
+                          else if (val === '194J_10') { sec = '194J'; rate = 10; }
+                          else if (val === 'CUSTOM') { sec = 'Custom'; }
+                          setInvoiceForm(f => ({ ...f, tdsSection: sec, tdsRate: rate, manualTdsAmount: undefined, _tdsPreset: val }));
+                        }}
+                        style={{ width: '100%', padding: '0.2rem 0.35rem', fontSize: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a' }}
+                      >
+                        <option value="194C_1">Sec 194C (1% - Indv/HUF)</option>
+                        <option value="194C_2">Sec 194C (2% - Company/Firm)</option>
+                        <option value="194Q">Sec 194Q (0.1% - Goods)</option>
+                        <option value="194J_2">Sec 194J (2% - Tech Service)</option>
+                        <option value="194J_10">Sec 194J (10% - Professional)</option>
+                        <option value="CUSTOM">Custom % / Manual Amount</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="%"
+                        value={invoiceForm.tdsRate !== undefined ? invoiceForm.tdsRate : 1}
+                        onChange={e => setInvoiceForm(f => ({ ...f, tdsRate: e.target.value === '' ? 0 : parseFloat(e.target.value), manualTdsAmount: undefined, _tdsPreset: 'CUSTOM' }))}
+                        style={{ width: '45px', padding: '0.2rem 0.25rem', fontSize: '0.75rem', textAlign: 'right', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a' }}
+                        title="TDS % Rate"
+                      />
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>%</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>₹</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Amt"
+                        value={invoiceForm.manualTdsAmount !== undefined ? invoiceForm.manualTdsAmount : calculatedInvoice.tdsAmount}
+                        onChange={e => setInvoiceForm(f => ({ ...f, manualTdsAmount: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                        onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualTdsAmount: undefined })); }}
+                        style={{ width: '70px', padding: '0.2rem 0.3rem', fontSize: '0.75rem', textAlign: 'right', fontWeight: 700, borderRadius: '4px', border: '1px solid #f59e0b', color: '#b45309', background: '#ffffff' }}
+                        title="Auto-calculated from taxable value. Edit to set manually."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#a78bfa' }}>
                 <span>Grand Total:</span>
                 <span key={calculatedInvoice.grandTotal} className="reactive-value-pulse" style={{ padding: '0 4px', borderRadius: 4 }}>
                   ₹ {calculatedInvoice.grandTotal.toFixed(2)}
                 </span>
               </div>
+
+              {invoiceForm.enableTds && calculatedInvoice.tdsAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.25rem', background: 'rgba(245, 158, 11, 0.08)', padding: '0.25rem 0.5rem', borderRadius: 4 }}>
+                  <span>Net Receivable (After TDS):</span>
+                  <span>₹ {(calculatedInvoice.grandTotal - calculatedInvoice.tdsAmount).toFixed(2)}</span>
+                </div>
+              )}
 
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
                 Amount in Words: {numToWords(calculatedInvoice.grandTotal)}
@@ -6849,10 +6987,24 @@ export default function EliteBillingDepartment({
                   <span style={{ fontWeight: 700 }}>{viewInvoiceModal.roundOff != null ? (viewInvoiceModal.roundOff > 0 ? '+' : '') + ' ₹ ' + Number(viewInvoiceModal.roundOff).toFixed(2) : '₹ 0.00'}</span>
                 </div>
 
+                {viewInvoiceModal.enableTds && Number(viewInvoiceModal.tdsAmount) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#d97706', fontWeight: 600 }}>
+                    <span>Less: TDS ({viewInvoiceModal.tdsSection || '194C'} @ {viewInvoiceModal.tdsRate || 0}%):</span>
+                    <span style={{ fontWeight: 700 }}>- {fmtINR(viewInvoiceModal.tdsAmount)}</span>
+                  </div>
+                )}
+
                 <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '0.45rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#6d28d9', fontWeight: 800, fontSize: '1.05rem' }}>Grand Total:</span>
                   <span style={{ color: '#059669', fontWeight: 900, fontSize: '1.25rem' }}>{fmtINR(viewInvoiceModal.grandTotal)}</span>
                 </div>
+
+                {viewInvoiceModal.enableTds && Number(viewInvoiceModal.tdsAmount) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(245, 158, 11, 0.08)', padding: '0.3rem 0.5rem', borderRadius: 6 }}>
+                    <span style={{ color: '#b45309', fontWeight: 700 }}>Net Receivable:</span>
+                    <span style={{ color: '#b45309', fontWeight: 800, fontSize: '1.1rem' }}>{fmtINR(Math.max(0, (viewInvoiceModal.grandTotal || 0) - (viewInvoiceModal.tdsAmount || 0)))}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -6903,6 +7055,12 @@ export default function EliteBillingDepartment({
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Record Payment — {paymentModalInvoice.invoiceNo}</h3>
               <button onClick={() => setPaymentModalInvoice(null)} className="btn-icon"><X size={16} /></button>
             </div>
+
+            {paymentModalInvoice.enableTds && Number(paymentModalInvoice.tdsAmount) > 0 && (
+              <div style={{ fontSize: '0.78rem', color: '#b45309', background: 'rgba(245, 158, 11, 0.1)', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                ℹ️ TDS Deducted: <strong>₹ {Number(paymentModalInvoice.tdsAmount).toFixed(2)}</strong> ({paymentModalInvoice.tdsSection || '194C'} @ {paymentModalInvoice.tdsRate || 0}%)
+              </div>
+            )}
 
             <div>
               <label style={labelStyle}>Payment Amount (₹) *</label>

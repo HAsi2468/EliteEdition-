@@ -75,6 +75,13 @@ const billingInvoiceSchema = new mongoose.Schema(
     // Round Off & Financial Totals
     roundOff: { type: Number, default: 0 },
     grandTotal: { type: Number, required: true, default: 0 },
+
+    // TDS (Tax Deducted at Source) Details
+    enableTds: { type: Boolean, default: false },
+    tdsSection: { type: String, default: '194C' },
+    tdsRate: { type: Number, default: 0 },
+    tdsAmount: { type: Number, default: 0 },
+
     paidAmount: { type: Number, default: 0 },
     balanceDue: { type: Number, default: 0 },
 

@@ -481,10 +481,11 @@ const createInvoice = async (req, res) => {
     invoiceData.createdBy = activeUserName;
     invoiceData.createdByName = activeUserName;
 
-    // Auto-calculate balance due
+    // Auto-calculate balance due (deducting TDS if enabled)
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const balanceDue = Math.max(0, parseFloat((grandTotal - paidAmount).toFixed(2)));
+    const tdsAmount = invoiceData.enableTds ? (parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
     invoiceData.balanceDue = balanceDue;
 
@@ -803,7 +804,8 @@ const updateInvoice = async (req, res) => {
 
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
-    const balanceDue = Math.max(0, parseFloat((grandTotal - paidAmount).toFixed(2)));
+    const tdsAmount = invoiceData.enableTds ? (parseFloat(invoiceData.tdsAmount) || 0) : 0;
+    const balanceDue = Math.max(0, parseFloat((grandTotal - tdsAmount - paidAmount).toFixed(2)));
 
     invoiceData.balanceDue = balanceDue;
 
@@ -1115,8 +1117,9 @@ const recordPayment = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
 
+    const effectiveTds = invoice.enableTds ? (parseFloat(invoice.tdsAmount) || 0) : 0;
     invoice.paidAmount = parseFloat(((invoice.paidAmount || 0) + paymentAmt).toFixed(2));
-    invoice.balanceDue = Math.max(0, parseFloat((invoice.grandTotal - invoice.paidAmount).toFixed(2)));
+    invoice.balanceDue = Math.max(0, parseFloat((invoice.grandTotal - effectiveTds - invoice.paidAmount).toFixed(2)));
 
     if (invoice.balanceDue === 0) {
       invoice.paymentStatus = 'PAID';
@@ -1884,6 +1887,26 @@ const downloadInvoicePdf = async (req, res) => {
           .text(`Rs. ${Number(invoice.grandTotal||0).toFixed(2)}`, colX[8] + 2, Y + 6, { width: COL[8]-4, align: 'right' });
         Y += totH;
 
+        if (invoice.enableTds && Number(invoice.tdsAmount) > 0) {
+          const tdsH = 16;
+          const tdsSec = invoice.tdsSection ? ` (${invoice.tdsSection})` : '';
+          const tdsRate = invoice.tdsRate ? ` @ ${invoice.tdsRate}%` : '';
+          doc.rect(PAD, Y, CW, tdsH).fill(PRPL).stroke(S200);
+          doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+            .text(`Less: TDS${tdsSec}${tdsRate}`, colX[6] - 40, Y + 4, { width: COL[6] + COL[7] + 36, align: 'right' });
+          doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
+            .text(`- ${Number(invoice.tdsAmount).toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+          Y += tdsH;
+
+          const netH = 20;
+          const netPayable = Math.max(0, Number(invoice.grandTotal || 0) - Number(invoice.tdsAmount || 0));
+          doc.rect(PAD, Y, CW, netH).fill(PRP);
+          doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
+            .text('Net Receivable', colX[6] - 20, Y + 5, { width: COL[6] + COL[7] + 16, align: 'right' })
+            .text(`Rs. ${netPayable.toFixed(2)}`, colX[8] + 2, Y + 5, { width: COL[8] - 4, align: 'right' });
+          Y += netH;
+        }
+
         const wordsH = 28;
         doc.rect(PAD, Y, CW, wordsH).fill(S50).stroke(S200);
         doc.fillColor(S700).fontSize(7.5).font('Helvetica-Bold')
@@ -2014,9 +2037,10 @@ const downloadInvoicePdf = async (req, res) => {
       const totalPages = pageChunks.length;
 
       // Calculate exact summary height and position minBottomY so summary meets footer with zero blank gap
-      const sumH = isIgst
+      const tdsExtraH = (invoice.enableTds && Number(invoice.tdsAmount) > 0) ? (16 + 20) : 0;
+      const sumH = (isIgst
         ? (16 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16)
-        : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16);
+        : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16)) + tdsExtraH;
       const minFooterY = PH - PAD - 82;
       const subRowH = 18;
       const minBottomYLast = minFooterY - sumH - subRowH;
@@ -2657,6 +2681,18 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             .text(`Round Off: ${roundOffVal !== 0 ? (roundOffVal > 0 ? '+' : '') + ' Rs. ' + roundOffVal.toFixed(2) : 'Rs. 0.00'}`, PAD + 5, Y + 3);
           Y += 16;
 
+          if (invoice.enableTds && Number(invoice.tdsAmount) > 0) {
+            const tdsSec = invoice.tdsSection ? ` (${invoice.tdsSection})` : '';
+            const tdsRate = invoice.tdsRate ? ` @ ${invoice.tdsRate}%` : '';
+            doc.rect(PAD, Y, CW, 16).fill(PRPL).stroke(S200);
+            doc.fillColor(PRPM).fontSize(8).font('Helvetica-Bold')
+              .text(`Less: TDS${tdsSec}${tdsRate}: - Rs. ${Number(invoice.tdsAmount).toFixed(2)}`, PAD + 5, Y + 3);
+            const netPayable = Math.max(0, Number(grandTotalVal) - Number(invoice.tdsAmount || 0));
+            doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
+              .text(`Net Receivable: Rs. ${netPayable.toFixed(2)}`, PAD + CW - 160, Y + 3, { width: 155, align: 'right' });
+            Y += 16;
+          }
+
           doc.rect(PAD, Y, CW, 16).fill(WHT).stroke(S200);
           doc.fillColor(S500).fontSize(7.5).font('Helvetica')
             .text('Tax Amount (in words):', PAD + 2, Y + 2)
@@ -2702,9 +2738,10 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         const pageChunks = getInvoicePageChunks(items, 6, 4);
         const totalPages = pageChunks.length;
 
-        const sumH = isIgst
+        const tdsExtraH = (invoice.enableTds && Number(invoice.tdsAmount) > 0) ? 16 : 0;
+        const sumH = (isIgst
           ? (16 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16)
-          : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16);
+          : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16)) + tdsExtraH;
         const minFooterY = PH - PAD - 82;
         const subRowH = 18;
         const minBottomYLast = minFooterY - sumH - subRowH;
