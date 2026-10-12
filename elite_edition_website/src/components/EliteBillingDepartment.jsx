@@ -3907,7 +3907,7 @@ export default function EliteBillingDepartment({
             { id: 'challans', label: 'Challan' },
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
             { id: 'purchase', label: 'Purchases' },
-            { id: 'gst', label: 'GST & Tax' },
+            { id: 'gst', label: 'GST Summary' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
             { id: 'expense', label: 'Expenses & Ledger' },
             { id: 'customers', label: `Customers (${customers.length})` },

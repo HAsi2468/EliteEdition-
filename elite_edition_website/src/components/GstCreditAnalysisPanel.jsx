@@ -633,7 +633,7 @@ export default function GstCreditAnalysisPanel({
               </div>
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary, #0f172a)' }}>
-                  GST & Tax Details
+                  GST Summary
                 </h2>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', fontWeight: 500 }}>
                   Sales GST, Purchase GST Credit, and TDS Details

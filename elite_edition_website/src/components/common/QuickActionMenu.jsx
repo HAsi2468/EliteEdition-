@@ -80,7 +80,7 @@ export default function QuickActionMenu({
     ...(onGstReports ? [{
       id: 'gst',
       icon: Calculator,
-      label: 'GST & Tax Details',
+      label: 'GST Summary',
       subtitle: 'Sales GST, Purchase GST Credit & TDS',
       iconColor: '#7c3aed',
       iconBg: '#f5f3ff',
