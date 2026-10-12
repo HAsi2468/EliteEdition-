@@ -1413,7 +1413,7 @@ const cleanJobDisplay = (jobStr) => {
   return String(jobStr).replace(/JOB NO\.-?\s*/gi,'').replace(/Job\s*#?\s*/gi,'').trim();
 };
 
-const getInvoicePageChunks = (items, maxNonLast = 6, maxLast = 4) => {
+const getInvoicePageChunks = (items, maxNonLast = 6, maxLast = 5) => {
   const total = (items || []).length;
   if (total <= maxLast) return [items || []];
   const pagesNeeded = 1 + Math.ceil((total - maxLast) / maxNonLast);
@@ -1585,7 +1585,8 @@ const downloadInvoicePdf = async (req, res) => {
       const S50  = c('#f8fafc', '#f9f9f9');
       const WHT  = '#ffffff';
 
-      const useTwoPages = items.length > 5;
+      const pageChunks = getInvoicePageChunks(items, 6, 5);
+      const totalPages = pageChunks.length;
 
       const drawHeader = (pageLabel) => {
         let Y = PAD;
@@ -1644,7 +1645,7 @@ const downloadInvoicePdf = async (req, res) => {
           ['Challan No.', rawChallanStr, 'Tax Invoice No.', invoice.invoiceNo || '--'],
           ['', '', 'Terms of Delivery', delByVal],
         ];
-        if (useTwoPages && pageLabel) {
+        if (totalPages > 1 && pageLabel) {
           pairs.push(['Page', pageLabel, '', '']);
         }
 
@@ -1744,6 +1745,11 @@ const downloadInvoicePdf = async (req, res) => {
         };
 
         let targetRowHPerItem = 82;
+        if (isLastPage && minBottomY && itemsToRender.length > 0) {
+          const availH = minBottomY - Y;
+          const dynamicRowH = Math.floor(availH / itemsToRender.length);
+          targetRowHPerItem = Math.min(82, Math.max(62, dynamicRowH));
+        }
 
         itemsToRender.forEach((item, localIdx) => {
           const idx = startIdx + localIdx;
@@ -2104,8 +2110,7 @@ const downloadInvoicePdf = async (req, res) => {
       };
 
       // ── PAGINATION: INTERMEDIATE PAGES FIT UP TO 6 ITEMS; LAST PAGE HAS FULL DETAILS ──
-      const pageChunks = getInvoicePageChunks(items, 6, 4);
-      const totalPages = pageChunks.length;
+      // pageChunks and totalPages are calculated at start of renderPage (getInvoicePageChunks(items, 6, 5))
 
       // Calculate exact summary height and position minBottomY so summary meets footer with zero blank gap
       const tdsExtraH = (invoice.enableTds && Number(invoice.tdsAmount) > 0) ? (16 + 20) : 0;
@@ -2333,6 +2338,9 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         const S50  = c('#f8fafc', '#f9f9f9');
         const WHT  = '#ffffff';
 
+        const pageChunks = getInvoicePageChunks(items, 6, 5);
+        const totalPages = pageChunks.length;
+
         const drawHeader = (pageLabel) => {
           let Y = PAD;
 
@@ -2386,7 +2394,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
             ['Challan No.', rawChallanStr, 'Tax Invoice No.', invoice.invoiceNo || '--'],
             ['', '', 'Terms of Delivery', delByVal],
           ];
-          if (useTwoPages && pageLabel) {
+          if (totalPages > 1 && pageLabel) {
             pairs.push(['Page', pageLabel, '', '']);
           }
 
@@ -2485,6 +2493,11 @@ const downloadBulkInvoicesPdf = async (req, res) => {
           };
 
           let targetRowHPerItem = 82;
+          if (isLastPage && minBottomY && itemsToRender.length > 0) {
+            const availH = minBottomY - Y;
+            const dynamicRowH = Math.floor(availH / itemsToRender.length);
+            targetRowHPerItem = Math.min(82, Math.max(62, dynamicRowH));
+          }
 
           itemsToRender.forEach((item, localIdx) => {
             const idx = startIdx + localIdx;
@@ -2806,8 +2819,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         };
 
         // ── PAGINATION: INTERMEDIATE PAGES FIT UP TO 6 ITEMS; LAST PAGE HAS FULL DETAILS ──
-        const pageChunks = getInvoicePageChunks(items, 6, 4);
-        const totalPages = pageChunks.length;
+        // pageChunks and totalPages are calculated at start of renderPage (getInvoicePageChunks(items, 6, 5))
 
         const tdsExtraH = (invoice.enableTds && Number(invoice.tdsAmount) > 0) ? 16 : 0;
         const sumH = (isIgst
