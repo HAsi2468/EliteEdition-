@@ -246,6 +246,21 @@ const createTask = async (req, res) => {
       uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
     })).filter(att => !!att.fileUrl) : [];
 
+    // Prevent rapid double-click duplicate task creation (within 10 seconds)
+    const recentDuplicate = await Task.findOne({
+      title: title.trim(),
+      department,
+      projectRef: projectRef.trim(),
+      clientName: clientName.trim(),
+      createdAt: { $gte: new Date(Date.now() - 10000) }
+    }).populate('assignees', 'name email role department')
+      .populate('createdBy', 'name email role')
+      .populate('attachments.uploadedBy', 'name email');
+
+    if (recentDuplicate) {
+      return res.status(200).json({ success: true, data: recentDuplicate, isDuplicate: true });
+    }
+
     const task = await Task.create({
       title: title.trim(),
       description: description.trim(),

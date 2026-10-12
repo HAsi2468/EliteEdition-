@@ -612,6 +612,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   const handleCreateTaskSubmit = async (e) => {
     e.preventDefault();
+    if (creating) return; // Prevent concurrent submissions
     if (!newTitle.trim()) {
       triggerEliteAlert('Validation', 'Please enter a task title.', 'warning');
       return;
@@ -640,7 +641,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
       if (res && (res.success || res.data)) {
         const createdTask = res.data || res;
-        setTasks((prev) => [createdTask, ...prev]);
+        setTasks((prev) => {
+          const exists = prev.some((t) => String(t._id || t.id) === String(createdTask._id || createdTask.id));
+          if (exists) return prev;
+          return [createdTask, ...prev];
+        });
         setShowCreateModal(false);
         resetCreateForm();
         triggerEliteAlert('Success', `Task "${createdTask.title || newTitle.trim()}" created successfully!`, 'success');

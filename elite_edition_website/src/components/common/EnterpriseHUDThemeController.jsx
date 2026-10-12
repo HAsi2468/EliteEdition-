@@ -302,46 +302,34 @@ export function EnterpriseHUDThemeController({
       onPointerDown={onPointerDown}
       title="Click & Drag freely to position anywhere on your screen. Double-click grip to reset."
     >
-      {/* Drag Grip Handle */}
-      <div 
-        className="dock-grip-handle" 
-        onDoubleClick={handleDoubleClickGrip}
-        title="Drag anywhere (Double click to reset position)"
-      >
-        <GripVertical size={14} />
-      </div>
-
-      {/* ── COLLAPSED MODE: Single Smart Pill Button ── */}
+      {/* ── COLLAPSED MODE: Clean Minimal Circular FAB Button ── */}
       {isCollapsed ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <button
-            type="button"
-            className="dock-master-orb-btn"
-            onClick={toggleCollapsed}
-            title="Expand Floating Action Dock"
-            aria-label="Expand Dock"
-          >
-            <Zap size={13} style={{ color: '#38bdf8' }} />
-            <span className="dock-scale-badge">{Math.round(scale * 100)}%</span>
-            {chatUnreadCount > 0 && (
-              <span className="dock-unread-badge">
-                {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            className="dock-toggle-btn"
-            onClick={toggleCollapsed}
-            title="Expand to full controls"
-            aria-label="Expand"
-          >
-            <ChevronLeft size={12} />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="dock-circle-fab-btn"
+          onClick={handleItemClick(toggleCollapsed)}
+          title="Click to expand HUD Controls (Drag to reposition)"
+          aria-label="Expand Controls"
+        >
+          <Zap size={18} className="dock-circle-fab-icon" />
+          {chatUnreadCount > 0 && (
+            <span className="dock-unread-badge-floating">
+              {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+            </span>
+          )}
+        </button>
       ) : (
         /* ── EXPANDED MODE: Full 3-Action Dock ── */
         <>
+          {/* Drag Grip Handle */}
+          <div 
+            className="dock-grip-handle" 
+            onDoubleClick={handleDoubleClickGrip}
+            title="Drag anywhere (Double click to reset position)"
+          >
+            <GripVertical size={14} />
+          </div>
+
           {/* Button 1: Scale & Industrial HUD Display */}
           <button
             type="button"
@@ -350,7 +338,7 @@ export function EnterpriseHUDThemeController({
             title="Adjust UI Scale & Factory Floor Ergonomics"
             aria-label="UI Display Controller"
           >
-            <Gauge size={13} style={{ color: isIndustrial ? '#38bdf8' : '#38bdf8' }} />
+            <Gauge size={13} style={{ color: '#2563eb' }} />
             <span className="dock-scale-badge">{Math.round(scale * 100)}%</span>
             {isIndustrial && <span className="dock-hud-indicator">HUD</span>}
           </button>
@@ -374,7 +362,7 @@ export function EnterpriseHUDThemeController({
               title="Inter-Department Communication & Team Chat"
               aria-label="Communication"
             >
-              <MessageSquare size={13} style={{ color: isCommActive ? '#60a5fa' : '#94a3b8' }} />
+              <MessageSquare size={13} style={{ color: isCommActive ? '#2563eb' : '#64748b' }} />
               <span style={{ fontWeight: 700 }}>Chat</span>
               {chatUnreadCount > 0 && (
                 <span className="dock-unread-badge">
@@ -400,23 +388,21 @@ export function EnterpriseHUDThemeController({
               title="Task Management & Staff Workloads"
               aria-label="Tasks"
             >
-              <CheckSquare size={13} style={{ color: isTaskActive ? '#34d399' : '#94a3b8' }} />
+              <CheckSquare size={13} style={{ color: isTaskActive ? '#16a34a' : '#64748b' }} />
               <span style={{ fontWeight: 700 }}>Tasks</span>
             </button>
           )}
 
-          {/* Collapse to Single Button Toggle */}
-          {isAuthenticated && (hasCommunicationAccess || hasTaskAccess) && (
-            <button
-              type="button"
-              className="dock-toggle-btn"
-              onClick={toggleCollapsed}
-              title="Minimize to compact button"
-              aria-label="Minimize Dock"
-            >
-              <ChevronRight size={12} />
-            </button>
-          )}
+          {/* Collapse to Single Circular Button Toggle */}
+          <button
+            type="button"
+            className="dock-toggle-btn"
+            onClick={handleItemClick(toggleCollapsed)}
+            title="Minimize to circular button"
+            aria-label="Minimize Dock"
+          >
+            <ChevronRight size={12} />
+          </button>
         </>
       )}
 
