@@ -6,6 +6,7 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import FabricInventoryPanel from './FabricInventoryPanel';
 import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
+import GstCreditAnalysisPanel from './GstCreditAnalysisPanel';
 
 import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
@@ -3881,6 +3882,7 @@ export default function EliteBillingDepartment({
                 setAutoOpenExpenseModal(true);
               }}
               onLedgerReports={() => setShowLedgerModal(true)}
+              onGstReports={() => setActiveTab('gst')}
             />
           </div>
         </div>
@@ -3905,6 +3907,7 @@ export default function EliteBillingDepartment({
             { id: 'challans', label: 'Challan' },
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
             { id: 'purchase', label: 'Purchases' },
+            { id: 'gst', label: 'GST & ITC Hub' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
             { id: 'expense', label: 'Expenses & Ledger' },
             { id: 'customers', label: `Customers (${customers.length})` },
@@ -6097,6 +6100,21 @@ export default function EliteBillingDepartment({
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── GST & TAX CREDIT RECONCILIATION HUB ───────────────────────────── */}
+      {activeTab === 'gst' && (
+        <GstCreditAnalysisPanel
+          invoices={invoices}
+          purchases={purchases}
+          companyEntity={companyEntity}
+          onViewInvoice={(inv) => setViewInvoiceModal(inv)}
+          onViewPurchase={(pur) => setViewPurchaseModal(pur)}
+          refreshData={() => {
+            loadData();
+            fetchPurchases();
+          }}
+        />
       )}
 
       {/* ── NEW / EDIT PURCHASE ENTRY GENERATOR MODAL (MIRRORING INVOICE WITH VENDOR DETAILS) ── */}

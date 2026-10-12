@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, ChevronDown, FileText, Truck, Receipt, BarChart3, X } from 'lucide-react';
+import { Plus, ChevronDown, FileText, Truck, Receipt, BarChart3, Calculator, X } from 'lucide-react';
 
 export default function QuickActionMenu({
   onNewInvoice,
   onNewChallan,
   onExpenseEntry,
   onLedgerReports,
+  onGstReports,
   buttonText = 'Quick Action'
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -75,7 +76,16 @@ export default function QuickActionMenu({
       iconColor: '#059669',
       iconBg: '#ecfdf5',
       action: onLedgerReports
-    }
+    },
+    ...(onGstReports ? [{
+      id: 'gst',
+      icon: Calculator,
+      label: 'GST & ITC Analysis',
+      subtitle: 'Reconcile Outward GSTR-1, Inward ITC & TDS',
+      iconColor: '#7c3aed',
+      iconBg: '#f5f3ff',
+      action: onGstReports
+    }] : [])
   ];
 
   return (
