@@ -145,6 +145,9 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
 
   useEffect(() => {
     fetchChallans();
+    const handleRefresh = () => fetchChallans();
+    window.addEventListener('elite-data-refresh', handleRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleRefresh);
   }, [fetchChallans]);
 
   const openNew = async () => {

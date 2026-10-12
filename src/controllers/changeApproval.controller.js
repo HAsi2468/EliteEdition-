@@ -252,6 +252,133 @@ const executeApprovedAction = async (approval, adminUser) => {
 };
 
 /**
+ * Broadcast real-time updates across the ERP when an approval request is approved or rejected
+ */
+const broadcastApprovalResolution = (req, approval, status, executionResult = null) => {
+  try {
+    const io = global.io || (req?.app && req.app.get('io'));
+    const moduleName = approval.module || '';
+    const modLower = moduleName.toLowerCase();
+    const action = approval.action === 'DELETE' ? 'deleted' : 'updated';
+    const targetId = approval.targetId || approval._id;
+    const targetIdentifier = approval.targetIdentifier || '';
+    const payload = executionResult?.data || approval.requestBody || {};
+
+    if (io) {
+      // 1. Core approval status change event
+      io.emit('approval-status-changed', {
+        id: approval._id,
+        status,
+        module: moduleName,
+        action: approval.action,
+        targetId,
+        targetIdentifier,
+        requestedBy: approval.requestedBy,
+        reviewedBy: approval.reviewedBy,
+        executionResult,
+        timestamp: Date.now(),
+      });
+
+      // 2. Direct user notification to the requester
+      if (approval.requestedBy?.userId) {
+        const userMsg = status === 'APPROVED'
+          ? `Your edit on ${targetIdentifier || moduleName} has been approved by Admin and updated.`
+          : `Your edit on ${targetIdentifier || moduleName} was rejected: ${approval.rejectionReason || 'No reason provided'}`;
+        
+        io.to(`user:${approval.requestedBy.userId}`).emit('approval-result-notify', {
+          id: approval._id,
+          status,
+          module: moduleName,
+          targetId,
+          targetIdentifier,
+          message: userMsg,
+          timestamp: Date.now()
+        });
+        io.emit('approval-result-notify', {
+          id: approval._id,
+          status,
+          module: moduleName,
+          targetId,
+          targetIdentifier,
+          message: userMsg,
+          requestedBy: approval.requestedBy,
+          timestamp: Date.now()
+        });
+      }
+
+      // If approved, trigger instant data refresh across the whole system
+      if (status === 'APPROVED') {
+        // Universal data-changed event
+        io.emit('data-changed', {
+          eventId: Date.now(),
+          type: `${modLower}:${action}`,
+          entity: modLower,
+          action,
+          id: targetId,
+          targetIdentifier,
+          payload,
+          timestamp: Date.now(),
+        });
+
+        // Module-specific event routing so every screen's listeners immediately update
+        if (modLower.includes('jobcard') || modLower.includes('job')) {
+          io.emit('job-updated', payload);
+          io.emit('jobCardUpdated', payload);
+          io.emit('job-stage-updated', payload);
+        }
+        if (modLower.includes('fabric')) {
+          io.emit('fabric-updated', { type: 'transaction-updated', data: payload });
+          io.emit('fabric-challan-updated', payload);
+        }
+        if (modLower.includes('billing') || modLower.includes('invoice')) {
+          io.emit('invoice-updated', payload);
+          io.emit('billing-updated', payload);
+        }
+        if (modLower.includes('inventory') || modLower.includes('rawmaterial')) {
+          io.emit('inventory-updated', payload);
+        }
+        if (modLower.includes('design')) {
+          io.emit('design-updated', payload);
+          io.emit('catalog-updated', payload);
+        }
+        if (modLower.includes('expense') || modLower.includes('costing')) {
+          io.emit('expense-updated', payload);
+          io.emit('costing-updated', payload);
+        }
+        if (modLower.includes('stitching')) {
+          io.emit('stitching-updated', payload);
+          io.emit('stitching-challan-updated', payload);
+        }
+        if (modLower.includes('complaint')) {
+          io.emit('complaint-updated', payload);
+        }
+        if (modLower.includes('product')) {
+          io.emit('product-updated', payload);
+        }
+      }
+    }
+
+    // Publish to central eventBus service
+    try {
+      const eventBus = require('../services/eventBus.service');
+      if (eventBus && typeof eventBus.publishDataChange === 'function' && status === 'APPROVED') {
+        eventBus.publishDataChange({
+          entity: modLower || 'general',
+          id: targetId,
+          action,
+          immediate: true,
+          payload,
+        });
+      }
+    } catch (ebErr) {
+      logger.warn('[ChangeApprovalController] EventBus publish error: %s', ebErr.message);
+    }
+  } catch (err) {
+    logger.error('[ChangeApprovalController] broadcastApprovalResolution failed: %o', err);
+  }
+};
+
+/**
  * Approve a pending change request and execute it
  */
 const approveRequest = async (req, res) => {
@@ -286,20 +413,8 @@ const approveRequest = async (req, res) => {
 
     await approval.save();
 
-    // Broadcast real-time status update to all connected clients
-    try {
-      const io = global.io || (req.app && req.app.get('io'));
-      if (io) {
-        io.emit('approval-status-changed', {
-          id: approval._id,
-          status: 'APPROVED',
-          module: approval.module,
-          targetIdentifier: approval.targetIdentifier,
-        });
-      }
-    } catch (sockErr) {
-      logger.warn('[ChangeApprovalController] Socket emit failed: %s', sockErr.message);
-    }
+    // Broadcast real-time status & instant data refresh across the system
+    broadcastApprovalResolution(req, approval, 'APPROVED', executionResult);
 
     return res.status(200).json({
       success: true,
@@ -343,21 +458,8 @@ const rejectRequest = async (req, res) => {
 
     await approval.save();
 
-    // Broadcast real-time status update
-    try {
-      const io = global.io || (req.app && req.app.get('io'));
-      if (io) {
-        io.emit('approval-status-changed', {
-          id: approval._id,
-          status: 'REJECTED',
-          module: approval.module,
-          targetIdentifier: approval.targetIdentifier,
-          reason: approval.rejectionReason,
-        });
-      }
-    } catch (sockErr) {
-      logger.warn('[ChangeApprovalController] Socket emit failed: %s', sockErr.message);
-    }
+    // Broadcast rejection status
+    broadcastApprovalResolution(req, approval, 'REJECTED');
 
     return res.status(200).json({
       success: true,
@@ -398,6 +500,9 @@ const bulkApprove = async (req, res) => {
         reqItem.adminNotes = notes;
         reqItem.executionResult = execRes;
         await reqItem.save();
+        
+        // Broadcast each approved item
+        broadcastApprovalResolution(req, reqItem, 'APPROVED', execRes);
         results.push({ id: reqItem._id, success: true });
       } catch (e) {
         results.push({ id: reqItem._id, success: false, error: e.message });
@@ -425,24 +530,26 @@ const bulkReject = async (req, res) => {
       return res.status(400).json({ success: false, message: 'IDs array required' });
     }
 
-    const updateResult = await ChangeApprovalRequest.updateMany(
-      { _id: { $in: ids }, status: 'PENDING' },
-      {
-        $set: {
-          status: 'REJECTED',
-          rejectionReason: reason,
-          reviewedBy: {
-            userId: String(req.user?._id || req.user?.id || 'admin'),
-            name: req.user?.name || req.user?.username || 'Admin',
-          },
-          reviewedAt: new Date(),
-        },
-      }
-    );
+    const pendingRequests = await ChangeApprovalRequest.find({
+      _id: { $in: ids },
+      status: 'PENDING',
+    });
+
+    for (const reqItem of pendingRequests) {
+      reqItem.status = 'REJECTED';
+      reqItem.rejectionReason = reason;
+      reqItem.reviewedBy = {
+        userId: String(req.user?._id || req.user?.id || 'admin'),
+        name: req.user?.name || req.user?.username || 'Admin',
+      };
+      reqItem.reviewedAt = new Date();
+      await reqItem.save();
+      broadcastApprovalResolution(req, reqItem, 'REJECTED');
+    }
 
     return res.status(200).json({
       success: true,
-      message: `Rejected ${updateResult.modifiedCount} requests.`,
+      message: `Rejected ${pendingRequests.length} requests.`,
     });
   } catch (err) {
     logger.error('[ChangeApprovalController] bulkReject error: %o', err);

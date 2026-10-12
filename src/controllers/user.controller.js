@@ -57,6 +57,19 @@ const updateUser = catchAsync(async (req, res) => {
 	}
 
 	delete user.password;
+
+	// Broadcast user permissions update in real-time
+	try {
+		const io = global.io || (req.app && req.app.get('io'));
+		if (io) {
+			const uId = String(user._id || user.id);
+			io.to(`user:${uId}`).emit('user-permissions-updated', { userId: uId, user });
+			io.emit('user-permissions-updated', { userId: uId, user });
+		}
+	} catch (e) {
+		console.warn('[UserController] Socket emit failed:', e?.message);
+	}
+
 	res.send({ user });
 });
 

@@ -173,15 +173,16 @@ class SocketManager {
 
     // Backward-compatible individual event aliases
     const legacyEvents = [
-      'job-updated', 'job-created', 'job-deleted',
+      'job-updated', 'job-created', 'job-deleted', 'jobCardUpdated',
       'design-updated', 'design-created', 'design-deleted',
-      'invoice-updated', 'invoice-created', 'invoice-deleted',
+      'invoice-updated', 'invoice-created', 'invoice-deleted', 'billing-updated',
       'complaint-updated', 'complaint-created', 'complaint-deleted',
-      'expense-updated', 'expense-created', 'expense-deleted',
+      'expense-updated', 'expense-created', 'expense-deleted', 'costing-updated',
       'inventory-updated', 'inventory-created', 'inventory-deleted',
       'sales-updated', 'sales-created', 'sales-deleted',
       'task-updated', 'task-created', 'task-deleted',
-      'fabric-updated', 'catalog-updated', 'returns-updated'
+      'fabric-updated', 'fabric-challan-updated', 'catalog-updated', 'returns-updated',
+      'stitching-updated', 'stitching-challan-updated', 'product-updated'
     ];
 
     legacyEvents.forEach((evtName) => {
@@ -198,6 +199,85 @@ class SocketManager {
           timestamp: Date.now(),
         });
       });
+    });
+
+    // Real-time Change Approval resolution listener (Admin approved or rejected an edit/delete)
+    this.socket.on('approval-status-changed', (payload) => {
+      console.info('[SocketManager] Real-time approval status changed:', payload);
+      try {
+        window.dispatchEvent(new CustomEvent('elite-approval-status-changed', { detail: payload }));
+      } catch (e) {}
+
+      // Trigger instantaneous global data refresh across all open screens and components!
+      try {
+        window.dispatchEvent(new CustomEvent('elite-data-refresh', {
+          detail: {
+            source: 'approval-status-changed',
+            ...payload,
+            timestamp: Date.now()
+          }
+        }));
+      } catch (e) {}
+
+      // Broadcast across other browser tabs/windows
+      try {
+        import('../utils/crossTabSync').then(({ broadcastCrossTab }) => {
+          broadcastCrossTab('DATA_INVALIDATED', {
+            source: 'approval-status-changed',
+            ...payload,
+            timestamp: Date.now()
+          });
+        }).catch(() => {});
+      } catch (e) {}
+    });
+
+    // Targeted notification when admin approves/rejects an edit requested by this user
+    this.socket.on('approval-result-notify', (payload) => {
+      console.info('[SocketManager] Approval result notification:', payload);
+      try {
+        window.dispatchEvent(new CustomEvent('elite-approval-result-notify', { detail: payload }));
+        window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: payload }));
+      } catch (e) {}
+
+      import('../components/NotificationToast').then(({ triggerPushNotification }) => {
+        const isApproved = payload?.status === 'APPROVED';
+        triggerPushNotification(
+          isApproved ? '✅ Edit Approved by Admin' : '❌ Edit Request Rejected',
+          payload?.message || (isApproved ? `Changes for ${payload?.targetIdentifier || 'record'} have been approved and updated!` : 'Your change request was rejected.'),
+          isApproved ? 'success' : 'warning'
+        );
+      }).catch(() => {});
+    });
+
+    // Real-time user permissions updated by Admin
+    this.socket.on('user-permissions-updated', (payload) => {
+      console.info('[SocketManager] User permissions updated:', payload);
+      try {
+        const rawUser = localStorage.getItem('elite_user');
+        if (rawUser && payload?.userId) {
+          const logged = JSON.parse(rawUser);
+          const myId = String(logged._id || logged.id || '');
+          if (myId === String(payload.userId)) {
+            // Update local user permissions in storage
+            const updatedUser = { ...logged, ...payload.user };
+            localStorage.setItem('elite_user', JSON.stringify(updatedUser));
+            
+            // Dispatch event for UI re-evaluation
+            window.dispatchEvent(new CustomEvent('elite-user-permissions-updated', { detail: updatedUser }));
+            window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'permissions-updated' } }));
+
+            import('../components/NotificationToast').then(({ triggerPushNotification }) => {
+              triggerPushNotification(
+                '🛡️ Permissions Updated',
+                'Your account access & screen permissions have been updated by Admin.',
+                'info'
+              );
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.warn('[SocketManager] Error handling user-permissions-updated:', e);
+      }
     });
 
     // Handle force reload if emitted by admin

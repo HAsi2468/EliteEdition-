@@ -1039,8 +1039,16 @@ export default function App() {
       };
       window.addEventListener('elite-data-refresh', handleDataRefresh);
 
+      const handlePermsUpdate = (e) => {
+        if (e && e.detail) {
+          setCurrentUser(e.detail);
+        }
+      };
+      window.addEventListener('elite-user-permissions-updated', handlePermsUpdate);
+
       return () => {
         window.removeEventListener('elite-data-refresh', handleDataRefresh);
+        window.removeEventListener('elite-user-permissions-updated', handlePermsUpdate);
       };
     }
   }, [isAuthenticated]);

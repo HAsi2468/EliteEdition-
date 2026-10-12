@@ -3033,6 +3033,14 @@ export default function EliteBillingDepartment({
     loadData();
   }, [search, statusFilter, companyEntity]);
 
+  useEffect(() => {
+    const handleBillingDataRefresh = () => {
+      loadData();
+    };
+    window.addEventListener('elite-data-refresh', handleBillingDataRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleBillingDataRefresh);
+  }, [search, statusFilter, companyEntity]);
+
   // Auto-populate Invoice from Challan with Saved Customer Auto-Selection & Multi-Challan Merging
   const loadInvoiceFromChallan = async (chInput) => {
     if (!chInput) return;

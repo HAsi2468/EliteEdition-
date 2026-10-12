@@ -173,6 +173,8 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
     try {
       await api.approveChangeRequest(item._id, 'Approved via Admin Panel');
       triggerPushNotification('Approved', `Changes applied to ${item.targetIdentifier}`, 'success');
+      // Instantly trigger data refresh across client components
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'admin-approval', item } }));
       fetchStats();
       fetchRequests();
     } catch (err) {
@@ -196,6 +198,7 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
     try {
       await api.rejectChangeRequest(rejectModalItem._id, rejectionReason.trim() || 'Rejected by Admin');
       triggerPushNotification('Rejected', `Change request for ${rejectModalItem.targetIdentifier} was rejected.`, 'info');
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'admin-reject', item: rejectModalItem } }));
       setRejectModalItem(null);
       setRejectionReason('');
       fetchStats();
@@ -219,6 +222,7 @@ export default function AdminChangeApprovalQueue({ onCountChange }) {
     try {
       const res = await api.bulkApproveChangeRequests(selectedIds, 'Bulk approved via Admin Panel');
       triggerPushNotification('Bulk Approved', res.message || `Processed ${selectedIds.length} approvals`, 'success');
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'admin-bulk-approval' } }));
       setSelectedIds([]);
       fetchStats();
       fetchRequests();
