@@ -118,6 +118,19 @@ export function InfrastructureBilling() {
     loadData();
   }, [loadData]);
 
+  // Close floating modals on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setActiveDrawer(null);
+        setSettleModalBill(null);
+        setIsEditingBudget(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // 2. Synchronize All Cloud Providers
   const handleSyncAll = async () => {
     setSyncing(true);
@@ -589,7 +602,19 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
               </div>
               <div className="infra-kpi-footer">
                 <span style={{ color: '#64748b' }}>{latestBill.month || 'Current Month'}</span>
-                <span style={{ color: '#b45309', fontWeight: 800 }}>View Compute ↗</span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  background: '#fef3c7',
+                  color: '#b45309',
+                  fontWeight: 800,
+                  fontSize: '0.72rem',
+                }}>
+                  View Compute ↗
+                </span>
               </div>
             </div>
 
@@ -611,7 +636,19 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
               </div>
               <div className="infra-kpi-footer">
                 <span style={{ color: '#059669', fontWeight: 700 }}>PITR Active</span>
-                <span style={{ color: '#047857', fontWeight: 800 }}>Diagnostics ↗</span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  background: '#d1fae5',
+                  color: '#047857',
+                  fontWeight: 800,
+                  fontSize: '0.72rem',
+                }}>
+                  Diagnostics ↗
+                </span>
               </div>
             </div>
 
@@ -635,9 +672,22 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
               </div>
               <div className="infra-kpi-footer">
                 <span style={{ color: '#64748b' }}>{cfMetrics?.metrics?.objectCount || 148} Files Stored</span>
-                <span style={{ color: '#0369a1', fontWeight: 800 }}>Storage ↗</span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  background: '#e0f2fe',
+                  color: '#0369a1',
+                  fontWeight: 800,
+                  fontSize: '0.72rem',
+                }}>
+                  Storage ↗
+                </span>
               </div>
             </div>
+
 
             {/* Card 4: Total Monthly Running Cost */}
             <div
@@ -1353,39 +1403,62 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
       {/* DRAWERS & MODALS                                                       */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
 
-      {/* A. TELEMETRY DRAWER (AWS, MongoDB Atlas, Cloudflare R2) */}
+      {/* A. FLOATING TELEMETRY MODAL (AWS EC2 Compute, MongoDB Atlas, Cloudflare R2) */}
       {activeDrawer && (
-        <div className="infra-drawer-overlay">
-          <div className="infra-drawer-content">
+        <div
+          className="infra-drawer-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveDrawer(null);
+          }}
+        >
+          <div className="infra-drawer-content" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   background: activeDrawer === 'aws' ? '#fef3c7' : activeDrawer === 'mongodb' ? '#d1fae5' : '#e0f2fe',
                   color: activeDrawer === 'aws' ? '#d97706' : activeDrawer === 'mongodb' ? '#059669' : '#0284c7',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
                 }}>
-                  {activeDrawer === 'aws' ? <Cloud size={20} /> : activeDrawer === 'mongodb' ? <Database size={20} /> : <HardDrive size={20} />}
+                  {activeDrawer === 'aws' ? <Cloud size={22} /> : activeDrawer === 'mongodb' ? <Database size={22} /> : <HardDrive size={22} />}
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                    {activeDrawer === 'aws'
-                      ? 'AWS Compute & Services Drawer'
-                      : activeDrawer === 'mongodb'
-                      ? 'MongoDB Diagnostics & Performance'
-                      : 'Cloudflare R2 Object Storage Drawer'}
-                  </h3>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Live API Telemetry • Zero External Console Redirection</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: '#0f172a' }}>
+                      {activeDrawer === 'aws'
+                        ? 'AWS EC2 Compute & Cloud Services'
+                        : activeDrawer === 'mongodb'
+                        ? 'MongoDB Atlas Cluster Diagnostics'
+                        : 'Cloudflare R2 Object Storage'}
+                    </h3>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
+                    Direct Cloud API Telemetry • Zero External Console Redirection
+                  </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveDrawer(null)}
-                style={{ padding: 6, borderRadius: 8, background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: '#f1f5f9',
+                  border: '1px solid #e2e8f0',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Close (Esc)"
               >
                 <X size={18} />
               </button>
@@ -1399,11 +1472,11 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', marginBottom: 4 }}>
                     COMPUTE INSTANCE STATUS
                   </div>
-                  <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
                     EC2 Mumbai • {awsMetrics?.telemetry?.instanceType || 't3.medium (2 vCPU, 4 GiB RAM)'}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 4 }}>
-                    Status: <strong style={{ color: '#059669' }}>Healthy</strong> • Region: <strong style={{ color: '#0f172a' }}>ap-south-1</strong>
+                    Status: <strong style={{ color: '#059669' }}>Healthy (Running)</strong> • Region: <strong style={{ color: '#0f172a' }}>ap-south-1</strong>
                   </div>
                 </div>
 
@@ -1469,6 +1542,60 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                     ))}
                   </div>
                 </div>
+
+                {/* Floating Modal Footer */}
+                <div style={{
+                  marginTop: 10,
+                  paddingTop: 14,
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Live AWS Telemetry via CloudWatch
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDrawer(null)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: '#475569',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSyncAll}
+                      disabled={syncing}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#d97706',
+                        color: '#ffffff',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+                      <span>{syncing ? 'Syncing...' : 'Refresh Telemetry'}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1479,7 +1606,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#047857', marginBottom: 4 }}>
                     CLUSTER METADATA
                   </div>
-                  <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
                     MongoDB Atlas M10 Dedicated
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 4 }}>
@@ -1513,6 +1640,60 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                     </div>
                   </div>
                 </div>
+
+                {/* Floating Modal Footer */}
+                <div style={{
+                  marginTop: 10,
+                  paddingTop: 14,
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Dedicated 3-Node Replica Set
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDrawer(null)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: '#475569',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePingTest}
+                      disabled={pinging}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#059669',
+                        color: '#ffffff',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Activity size={13} />
+                      <span>{pinging ? 'Testing...' : 'Test Cluster Ping'}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1523,7 +1704,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#0369a1', marginBottom: 4 }}>
                     R2 OBJECT STORAGE USAGE
                   </div>
-                  <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
                     Zero-Egress Tier • 10 GB Free Allowance
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 4 }}>
@@ -1564,31 +1745,94 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                     </div>
                   </div>
                 </div>
+
+                {/* Floating Modal Footer */}
+                <div style={{
+                  marginTop: 10,
+                  paddingTop: 14,
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Zero-Egress Object Storage
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDrawer(null)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* B. IN-APP SETTLEMENT MODAL */}
+      {/* B. IN-APP SETTLEMENT FLOATING MODAL */}
       {settleModalBill && (
-        <div className="infra-modal-overlay">
-          <div className="infra-modal-content">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, borderBottom: '1px solid #e2e8f0', marginBottom: 16 }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                  In-App Infrastructure Bill Settlement
-                </h3>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                  Billing Period: <strong>{settleModalBill.month}</strong>
+        <div
+          className="infra-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSettleModalBill(null);
+          }}
+        >
+          <div className="infra-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottom: '1px solid #e2e8f0', marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#d1fae5',
+                  color: '#059669',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                }}>
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                    Record In-App Cloud Payment
+                  </h3>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                    Billing Cycle: <strong>{settleModalBill.month}</strong> • Auto-Debit Ledger Entry
+                  </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSettleModalBill(null)}
-                style={{ padding: 6, borderRadius: 6, background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: '#f1f5f9',
+                  border: '1px solid #e2e8f0',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Close (Esc)"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
@@ -1600,7 +1844,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                 <select
                   value={settlePlatform}
                   onChange={(e) => setSettlePlatform(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, background: '#f8fafc' }}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, background: '#f8fafc' }}
                 >
                   <option value="all">Entire Bill (All 3 Cloud Providers Combined)</option>
                   <option value="aws">AWS Cloud Only ({formatAmount(settleModalBill.awsAmount)})</option>
@@ -1616,7 +1860,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                 <select
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, background: '#f8fafc' }}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, background: '#f8fafc' }}
                 >
                   <option value="Corporate Card">Corporate Credit Card (Auto-Debit)</option>
                   <option value="Bank Wire / NEFT">Bank Wire Transfer / NEFT</option>
@@ -1634,7 +1878,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   placeholder={`e.g. TXN-AWS-${Date.now().toString(36).toUpperCase()}`}
                   value={referenceNo}
                   onChange={(e) => setReferenceNo(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontFamily: 'monospace' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontFamily: 'monospace' }}
                 />
               </div>
 
@@ -1647,13 +1891,13 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   placeholder="e.g. Verified by Accounts Dept"
                   value={settleNotes}
                   onChange={(e) => setSettleNotes(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
                 />
               </div>
 
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: '#1e3a8a' }}>
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: '#1e3a8a' }}>
                 <span>Amount to Mark Settled:</span>
-                <span style={{ fontSize: '0.92rem', fontWeight: 900 }}>
+                <span style={{ fontSize: '1rem', fontWeight: 900 }}>
                   {formatAmount(
                     settlePlatform === 'aws'
                       ? settleModalBill.awsAmount
@@ -1670,14 +1914,14 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                 <button
                   type="button"
                   onClick={() => setSettleModalBill(null)}
-                  style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.78rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.78rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={settling}
-                  style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#059669', color: '#ffffff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#059669', color: '#ffffff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   <CheckCircle2 size={14} />
                   <span>{settling ? 'Recording...' : 'Confirm In-App Settlement'}</span>
@@ -1687,6 +1931,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
           </div>
         </div>
       )}
+
     </div>
   );
 }
