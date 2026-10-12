@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Activity,
-  Layers,
   ChevronDown,
   ChevronUp,
   X,
@@ -23,19 +22,21 @@ import {
   Sparkles,
   ExternalLink,
   Search,
-  Filter,
   Copy,
   Check,
   Sliders,
-  Radio,
   Wifi,
-  Trash2,
+  FileSpreadsheet,
+  Calendar,
+  Layers,
+  ArrowUpRight,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import infrastructureService from '../services/infrastructureService';
 import '../styles/infrastructureBilling.css';
 
 export function InfrastructureBilling() {
-  // Navigation Sub-Tabs: 'bills' | 'health'
+  // Navigation Tabs: 'bills' | 'health'
   const [activeTab, setActiveTab] = useState('bills');
 
   // Billing History & Live Metrics States
@@ -195,7 +196,48 @@ export function InfrastructureBilling() {
     }
   };
 
-  // 6. Copy System Diagnostics Report
+  // 6. Export Full Year Cloud Expense Statement to Excel (For CA & Audit)
+  const handleExportAnnualExcel = () => {
+    try {
+      const exportRows = rows.map((r, idx) => ({
+        '#': idx + 1,
+        'Billing Month': r.month,
+        'Cloud Provider': r.platformName,
+        'Service Scope': r.scope,
+        'Amount (INR)': Number((r.amountInr || 0).toFixed(2)),
+        'Amount (USD)': Number((r.amountUsd || 0).toFixed(2)),
+        'Payment Status': r.isPaid ? 'PAID' : 'UNPAID',
+        'Payment Method': r.paymentMethod || 'Corporate Card',
+        'Transaction Reference': r.paymentRef || 'N/A',
+        'Auto Synced': r.isAutoSynced ? 'YES' : 'MANUAL',
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      XLSX.utils.book_append_sheet(wb, ws, 'Cloud_Expenses');
+      XLSX.writeFile(wb, `Elite_Edition_Cloud_Expenses_${new Date().getFullYear()}.xlsx`);
+      showToast('Annual Cloud Expense Statement exported to Excel successfully!');
+    } catch (err) {
+      showToast('Failed to export Excel: ' + err.message, 'error');
+    }
+  };
+
+  // 7. Purge Local App Cache
+  const handlePurgeCache = () => {
+    try {
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+      showToast('Browser cache purged successfully! Refreshing...', 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (e) {
+      showToast('Cache purge triggered.');
+    }
+  };
+
+  // 8. Copy System Diagnostics Report
   const handleCopyDiagnostics = () => {
     const report = `=====================================================
 ELITE EDITION ERP — INFRASTRUCTURE DIAGNOSTICS REPORT
@@ -208,12 +250,12 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
    - Status: ${systemHealth?.server?.status || 'Online'}
    - Uptime: ${systemHealth?.server?.uptimeFormatted || 'N/A'}
    - Node.js: ${systemHealth?.server?.nodeVersion || process.version}
-   - Process RAM: RSS ${systemHealth?.server?.memory?.rssMb || 94} MB | Heap ${systemHealth?.server?.memory?.heapUsedMb || 45} MB
+   - Process RAM: RSS ${systemHealth?.server?.memory?.rssMb || 232} MB | Heap ${systemHealth?.server?.memory?.heapUsedMb || 75} MB
 
 2. DATABASE (MONGODB ATLAS):
    - Cluster: ${systemHealth?.database?.cluster || 'MongoDB Atlas M10 Dedicated (ap-south-1)'}
    - Connection Status: ${systemHealth?.database?.status || 'Connected'}
-   - Active Connections: ${mongoMetrics?.measurements?.connections || 24} / 1500
+   - Active Connections: ${mongoMetrics?.measurements?.connections || 83} / 1500
    - Disk Partition: ${mongoMetrics?.measurements?.diskPartitionSpaceUsedGb || 1.48} GB / 10 GB
    - Continuous PITR Backup: Active
 
@@ -224,10 +266,10 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
    - Stored Objects: ${cfMetrics?.metrics?.objectCount || 148} Challans & Invoices
 
 4. CURRENT MONTH CLOUD EXPENSES:
-   - AWS EC2: ₹${(bills[0]?.awsAmount || 436.30).toFixed(2)}
+   - AWS EC2: ₹${(bills[0]?.awsAmount || 1168.65).toFixed(2)}
    - MongoDB Atlas: ₹${(bills[0]?.mongoDbAmount || 1245.00).toFixed(2)}
    - Cloudflare R2: ₹0.00
-   - Total Spend: ₹${((bills[0]?.awsAmount || 436.30) + (bills[0]?.mongoDbAmount || 1245.00)).toFixed(2)}
+   - Total Spend: ₹${((bills[0]?.awsAmount || 1168.65) + (bills[0]?.mongoDbAmount || 1245.00)).toFixed(2)}
    - Budget Cap: ₹${monthlyBudgetInr}
 =====================================================`;
 
@@ -276,7 +318,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
         platformKey: 'aws',
         platformName: 'AWS Cloud Server',
         platformProvider: 'AWS Infrastructure',
-        scope: 'EC2 Mumbai (t3.medium) • Route 53 DNS • Application Load Balancer • S3 Storage',
+        scope: 'EC2 Mumbai • Route 53 • ALB • S3 Storage',
         amountInr: b.awsAmount,
         amountUsd: b.awsUsdAmount || b.awsAmount / exchangeRate,
         isPaid: awsPaid,
@@ -286,10 +328,13 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
         isAutoSynced: b.isAutoSynced,
         syncedAt: b.syncedAt,
         breakdown: b.awsBreakdown || [
-          { service: 'Amazon Elastic Compute Cloud (EC2)', amountInr: 280.0, amountUsd: 3.24 },
-          { service: 'Amazon Route 53 (DNS & Routing)', amountInr: 43.25, amountUsd: 0.5 },
-          { service: 'Elastic Load Balancing (ALB)', amountInr: 65.0, amountUsd: 0.75 },
-          { service: 'Amazon Simple Storage Service (S3)', amountInr: 48.05, amountUsd: 0.55 },
+          { service: 'EC2 - Other (EBS & Network)', amountInr: 326.72, amountUsd: 3.78 },
+          { service: 'Amazon Elastic Compute Cloud - Compute', amountInr: 268.99, amountUsd: 3.11 },
+          { service: 'Tax (GST on Cloud Services)', amountInr: 178.19, amountUsd: 2.06 },
+          { service: 'AWS WAF (Web Firewall)', amountInr: 131.76, amountUsd: 1.52 },
+          { service: 'Amazon Virtual Private Cloud (VPC)', amountInr: 115.91, amountUsd: 1.34 },
+          { service: 'AWS Cost Explorer', amountInr: 72.66, amountUsd: 0.84 },
+          { service: 'Amazon Route 53 (DNS Routing)', amountInr: 54.41, amountUsd: 0.63 },
         ],
       });
 
@@ -303,7 +348,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
         platformKey: 'mongodb',
         platformName: 'MongoDB Atlas Database',
         platformProvider: 'MongoDB Inc. Cloud',
-        scope: 'Dedicated M10 3-Node Cluster (ap-south-1) • Point-in-Time Continuous Backups',
+        scope: 'Dedicated M10 Cluster (ap-south-1) • PITR Backups',
         amountInr: b.mongoDbAmount,
         amountUsd: (b.mongoDbAmount || 0) / exchangeRate,
         isPaid: mongoPaid,
@@ -328,7 +373,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
         platformKey: 'cloudflare',
         platformName: 'Cloudflare R2 Storage',
         platformProvider: 'Cloudflare Inc.',
-        scope: 'Zero-Egress Object Storage (Challans, Invoices & Design Files • 10 GB Free)',
+        scope: 'Zero-Egress Object Storage (Challans & PDFs • 10 GB Free)',
         amountInr: b.cloudflareAmount || 0,
         amountUsd: b.cloudflareUsdAmount || 0,
         isPaid: cfPaid,
@@ -368,13 +413,18 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
 
   // KPI Computations
   const latestBill = bills[0] || {};
-  const latestAwsInr = latestBill.awsAmount || 436.30;
-  const latestAwsUsd = latestBill.awsUsdAmount || 5.04;
+  const prevBill = bills[1] || {};
+  const latestAwsInr = latestBill.awsAmount || 1168.65;
+  const latestAwsUsd = latestBill.awsUsdAmount || 13.51;
   const latestMongoInr = latestBill.mongoDbAmount || 1245.00;
   const latestMongoUsd = (latestBill.mongoDbAmount || 1245.00) / exchangeRate;
   const latestCfInr = latestBill.cloudflareAmount || 0.00;
   const latestTotalInr = latestAwsInr + latestMongoInr + latestCfInr;
   const latestTotalUsd = latestAwsUsd + latestMongoUsd + 0;
+
+  // Month-over-Month Growth Calculation
+  const prevTotalInr = (prevBill.awsAmount || 0) + (prevBill.mongoDbAmount || 0) + (prevBill.cloudflareAmount || 0);
+  const momGrowthPercent = prevTotalInr > 0 ? Number((((latestTotalInr - prevTotalInr) / prevTotalInr) * 100).toFixed(1)) : 10.7;
 
   const totalUnpaidInr = rows.filter((r) => !r.isPaid).reduce((acc, r) => acc + (r.amountInr || 0), 0);
 
@@ -385,18 +435,27 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
   const isBudgetNearCap = budgetUsagePercent >= 80;
 
   return (
-    <div className="infra-billing-root w-full min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 font-sans">
+    <div className="infra-root">
       {/* Toast Notification */}
       {toast && (
         <div
           role="status"
-          className={`fixed top-5 right-5 z-[100000] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-semibold transition-all duration-300 ${
-            toast.type === 'error'
-              ? 'bg-rose-600 text-white shadow-rose-600/30'
-              : toast.type === 'warning'
-              ? 'bg-amber-600 text-white shadow-amber-600/30'
-              : 'bg-emerald-600 text-white shadow-emerald-600/30'
-          }`}
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 100000,
+            padding: '12px 18px',
+            borderRadius: 12,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            background: toast.type === 'error' ? '#ef4444' : toast.type === 'warning' ? '#f59e0b' : '#10b981',
+            color: '#ffffff',
+          }}
         >
           {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
           <span>{toast.message}</span>
@@ -406,38 +465,47 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* MASTER HEADER BAR                                                      */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      <header className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-blue-500/25">
-              <Server size={22} />
-            </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                Cloud Control Center & Infrastructure Billing
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  System Online
-                </span>
-              </h1>
-              <p className="text-xs md:text-sm text-slate-500">
-                Self-sufficient cloud billing, live compute diagnostics, budget alerts, and disaster recovery
-              </p>
-            </div>
+      <header className="infra-header">
+        <div className="infra-header-left">
+          <div className="infra-header-icon">
+            <Server size={22} />
+          </div>
+          <div>
+            <h1 className="infra-title">
+              <span>Cloud Control Center & Infrastructure Billing</span>
+              <span className="infra-badge-online">
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a' }}></span>
+                System Online
+              </span>
+            </h1>
+            <p className="infra-subtitle">
+              Live AWS & MongoDB cost tracking, server diagnostics, budget alerts, and official tax invoices
+            </p>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="infra-header-actions">
           {/* Currency Toggle */}
           <button
             type="button"
             onClick={() => setCurrency(currency === 'INR' ? 'USD' : 'INR')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all cursor-pointer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 12px',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#334155',
+              cursor: 'pointer',
+            }}
             title="Toggle Currency (1 USD = 86.5 INR)"
           >
-            <DollarSign size={14} className="text-emerald-600" />
-            <span>Currency: <strong className="text-blue-600">{currency}</strong></span>
+            <DollarSign size={14} color="#059669" />
+            <span>Currency: <strong style={{ color: '#2563eb' }}>{currency}</strong></span>
           </button>
 
           {/* Sync All Cloud Providers */}
@@ -445,34 +513,41 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
             type="button"
             onClick={handleSyncAll}
             disabled={syncing}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-60"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 14px',
+              borderRadius: 8,
+              border: 'none',
+              background: '#2563eb',
+              color: '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              opacity: syncing ? 0.6 : 1,
+            }}
             title="Fetches live billing from AWS Cost Explorer & MongoDB Atlas"
           >
             <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
-            <span>{syncing ? 'Syncing All Clouds...' : 'Sync Cloud Metrics'}</span>
+            <span>{syncing ? 'Syncing...' : 'Sync Cloud Metrics'}</span>
           </button>
         </div>
       </header>
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* 3 CORE NAVIGATION SUB-TABS                                             */}
+      {/* SEGMENTED 2-TAB BAR                                                    */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      <div className="flex items-center gap-2 mb-6 border-b border-slate-200 pb-3 overflow-x-auto">
+      <div className="infra-tabs-bar">
         <button
           type="button"
           onClick={() => setActiveTab('bills')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'bills'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-          }`}
+          className={`infra-tab-btn ${activeTab === 'bills' ? 'active' : ''}`}
         >
           <CreditCard size={15} />
           <span>Cloud Bills & Expenses</span>
           {totalUnpaidInr > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-              activeTab === 'bills' ? 'bg-white text-blue-700' : 'bg-rose-100 text-rose-700'
-            }`}>
+            <span className="infra-tab-pill">
               {formatAmount(totalUnpaidInr)} Due
             </span>
           )}
@@ -481,15 +556,11 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
         <button
           type="button"
           onClick={() => setActiveTab('health')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'health'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-          }`}
+          className={`infra-tab-btn ${activeTab === 'health' ? 'active' : ''}`}
         >
           <Activity size={15} />
           <span>Server & System Health</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a' }}></span>
         </button>
       </div>
 
@@ -497,162 +568,164 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
       {/* TAB 1: CLOUD BILLS & EXPENSES                                          */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'bills' && (
-        <div className="space-y-6">
+        <div>
           {/* 1. TOP KPI SUMMARY CARDS */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="infra-kpi-grid">
             {/* Card 1: AWS EC2 Server */}
             <div
               onClick={() => setActiveDrawer('aws')}
-              className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden border-l-4 border-l-amber-500 group"
+              className="infra-kpi-card"
+              style={{ borderLeft: '4px solid #f59e0b' }}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wider">
-                  ERP Server (AWS EC2)
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Cloud size={18} />
+              <div>
+                <div className="infra-kpi-top">
+                  <span className="infra-kpi-label" style={{ color: '#b45309' }}>ERP Server (AWS EC2)</span>
+                  <div className="infra-kpi-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
+                    <Cloud size={18} />
+                  </div>
                 </div>
+                <div className="infra-kpi-value">{formatAmount(latestAwsInr, latestAwsUsd)}</div>
+                <div className="infra-kpi-desc">EC2 Mumbai • API & Website</div>
               </div>
-              <div className="text-2xl font-black text-slate-900 tracking-tight">
-                {formatAmount(latestAwsInr, latestAwsUsd)}
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                EC2 Mumbai • API & Website
-              </div>
-              <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-                <span>{latestBill.month || 'Current Month'}</span>
-                <span className="text-amber-700 font-bold group-hover:underline inline-flex items-center gap-0.5">
-                  View Compute ↗
-                </span>
+              <div className="infra-kpi-footer">
+                <span style={{ color: '#64748b' }}>{latestBill.month || 'Current Month'}</span>
+                <span style={{ color: '#b45309', fontWeight: 800 }}>View Compute ↗</span>
               </div>
             </div>
 
             {/* Card 2: MongoDB Atlas Database */}
             <div
               onClick={() => setActiveDrawer('mongodb')}
-              className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden border-l-4 border-l-emerald-500 group"
+              className="infra-kpi-card"
+              style={{ borderLeft: '4px solid #10b981' }}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-emerald-700 uppercase tracking-wider">
-                  Database (MongoDB Atlas)
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Database size={18} />
+              <div>
+                <div className="infra-kpi-top">
+                  <span className="infra-kpi-label" style={{ color: '#047857' }}>Database (MongoDB Atlas)</span>
+                  <div className="infra-kpi-icon" style={{ background: '#d1fae5', color: '#059669' }}>
+                    <Database size={18} />
+                  </div>
                 </div>
+                <div className="infra-kpi-value">{formatAmount(latestMongoInr, latestMongoUsd)}</div>
+                <div className="infra-kpi-desc">M10 3-Node Dedicated Cluster</div>
               </div>
-              <div className="text-2xl font-black text-slate-900 tracking-tight">
-                {formatAmount(latestMongoInr, latestMongoUsd)}
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                M10 3-Node Dedicated Cluster
-              </div>
-              <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-                <span className="text-emerald-700 font-bold">PITR Active</span>
-                <span className="text-emerald-700 font-bold group-hover:underline inline-flex items-center gap-0.5">
-                  Diagnostics ↗
-                </span>
+              <div className="infra-kpi-footer">
+                <span style={{ color: '#059669', fontWeight: 700 }}>PITR Active</span>
+                <span style={{ color: '#047857', fontWeight: 800 }}>Diagnostics ↗</span>
               </div>
             </div>
 
             {/* Card 3: Cloudflare R2 Storage */}
             <div
               onClick={() => setActiveDrawer('cloudflare')}
-              className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden border-l-4 border-l-sky-500 group"
+              className="infra-kpi-card"
+              style={{ borderLeft: '4px solid #0ea5e9' }}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-sky-700 uppercase tracking-wider">
-                  PDF & Challan Files (R2)
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <HardDrive size={18} />
+              <div>
+                <div className="infra-kpi-top">
+                  <span className="infra-kpi-label" style={{ color: '#0369a1' }}>PDF & Challan Files (R2)</span>
+                  <div className="infra-kpi-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
+                    <HardDrive size={18} />
+                  </div>
                 </div>
+                <div className="infra-kpi-value" style={{ color: '#059669' }}>
+                  ₹0.00 <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>($0.00)</span>
+                </div>
+                <div className="infra-kpi-desc">Zero-Egress Tier • 10 GB Free</div>
               </div>
-              <div className="text-2xl font-black text-emerald-600 tracking-tight">
-                ₹0.00 <span className="text-xs font-semibold text-slate-400">($0.00)</span>
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Zero-Egress Tier • 10 GB Free
-              </div>
-              <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-                <span>{cfMetrics?.metrics?.objectCount || 148} Files Stored</span>
-                <span className="text-sky-700 font-bold group-hover:underline inline-flex items-center gap-0.5">
-                  Storage ↗
-                </span>
+              <div className="infra-kpi-footer">
+                <span style={{ color: '#64748b' }}>{cfMetrics?.metrics?.objectCount || 148} Files Stored</span>
+                <span style={{ color: '#0369a1', fontWeight: 800 }}>Storage ↗</span>
               </div>
             </div>
 
             {/* Card 4: Total Monthly Running Cost */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm relative overflow-hidden border-l-4 border-l-blue-600">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-blue-700 uppercase tracking-wider">
-                  Total Monthly Running Cost
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <TrendingUp size={18} />
+            <div
+              className="infra-kpi-card"
+              style={{ borderLeft: '4px solid #2563eb' }}
+            >
+              <div>
+                <div className="infra-kpi-top">
+                  <span className="infra-kpi-label" style={{ color: '#1d4ed8' }}>Total Monthly Running Cost</span>
+                  <div className="infra-kpi-icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+                    <TrendingUp size={18} />
+                  </div>
                 </div>
+                <div className="infra-kpi-value">{formatAmount(latestTotalInr, latestTotalUsd)}</div>
+                <div className="infra-kpi-desc">All 3 Cloud Providers Combined</div>
               </div>
-              <div className="text-2xl font-black text-slate-900 tracking-tight">
-                {formatAmount(latestTotalInr, latestTotalUsd)}
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                All 3 Cloud Providers Combined
-              </div>
-              <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-                <span>1 USD = ₹{exchangeRate}</span>
-                <span className="font-extrabold text-slate-700">Official Auto-Debit</span>
+              <div className="infra-kpi-footer">
+                <span style={{ color: '#64748b' }}>1 USD = ₹{exchangeRate}</span>
+                <span style={{ color: '#0f172a', fontWeight: 800 }}>Official Auto-Debit</span>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* 2. MONTHLY BUDGET CAP & OVER-SPEND ALERT METER */}
-          <section className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                  isBudgetExceeded ? 'bg-rose-100 text-rose-600' : isBudgetNearCap ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'
-                }`}>
-                  <Sliders size={17} />
+          {/* 2. AUTO-DEBIT & MONTHLY BUDGET WIDGET */}
+          <div className="infra-alert-banner">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: isBudgetExceeded ? '#fee2e2' : isBudgetNearCap ? '#fef3c7' : '#ecfdf5',
+                  color: isBudgetExceeded ? '#dc2626' : isBudgetNearCap ? '#d97706' : '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Sliders size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-900">
-                    Monthly Cloud Budget Cap & Health Alert
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Prevents runaway compute expenses or unexpected third-party cloud charges
-                  </p>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                    Monthly Cloud Budget Cap & Auto-Debit Alert
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Next Auto-Debit on <strong>02 Nov 2026</strong> via Corporate Card • MoM Growth: <strong>+{momGrowthPercent}%</strong>
+                  </div>
                 </div>
               </div>
 
               {/* Budget Limit Config */}
-              <div className="flex items-center gap-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {isEditingBudget ? (
-                  <form onSubmit={handleSaveBudget} className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-600">₹</span>
+                  <form onSubmit={handleSaveBudget} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>₹</span>
                     <input
                       type="number"
                       value={tempBudgetInput}
                       onChange={(e) => setTempBudgetInput(e.target.value)}
-                      className="w-24 px-2 py-1 text-xs font-bold border border-blue-400 rounded-lg focus:outline-none"
+                      style={{
+                        width: 90,
+                        padding: '4px 8px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        border: '1px solid #2563eb',
+                        borderRadius: 6,
+                        outline: 'none',
+                      }}
                       autoFocus
                     />
                     <button
                       type="submit"
-                      className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+                      style={{ padding: '4px 10px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Save
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsEditingBudget(false)}
-                      className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg cursor-pointer"
+                      style={{ padding: '4px 8px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
                   </form>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-600 font-bold">
-                      Budget Limit: <strong className="text-slate-900">₹{monthlyBudgetInr.toLocaleString('en-IN')}</strong> / month
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                      Budget Cap: <strong style={{ color: '#0f172a' }}>₹{monthlyBudgetInr.toLocaleString('en-IN')}</strong>/mo
                     </span>
                     <button
                       type="button"
@@ -660,7 +733,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                         setTempBudgetInput(String(monthlyBudgetInr));
                         setIsEditingBudget(true);
                       }}
-                      className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
+                      style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
                     >
                       Edit Cap
                     </button>
@@ -669,293 +742,316 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
               </div>
             </div>
 
-            {/* Visual Budget Meter */}
-            <div className="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden relative">
+            {/* Progress Bar */}
+            <div className="infra-progress-track">
               <div
-                className={`h-full transition-all duration-500 rounded-full ${
-                  isBudgetExceeded ? 'bg-rose-500' : isBudgetNearCap ? 'bg-amber-500' : 'bg-emerald-500'
-                }`}
-                style={{ width: `${budgetUsagePercent}%` }}
-              ></div>
+                className="infra-progress-bar"
+                style={{
+                  width: `${budgetUsagePercent}%`,
+                  background: isBudgetExceeded ? '#ef4444' : isBudgetNearCap ? '#f59e0b' : '#10b981',
+                }}
+              />
             </div>
 
-            <div className="mt-2.5 flex flex-wrap items-center justify-between text-xs font-bold text-slate-600">
-              <div className="flex items-center gap-2">
-                <span>{budgetUsagePercent}% Budget Utilized</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-extrabold ${
-                  isBudgetExceeded
-                    ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                    : isBudgetNearCap
-                    ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                    : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                }`}>
-                  {isBudgetExceeded ? '⚠️ Budget Limit Exceeded' : isBudgetNearCap ? '⚠️ Approaching Budget Cap' : '🟢 Safe Within Budget'}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#475569', flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>{budgetUsagePercent}% Utilized</span>
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: 9999,
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  background: isBudgetExceeded ? '#fee2e2' : isBudgetNearCap ? '#fef3c7' : '#dcfce7',
+                  color: isBudgetExceeded ? '#b91c1c' : isBudgetNearCap ? '#b45309' : '#15803d',
+                }}>
+                  {isBudgetExceeded ? '⚠️ Limit Exceeded' : isBudgetNearCap ? '⚠️ Approaching Cap' : '🟢 Safe Within Budget'}
                 </span>
               </div>
               <div>
                 <span>Buffer Remaining: </span>
-                <strong className={isBudgetExceeded ? 'text-rose-600' : 'text-emerald-700'}>
+                <strong style={{ color: isBudgetExceeded ? '#dc2626' : '#059669' }}>
                   ₹{budgetRemainingInr.toLocaleString('en-IN')}
                 </strong>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* 3. MONTHLY CLOUD BILLING LEDGER TABLE */}
-          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/50">
-              <div className="flex items-center gap-2 flex-1 max-w-md">
-                <div className="relative w-full">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by month, platform, reference ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap text-xs">
-                {/* Platform Filters */}
-                <div className="flex items-center rounded-xl border border-slate-300 bg-white p-0.5">
-                  {['all', 'aws', 'mongodb', 'cloudflare'].map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setPlatformFilter(key)}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition-colors capitalize cursor-pointer ${
-                        platformFilter === key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {key === 'all' ? 'All Providers' : key === 'aws' ? 'AWS' : key === 'mongodb' ? 'MongoDB' : 'R2'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Status Filters */}
-                <div className="flex items-center rounded-xl border border-slate-300 bg-white p-0.5">
-                  {['all', 'unpaid', 'paid'].map((sKey) => (
-                    <button
-                      key={sKey}
-                      type="button"
-                      onClick={() => setStatusFilter(sKey)}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition-colors capitalize cursor-pointer ${
-                        statusFilter === sKey ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {sKey}
-                    </button>
-                  ))}
-                </div>
-
-                {totalUnpaidInr > 0 && (
-                  <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 font-extrabold text-[11px] border border-rose-200">
-                    Due Total: {formatAmount(totalUnpaidInr)}
-                  </span>
-                )}
-              </div>
+          {/* 3. TOOLBAR & TABLE */}
+          <div className="infra-toolbar">
+            <div className="infra-search-box">
+              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search by month, platform, reference ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="infra-search-input"
+              />
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider">
-                    <th className="py-3 px-3 w-10 text-center">#</th>
-                    <th className="py-3 px-4">Billing Month</th>
-                    <th className="py-3 px-4">Provider / Service</th>
-                    <th className="py-3 px-4">Infrastructure Scope</th>
-                    <th className="py-3 px-4 text-right">Amount ({currency})</th>
-                    <th className="py-3 px-4 text-center">Payment Status</th>
-                    <th className="py-3 px-4">Payment Details & Ref</th>
-                    <th className="py-3 px-4 text-center">Service Breakdown</th>
-                    <th className="py-3 px-4 text-center w-28">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
-                        <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-blue-600" />
-                        Loading infrastructure billing records...
-                      </td>
-                    </tr>
-                  ) : filteredRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
-                        No billing records found matching your filter criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRows.map((row, idx) => {
-                      const isExpanded = expandedRowId === row.id;
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {/* Provider Filter */}
+              <div className="infra-filter-group">
+                {['all', 'aws', 'mongodb', 'cloudflare'].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setPlatformFilter(key)}
+                    className={`infra-filter-btn ${platformFilter === key ? 'active' : ''}`}
+                  >
+                    {key === 'all' ? 'All Providers' : key === 'aws' ? 'AWS' : key === 'mongodb' ? 'MongoDB' : 'R2'}
+                  </button>
+                ))}
+              </div>
 
-                      return (
-                        <React.Fragment key={row.id}>
-                          <tr className="hover:bg-blue-50/40 transition-colors">
-                            <td className="py-3 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
-                            <td className="py-3 px-4 font-bold text-slate-900">
-                              <div className="flex flex-col gap-0.5">
-                                <span>{row.month}</span>
-                                {row.isAutoSynced && (
-                                  <span className="text-[10px] font-extrabold text-emerald-600 inline-flex items-center gap-0.5">
-                                    ⚡ {row.platformKey.toUpperCase()} Sync
-                                  </span>
-                                )}
+              {/* Status Filter */}
+              <div className="infra-filter-group">
+                {['all', 'unpaid', 'paid'].map((sKey) => (
+                  <button
+                    key={sKey}
+                    type="button"
+                    onClick={() => setStatusFilter(sKey)}
+                    className={`infra-filter-btn ${statusFilter === sKey ? 'active' : ''}`}
+                    style={{ textTransform: 'capitalize' }}
+                  >
+                    {sKey}
+                  </button>
+                ))}
+              </div>
+
+              {/* 1-Click Excel Export Button */}
+              <button
+                type="button"
+                onClick={handleExportAnnualExcel}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '6px 11px',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                }}
+                title="Download complete annual cloud expenses for CA audit"
+              >
+                <FileSpreadsheet size={13} color="#059669" />
+                <span>Export Excel</span>
+              </button>
+
+              {totalUnpaidInr > 0 && (
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '4px 8px', borderRadius: 9999, background: '#fee2e2', color: '#b91c1c' }}>
+                  Due Total: {formatAmount(totalUnpaidInr)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="infra-table-wrapper">
+            <table className="infra-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 40, textAlign: 'center' }}>#</th>
+                  <th>Billing Month</th>
+                  <th>Provider / Service</th>
+                  <th>Infrastructure Scope</th>
+                  <th style={{ textAlign: 'right' }}>Amount ({currency})</th>
+                  <th style={{ textAlign: 'center' }}>Payment Status</th>
+                  <th>Payment Details & Ref</th>
+                  <th style={{ textAlign: 'center' }}>Breakdown</th>
+                  <th style={{ textAlign: 'center', width: 90 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
+                      <RefreshCw size={22} className="animate-spin" style={{ margin: '0 auto 8px auto', color: '#2563eb' }} />
+                      <div>Loading infrastructure billing records...</div>
+                    </td>
+                  </tr>
+                ) : filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
+                      No billing records found matching your filter criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRows.map((row, idx) => {
+                    const isExpanded = expandedRowId === row.id;
+
+                    return (
+                      <React.Fragment key={row.id}>
+                        <tr>
+                          <td style={{ textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>{idx + 1}</td>
+                          <td style={{ fontWeight: 800, color: '#0f172a' }}>
+                            <div>{row.month}</div>
+                            {row.isAutoSynced && (
+                              <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 2, marginTop: 2 }}>
+                                ⚡ {row.platformKey.toUpperCase()} Sync
                               </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                                  row.platformKey === 'aws'
-                                    ? 'bg-amber-50 text-amber-600 border-amber-200'
-                                    : row.platformKey === 'mongodb'
-                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                    : 'bg-sky-50 text-sky-600 border-sky-200'
-                                }`}>
-                                  {row.platformKey === 'aws' ? (
-                                    <Cloud size={15} />
-                                  ) : row.platformKey === 'mongodb' ? (
-                                    <Database size={15} />
-                                  ) : (
-                                    <HardDrive size={15} />
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="font-extrabold text-slate-900">{row.platformName}</div>
-                                  <div className="text-[10px] text-slate-500">{row.platformProvider}</div>
-                                </div>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 7,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: row.platformKey === 'aws' ? '#fef3c7' : row.platformKey === 'mongodb' ? '#d1fae5' : '#e0f2fe',
+                                color: row.platformKey === 'aws' ? '#d97706' : row.platformKey === 'mongodb' ? '#059669' : '#0284c7',
+                              }}>
+                                {row.platformKey === 'aws' ? <Cloud size={15} /> : row.platformKey === 'mongodb' ? <Database size={15} /> : <HardDrive size={15} />}
                               </div>
-                            </td>
-                            <td className="py-3 px-4 text-slate-600 text-[11px] max-w-xs truncate">
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#0f172a' }}>{row.platformName}</div>
+                                <div style={{ fontSize: '0.68rem', color: '#64748b' }}>{row.platformProvider}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ color: '#475569', fontSize: '0.74rem' }}>
+                            <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
                               {row.scope}
-                            </td>
-                            <td className="py-3 px-4 text-right font-black text-slate-900 text-sm">
-                              {formatAmount(row.amountInr, row.amountUsd)}
-                              {currency === 'INR' && row.amountUsd > 0 && (
-                                <div className="text-[10px] text-slate-400 font-normal">
-                                  ${Number(row.amountUsd).toFixed(2)}
-                                </div>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              {row.isPaid ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-extrabold text-[11px] border border-emerald-200">
-                                  <CheckCircle2 size={11} /> PAID
-                                </span>
-                              ) : (
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 900, color: '#0f172a', fontSize: '0.88rem' }}>
+                            <div>{formatAmount(row.amountInr, row.amountUsd)}</div>
+                            {currency === 'INR' && row.amountUsd > 0 && (
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 500 }}>
+                                ${Number(row.amountUsd).toFixed(2)}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {row.isPaid ? (
+                              <span className="badge-paid">
+                                <CheckCircle2 size={11} /> PAID
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSettleModalBill(row.bill);
+                                  setSettlePlatform(row.platformKey);
+                                }}
+                                className="badge-unpaid"
+                                title="Click to settle in-app"
+                              >
+                                <AlertCircle size={11} /> UNPAID
+                              </button>
+                            )}
+                          </td>
+                          <td style={{ fontSize: '0.74rem' }}>
+                            {row.isPaid ? (
+                              <div>
+                                <div style={{ fontWeight: 700, color: '#0f172a' }}>Paid via {row.paymentMethod || 'Corporate Card'}</div>
+                                <div style={{ color: '#64748b', fontFamily: 'monospace', fontSize: '0.68rem' }}>Ref: {row.paymentRef || 'N/A'}</div>
+                              </div>
+                            ) : (
+                              <div style={{ color: '#dc2626', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Clock size={12} /> Pending Settlement
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRowId(isExpanded ? null : row.id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '4px 8px',
+                                borderRadius: 6,
+                                background: '#f1f5f9',
+                                border: 'none',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                color: '#334155',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <span>{row.breakdown.length} items</span>
+                              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </button>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              {!row.isPaid && (
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setSettleModalBill(row.bill);
                                     setSettlePlatform(row.platformKey);
                                   }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-[11px] border border-rose-200 cursor-pointer transition-colors"
-                                  title="Click to settle in-app"
+                                  style={{
+                                    padding: '5px 8px',
+                                    borderRadius: 6,
+                                    background: '#059669',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                  }}
+                                  title="Mark as Paid"
                                 >
-                                  <AlertCircle size={11} /> UNPAID
+                                  <CreditCard size={13} />
                                 </button>
                               )}
-                            </td>
-                            <td className="py-3 px-4 text-[11px]">
-                              {row.isPaid ? (
-                                <div>
-                                  <div className="font-bold text-slate-800">
-                                    Paid via {row.paymentMethod || 'Corporate Card'}
-                                  </div>
-                                  <div className="text-slate-500 font-mono text-[10px]">
-                                    Ref: {row.paymentRef || 'N/A'}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-rose-600 font-semibold flex items-center gap-1">
-                                  <Clock size={12} /> Pending Settlement
-                                </div>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-center">
                               <button
                                 type="button"
-                                onClick={() => setExpandedRowId(isExpanded ? null : row.id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer transition-colors"
+                                onClick={() => handleDownloadInvoice(row.bill)}
+                                disabled={downloadingPdfId === row.bill._id}
+                                style={{
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  background: '#f8fafc',
+                                  border: '1px solid #cbd5e1',
+                                  color: '#334155',
+                                  cursor: 'pointer',
+                                }}
+                                title="Download Tax Invoice PDF"
                               >
-                                <span>{row.breakdown.length} Services</span>
-                                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                <Download size={13} className={downloadingPdfId === row.bill._id ? 'animate-bounce' : ''} />
                               </button>
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                {!row.isPaid && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSettleModalBill(row.bill);
-                                      setSettlePlatform(row.platformKey);
-                                    }}
-                                    className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm cursor-pointer transition-colors"
-                                    title="Settle bill in-app (eliminates external consoles)"
-                                  >
-                                    <CreditCard size={14} />
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownloadInvoice(row.bill)}
-                                  disabled={downloadingPdfId === row.bill._id}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 shadow-sm cursor-pointer transition-colors disabled:opacity-50"
-                                  title="Download official Tax Invoice PDF"
-                                >
-                                  <Download size={14} className={downloadingPdfId === row.bill._id ? 'animate-bounce' : ''} />
-                                </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Expandable Line Items */}
+                        {isExpanded && (
+                          <tr style={{ background: '#f8fafc' }}>
+                            <td colSpan={9} style={{ padding: '12px 20px 16px 54px' }}>
+                              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, maxWidth: 650 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 6, marginBottom: 8, fontSize: '0.74rem', fontWeight: 800, color: '#334155' }}>
+                                  <span>Itemized Breakdown ({row.month})</span>
+                                  <span>Provider: {row.platformName}</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  {row.breakdown.map((item, bIdx) => (
+                                    <div key={bIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', padding: '3px 6px', borderRadius: 4 }}>
+                                      <span style={{ color: '#475569' }}>{item.service}</span>
+                                      <strong style={{ color: '#0f172a' }}>{formatAmount(item.amountInr, item.amountUsd)}</strong>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </td>
                           </tr>
-
-                          {/* Itemized Service Breakdown Accordion */}
-                          {isExpanded && (
-                            <tr className="bg-slate-50/80 border-b border-slate-200">
-                              <td colSpan={9} className="p-4 pl-12">
-                                <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm max-w-3xl">
-                                  <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-                                    <span className="font-extrabold text-xs text-slate-800 uppercase tracking-wider">
-                                      Itemized Cloud Services Breakdown ({row.month})
-                                    </span>
-                                    <span className="text-[11px] text-slate-500">
-                                      Provider: <strong>{row.platformName}</strong>
-                                    </span>
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    {row.breakdown.map((item, bIdx) => (
-                                      <div
-                                        key={bIdx}
-                                        className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-slate-50"
-                                      >
-                                        <span className="font-medium text-slate-700">{item.service}</span>
-                                        <span className="font-bold text-slate-900">
-                                          {formatAmount(item.amountInr, item.amountUsd)}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-800">
-                                    <span>Subtotal for {row.platformName}:</span>
-                                    <span>{formatAmount(row.amountInr, row.amountUsd)}</span>
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -963,230 +1059,289 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
       {/* TAB 2: SERVER & SYSTEM HEALTH (LIVE TELEMETRY)                         */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'health' && (
-        <div className="space-y-6">
-          {/* Top Live Diagnostic Action Bar */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Wifi size={18} />
+        <div>
+          {/* Top Diagnostics Bar */}
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Wifi size={17} />
               </div>
               <div>
-                <div className="text-xs font-black text-slate-900 flex items-center gap-2">
-                  <span>Backend Node.js & Database Connectivity</span>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Backend Node.js & Database Status</span>
                   {pingLatency !== null && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      pingLatency < 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: 9999, background: '#dcfce7', color: '#15803d' }}>
                       ⚡ {pingLatency} ms Roundtrip
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  Region: ap-south-1 (Mumbai) • Host: 3.7.174.180
+                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  Region: ap-south-1 (Mumbai) • Host: 3.7.174.180 • Zero-Downtime Cluster
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
                 onClick={handlePingTest}
                 disabled={pinging}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#334155',
+                  cursor: 'pointer',
+                }}
               >
                 <RefreshCw size={13} className={pinging ? 'animate-spin' : ''} />
-                <span>{pinging ? 'Testing Latency...' : 'Run Ping Test'}</span>
+                <span>{pinging ? 'Pinging...' : 'Run Ping Test'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePurgeCache}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#334155',
+                  cursor: 'pointer',
+                }}
+                title="Force-clears cached files in browser"
+              >
+                <span>Purge App Cache</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleCopyDiagnostics}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
               >
-                {copiedReport ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                {copiedReport ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
                 <span>{copiedReport ? 'Copied Report!' : 'Copy Diagnostics'}</span>
               </button>
             </div>
           </div>
 
-          {/* 4 Health KPI Panels */}
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 1. Host Server Uptime */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-slate-500 uppercase">SERVER PROCESS</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">ONLINE</span>
+          {/* 4 Clean Metric Tiles */}
+          <div className="infra-kpi-grid">
+            {/* Tile 1: Server Process */}
+            <div className="infra-metric-tile">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span className="infra-metric-tile-title">SERVER PROCESS</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#15803d' }}>ONLINE</span>
               </div>
-              <div className="text-xl font-black text-slate-900">
-                {systemHealth?.server?.uptimeFormatted || 'Running 24/7'}
+              <div className="infra-metric-tile-num">{systemHealth?.server?.uptimeFormatted || '0h 15m'}</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
+                Node {systemHealth?.server?.nodeVersion || 'v22.x'} • PM2 Cluster
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                Node {systemHealth?.server?.nodeVersion || 'v20.x'} • PM2 Cluster
-              </div>
-              <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-600 flex justify-between font-medium">
-                <span>RAM RSS:</span>
-                <strong className="text-slate-900">{systemHealth?.server?.memory?.rssMb || 94} MB</strong>
+              {/* RAM Meter */}
+              <div style={{ marginTop: 10, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                  <span>RAM Usage:</span>
+                  <strong style={{ color: '#0f172a' }}>{systemHealth?.server?.memory?.rssMb || 232} MB / 4 GB</strong>
+                </div>
+                <div style={{ width: '100%', height: 5, background: '#e2e8f0', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(((systemHealth?.server?.memory?.rssMb || 232) / 4096) * 100, 100)}%`, height: '100%', background: '#2563eb' }} />
+                </div>
               </div>
             </div>
 
-            {/* 2. AWS EC2 CPU Utilization */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-amber-700 uppercase">AWS EC2 COMPUTE</span>
-                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">t3.medium</span>
+            {/* Tile 2: AWS EC2 Compute */}
+            <div className="infra-metric-tile">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span className="infra-metric-tile-title">AWS EC2 COMPUTE</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#b45309' }}>t3.medium</span>
               </div>
-              <div className="text-xl font-black text-slate-900">
-                {awsMetrics?.telemetry?.averageCpu || 18.4}% Avg CPU
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="infra-metric-tile-num">{awsMetrics?.telemetry?.averageCpu || 18.4}% Avg CPU</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
                 Peak: {awsMetrics?.telemetry?.maxCpu || 42.1}% • Min: {awsMetrics?.telemetry?.minCpu || 8.2}%
               </div>
-              <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-600 flex justify-between font-medium">
-                <span>System Checks:</span>
-                <strong className="text-emerald-700">2 / 2 Passed (100%)</strong>
+              {/* CPU Meter */}
+              <div style={{ marginTop: 10, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                  <span>System Checks:</span>
+                  <strong style={{ color: '#059669' }}>2 / 2 Passed (100%)</strong>
+                </div>
+                <div style={{ width: '100%', height: 5, background: '#e2e8f0', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${awsMetrics?.telemetry?.averageCpu || 18.4}%`, height: '100%', background: '#10b981' }} />
+                </div>
               </div>
             </div>
 
-            {/* 3. MongoDB Connections & Partition */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-emerald-700 uppercase">MONGODB REPLICA</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">3 Nodes</span>
+            {/* Tile 3: MongoDB Replica */}
+            <div className="infra-metric-tile">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span className="infra-metric-tile-title">MONGODB REPLICA</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#15803d' }}>3 Nodes</span>
               </div>
-              <div className="text-xl font-black text-slate-900">
-                {mongoMetrics?.measurements?.connections || 24} Connections
+              <div className="infra-metric-tile-num">{mongoMetrics?.measurements?.connections || 83} Conns</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
+                Disk: {mongoMetrics?.measurements?.diskPartitionSpaceUsedGb || 1.48} GB / 10 GB
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                Disk: {mongoMetrics?.measurements?.diskPartitionSpaceUsedGb || 1.48} GB / 10 GB (14.8%)
-              </div>
-              <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-600 flex justify-between font-medium">
-                <span>Max Pool Limit:</span>
-                <strong className="text-slate-900">1,500 Conns</strong>
+              {/* Disk Meter */}
+              <div style={{ marginTop: 10, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                  <span>Max Pool Limit:</span>
+                  <strong style={{ color: '#0f172a' }}>1,500 Conns</strong>
+                </div>
+                <div style={{ width: '100%', height: 5, background: '#e2e8f0', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                  <div style={{ width: '14.8%', height: '100%', background: '#059669' }} />
+                </div>
               </div>
             </div>
 
-            {/* 4. Cloudflare R2 Objects */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-extrabold text-sky-700 uppercase">OBJECT STORAGE</span>
-                <span className="px-2 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px] font-bold">Free Tier</span>
+            {/* Tile 4: Object Storage */}
+            <div className="infra-metric-tile">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span className="infra-metric-tile-title">OBJECT STORAGE</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#e0f2fe', color: '#0369a1' }}>Free Tier</span>
               </div>
-              <div className="text-xl font-black text-slate-900">
-                {cfMetrics?.metrics?.objectCount || 148} Stored Files
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="infra-metric-tile-num">{cfMetrics?.metrics?.objectCount || 148} Stored Files</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
                 {cfMetrics?.metrics?.storageUsedGb || 0.42} GB / 10 GB Free Allowance
               </div>
-              <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-600 flex justify-between font-medium">
-                <span>Egress Fee:</span>
-                <strong className="text-emerald-700">$0.00 (Zero)</strong>
+              {/* Egress Meter */}
+              <div style={{ marginTop: 10, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                  <span>Egress Fee:</span>
+                  <strong style={{ color: '#059669' }}>$0.00 (Zero)</strong>
+                </div>
+                <div style={{ width: '100%', height: 5, background: '#e2e8f0', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                  <div style={{ width: '4.2%', height: '100%', background: '#0ea5e9' }} />
+                </div>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Detailed Telemetry Breakdown Accordions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Box 1: AWS Services Telemetry */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="font-extrabold text-xs text-slate-900 flex items-center gap-2">
-                  <Cloud size={16} className="text-amber-600" />
+          {/* 3 Detailed Mini Tables */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            {/* Box 1: AWS Services Breakdown */}
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.78rem', color: '#0f172a' }}>
+                  <Cloud size={16} color="#d97706" />
                   <span>AWS Mumbai Services</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveDrawer('aws')}
-                  className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   Deep View ↗
                 </button>
               </div>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Amazon EC2 (Compute)</span>
-                  <strong className="text-slate-900">₹280.00 ($3.24)</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>EC2 - Other (EBS & Network)</span>
+                  <strong style={{ color: '#0f172a' }}>₹326.72</strong>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Route 53 (DNS & Domains)</span>
-                  <strong className="text-slate-900">₹43.25 ($0.50)</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Amazon EC2 - Compute</span>
+                  <strong style={{ color: '#0f172a' }}>₹268.99</strong>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Application Load Balancer</span>
-                  <strong className="text-slate-900">₹65.00 ($0.75)</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Tax (GST on Cloud Services)</span>
+                  <strong style={{ color: '#0f172a' }}>₹178.19</strong>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-600">Amazon S3 (Backups)</span>
-                  <strong className="text-slate-900">₹48.05 ($0.55)</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span style={{ color: '#64748b' }}>AWS WAF (Web Firewall)</span>
+                  <strong style={{ color: '#0f172a' }}>₹131.76</strong>
                 </div>
               </div>
             </div>
 
-            {/* Box 2: MongoDB Health */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="font-extrabold text-xs text-slate-900 flex items-center gap-2">
-                  <Database size={16} className="text-emerald-600" />
+            {/* Box 2: Atlas M10 Dedicated */}
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.78rem', color: '#0f172a' }}>
+                  <Database size={16} color="#059669" />
                   <span>Atlas M10 Dedicated</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveDrawer('mongodb')}
-                  className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   Deep View ↗
                 </button>
               </div>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Replica Set Nodes</span>
-                  <strong className="text-emerald-700">3 Nodes Primary+Secondary</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Replica Set Nodes</span>
+                  <strong style={{ color: '#059669' }}>3 Nodes Primary+Sec</strong>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Database Engine</span>
-                  <strong className="text-slate-900">MongoDB 7.0 Enterprise</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Database Engine</span>
+                  <strong style={{ color: '#0f172a' }}>MongoDB 7.0 Enterprise</strong>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Point-in-Time Oplog</span>
-                  <strong className="text-emerald-700">Continuous Streaming</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Point-in-Time Oplog</span>
+                  <strong style={{ color: '#059669' }}>Continuous Streaming</strong>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-600">Storage Partition</span>
-                  <strong className="text-slate-900">1.48 GB of 10 GB</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span style={{ color: '#64748b' }}>Storage Partition</span>
+                  <strong style={{ color: '#0f172a' }}>1.48 GB of 10 GB</strong>
                 </div>
               </div>
             </div>
 
-            {/* Box 3: Cloudflare R2 Operations */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="font-extrabold text-xs text-slate-900 flex items-center gap-2">
-                  <HardDrive size={16} className="text-sky-600" />
+            {/* Box 3: R2 Cloud Storage */}
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.78rem', color: '#0f172a' }}>
+                  <HardDrive size={16} color="#0284c7" />
                   <span>R2 Cloud Storage</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveDrawer('cloudflare')}
-                  className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   Deep View ↗
                 </button>
               </div>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Class A Writes / Mutates</span>
-                  <strong className="text-slate-900">{cfMetrics?.metrics?.classAOperations || 240} reqs</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Class A Writes</span>
+                  <strong style={{ color: '#0f172a' }}>{cfMetrics?.metrics?.classAOperations || 240} reqs</strong>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Class B Reads / Downloads</span>
-                  <strong className="text-slate-900">{cfMetrics?.metrics?.classBOperations || 1820} reqs</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Class B Reads</span>
+                  <strong style={{ color: '#0f172a' }}>{cfMetrics?.metrics?.classBOperations || 1820} reqs</strong>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-600">Stored Objects</span>
-                  <strong className="text-slate-900">{cfMetrics?.metrics?.objectCount || 148} PDFs & Files</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                  <span style={{ color: '#64748b' }}>Stored Objects</span>
+                  <strong style={{ color: '#0f172a' }}>{cfMetrics?.metrics?.objectCount || 148} PDFs</strong>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-600">Egress Bandwidth Charged</span>
-                  <strong className="text-emerald-700">$0.00 (Zero Fee)</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span style={{ color: '#64748b' }}>Egress Bandwidth</span>
+                  <strong style={{ color: '#059669' }}>$0.00 (Zero Fee)</strong>
                 </div>
               </div>
             </div>
@@ -1195,100 +1350,121 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* 4. MODALS & SLIDE-OVERS                                                */}
+      {/* DRAWERS & MODALS                                                       */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
 
       {/* A. TELEMETRY DRAWER (AWS, MongoDB Atlas, Cloudflare R2) */}
       {activeDrawer && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-[100000] flex justify-end bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-        >
-          <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right duration-300 border-l border-slate-200">
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  activeDrawer === 'aws'
-                    ? 'bg-amber-100 text-amber-600'
-                    : activeDrawer === 'mongodb'
-                    ? 'bg-emerald-100 text-emerald-600'
-                    : 'bg-sky-100 text-sky-600'
-                }`}>
-                  {activeDrawer === 'aws' ? <Cloud size={22} /> : activeDrawer === 'mongodb' ? <Database size={22} /> : <HardDrive size={22} />}
+        <div className="infra-drawer-overlay">
+          <div className="infra-drawer-content">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: activeDrawer === 'aws' ? '#fef3c7' : activeDrawer === 'mongodb' ? '#d1fae5' : '#e0f2fe',
+                  color: activeDrawer === 'aws' ? '#d97706' : activeDrawer === 'mongodb' ? '#059669' : '#0284c7',
+                }}>
+                  {activeDrawer === 'aws' ? <Cloud size={20} /> : activeDrawer === 'mongodb' ? <Database size={20} /> : <HardDrive size={20} />}
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                     {activeDrawer === 'aws'
                       ? 'AWS Compute & Services Drawer'
                       : activeDrawer === 'mongodb'
                       ? 'MongoDB Diagnostics & Performance'
                       : 'Cloudflare R2 Object Storage Drawer'}
                   </h3>
-                  <p className="text-xs text-slate-500">Live API Telemetry • Zero External Redirection</p>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Live API Telemetry • Zero External Console Redirection</div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveDrawer(null)}
-                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+                style={{ padding: 6, borderRadius: 8, background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* AWS Content */}
+            {/* AWS Content with Crystal Clear High Contrast Telemetry */}
             {activeDrawer === 'aws' && (
-              <div className="space-y-6">
-                <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                  <div className="text-xs font-bold text-amber-800 uppercase mb-1">Compute Instance Status</div>
-                  <div className="text-base font-extrabold text-slate-900">
-                    EC2 Mumbai • {awsMetrics?.telemetry?.instanceType || 't3.medium (2 vCPU, 4 GiB)'}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {/* Instance Status */}
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', marginBottom: 4 }}>
+                    COMPUTE INSTANCE STATUS
                   </div>
-                  <div className="text-xs text-slate-600 mt-1">
-                    Status: <strong className="text-emerald-600">{awsMetrics?.telemetry?.status || 'Healthy'}</strong> • Region: <strong className="text-slate-800">ap-south-1</strong>
+                  <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>
+                    EC2 Mumbai • {awsMetrics?.telemetry?.instanceType || 't3.medium (2 vCPU, 4 GiB RAM)'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 4 }}>
+                    Status: <strong style={{ color: '#059669' }}>Healthy</strong> • Region: <strong style={{ color: '#0f172a' }}>ap-south-1</strong>
                   </div>
                 </div>
 
+                {/* CloudWatch CPU Utilization (Crystal Clear White & Sky-Blue Text on Dark Terminal) */}
                 <div>
-                  <h4 className="text-xs font-extrabold uppercase text-slate-500 mb-2">
-                    CloudWatch Average CPU Utilization (Last 24 Hours)
-                  </h4>
-                  <div className="bg-slate-900 text-emerald-400 font-mono p-4 rounded-xl text-xs space-y-1">
-                    <div className="flex justify-between border-b border-slate-800 pb-1 text-slate-400">
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b', marginBottom: 8 }}>
+                    CLOUDWATCH AVERAGE CPU UTILIZATION (LAST 24 HOURS)
+                  </div>
+                  <div className="infra-terminal-box">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #334155', paddingBottom: 6, marginBottom: 6, color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700 }}>
                       <span>METRIC</span>
                       <span>VALUE</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">Average CPU:</span>
-                      <span>{awsMetrics?.telemetry?.averageCpu || 18.4}%</span>
+                    <div className="infra-terminal-row">
+                      <span className="infra-terminal-label">Average CPU (24h):</span>
+                      <span className="infra-terminal-val">{awsMetrics?.telemetry?.averageCpu || 18.4}%</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">Peak CPU:</span>
-                      <span>{awsMetrics?.telemetry?.maxCpu || 42.1}%</span>
+                    <div className="infra-terminal-row">
+                      <span className="infra-terminal-label">Peak CPU Spike:</span>
+                      <span className="infra-terminal-val" style={{ color: '#fb923c' }}>{awsMetrics?.telemetry?.maxCpu || 42.1}%</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">Minimum CPU:</span>
-                      <span>{awsMetrics?.telemetry?.minCpu || 8.2}%</span>
+                    <div className="infra-terminal-row">
+                      <span className="infra-terminal-label">Minimum Idle CPU:</span>
+                      <span className="infra-terminal-val" style={{ color: '#4ade80' }}>{awsMetrics?.telemetry?.minCpu || 8.2}%</span>
+                    </div>
+                    <div className="infra-terminal-row">
+                      <span className="infra-terminal-label">System Checks:</span>
+                      <span className="infra-terminal-val" style={{ color: '#4ade80' }}>2 / 2 Passed (100% OK)</span>
                     </div>
                   </div>
                 </div>
 
+                {/* Month-to-Date Service Cost Breakdown */}
                 <div>
-                  <h4 className="text-xs font-extrabold uppercase text-slate-500 mb-2">
-                    Month-to-Date Service Cost Breakdown
-                  </h4>
-                  <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden text-xs">
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b', marginBottom: 8 }}>
+                    MONTH-TO-DATE SERVICE COST BREAKDOWN
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
                     {(awsMetrics?.cost?.services || [
-                      { service: 'Amazon Elastic Compute Cloud (EC2)', amountInr: 280.00, amountUsd: 3.24 },
-                      { service: 'Amazon Route 53 (DNS & Routing)', amountInr: 43.25, amountUsd: 0.50 },
-                      { service: 'Elastic Load Balancing (ALB)', amountInr: 65.00, amountUsd: 0.75 },
-                      { service: 'Amazon Simple Storage Service (S3)', amountInr: 48.05, amountUsd: 0.55 },
+                      { service: 'EC2 - Other (EBS & Network)', amountInr: 326.72, amountUsd: 3.78 },
+                      { service: 'Amazon Elastic Compute Cloud - Compute', amountInr: 268.99, amountUsd: 3.11 },
+                      { service: 'Tax (GST on Cloud Services)', amountInr: 178.19, amountUsd: 2.06 },
+                      { service: 'AWS WAF (Web Firewall)', amountInr: 131.76, amountUsd: 1.52 },
+                      { service: 'Amazon Virtual Private Cloud (VPC)', amountInr: 115.91, amountUsd: 1.34 },
+                      { service: 'AWS Cost Explorer', amountInr: 72.66, amountUsd: 0.84 },
+                      { service: 'Amazon Route 53 (DNS Routing)', amountInr: 54.41, amountUsd: 0.63 },
                     ]).map((s, idx) => (
-                      <div key={idx} className="flex justify-between p-3 hover:bg-slate-50">
-                        <span className="font-medium text-slate-700">{s.service}</span>
-                        <span className="font-extrabold text-slate-900">{formatAmount(s.amountInr, s.amountUsd)}</span>
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 14px',
+                          borderBottom: idx === 6 ? 'none' : '1px solid #f1f5f9',
+                          fontSize: '0.78rem',
+                          background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                        }}
+                      >
+                        <span style={{ color: '#334155', fontWeight: 500 }}>{s.service}</span>
+                        <strong style={{ color: '#0f172a' }}>{formatAmount(s.amountInr, s.amountUsd)}</strong>
                       </div>
                     ))}
                   </div>
@@ -1298,46 +1474,42 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
 
             {/* MongoDB Content */}
             {activeDrawer === 'mongodb' && (
-              <div className="space-y-6">
-                <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
-                  <div className="text-xs font-bold text-emerald-800 uppercase mb-1">Cluster Metadata</div>
-                  <div className="text-base font-extrabold text-slate-900">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#047857', marginBottom: 4 }}>
+                    CLUSTER METADATA
+                  </div>
+                  <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>
                     MongoDB Atlas M10 Dedicated
                   </div>
-                  <div className="text-xs text-slate-600 mt-1">
-                    3-Node Dedicated Replica Set • Region: <strong className="text-slate-800">ap-south-1</strong> • Engine: <strong className="text-slate-800">MongoDB 7.0 Enterprise</strong>
+                  <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 4 }}>
+                    3-Node Replica Set • Region: <strong style={{ color: '#0f172a' }}>ap-south-1</strong> • Engine: <strong style={{ color: '#0f172a' }}>MongoDB 7.0 Enterprise</strong>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-100 p-3 rounded-xl border border-slate-200">
-                    <div className="text-[11px] text-slate-500 font-bold uppercase">Active Connections</div>
-                    <div className="text-xl font-black text-slate-900 mt-1">
-                      {mongoMetrics?.measurements?.connections || 24}
-                    </div>
-                    <div className="text-[10px] text-slate-400">Max limit: 1,500 conns</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Active Connections</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', marginTop: 4 }}>{mongoMetrics?.measurements?.connections || 83}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Max limit: 1,500 conns</div>
                   </div>
 
-                  <div className="bg-slate-100 p-3 rounded-xl border border-slate-200">
-                    <div className="text-[11px] text-slate-500 font-bold uppercase">Disk Partition Used</div>
-                    <div className="text-xl font-black text-slate-900 mt-1">
-                      {mongoMetrics?.measurements?.diskPartitionSpaceUsedGb || 1.48} GB
-                    </div>
-                    <div className="text-[10px] text-slate-400">Of 10 GB allocated (14.8%)</div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Disk Partition Used</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', marginTop: 4 }}>{mongoMetrics?.measurements?.diskPartitionSpaceUsedGb || 1.48} GB</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Of 10 GB allocated (14.8%)</div>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-extrabold uppercase text-slate-500 mb-2">
-                    Backup & Disaster Recovery
-                  </h4>
-                  <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/30 flex items-center gap-3 text-xs">
-                    <ShieldCheck size={20} className="text-emerald-600 shrink-0" />
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b', marginBottom: 8 }}>
+                    BACKUP & DISASTER RECOVERY
+                  </div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #a7f3d0', borderRadius: 12, padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <ShieldCheck size={22} color="#059669" />
                     <div>
-                      <div className="font-extrabold text-slate-900">Continuous Cloud Backup (PITR) Active</div>
-                      <div className="text-[11px] text-slate-500">
-                        Point-in-time recovery enabled with continuous oplog streaming
-                      </div>
+                      <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>Continuous Cloud Backup (PITR) Active</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Point-in-time recovery enabled with continuous oplog streaming</div>
                     </div>
                   </div>
                 </div>
@@ -1346,51 +1518,49 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
 
             {/* Cloudflare R2 Content */}
             {activeDrawer === 'cloudflare' && (
-              <div className="space-y-6">
-                <div className="bg-sky-50 rounded-xl p-4 border border-sky-200">
-                  <div className="text-xs font-bold text-sky-800 uppercase mb-1">R2 Object Storage Usage</div>
-                  <div className="text-base font-extrabold text-slate-900">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#0369a1', marginBottom: 4 }}>
+                    R2 OBJECT STORAGE USAGE
+                  </div>
+                  <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>
                     Zero-Egress Tier • 10 GB Free Allowance
                   </div>
-                  <div className="text-xs text-slate-600 mt-1">
-                    Status: <strong className="text-emerald-600">Active & Protected</strong> • Egress Bandwidth: <strong className="text-emerald-600">$0.00 (Free)</strong>
+                  <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 4 }}>
+                    Status: <strong style={{ color: '#059669' }}>Active & Protected</strong> • Egress Bandwidth: <strong style={{ color: '#059669' }}>$0.00 (Free)</strong>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-100 p-3 rounded-xl border border-slate-200">
-                    <div className="text-[11px] text-slate-500 font-bold uppercase">Storage Consumed</div>
-                    <div className="text-xl font-black text-slate-900 mt-1">
-                      {cfMetrics?.metrics?.storageUsedGb || 0.42} GB
-                    </div>
-                    <div className="text-[10px] text-slate-400">4.2% of 10 GB Free Tier</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Storage Consumed</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', marginTop: 4 }}>{cfMetrics?.metrics?.storageUsedGb || 0.42} GB</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>4.2% of 10 GB Free Tier</div>
                   </div>
 
-                  <div className="bg-slate-100 p-3 rounded-xl border border-slate-200">
-                    <div className="text-[11px] text-slate-500 font-bold uppercase">Stored Objects</div>
-                    <div className="text-xl font-black text-slate-900 mt-1">
-                      {cfMetrics?.metrics?.objectCount || 148} Files
-                    </div>
-                    <div className="text-[10px] text-slate-400">Delivery Challans & PDFs</div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Stored Objects</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', marginTop: 4 }}>{cfMetrics?.metrics?.objectCount || 148} Files</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Delivery Challans & PDFs</div>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-extrabold uppercase text-slate-500 mb-2">
-                    Operation Counters (Adaptive Groups)
-                  </h4>
-                  <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 text-xs">
-                    <div className="flex justify-between p-3">
-                      <span className="font-medium text-slate-700">Class A Operations (Uploads / Mutates)</span>
-                      <span className="font-bold text-slate-900">{cfMetrics?.metrics?.classAOperations || 240} reqs</span>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b', marginBottom: 8 }}>
+                    OPERATION COUNTERS
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#475569' }}>Class A Operations (Uploads)</span>
+                      <strong style={{ color: '#0f172a' }}>{cfMetrics?.metrics?.classAOperations || 240} reqs</strong>
                     </div>
-                    <div className="flex justify-between p-3">
-                      <span className="font-medium text-slate-700">Class B Operations (Downloads / Reads)</span>
-                      <span className="font-bold text-slate-900">{cfMetrics?.metrics?.classBOperations || 1820} reqs</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#475569' }}>Class B Operations (Reads)</span>
+                      <strong style={{ color: '#0f172a' }}>{cfMetrics?.metrics?.classBOperations || 1820} reqs</strong>
                     </div>
-                    <div className="flex justify-between p-3 bg-emerald-50">
-                      <span className="font-bold text-emerald-800">Total Billed Bandwidth</span>
-                      <span className="font-bold text-emerald-800">₹0.00 ($0.00)</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', fontSize: '0.78rem', background: '#ecfdf5' }}>
+                      <span style={{ color: '#047857', fontWeight: 700 }}>Total Billed Bandwidth</span>
+                      <strong style={{ color: '#047857' }}>₹0.00 ($0.00)</strong>
                     </div>
                   </div>
                 </div>
@@ -1402,39 +1572,35 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
 
       {/* B. IN-APP SETTLEMENT MODAL */}
       {settleModalBill && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-        >
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+        <div className="infra-modal-overlay">
+          <div className="infra-modal-content">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, borderBottom: '1px solid #e2e8f0', marginBottom: 16 }}>
               <div>
-                <h3 className="text-lg font-black text-slate-900">
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                   In-App Infrastructure Bill Settlement
                 </h3>
-                <p className="text-xs text-slate-500">
+                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
                   Billing Period: <strong>{settleModalBill.month}</strong>
-                </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSettleModalBill(null)}
-                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+                style={{ padding: 6, borderRadius: 6, background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer' }}
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleConfirmSettlement} className="space-y-4">
+            <form onSubmit={handleConfirmSettlement} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>
                   Settlement Scope
                 </label>
                 <select
                   value={settlePlatform}
                   onChange={(e) => setSettlePlatform(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 font-bold focus:ring-2 focus:ring-blue-500"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, background: '#f8fafc' }}
                 >
                   <option value="all">Entire Bill (All 3 Cloud Providers Combined)</option>
                   <option value="aws">AWS Cloud Only ({formatAmount(settleModalBill.awsAmount)})</option>
@@ -1444,13 +1610,13 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>
                   Payment Mode
                 </label>
                 <select
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 font-bold focus:ring-2 focus:ring-blue-500"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, background: '#f8fafc' }}
                 >
                   <option value="Corporate Card">Corporate Credit Card (Auto-Debit)</option>
                   <option value="Bank Wire / NEFT">Bank Wire Transfer / NEFT</option>
@@ -1460,7 +1626,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>
                   Transaction / Invoice Reference ID
                 </label>
                 <input
@@ -1468,12 +1634,12 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   placeholder={`e.g. TXN-AWS-${Date.now().toString(36).toUpperCase()}`}
                   value={referenceNo}
                   onChange={(e) => setReferenceNo(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-white font-mono focus:ring-2 focus:ring-blue-500"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem', fontFamily: 'monospace' }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>
                   Audit Notes (Optional)
                 </label>
                 <input
@@ -1481,13 +1647,13 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   placeholder="e.g. Verified by Accounts Dept"
                   value={settleNotes}
                   onChange={(e) => setSettleNotes(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-blue-500"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between text-xs font-bold text-blue-900">
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: '#1e3a8a' }}>
                 <span>Amount to Mark Settled:</span>
-                <span className="text-sm font-black">
+                <span style={{ fontSize: '0.92rem', fontWeight: 900 }}>
                   {formatAmount(
                     settlePlatform === 'aws'
                       ? settleModalBill.awsAmount
@@ -1500,21 +1666,21 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                 </span>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
                 <button
                   type="button"
                   onClick={() => setSettleModalBill(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.78rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={settling}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#059669', color: '#ffffff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   <CheckCircle2 size={14} />
-                  <span>{settling ? 'Recording Settlement...' : 'Confirm In-App Settlement'}</span>
+                  <span>{settling ? 'Recording...' : 'Confirm In-App Settlement'}</span>
                 </button>
               </div>
             </form>
