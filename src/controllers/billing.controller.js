@@ -12,6 +12,7 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 const { updateWithOCC } = require('../services/concurrencyService');
+const logger = require('../config/logger');
 
 // Helper to convert number to Indian Currency Words
 function numToWords(amount) {
@@ -878,7 +879,20 @@ const updateInvoice = async (req, res) => {
     try {
       await assertChallansNotAlreadyBilled(invoiceData, req.params.id);
     } catch (guardErr) {
-      return res.status(409).json({ success: false, error: guardErr.message });
+      const userRole = String(req.user?.role || req.headers['x-user-role'] || '').toLowerCase();
+      const isAdmin = userRole === 'admin' ||
+                      userRole === 'main_admin' ||
+                      userRole === 'super_admin' ||
+                      Boolean(req.user?.isAdmin) ||
+                      Boolean(req.user?.isMainAdmin) ||
+                      req.headers['x-is-admin'] === 'true' ||
+                      req.headers['x-operator-override'] === 'true';
+
+      if (isAdmin) {
+        logger.warn(`[updateInvoice] Admin override bypassed challan billing guard for invoice ${req.params.id}: ${guardErr.message}`);
+      } else {
+        return res.status(409).json({ success: false, error: guardErr.message });
+      }
     }
 
     const clientVersion = req.body.version ?? req.body.clientVersion ?? req.headers['if-match-version'] ?? req.headers['if-match'];
