@@ -81,6 +81,7 @@ const db = {
   PushSubscription: require('./pushSubscription.model'),
   ChangeApprovalRequest: require('./changeApprovalRequest.model'),
   FreightBill: require('./freightBill.model'),
+  DocumentTemplate: require('./documentTemplate.model'),
   mongoose,
 };
 

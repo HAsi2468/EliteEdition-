@@ -8,6 +8,7 @@ import {
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import CompanyDesignStudio from './CompanyDesignStudio';
+import DocumentDesignStudio from './DesignStudio/DocumentDesignStudio';
 
 const getCompanyAccentColor = (entity) => {
   return 'var(--primary)';
@@ -81,6 +82,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
   });
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'users', 'tags', 'design'
+  const [designStudioMode, setDesignStudioMode] = useState('visual'); // 'visual' | 'classic'
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
@@ -404,7 +406,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           className={activeTab === 'design' ? 'btn-primary' : 'btn-secondary'}
           style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
         >
-          <Palette size={16} /> 🎨 Challan & Report Design Studio
+          <Palette size={16} /> 🎨 Document & Invoice Design Studio
         </button>
       </div>
 
@@ -952,19 +954,69 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
       </form>
       )}
 
-      {/* TAB 4: CHALLAN & REPORT DESIGN STUDIO */}
+      {/* TAB 4: VISUAL DOCUMENT & INVOICE DESIGN STUDIO */}
       {activeTab === 'design' && (
-        <CompanyDesignStudio
-          companyEntity={companyEntity}
-          accentColor={accentColor}
-          companyForm={form}
-          challanDesign={form.challanDesign || {}}
-          reportDesign={form.reportDesign || {}}
-          onChangeChallan={handleChallanDesignChange}
-          onChangeReport={handleReportDesignChange}
-          onSave={handleSubmit}
-          saving={saving}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Sub-mode selector pills */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f1f5f9', padding: '0.4rem 0.6rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setDesignStudioMode('visual')}
+                style={{
+                  padding: '0.45rem 1rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  backgroundColor: designStudioMode === 'visual' ? '#0284c7' : 'transparent',
+                  color: designStudioMode === 'visual' ? '#ffffff' : '#64748b',
+                  boxShadow: designStudioMode === 'visual' ? '0 2px 8px rgba(2, 132, 199, 0.25)' : 'none'
+                }}
+              >
+                🎨 Visual A4 Canvas Studio (Invoices, Challans, Job Cards)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDesignStudioMode('classic')}
+                style={{
+                  padding: '0.45rem 1rem',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  backgroundColor: designStudioMode === 'classic' ? '#0284c7' : 'transparent',
+                  color: designStudioMode === 'classic' ? '#ffffff' : '#64748b',
+                  boxShadow: designStudioMode === 'classic' ? '0 2px 8px rgba(2, 132, 199, 0.25)' : 'none'
+                }}
+              >
+                ⚙️ Classic Challan Form Settings
+              </button>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+              Live Print Rendering Powered by Puppeteer
+            </span>
+          </div>
+
+          {/* Render Active Studio */}
+          {designStudioMode === 'visual' ? (
+            <DocumentDesignStudio companyEntity={companyEntity} />
+          ) : (
+            <CompanyDesignStudio
+              companyEntity={companyEntity}
+              accentColor={accentColor}
+              companyForm={form}
+              challanDesign={form.challanDesign || {}}
+              reportDesign={form.reportDesign || {}}
+              onChangeChallan={handleChallanDesignChange}
+              onChangeReport={handleReportDesignChange}
+              onSave={handleSubmit}
+              saving={saving}
+            />
+          )}
+        </div>
       )}
     </div>
   );

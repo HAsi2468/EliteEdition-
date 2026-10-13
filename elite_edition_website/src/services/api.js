@@ -3005,6 +3005,61 @@ export const api = {
 
   async getEntryUsersList() {
     return request('/change-approvals/entry-users');
+  },
+
+  // --- Document & Invoice Design Studio Engine ---
+  async getDocumentTemplates(documentType) {
+    const query = documentType ? `?documentType=${documentType}` : '';
+    return request(`/document-templates${query}`);
+  },
+
+  async getDocumentTemplateById(id) {
+    return request(`/document-templates/${id}`);
+  },
+
+  async createDocumentTemplate(data) {
+    return request('/document-templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateDocumentTemplate(id, data) {
+    return request(`/document-templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteDocumentTemplate(id) {
+    return request(`/document-templates/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async setDefaultDocumentTemplate(id) {
+    return request(`/document-templates/${id}/set-default`, {
+      method: 'POST',
+    });
+  },
+
+  async generateTemplatePdf(payload) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+    const response = await fetch(`${baseUrl}/document-templates/generate-pdf`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to generate template PDF');
+    }
+    const blob = await response.blob();
+    return { data: blob };
   }
 };
 

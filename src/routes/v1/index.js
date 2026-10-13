@@ -82,6 +82,7 @@ router.use('/jobs', require('./jobs.route').router);
 router.use('/change-approvals', require('./changeApproval.route'));
 router.use('/textile-compute', require('./textileCompute.route'));
 router.use('/gst', require('./gst.route'));
+router.use('/document-templates', require('./documentTemplate.route'));
 
 module.exports = router;
 

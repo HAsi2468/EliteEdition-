@@ -128,7 +128,7 @@ export default function SystemMaintenanceLockScreen({ lockData, onAdminAuthSucce
         <div style={styles.techDetailsBox}>
           <div style={styles.techRow}>
             <span style={styles.techLabel}>Target Route:</span>
-            <span style={styles.techValue} style={{ wordBreak: 'break-all' }}>{currentPath || '/'}</span>
+            <span style={{ ...styles.techValue, wordBreak: 'break-all' }}>{currentPath || '/'}</span>
           </div>
           <div style={styles.techRow}>
             <span style={styles.techLabel}>Host:</span>

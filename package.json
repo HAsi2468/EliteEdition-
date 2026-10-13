@@ -78,6 +78,7 @@
     "nodemailer": "^8.0.9",
     "pdfkit": "^0.19.1",
     "pg": "^8.23.0",
+    "puppeteer": "^24.43.1",
     "qrcode": "^1.5.4",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
