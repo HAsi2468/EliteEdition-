@@ -1004,6 +1004,32 @@ const generatePdf = async (req, res) => {
 
     const pdfBuffer = await templatePdfService.generatePdfFromTemplate(template, dataContext);
 
+    // Audit Log print event asynchronously
+    try {
+      const docNum = dataContext.invoice?.invoiceNumber || dataContext.challan?.challanNumber || dataContext.jobCard?.jobCardNumber || 'DIRECT_PREVIEW';
+      const party = dataContext.customer?.name || 'General';
+      const existingCount = await db.DocumentPrintLog.countDocuments({
+        documentType: template.documentType,
+        documentNumber: docNum
+      });
+      const printCount = existingCount + 1;
+      const copyType = printCount === 1 ? 'ORIGINAL' : printCount === 2 ? 'DUPLICATE' : 'REPRINT';
+
+      db.DocumentPrintLog.create({
+        templateId: template._id,
+        templateName: template.name || 'Document',
+        documentType: template.documentType,
+        documentNumber: docNum,
+        partyName: party,
+        printedBy: req.user?.name || req.user?.username || 'Admin',
+        printCount,
+        copyType,
+        fileSize: pdfBuffer.length
+      }).catch((e) => logger.warn('Failed to save print log: %o', e));
+    } catch (auditErr) {
+      logger.warn('Failed to calculate print log counter: %o', auditErr);
+    }
+
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${(template.name || 'document').replace(/\s+/g, '_')}.pdf"`,
@@ -1135,6 +1161,30 @@ const getRecentRecords = async (req, res) => {
   }
 };
 
+// 9. Fetch Document Print Audit Logs
+const getPrintLogs = async (req, res) => {
+  try {
+    const { documentType, limit = 50 } = req.query;
+    const filter = {};
+    if (documentType) filter.documentType = documentType.toUpperCase();
+    const logs = await db.DocumentPrintLog.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .lean();
+
+    return res.status(httpStatus.OK).json({
+      success: true,
+      data: logs
+    });
+  } catch (err) {
+    logger.error('Error fetching print audit logs: %o', err);
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
 module.exports = {
   getTemplates,
   getTemplateById,
@@ -1144,6 +1194,7 @@ module.exports = {
   setDefaultTemplate,
   generatePdf,
   getRecentRecords,
+  getPrintLogs,
   getDefaultStarterTemplates,
   getMockDataContext
 };

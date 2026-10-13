@@ -3018,6 +3018,11 @@ export const api = {
     return request(`/document-templates/recent-records${query}`);
   },
 
+  async getPrintLogs(documentType) {
+    const query = documentType ? `?documentType=${documentType}` : '';
+    return request(`/document-templates/print-logs${query}`);
+  },
+
   async getDocumentTemplateById(id) {
     return request(`/document-templates/${id}`);
   },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Save, Download, Eye, EyeOff, ZoomIn, ZoomOut, RotateCcw, 
-  Check, Plus, Sparkles, Layers, Sliders, Printer, Shield, RefreshCw 
+  FileText, Save, Download, Eye, EyeOff, ZoomIn, ZoomOut, RotateCcw, RotateCw,
+  Check, Plus, Sparkles, Layers, Sliders, Printer, Shield, RefreshCw, Clock, History, X 
 } from 'lucide-react';
 import TokenPalette from './TokenPalette';
 import A4Canvas from './A4Canvas';
@@ -29,6 +29,42 @@ export default function DocumentDesignStudio({
   const [recentRecords, setRecentRecords] = useState([]);
   const [selectedRecordId, setSelectedRecordId] = useState('mock');
 
+  // Print History & Audit Logs
+  const [printLogs, setPrintLogs] = useState([]);
+  const [showPrintLogsModal, setShowPrintLogsModal] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // Undo / Redo History Stack
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const pushHistory = (tpl) => {
+    if (!tpl) return;
+    setHistory((prev) => {
+      const next = prev.slice(0, historyIndex + 1);
+      return [...next, JSON.parse(JSON.stringify(tpl))].slice(-30);
+    });
+    setHistoryIndex((prev) => Math.min(prev + 1, 29));
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const targetState = history[historyIndex - 1];
+      setActiveTemplate(JSON.parse(JSON.stringify(targetState)));
+      setHistoryIndex(historyIndex - 1);
+      showStatus('Undo (⌘Z)');
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const targetState = history[historyIndex + 1];
+      setActiveTemplate(JSON.parse(JSON.stringify(targetState)));
+      setHistoryIndex(historyIndex + 1);
+      showStatus('Redo (⌘Y)');
+    }
+  };
+
   // Fetch templates for selected document type
   const fetchTemplates = async (docType = documentType) => {
     setLoading(true);
@@ -38,9 +74,13 @@ export default function DocumentDesignStudio({
         setTemplates(res.data);
         const defaultTpl = res.data.find((t) => t.isDefault) || res.data[0];
         setActiveTemplate(defaultTpl);
+        setHistory([JSON.parse(JSON.stringify(defaultTpl))]);
+        setHistoryIndex(0);
       } else {
         setTemplates([]);
         setActiveTemplate(null);
+        setHistory([]);
+        setHistoryIndex(-1);
       }
     } catch (err) {
       console.error('Failed to load document templates:', err);
@@ -63,6 +103,21 @@ export default function DocumentDesignStudio({
     }
   };
 
+  // Fetch Print Audit Logs
+  const fetchPrintLogs = async (docType = documentType) => {
+    setLoadingLogs(true);
+    try {
+      const res = await api.getPrintLogs(docType);
+      if (res && res.data) {
+        setPrintLogs(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load print logs:', err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
     fetchTemplates(documentType);
     fetchRecentRecords(documentType);
@@ -73,6 +128,58 @@ export default function DocumentDesignStudio({
     setStatusMessage({ msg, type });
     setTimeout(() => setStatusMessage(null), 3000);
   };
+
+  // Global Keyboard Shortcuts (Nudging, Delete, Undo/Redo)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Do nothing if typing inside input, textarea, or select
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+
+      // Undo: Cmd+Z / Ctrl+Z (without shift)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      // Redo: Cmd+Y / Ctrl+Y OR Cmd+Shift+Z
+      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') ||
+          ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      // Arrow Nudging (1px, or 10px with Shift)
+      if (selectedElementId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const delta = e.shiftKey ? 10 : 1;
+        const currentEl = activeTemplate?.elements?.find((el) => el.id === selectedElementId);
+        if (!currentEl) return;
+
+        let { x, y } = currentEl;
+        if (e.key === 'ArrowUp') y -= delta;
+        if (e.key === 'ArrowDown') y += delta;
+        if (e.key === 'ArrowLeft') x -= delta;
+        if (e.key === 'ArrowRight') x += delta;
+
+        handleUpdateElementPosition(selectedElementId, { x, y });
+        return;
+      }
+
+      // Delete / Backspace
+      if (selectedElementId && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        handleDeleteElement(selectedElementId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedElementId, activeTemplate, historyIndex, history]);
 
   // 1. Add Element
   const handleAddElement = (type, defaultProps = {}) => {
@@ -102,35 +209,51 @@ export default function DocumentDesignStudio({
       }
     };
 
-    setActiveTemplate((prev) => ({
-      ...prev,
-      elements: [...(prev.elements || []), newElement]
-    }));
+    setActiveTemplate((prev) => {
+      const updated = {
+        ...prev,
+        elements: [...(prev.elements || []), newElement]
+      };
+      pushHistory(updated);
+      return updated;
+    });
     setSelectedElementId(newElement.id);
   };
 
   // 2. Update Element Props
   const handleUpdateElement = (id, updates) => {
-    setActiveTemplate((prev) => ({
-      ...prev,
-      elements: prev.elements.map((el) => (el.id === id ? { ...el, ...updates } : el))
-    }));
+    setActiveTemplate((prev) => {
+      const updated = {
+        ...prev,
+        elements: prev.elements.map((el) => (el.id === id ? { ...el, ...updates } : el))
+      };
+      pushHistory(updated);
+      return updated;
+    });
   };
 
   // 3. Update Element Position/Size
   const handleUpdateElementPosition = (id, coords) => {
-    setActiveTemplate((prev) => ({
-      ...prev,
-      elements: prev.elements.map((el) => (el.id === id ? { ...el, ...coords } : el))
-    }));
+    setActiveTemplate((prev) => {
+      const updated = {
+        ...prev,
+        elements: prev.elements.map((el) => (el.id === id ? { ...el, ...coords } : el))
+      };
+      pushHistory(updated);
+      return updated;
+    });
   };
 
   // 4. Delete Element
   const handleDeleteElement = (id) => {
-    setActiveTemplate((prev) => ({
-      ...prev,
-      elements: prev.elements.filter((el) => el.id !== id)
-    }));
+    setActiveTemplate((prev) => {
+      const updated = {
+        ...prev,
+        elements: prev.elements.filter((el) => el.id !== id)
+      };
+      pushHistory(updated);
+      return updated;
+    });
     if (selectedElementId === id) setSelectedElementId(null);
   };
 
@@ -142,10 +265,14 @@ export default function DocumentDesignStudio({
       x: (el.x || 0) + 15,
       y: (el.y || 0) + 15
     };
-    setActiveTemplate((prev) => ({
-      ...prev,
-      elements: [...(prev.elements || []), clone]
-    }));
+    setActiveTemplate((prev) => {
+      const updated = {
+        ...prev,
+        elements: [...(prev.elements || []), clone]
+      };
+      pushHistory(updated);
+      return updated;
+    });
     setSelectedElementId(clone.id);
   };
 
@@ -317,6 +444,20 @@ export default function DocumentDesignStudio({
 
         {/* Right Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {/* Print Audit Log Tracker */}
+          <button
+            type="button"
+            onClick={() => {
+              fetchPrintLogs();
+              setShowPrintLogsModal(true);
+            }}
+            style={{ ...styles.headerBtn, backgroundColor: '#ffffff', color: '#475569' }}
+            title="View print history, reprint counters & audit trail"
+          >
+            <Clock size={15} />
+            <span>Audit Log</span>
+          </button>
+
           {/* Live Mock / Real Record Preview Toggle */}
           <button
             type="button"
@@ -449,7 +590,7 @@ export default function DocumentDesignStudio({
           </div>
         )}
 
-        {/* Zoom Controls */}
+        {/* Zoom & History Undo/Redo Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           <button
             type="button"
@@ -476,6 +617,28 @@ export default function DocumentDesignStudio({
           >
             <RotateCcw size={12} />
           </button>
+
+          {/* Undo / Redo Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', borderLeft: '1px solid #cbd5e1', paddingLeft: '0.4rem', marginLeft: '0.2rem' }}>
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={historyIndex <= 0}
+              style={{ ...styles.zoomBtn, opacity: historyIndex <= 0 ? 0.35 : 1 }}
+              title="Undo (Ctrl+Z / ⌘Z)"
+            >
+              <RotateCcw size={12} color="#0284c7" />
+            </button>
+            <button
+              type="button"
+              onClick={handleRedo}
+              disabled={historyIndex >= history.length - 1}
+              style={{ ...styles.zoomBtn, opacity: historyIndex >= history.length - 1 ? 0.35 : 1 }}
+              title="Redo (Ctrl+Y / ⌘Y)"
+            >
+              <RotateCw size={12} color="#0284c7" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -536,6 +699,148 @@ export default function DocumentDesignStudio({
           />
         </div>
       </div>
+
+      {/* ================================================================= */}
+      {/* PRINT HISTORY & AUDIT LOG MODAL                                  */}
+      {/* ================================================================= */}
+      {showPrintLogsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '14px',
+            width: '100%',
+            maxWidth: '780px',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1rem 1.25rem',
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '8px', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <History size={18} color="#0284c7" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                    Print History & Statutory Audit Log
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                    Tracking print instances, user timestamps, and reprint counters (Original vs Duplicate)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPrintLogsModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '6px', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Table Body */}
+            <div style={{ padding: '1rem', overflowY: 'auto', flex: 1 }}>
+              {loadingLogs ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading print logs...</div>
+              ) : printLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                  <Printer size={32} style={{ opacity: 0.4, marginBottom: '0.5rem' }} />
+                  <p style={{ margin: 0, fontSize: '0.85rem' }}>No print logs recorded yet for {documentType}.</p>
+                  <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>Logs are automatically created each time "Print PDF" is invoked.</span>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'left', height: '32px' }}>
+                      <th style={{ padding: '6px 10px', borderRadius: '6px 0 0 6px' }}>Doc #</th>
+                      <th style={{ padding: '6px 10px' }}>Party / Client</th>
+                      <th style={{ padding: '6px 10px' }}>Template</th>
+                      <th style={{ padding: '6px 10px' }}>Copy Type</th>
+                      <th style={{ padding: '6px 10px' }}>Printed By</th>
+                      <th style={{ padding: '6px 10px', borderRadius: '0 6px 6px 0' }}>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printLogs.map((log) => {
+                      const isOriginal = log.printCount === 1;
+                      const isDuplicate = log.printCount === 2;
+                      const badgeBg = isOriginal ? '#e0f2fe' : isDuplicate ? '#fef3c7' : '#fee2e2';
+                      const badgeColor = isOriginal ? '#0369a1' : isDuplicate ? '#b45309' : '#b91c1c';
+
+                      return (
+                        <tr key={log._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a' }}>{log.documentNumber || 'Preview'}</td>
+                          <td style={{ padding: '8px 10px', color: '#334155' }}>{log.partyName || '-'}</td>
+                          <td style={{ padding: '8px 10px', color: '#64748b' }}>{log.templateName}</td>
+                          <td style={{ padding: '8px 10px' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              fontSize: '0.66rem',
+                              fontWeight: 800,
+                              backgroundColor: badgeBg,
+                              color: badgeColor
+                            }}>
+                              {log.printCount === 1 ? '1st (Original)' : log.printCount === 2 ? '2nd (Duplicate)' : `${log.printCount}th (Reprint)`}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 10px', color: '#475569' }}>{log.printedBy}</td>
+                          <td style={{ padding: '8px 10px', color: '#64748b' }}>
+                            {new Date(log.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowPrintLogsModal(false)}
+                style={{
+                  padding: '0.4rem 1rem',
+                  borderRadius: '6px',
+                  backgroundColor: '#0f172a',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -82,6 +82,7 @@ const db = {
   ChangeApprovalRequest: require('./changeApprovalRequest.model'),
   FreightBill: require('./freightBill.model'),
   DocumentTemplate: require('./documentTemplate.model'),
+  DocumentPrintLog: require('./documentPrintLog.model'),
   mongoose,
 };
 

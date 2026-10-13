@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { 
   Type, Variable, Table, Image, Minus, QrCode, Square, Search, 
-  ChevronDown, ChevronRight, Copy, Check, Plus, Sparkles 
+  ChevronDown, ChevronRight, Copy, Check, Plus, Sparkles, Award, ShieldCheck, CheckCircle 
 } from 'lucide-react';
 import { ERP_TOKEN_CATEGORIES } from '../../utils/tokenResolver';
+
+const COMPANY_SEAL_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="%232563eb" stroke-width="3" stroke-dasharray="4,2"/><circle cx="60" cy="60" r="46" fill="none" stroke="%232563eb" stroke-width="1.5"/><circle cx="60" cy="60" r="32" fill="none" stroke="%232563eb" stroke-width="1"/><path id="textCircle" d="M 60,60 m -38,0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0" fill="none"/><text fill="%231e40af" font-size="8.5" font-weight="900" font-family="sans-serif" letter-spacing="1.5"><textPath href="%23textCircle" startOffset="50%" text-anchor="middle">★ ELITE EDITION • SURAT ★</textPath></text><text x="60" y="58" fill="%231e40af" font-size="7" font-weight="800" font-family="sans-serif" text-anchor="middle">AUTHORIZED</text><text x="60" y="68" fill="%231e40af" font-size="7" font-weight="800" font-family="sans-serif" text-anchor="middle">SIGNATORY</text></svg>`;
+
+const QA_PASSED_SEAL_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="%2316a34a" stroke-width="3"/><circle cx="60" cy="60" r="46" fill="none" stroke="%2316a34a" stroke-width="1.5"/><path id="qaCircle" d="M 60,60 m -38,0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0" fill="none"/><text fill="%2315803d" font-size="8" font-weight="900" font-family="sans-serif" letter-spacing="1"><textPath href="%23qaCircle" startOffset="50%" text-anchor="middle">ELITE QUALITY CONTROL</textPath></text><text x="60" y="58" fill="%2315803d" font-size="9" font-weight="900" font-family="sans-serif" text-anchor="middle">PASSED</text><text x="60" y="68" fill="%2315803d" font-size="6.5" font-weight="700" font-family="sans-serif" text-anchor="middle">QA VERIFIED</text></svg>`;
 
 export default function TokenPalette({ onAddElement, onInsertToken }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,6 +122,42 @@ export default function TokenPalette({ onAddElement, onInsertToken }) {
         width: 260,
         height: 70,
         style: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8 }
+      }
+    },
+    {
+      type: 'text',
+      label: 'Auth Signatory',
+      icon: Award,
+      color: '#4f46e5',
+      defaultProps: {
+        width: 175,
+        height: 70,
+        content: 'For {{company.name}}\n\n\n___________________________\nAuthorized Signatory',
+        style: { fontSize: 8.5, fontWeight: '700', textAlign: 'center', color: '#0f172a', lineHeight: 1.35 }
+      }
+    },
+    {
+      type: 'image',
+      label: 'Company Seal',
+      icon: ShieldCheck,
+      color: '#2563eb',
+      defaultProps: {
+        width: 90,
+        height: 90,
+        content: COMPANY_SEAL_SVG,
+        style: { backgroundColor: 'transparent' }
+      }
+    },
+    {
+      type: 'image',
+      label: 'QA Passed Seal',
+      icon: CheckCircle,
+      color: '#16a34a',
+      defaultProps: {
+        width: 85,
+        height: 85,
+        content: QA_PASSED_SEAL_SVG,
+        style: { backgroundColor: 'transparent' }
       }
     }
   ];
