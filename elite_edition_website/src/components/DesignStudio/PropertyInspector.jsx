@@ -7,20 +7,161 @@ import { ERP_TOKEN_CATEGORIES } from '../../utils/tokenResolver';
 
 export default function PropertyInspector({
   selectedElement,
+  activeTemplate,
+  onUpdateTemplate,
   onUpdateElement,
   onDeleteElement,
   onDuplicateElement
 }) {
   if (!selectedElement) {
+    const stamp = activeTemplate?.stamp || {};
+    const watermark = activeTemplate?.watermark || {};
+
     return (
-      <div style={styles.emptyContainer}>
-        <div style={styles.emptyIconBox}>
-          <Layers size={24} color="#94a3b8" />
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div>
+            <span style={styles.elementBadge}>PAGE SETUP</span>
+            <div style={styles.elementIdText}>Document & Print Settings</div>
+          </div>
         </div>
-        <h4 style={styles.emptyTitle}>No Element Selected</h4>
-        <p style={styles.emptyText}>
-          Click any element on the A4 canvas to inspect and customize its typography, borders, coordinates, or data bindings.
-        </p>
+
+        {/* Page Dimensions & Sizing */}
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>
+            <Maximize2 size={13} color="#0284c7" /> Page Dimensions & Sizing
+          </div>
+          <div style={styles.grid2}>
+            <div>
+              <label style={styles.label}>Format Preset</label>
+              <select
+                value={activeTemplate?.pageSize || 'A4'}
+                onChange={(e) => onUpdateTemplate && onUpdateTemplate({ pageSize: e.target.value })}
+                style={styles.select}
+              >
+                <option value="A4">A4 (Standard 210x297mm)</option>
+                <option value="A5">A5 (Half Sheet 148x210mm)</option>
+                <option value="4x6">4x6" Thermal Shipping Label</option>
+                <option value="3x2">3x2" Fabric Roll Barcode</option>
+              </select>
+            </div>
+            <div>
+              <label style={styles.label}>Orientation</label>
+              <select
+                value={activeTemplate?.orientation || 'portrait'}
+                onChange={(e) => onUpdateTemplate && onUpdateTemplate({ orientation: e.target.value })}
+                style={styles.select}
+              >
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* GST Statutory Rubber Stamp */}
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>
+            <Sparkles size={13} color="#dc2626" /> GST Copy Stamp
+          </div>
+          <p style={{ fontSize: '0.68rem', color: '#64748b', margin: '0 0 0.5rem 0' }}>
+            Prints an authentic angled statutory copy badge in the top-right corner.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.6rem' }}>
+            {[
+              { label: 'None', text: '', color: '#64748b' },
+              { label: 'Original', text: 'ORIGINAL FOR RECIPIENT', color: '#0284c7' },
+              { label: 'Duplicate', text: 'DUPLICATE FOR TRANSPORTER', color: '#dc2626' },
+              { label: 'Triplicate', text: 'TRIPLICATE FOR SUPPLIER', color: '#78350f' },
+              { label: 'PAID', text: 'PAID', color: '#16a34a' },
+              { label: 'DRAFT', text: 'DRAFT', color: '#f59e0b' },
+              { label: 'CANCELLED', text: 'CANCELLED', color: '#991b1b' }
+            ].map((p) => {
+              const isCurrent = stamp.enabled && stamp.text === p.text;
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => {
+                    if (onUpdateTemplate) {
+                      onUpdateTemplate({
+                        stamp: {
+                          enabled: !!p.text,
+                          text: p.text,
+                          color: p.color
+                        }
+                      });
+                    }
+                  }}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '5px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    border: `1px solid ${isCurrent ? p.color : '#e2e8f0'}`,
+                    backgroundColor: isCurrent ? `${p.color}15` : '#ffffff',
+                    color: isCurrent ? p.color : '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Translucent Watermark */}
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>
+            <Palette size={13} color="#6366f1" /> Background Watermark
+          </div>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={styles.label}>Watermark Text</label>
+            <input
+              type="text"
+              value={watermark.text || ''}
+              placeholder="e.g. ELITE EDITION or CONFIDENTIAL"
+              onChange={(e) => {
+                if (onUpdateTemplate) {
+                  onUpdateTemplate({
+                    watermark: {
+                      ...watermark,
+                      enabled: !!e.target.value.trim(),
+                      text: e.target.value
+                    }
+                  });
+                }
+              }}
+              style={styles.input}
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Opacity: {Math.round((watermark.opacity || 0.08) * 100)}%</label>
+            <input
+              type="range"
+              min="0.02"
+              max="0.30"
+              step="0.01"
+              value={watermark.opacity || 0.08}
+              onChange={(e) => {
+                if (onUpdateTemplate) {
+                  onUpdateTemplate({
+                    watermark: {
+                      ...watermark,
+                      opacity: parseFloat(e.target.value)
+                    }
+                  });
+                }
+              }}
+              style={{ width: '100%', cursor: 'pointer' }}
+            />
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', padding: '1rem 0.5rem', color: '#94a3b8', fontSize: '0.72rem' }}>
+          💡 Click any element on the canvas to inspect its font, size, position, and data bindings.
+        </div>
       </div>
     );
   }

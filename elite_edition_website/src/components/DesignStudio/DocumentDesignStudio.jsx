@@ -25,6 +25,10 @@ export default function DocumentDesignStudio({
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
 
+  // Real ERP Records for live test previewing
+  const [recentRecords, setRecentRecords] = useState([]);
+  const [selectedRecordId, setSelectedRecordId] = useState('mock');
+
   // Fetch templates for selected document type
   const fetchTemplates = async (docType = documentType) => {
     setLoading(true);
@@ -45,8 +49,24 @@ export default function DocumentDesignStudio({
     }
   };
 
+  // Fetch real ERP records for selected document type
+  const fetchRecentRecords = async (docType = documentType) => {
+    try {
+      const res = await api.getRecentRecords(docType);
+      if (res && res.data) {
+        setRecentRecords(res.data);
+      } else {
+        setRecentRecords([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load recent ERP records for studio:', err);
+    }
+  };
+
   useEffect(() => {
     fetchTemplates(documentType);
+    fetchRecentRecords(documentType);
+    setSelectedRecordId('mock');
   }, [documentType]);
 
   const showStatus = (msg, type = 'success') => {
@@ -158,9 +178,13 @@ export default function DocumentDesignStudio({
     if (!activeTemplate) return;
     setGeneratingPdf(true);
     try {
+      const selectedRec = recentRecords.find((r) => r.id === selectedRecordId);
+      const customDataContext = selectedRec ? selectedRec.dataContext : null;
+
       const response = await api.generateTemplatePdf({
         documentType: activeTemplate.documentType,
-        mockData: true,
+        mockData: !customDataContext,
+        dataContext: customDataContext,
         templateOverride: activeTemplate
       });
 
@@ -181,6 +205,33 @@ export default function DocumentDesignStudio({
     } finally {
       setGeneratingPdf(false);
     }
+  };
+
+  // Quick Alignment Actions for selected element
+  const handleAlignElement = (alignment) => {
+    if (!selectedElementId || !activeTemplate) return;
+    const el = activeTemplate.elements.find((e) => e.id === selectedElementId);
+    if (!el) return;
+
+    let baseWidth = 595;
+    let baseHeight = 842;
+    if (activeTemplate.pageSize === 'A5') { baseWidth = 420; baseHeight = 595; }
+    else if (activeTemplate.pageSize === '4x6') { baseWidth = 288; baseHeight = 432; }
+    else if (activeTemplate.pageSize === '3x2') { baseWidth = 216; baseHeight = 144; }
+    const isLandscape = activeTemplate.orientation === 'landscape';
+    const cWidth = isLandscape ? baseHeight : baseWidth;
+    const cHeight = isLandscape ? baseWidth : baseHeight;
+    const margins = activeTemplate.margins || { top: 20, bottom: 20, left: 20, right: 20 };
+
+    let updates = {};
+    if (alignment === 'left') updates = { x: margins.left };
+    else if (alignment === 'center-h') updates = { x: Math.round((cWidth - el.width) / 2) };
+    else if (alignment === 'right') updates = { x: cWidth - margins.right - el.width };
+    else if (alignment === 'top') updates = { y: margins.top };
+    else if (alignment === 'center-v') updates = { y: Math.round((cHeight - el.height) / 2) };
+    else if (alignment === 'bottom') updates = { y: cHeight - margins.bottom - el.height };
+
+    handleUpdateElement(selectedElementId, updates);
   };
 
   // 8. New Template
@@ -210,6 +261,8 @@ export default function DocumentDesignStudio({
   };
 
   const selectedElement = activeTemplate?.elements?.find((el) => el.id === selectedElementId);
+  const selectedRecord = recentRecords.find((r) => r.id === selectedRecordId);
+  const currentDataContext = selectedRecord ? selectedRecord.dataContext : (MOCK_DATA_CONTEXT[documentType] || MOCK_DATA_CONTEXT);
 
   return (
     <div style={styles.studioContainer}>
@@ -227,21 +280,27 @@ export default function DocumentDesignStudio({
               <span style={styles.versionBadge}>v2.0 Visual Engine</span>
             </div>
             <p style={styles.subtitle}>
-              Design, customize, and print pixel-perfect A4 templates for {companyEntity}
+              Design, customize, and print pixel-perfect A4 & Thermal templates for {companyEntity}
             </p>
           </div>
         </div>
 
-        {/* Center Document Type Selector */}
+        {/* Center Document Type Selector (Includes Thermal Labels) */}
         <div style={styles.docTypePills}>
-          {['INVOICE', 'CHALLAN', 'JOB_CARD', 'BILL'].map((type) => {
-            const isActive = documentType === type;
+          {[
+            { id: 'INVOICE', label: 'Invoices' },
+            { id: 'CHALLAN', label: 'Challans' },
+            { id: 'JOB_CARD', label: 'Job Cards' },
+            { id: 'SHIPPING_LABEL', label: '4x6" Shipping' },
+            { id: 'ROLL_LABEL', label: '3x2" Roll Barcode' }
+          ].map((item) => {
+            const isActive = documentType === item.id;
             return (
               <button
-                key={type}
+                key={item.id}
                 type="button"
                 onClick={() => {
-                  setDocumentType(type);
+                  setDocumentType(item.id);
                   setSelectedElementId(null);
                 }}
                 style={{
@@ -250,7 +309,7 @@ export default function DocumentDesignStudio({
                   color: isActive ? '#ffffff' : '#64748b'
                 }}
               >
-                {type}
+                {item.label}
               </button>
             );
           })}
@@ -258,7 +317,7 @@ export default function DocumentDesignStudio({
 
         {/* Right Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          {/* Live Mock Preview Toggle */}
+          {/* Live Mock / Real Record Preview Toggle */}
           <button
             type="button"
             onClick={() => setIsPreview(!isPreview)}
@@ -268,7 +327,7 @@ export default function DocumentDesignStudio({
               color: isPreview ? '#0284c7' : '#334155',
               borderColor: isPreview ? '#bae6fd' : '#cbd5e1'
             }}
-            title="Toggle between token keys and realistic mock preview"
+            title="Toggle between token keys and realistic preview"
           >
             {isPreview ? <EyeOff size={15} /> : <Eye size={15} />}
             <span>{isPreview ? 'Design Mode' : 'Live Preview'}</span>
@@ -300,11 +359,11 @@ export default function DocumentDesignStudio({
       </div>
 
       {/* ================================================================= */}
-      {/* SECONDARY SUB-BAR: TEMPLATE SELECTOR & ZOOM CONTROLS              */}
+      {/* SECONDARY SUB-BAR: TEMPLATE, REAL RECORD, ALIGNMENT & ZOOM       */}
       {/* ================================================================= */}
       <div style={styles.subBar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Active Template:</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Active Template:</span>
           <select
             value={activeTemplate?._id || ''}
             onChange={(e) => {
@@ -331,6 +390,46 @@ export default function DocumentDesignStudio({
           >
             <Plus size={13} /> New Blank
           </button>
+
+          {/* Real ERP Data Source Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.5rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Data Source:</span>
+            <select
+              value={selectedRecordId}
+              onChange={(e) => setSelectedRecordId(e.target.value)}
+              style={{
+                padding: '0.3rem 0.55rem',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                color: selectedRecordId === 'mock' ? '#64748b' : '#0284c7',
+                backgroundColor: selectedRecordId === 'mock' ? '#ffffff' : '#f0f9ff',
+                outline: 'none',
+                cursor: 'pointer',
+                maxWidth: '240px'
+              }}
+            >
+              <option value="mock">🧪 Mock Test Data</option>
+              {recentRecords.map((r) => (
+                <option key={r.id} value={r.id}>
+                  📄 {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quick Alignment Toolbar (Shown when an element is selected) */}
+          {selectedElementId && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', backgroundColor: '#e2e8f0', padding: '2px 4px', borderRadius: '6px', marginLeft: '0.5rem' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', padding: '0 3px' }}>Align:</span>
+              <button type="button" onClick={() => handleAlignElement('left')} style={styles.alignBtn} title="Align Left Margins">⇥ Left</button>
+              <button type="button" onClick={() => handleAlignElement('center-h')} style={styles.alignBtn} title="Center Horizontally">↔ Center</button>
+              <button type="button" onClick={() => handleAlignElement('right')} style={styles.alignBtn} title="Align Right Margins">⇤ Right</button>
+              <button type="button" onClick={() => handleAlignElement('top')} style={styles.alignBtn} title="Align Top Margins">⤒ Top</button>
+              <button type="button" onClick={() => handleAlignElement('bottom')} style={styles.alignBtn} title="Align Bottom Margins">⤓ Bottom</button>
+            </div>
+          )}
         </div>
 
         {/* Status Notification Toast */}
@@ -406,7 +505,7 @@ export default function DocumentDesignStudio({
           />
         </div>
 
-        {/* CENTER PANEL: A4 Canvas */}
+        {/* CENTER PANEL: Canvas */}
         <div style={styles.centerPanel}>
           {activeTemplate ? (
             <A4Canvas
@@ -416,7 +515,7 @@ export default function DocumentDesignStudio({
               onUpdateElementPosition={handleUpdateElementPosition}
               isPreview={isPreview}
               zoom={zoom}
-              dataContext={MOCK_DATA_CONTEXT}
+              dataContext={currentDataContext}
             />
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
@@ -425,10 +524,12 @@ export default function DocumentDesignStudio({
           )}
         </div>
 
-        {/* RIGHT PANEL: Property Inspector */}
+        {/* RIGHT PANEL: Property & Document Setup Inspector */}
         <div style={styles.rightPanel}>
           <PropertyInspector
             selectedElement={selectedElement}
+            activeTemplate={activeTemplate}
+            onUpdateTemplate={(updates) => setActiveTemplate((prev) => ({ ...prev, ...updates }))}
             onUpdateElement={handleUpdateElement}
             onDeleteElement={handleDeleteElement}
             onDuplicateElement={handleDuplicateElement}
@@ -576,6 +677,16 @@ const styles = {
     justifyContent: 'center',
     cursor: 'pointer',
     color: '#475569'
+  },
+  alignBtn: {
+    padding: '2px 6px',
+    borderRadius: '4px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    fontSize: '0.68rem',
+    fontWeight: '700',
+    color: '#334155',
+    cursor: 'pointer'
   },
   workspaceGrid: {
     display: 'grid',

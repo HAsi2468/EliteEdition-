@@ -523,6 +523,174 @@ const getDefaultStarterTemplates = () => [
         style: { fontSize: 8.5, color: '#334155', lineHeight: 1.5 }
       }
     ]
+  },
+  {
+    name: 'Thermal Shipping Label (4x6")',
+    documentType: 'SHIPPING_LABEL',
+    pageSize: '4x6',
+    orientation: 'portrait',
+    margins: { top: 10, bottom: 10, left: 10, right: 10 },
+    isDefault: true,
+    description: 'Standard 4x6 inch direct thermal courier & transport parcel dispatch label',
+    elements: [
+      {
+        id: 'lbl-transporter-badge',
+        type: 'rect',
+        x: 10,
+        y: 10,
+        width: 268,
+        height: 38,
+        style: { backgroundColor: '#0f172a', borderRadius: 4 }
+      },
+      {
+        id: 'lbl-transporter-text',
+        type: 'text',
+        x: 18,
+        y: 16,
+        width: 250,
+        height: 26,
+        content: 'EXPEDITED FREIGHT • {{invoice.transporter}}',
+        style: { fontSize: 11, fontWeight: '900', color: '#ffffff', letterSpacing: '0.04em' }
+      },
+      {
+        id: 'lbl-to-header',
+        type: 'text',
+        x: 14,
+        y: 56,
+        width: 260,
+        height: 14,
+        content: 'DELIVER TO / CONSIGNEE:',
+        style: { fontSize: 8, fontWeight: '800', color: '#475569' }
+      },
+      {
+        id: 'lbl-to-body',
+        type: 'text',
+        x: 14,
+        y: 72,
+        width: 260,
+        height: 60,
+        content: '{{customer.name}}\n{{customer.deliveryAddress}}\nCity: Surat | State: {{customer.state}}\nPhone: {{customer.phone}}',
+        style: { fontSize: 9.5, fontWeight: '700', color: '#0f172a', lineHeight: 1.35 }
+      },
+      {
+        id: 'lbl-div-1',
+        type: 'divider',
+        x: 10,
+        y: 140,
+        width: 268,
+        height: 2,
+        style: { borderWidth: 2, borderColor: '#000000' }
+      },
+      {
+        id: 'lbl-barcode-qr',
+        type: 'qr_code',
+        x: 20,
+        y: 152,
+        width: 110,
+        height: 110,
+        content: 'PKG-{{invoice.invoiceNumber}}-SURAT',
+        style: { borderWidth: 1, borderColor: '#cbd5e1', padding: 2, backgroundColor: '#ffffff' }
+      },
+      {
+        id: 'lbl-pkg-meta',
+        type: 'text',
+        x: 140,
+        y: 158,
+        width: 135,
+        height: 100,
+        content: 'Ref: {{invoice.invoiceNumber}}\nDate: {{invoice.invoiceDate}}\nMeters: 855 Mtr\nRolls: 3 Parcels\nWeight: 142.5 KG',
+        style: { fontSize: 9, fontWeight: '800', color: '#0f172a', lineHeight: 1.45 }
+      },
+      {
+        id: 'lbl-div-2',
+        type: 'divider',
+        x: 10,
+        y: 275,
+        width: 268,
+        height: 1,
+        style: { borderWidth: 1, borderColor: '#cbd5e1' }
+      },
+      {
+        id: 'lbl-return-info',
+        type: 'text',
+        x: 14,
+        y: 286,
+        width: 260,
+        height: 48,
+        content: 'If undelivered, return to sender:\n{{company.name}}\n{{company.address}}\nHelpline: {{company.phone}}',
+        style: { fontSize: 7.5, color: '#475569', lineHeight: 1.3 }
+      }
+    ]
+  },
+  {
+    name: 'Fabric Roll Barcode Sticker (3x2")',
+    documentType: 'ROLL_LABEL',
+    pageSize: '3x2',
+    orientation: 'landscape',
+    margins: { top: 6, bottom: 6, left: 8, right: 8 },
+    isDefault: true,
+    description: 'Direct thermal 3x2 inch barcode sticker for factory fabric roll tracking',
+    elements: [
+      {
+        id: 'roll-comp',
+        type: 'text',
+        x: 10,
+        y: 8,
+        width: 196,
+        height: 16,
+        content: 'ELITE PRINTS • ROLL IDENTIFIER',
+        style: { fontSize: 8, fontWeight: '900', color: '#0f172a' }
+      },
+      {
+        id: 'roll-quality',
+        type: 'text',
+        x: 10,
+        y: 26,
+        width: 120,
+        height: 28,
+        content: 'Pure Modal Satin\n44" Panna | Lot #402',
+        style: { fontSize: 8, fontWeight: '700', color: '#334155', lineHeight: 1.25 }
+      },
+      {
+        id: 'roll-qr',
+        type: 'qr_code',
+        x: 140,
+        y: 20,
+        width: 65,
+        height: 65,
+        content: 'ROLL-402-120M',
+        style: { borderWidth: 1, borderColor: '#cbd5e1', padding: 2, backgroundColor: '#ffffff' }
+      },
+      {
+        id: 'roll-meters-badge',
+        type: 'rect',
+        x: 10,
+        y: 60,
+        width: 120,
+        height: 25,
+        style: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 4 }
+      },
+      {
+        id: 'roll-meters-text',
+        type: 'text',
+        x: 16,
+        y: 65,
+        width: 110,
+        height: 18,
+        content: 'NET: 120.50 MTR',
+        style: { fontSize: 10, fontWeight: '900', color: '#0f172a' }
+      },
+      {
+        id: 'roll-barcode-text',
+        type: 'text',
+        x: 10,
+        y: 95,
+        width: 196,
+        height: 14,
+        content: '*RL-2026-9021*',
+        style: { fontSize: 9, fontWeight: '800', textAlign: 'center', letterSpacing: '0.12em', color: '#0f172a' }
+      }
+    ]
   }
 ];
 
@@ -852,6 +1020,121 @@ const generatePdf = async (req, res) => {
   }
 };
 
+// 8. Fetch Real ERP Records for Live Studio Previewing
+const getRecentRecords = async (req, res) => {
+  try {
+    const { documentType = 'INVOICE' } = req.query;
+    const docTypeUpper = (documentType || 'INVOICE').toUpperCase();
+    let records = [];
+
+    if (docTypeUpper === 'INVOICE' || docTypeUpper === 'BILL') {
+      const invoices = await db.BillingInvoice.find()
+        .populate('customer')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      records = invoices.map((inv) => ({
+        id: inv._id,
+        label: `${inv.invoiceNumber || 'INV'} • ${inv.customer?.name || inv.partyName || 'Customer'} (₹${Number(inv.grandTotal || 0).toLocaleString('en-IN')})`,
+        dataContext: {
+          ...getMockDataContext('INVOICE'),
+          invoice: {
+            ...inv,
+            invoiceNumber: inv.invoiceNumber || 'INV-001',
+            invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
+            placeOfSupply: inv.placeOfSupply || 'Gujarat (24)',
+            transporter: inv.transporter || 'V-Trans Logistics',
+            taxableTotal: inv.subTotal || inv.taxableTotal || 0,
+            cgstTotal: inv.cgstTotal || 0,
+            sgstTotal: inv.sgstTotal || 0,
+            igstTotal: inv.igstTotal || 0,
+            grandTotal: inv.grandTotal || 0,
+            items: inv.items || []
+          },
+          customer: {
+            name: inv.customer?.name || inv.partyName || 'Cash Customer',
+            address: inv.customer?.billingAddress || inv.customer?.address || inv.deliveryAddress || 'Surat, Gujarat',
+            deliveryName: inv.customer?.name || inv.partyName || '',
+            deliveryAddress: inv.customer?.deliveryAddress || inv.deliveryAddress || '',
+            gstin: inv.customer?.gstin || inv.gstin || '',
+            state: inv.customer?.state || 'Gujarat (24)',
+            phone: inv.customer?.phone || ''
+          },
+          items: inv.items || []
+        }
+      }));
+    } else if (docTypeUpper === 'CHALLAN') {
+      const challans = await db.FabricChallan.find()
+        .populate('party vendor')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      records = challans.map((ch) => ({
+        id: ch._id,
+        label: `${ch.challanNumber || ch.challanNo || 'CH'} • ${ch.party?.name || ch.partyName || 'Party'} (${ch.totalMeters || 0} Mtr)`,
+        dataContext: {
+          ...getMockDataContext('CHALLAN'),
+          challan: {
+            challanNumber: ch.challanNumber || ch.challanNo || 'CH-001',
+            challanDate: ch.challanDate ? new Date(ch.challanDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
+            vehicleNumber: ch.vehicleNumber || ch.vehicleNo || 'GJ-05-BX-4921',
+            transporter: ch.transporter || 'Local Tempo Delivery',
+            ewayBill: ch.ewayBill || ch.ewayBillNumber || '',
+            totalMeters: ch.totalMeters || 0,
+            items: ch.items || ch.rolls || []
+          },
+          customer: {
+            name: ch.party?.name || ch.partyName || 'Recipient Party',
+            address: ch.party?.address || '',
+            deliveryAddress: ch.deliveryAddress || ch.party?.address || '',
+            gstin: ch.party?.gstin || ''
+          },
+          items: ch.items || ch.rolls || []
+        }
+      }));
+    } else if (docTypeUpper === 'JOB_CARD') {
+      const jobCards = await db.JobCard.find()
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      records = jobCards.map((jc) => ({
+        id: jc._id,
+        label: `${jc.jobCardNumber || jc.jobNo || 'JC'} • ${jc.party || jc.client || 'Client'} (${jc.quality || 'Quality'})`,
+        dataContext: {
+          ...getMockDataContext('JOB_CARD'),
+          jobCard: {
+            jobCardNumber: jc.jobCardNumber || jc.jobNo || 'JC-001',
+            priority: jc.priority || 'NORMAL',
+            targetDate: jc.targetDate || jc.deliveryDate ? new Date(jc.targetDate || jc.deliveryDate).toLocaleDateString('en-IN') : '',
+            fabricQuality: jc.quality || jc.fabric || 'Pure Modal Satin',
+            panna: jc.panna || '44',
+            pass: jc.pass || '2 Pass HD',
+            items: jc.items || jc.designs || []
+          },
+          customer: {
+            name: jc.party || jc.client || 'Client'
+          },
+          items: jc.items || jc.designs || []
+        }
+      }));
+    }
+
+    return res.status(httpStatus.OK).json({
+      success: true,
+      data: records
+    });
+  } catch (error) {
+    logger.error('Error fetching recent ERP records for studio: %o', error);
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getTemplates,
   getTemplateById,
@@ -860,6 +1143,7 @@ module.exports = {
   deleteTemplate,
   setDefaultTemplate,
   generatePdf,
+  getRecentRecords,
   getDefaultStarterTemplates,
   getMockDataContext
 };

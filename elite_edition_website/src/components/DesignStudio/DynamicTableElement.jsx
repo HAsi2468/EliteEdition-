@@ -89,6 +89,11 @@ export default function DynamicTableElement({ element, dataContext = {}, isPrevi
           })}
         </tbody>
       </table>
+      {items.length > 8 && (
+        <div style={{ fontSize: '0.66rem', color: '#64748b', fontStyle: 'italic', marginTop: '3px', textAlign: 'right', paddingRight: '4px' }}>
+          Showing 8 of {items.length} items • Auto-paginates into {Math.ceil(items.length / 8)} pages on PDF print
+        </div>
+      )}
     </div>
   );
 }

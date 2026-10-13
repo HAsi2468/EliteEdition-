@@ -43,13 +43,30 @@ const compileTemplateToHtml = async (template, dataContext = {}) => {
     pageSize = 'A4',
     orientation = 'portrait',
     margins = { top: 20, bottom: 20, left: 20, right: 20 },
+    watermark = {},
+    stamp = {},
     elements = []
   } = template;
 
   const isLandscape = orientation === 'landscape';
-  // A4 standard points: 595 x 842 at 72 DPI
-  const canvasWidth = isLandscape ? 842 : 595;
-  const canvasHeight = isLandscape ? 595 : 842;
+  
+  // Dimensions in points (72 pt per inch)
+  let baseWidth = 595;
+  let baseHeight = 842;
+
+  if (pageSize === 'A5') {
+    baseWidth = 420;
+    baseHeight = 595;
+  } else if (pageSize === '4x6') {
+    baseWidth = 288;
+    baseHeight = 432;
+  } else if (pageSize === '3x2') {
+    baseWidth = 216;
+    baseHeight = 144;
+  }
+
+  const canvasWidth = isLandscape ? baseHeight : baseWidth;
+  const canvasHeight = isLandscape ? baseWidth : baseHeight;
 
   let elementsHtml = '';
 
@@ -239,6 +256,18 @@ const compileTemplateToHtml = async (template, dataContext = {}) => {
     </head>
     <body>
       <div class="canvas-sheet">
+        ${watermark && watermark.enabled && watermark.text ? `
+          <div style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-size: 56px; font-weight: 900; color: rgba(15, 23, 42, ${watermark.opacity || 0.08}); white-space: nowrap; pointer-events: none; text-transform: uppercase; letter-spacing: 0.12em; z-index: 0; user-select: none;">
+            ${watermark.text}
+          </div>
+        ` : ''}
+
+        ${stamp && stamp.enabled && stamp.text ? `
+          <div style="position: absolute; top: 22px; right: 25px; transform: rotate(-8deg); border: 2.5px dashed ${stamp.color || '#dc2626'}; color: ${stamp.color || '#dc2626'}; padding: 4px 14px; font-size: 11px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; border-radius: 4px; z-index: 998; opacity: 0.9; pointer-events: none;">
+            ${stamp.text}
+          </div>
+        ` : ''}
+
         ${elementsHtml}
       </div>
     </body>
@@ -249,7 +278,7 @@ const compileTemplateToHtml = async (template, dataContext = {}) => {
 };
 
 /**
- * Generates an A4 PDF Buffer using headless Chrome via Puppeteer
+ * Generates an A4 / Thermal Label PDF Buffer using headless Chrome via Puppeteer
  */
 const generatePdfFromTemplate = async (template, dataContext = {}) => {
   const html = await compileTemplateToHtml(template, dataContext);
@@ -274,8 +303,7 @@ const generatePdfFromTemplate = async (template, dataContext = {}) => {
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
 
     const isLandscape = template.orientation === 'landscape';
-    const pdfBuffer = await page.pdf({
-      format: template.pageSize || 'A4',
+    const pdfOptions = {
       landscape: isLandscape,
       printBackground: true,
       margin: {
@@ -284,7 +312,19 @@ const generatePdfFromTemplate = async (template, dataContext = {}) => {
         bottom: '0px',
         left: '0px'
       }
-    });
+    };
+
+    if (template.pageSize === '4x6') {
+      pdfOptions.width = isLandscape ? '6in' : '4in';
+      pdfOptions.height = isLandscape ? '4in' : '6in';
+    } else if (template.pageSize === '3x2') {
+      pdfOptions.width = isLandscape ? '3in' : '2in';
+      pdfOptions.height = isLandscape ? '2in' : '3in';
+    } else {
+      pdfOptions.format = template.pageSize || 'A4';
+    }
+
+    const pdfBuffer = await page.pdf(pdfOptions);
 
     return pdfBuffer;
   } catch (error) {

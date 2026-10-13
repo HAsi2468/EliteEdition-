@@ -3013,6 +3013,11 @@ export const api = {
     return request(`/document-templates${query}`);
   },
 
+  async getRecentRecords(documentType) {
+    const query = documentType ? `?documentType=${documentType}` : '';
+    return request(`/document-templates/recent-records${query}`);
+  },
+
   async getDocumentTemplateById(id) {
     return request(`/document-templates/${id}`);
   },

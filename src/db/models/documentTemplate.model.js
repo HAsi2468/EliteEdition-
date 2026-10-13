@@ -63,13 +63,13 @@ const documentTemplateSchema = new mongoose.Schema(
     documentType: {
       type: String,
       required: true,
-      enum: ['INVOICE', 'CHALLAN', 'JOB_CARD', 'BILL'],
+      enum: ['INVOICE', 'CHALLAN', 'JOB_CARD', 'BILL', 'SHIPPING_LABEL', 'ROLL_LABEL'],
       default: 'INVOICE'
     },
     pageSize: {
       type: String,
       default: 'A4',
-      enum: ['A4', 'A5', 'LETTER']
+      enum: ['A4', 'A5', 'LETTER', '4x6', '3x2']
     },
     orientation: {
       type: String,
@@ -81,6 +81,16 @@ const documentTemplateSchema = new mongoose.Schema(
       bottom: { type: Number, default: 20 },
       left: { type: Number, default: 20 },
       right: { type: Number, default: 20 }
+    },
+    watermark: {
+      text: { type: String, default: '' },
+      opacity: { type: Number, default: 0.08 },
+      enabled: { type: Boolean, default: false }
+    },
+    stamp: {
+      text: { type: String, default: '' },
+      color: { type: String, default: '#dc2626' },
+      enabled: { type: Boolean, default: false }
     },
     elements: [templateElementSchema],
     isDefault: {

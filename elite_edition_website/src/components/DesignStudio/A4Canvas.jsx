@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Rnd } from 'react-rnd';
 import { resolveTokens, getNestedValue } from '../../utils/tokenResolver';
 import DynamicTableElement from './DynamicTableElement';
@@ -16,18 +16,73 @@ export default function A4Canvas({
     pageSize = 'A4',
     orientation = 'portrait',
     margins = { top: 20, bottom: 20, left: 20, right: 20 },
+    watermark = {},
+    stamp = {},
     elements = []
   } = template;
 
   const isLandscape = orientation === 'landscape';
-  // A4 standard points: 595 x 842 at 72 DPI
-  const canvasWidth = isLandscape ? 842 : 595;
-  const canvasHeight = isLandscape ? 595 : 842;
+
+  // Calculate canvas dimensions based on preset
+  let baseWidth = 595;
+  let baseHeight = 842;
+  if (pageSize === 'A5') {
+    baseWidth = 420;
+    baseHeight = 595;
+  } else if (pageSize === '4x6') {
+    baseWidth = 288;
+    baseHeight = 432;
+  } else if (pageSize === '3x2') {
+    baseWidth = 216;
+    baseHeight = 144;
+  }
+
+  const canvasWidth = isLandscape ? baseHeight : baseWidth;
+  const canvasHeight = isLandscape ? baseWidth : baseHeight;
+
+  // Magnetic Snap Guide Lines (X and Y coordinates)
+  const [guideLines, setGuideLines] = useState({ x: null, y: null });
 
   const handleCanvasClick = (e) => {
     if (e.target.id === 'a4-sheet-surface' || e.target.id === 'a4-canvas-container') {
       onSelectElement(null);
     }
+  };
+
+  const handleDrag = (currentId, d) => {
+    const SNAP_THRESHOLD = 5;
+    let matchedX = null;
+    let matchedY = null;
+
+    const currentEl = elements.find(el => el.id === currentId);
+    if (!currentEl) return;
+
+    for (const other of elements) {
+      if (other.id === currentId) continue;
+
+      // Check Left / Center / Right alignment
+      if (Math.abs(d.x - other.x) <= SNAP_THRESHOLD) matchedX = other.x;
+      else if (Math.abs(d.x + currentEl.width / 2 - (other.x + other.width / 2)) <= SNAP_THRESHOLD) {
+        matchedX = other.x + other.width / 2;
+      } else if (Math.abs(d.x + currentEl.width - (other.x + other.width)) <= SNAP_THRESHOLD) {
+        matchedX = other.x + other.width;
+      }
+
+      // Check Top / Middle / Bottom alignment
+      if (Math.abs(d.y - other.y) <= SNAP_THRESHOLD) matchedY = other.y;
+      else if (Math.abs(d.y + currentEl.height / 2 - (other.y + other.height / 2)) <= SNAP_THRESHOLD) {
+        matchedY = other.y + other.height / 2;
+      } else if (Math.abs(d.y + currentEl.height - (other.y + other.height)) <= SNAP_THRESHOLD) {
+        matchedY = other.y + other.height;
+      }
+    }
+
+    setGuideLines({ x: matchedX, y: matchedY });
+  };
+
+  const handleDragStop = (id, d) => {
+    setGuideLines({ x: null, y: null });
+    onUpdateElementPosition(id, { x: d.x, y: d.y });
   };
 
   return (
@@ -73,6 +128,85 @@ export default function A4Canvas({
               zIndex: 0
             }}
           />
+        )}
+
+        {/* Magnetic Snapping Guide Lines */}
+        {guideLines.x !== null && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${guideLines.x}px`,
+              top: 0,
+              bottom: 0,
+              width: '1px',
+              borderLeft: '1.5px dashed #0284c7',
+              pointerEvents: 'none',
+              zIndex: 9999
+            }}
+          />
+        )}
+        {guideLines.y !== null && (
+          <div
+            style={{
+              position: 'absolute',
+              top: `${guideLines.y}px`,
+              left: 0,
+              right: 0,
+              height: '1px',
+              borderTop: '1.5px dashed #0284c7',
+              pointerEvents: 'none',
+              zIndex: 9999
+            }}
+          />
+        )}
+
+        {/* Diagonal Watermark Overlay */}
+        {watermark && watermark.enabled && watermark.text && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '40%',
+              left: '50%',
+              transform: 'translate(-50%, -50%) rotate(-35deg)',
+              fontSize: '52px',
+              fontWeight: 900,
+              color: `rgba(15, 23, 42, ${watermark.opacity || 0.08})`,
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              zIndex: 0,
+              userSelect: 'none'
+            }}
+          >
+            {watermark.text}
+          </div>
+        )}
+
+        {/* Statutory Rubber Stamp Badge */}
+        {stamp && stamp.enabled && stamp.text && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '22px',
+              right: '25px',
+              transform: 'rotate(-8deg)',
+              border: `2.5px dashed ${stamp.color || '#dc2626'}`,
+              color: stamp.color || '#dc2626',
+              padding: '4px 14px',
+              fontSize: '11px',
+              fontWeight: 900,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              borderRadius: '4px',
+              zIndex: 998,
+              opacity: 0.9,
+              pointerEvents: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+            }}
+          >
+            {stamp.text}
+          </div>
         )}
 
         {/* Render Canvas Elements */}
@@ -236,9 +370,8 @@ export default function A4Canvas({
               scale={zoom}
               grid={[2, 2]}
               onDragStart={() => onSelectElement(el.id)}
-              onDragStop={(e, d) => {
-                onUpdateElementPosition(el.id, { x: d.x, y: d.y });
-              }}
+              onDrag={(e, d) => handleDrag(el.id, d)}
+              onDragStop={(e, d) => handleDragStop(el.id, d)}
               onResizeStart={() => onSelectElement(el.id)}
               onResizeStop={(e, direction, ref, delta, position) => {
                 onUpdateElementPosition(el.id, {
