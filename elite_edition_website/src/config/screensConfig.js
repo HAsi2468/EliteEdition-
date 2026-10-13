@@ -13,6 +13,7 @@ export const AVAILABLE_SCREENS = [
   { id: 'workspace', label: 'Workspace / Chat', category: 'General' },
   { id: 'task_management', label: 'Inter-Department: Task Management (TASK)', category: 'General' },
   { id: 'reports', label: 'Reports Center', category: 'General' },
+  { id: 'document_design_studio', label: '🎨 Document Design Studio', category: 'General' },
   { id: 'unicommerce', label: 'Uniware Integrations', category: 'General' },
   { id: 'myntra', label: 'Myntra Integrations', category: 'General' },
   { id: 'admin', label: 'Admin User & Infrastructure Settings', category: 'General' },

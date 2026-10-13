@@ -21,6 +21,7 @@ const Workspace = lazy(() => import('./components/Workspace'));
 const CommunicationPanel = lazy(() => import('./components/CommunicationPanel'));
 const TaskManagerPanel = lazy(() => import('./components/TaskManagerPanel'));
 const CompanySettingsPanel = lazy(() => import('./components/CompanySettingsPanel'));
+const DocumentDesignStudio = lazy(() => import('./components/DesignStudio/DocumentDesignStudio'));
 const EliteBillingDepartment = lazy(() => import('./components/EliteBillingDepartment'));
 const CompanyDevelopmentWorkspace = lazy(() => import('./components/CompanyDevelopmentWorkspace'));
 const DigitalPrintComplainModule = lazy(() => import('./components/DigitalPrintComplainModule'));
@@ -3066,6 +3067,8 @@ export default function App() {
             <SalesGrid />
           ) : activeTab === 'reports' ? (
             <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
+          ) : activeTab === 'document_design_studio' ? (
+            <DocumentDesignStudio companyEntity={companyEntity || 'Elite Edition'} />
           ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' || activeTab === 'crm_profiles' || activeTab === 'crm_leads' ? (
             <CrmPanel currentUser={currentUser} initialSubTab={activeTab === 'crm_profiles' ? 'profiles' : 'leads'} />
           ) : activeTab === 'jobcards_business_connection' || activeTab === 'jobcards_master_ai' || activeTab === 'master_ai_agent' || activeTab === 'business_connection' ? (
