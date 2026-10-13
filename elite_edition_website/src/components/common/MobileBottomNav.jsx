@@ -45,6 +45,13 @@ const COMPANY_NAV_CONFIG = {
     { id: 'ef_complaints', label: 'Complaints' },
     { id: 'ef_settings', label: 'Settings' },
     { id: '__more__', label: 'More' }
+  ],
+  sobise: [
+    { id: 'so_dashboard', label: 'Dashboard' },
+    { id: 'so_invoices', label: 'Finance' },
+    { id: 'so_complaints', label: 'Complaints' },
+    { id: 'so_settings', label: 'Settings' },
+    { id: '__more__', label: 'More' }
   ]
 };
 

@@ -54,6 +54,13 @@ function buildCompanyFilter(companyEntity) {
         { invoiceNo: { $regex: '^EF', $options: 'i' } }
       ]
     };
+  } else if (ce === 'Sobise') {
+    return {
+      $or: [
+        { companyEntity: 'Sobise' },
+        { invoiceNo: { $regex: '^SO', $options: 'i' } }
+      ]
+    };
   } else {
     // Elite Digital Print / Digital Print / Default
     return {
@@ -83,6 +90,13 @@ function buildPurchaseCompanyFilter(companyEntity) {
       $or: [
         { companyEntity: 'Elite Fabtex' },
         { purchaseNo: { $regex: '^EF', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Sobise') {
+    return {
+      $or: [
+        { companyEntity: 'Sobise' },
+        { purchaseNo: { $regex: '^SO', $options: 'i' } }
       ]
     };
   } else if (ce === 'edp' || ce === 'Elite Digital Prints' || ce === 'Elite Digital Print') {
@@ -288,6 +302,9 @@ const getNextInvoiceNo = async (req, res) => {
       defaultStartSeq = 1;
     } else if (companyEntity === 'Elite Fabtex') {
       defaultPrefix = 'EF-2627-';
+      defaultStartSeq = 1;
+    } else if (companyEntity === 'Sobise') {
+      defaultPrefix = 'SO-2627-';
       defaultStartSeq = 1;
     }
 
@@ -3005,7 +3022,9 @@ const getCompanySettings = async (req, res) => {
       const masterConfig = (await PrintConfig.findOne({ isConfig: true }).lean()) || {};
       let compName = companyEntity.toUpperCase();
       let prefix = 'EE-2627-';
-      if (companyEntity === 'Elite Fabtex') {
+      if (companyEntity === 'Sobise') {
+        prefix = 'SO-2627-';
+      } else if (companyEntity === 'Elite Fabtex') {
         prefix = 'EF-2627-';
       } else if (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') {
         prefix = 'EDP/26-27/';

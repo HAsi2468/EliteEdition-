@@ -9,6 +9,7 @@ const normalizeBusinessUnit = (bu) => {
   if (u === 'ES' || u === 'ELITE STITCHING') return 'Elite Stitching';
   if (u === 'EE' || u === 'ELITE EDITION') return 'Elite Edition';
   if (u === 'EF' || u === 'ELITE FABTEX') return 'Elite Fabtex';
+  if (u === 'SO' || u === 'SOBISE') return 'Sobise';
   if (u === 'EON' || u === 'ELITE ONLINE') return 'Elite Online';
   return bu;
 };
@@ -19,6 +20,7 @@ const getBusinessUnitCode = (bu) => {
   if (norm === 'Elite Stitching') return 'ES';
   if (norm === 'Elite Edition') return 'EE';
   if (norm === 'Elite Fabtex') return 'EF';
+  if (norm === 'Sobise') return 'SO';
   if (norm === 'Elite Online') return 'EON';
   return 'EDP';
 };
@@ -33,6 +35,9 @@ const buildExpenseCompFilter = (companyEntity) => {
   }
   if (norm === 'Elite Fabtex') {
     return { companyEntity: 'Elite Fabtex' };
+  }
+  if (norm === 'Sobise') {
+    return { companyEntity: 'Sobise' };
   }
   if (norm === 'Elite Online') {
     return { companyEntity: 'Elite Online' };
@@ -544,6 +549,7 @@ const saveLedgerSettings = async (req, res) => {
 // Helper to generate a guaranteed unique expense voucher number
 async function generateUniqueVoucherNo(companyEntity = 'Elite Digital Print') {
   const prefixMap = {
+    'Sobise': 'SO-EXP-',
     'Elite Edition': 'EE-EXP-',
     'Elite Fabtex': 'EF-EXP-',
     'Elite Stitching': 'ES-EXP-',

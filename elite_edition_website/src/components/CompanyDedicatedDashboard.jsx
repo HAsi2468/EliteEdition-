@@ -143,7 +143,7 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button
-            onClick={() => onNavigate && onNavigate(companyEntity === 'Elite Fabtex' ? 'ef_invoices' : 'ee_invoices')}
+            onClick={() => onNavigate && onNavigate(companyEntity === 'Sobise' ? 'so_invoices' : companyEntity === 'Elite Fabtex' ? 'ef_invoices' : 'ee_invoices')}
             className="btn-primary"
             style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
           >
@@ -271,7 +271,7 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
             </h3>
           </div>
           <button
-            onClick={() => onNavigate && onNavigate(companyEntity === 'Elite Fabtex' ? 'ef_invoices' : 'ee_invoices')}
+            onClick={() => onNavigate && onNavigate(companyEntity === 'Sobise' ? 'so_invoices' : companyEntity === 'Elite Fabtex' ? 'ef_invoices' : 'ee_invoices')}
             style={{ background: 'none', border: 'none', color: accentColor, fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
             View All Invoices <ChevronRight size={14} />

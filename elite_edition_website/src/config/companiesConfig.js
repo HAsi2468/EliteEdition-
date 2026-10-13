@@ -78,6 +78,21 @@ export const COMPANIES = [
     gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)',
     description: 'E-commerce store inventory, catalog, sales orders & return management.',
     aliases: ['elite_online', 'eon', 'elite online', 'elite online store', 'store', 'e-commerce']
+  },
+  {
+    id: 'sobise',
+    code: 'SO',
+    name: 'Sobise',
+    fullName: 'Sobise',
+    shortName: 'Sobise',
+    type: 'Fashion & Corporate Entity',
+    iconName: 'Building',
+    defaultTab: 'so_invoices',
+    badgeColor: '#e11d48',
+    iconColor: '#e11d48',
+    gradient: 'linear-gradient(135deg, #f43f5e, #be123c)',
+    description: 'Company workspace for Sobise finance, complaints & settings.',
+    aliases: ['sobise', 'so', 'sobise entity']
   }
 ];
 

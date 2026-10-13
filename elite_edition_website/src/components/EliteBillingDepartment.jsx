@@ -185,10 +185,10 @@ const PRESET_OPTIONS = [
 export default function EliteBillingDepartment({ 
   initialChallanData = null, 
   department = 'digital_print', 
-  companyEntity = (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'elite_edition' ? 'Elite Edition' : 'Elite Digital Prints'), 
+  companyEntity = (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : 'Elite Digital Prints'), 
   initialTab = null 
 }) {
-  const [activeTab, setActiveTab] = useState(() => (initialTab && initialTab !== 'costing') || (companyEntity === 'Elite Edition' || companyEntity === 'Elite Fabtex' ? 'invoices' : 'challans')); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
+  const [activeTab, setActiveTab] = useState(() => (initialTab && initialTab !== 'costing') || (companyEntity === 'Elite Edition' || companyEntity === 'Elite Fabtex' || companyEntity === 'Sobise' ? 'invoices' : 'challans')); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
     totalInvoices: 0,
@@ -236,7 +236,7 @@ export default function EliteBillingDepartment({
     try {
       const saved = localStorage.getItem(`elite_purchases_${companyEntity || 'edp'}`);
       if (saved) return JSON.parse(saved);
-      for (const k of ['elite_purchases_edp', 'elite_purchases_Elite Digital Prints', 'elite_purchases_Elite Edition', 'elite_purchases_Elite Fabtex']) {
+      for (const k of ['elite_purchases_edp', 'elite_purchases_Elite Digital Prints', 'elite_purchases_Elite Edition', 'elite_purchases_Elite Fabtex', 'elite_purchases_Sobise']) {
         const anySaved = localStorage.getItem(k);
         if (anySaved) {
           const parsed = JSON.parse(anySaved);
@@ -998,7 +998,8 @@ export default function EliteBillingDepartment({
           'elite_purchases_edp',
           'elite_purchases_Elite Digital Prints',
           'elite_purchases_Elite Edition',
-          'elite_purchases_Elite Fabtex'
+          'elite_purchases_Elite Fabtex',
+          'elite_purchases_Sobise'
         ];
         const purgedNos = new Set(['INV/26-27/563', '4177/26-27']);
         legacyKeys.forEach(k => {
@@ -1298,7 +1299,8 @@ export default function EliteBillingDepartment({
         'elite_purchases_Elite Digital Prints',
         'elite_purchases_Elite Digital Print',
         'elite_purchases_Elite Edition',
-        'elite_purchases_Elite Fabtex'
+        'elite_purchases_Elite Fabtex',
+        'elite_purchases_Sobise'
       ];
       legacyKeys.forEach(k => {
         try {

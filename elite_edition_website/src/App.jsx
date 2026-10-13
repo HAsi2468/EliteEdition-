@@ -638,6 +638,7 @@ export default function App() {
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses', 'eo_settings'];
   const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses'];
   const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses'];
+  const SOBISE_PERMISSIONS = ['so_dashboard', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'es_dashboard', 'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
@@ -693,6 +694,13 @@ export default function App() {
           return l === 'ef' || l === 'elite fabtex' || l === 'elite_fabtex';
         });
       }
+      // Match Sobise
+      if (target === 'so' || target === 'sobise') {
+        return currentUser.allowedCompanies.some(c => {
+          const l = String(c).toLowerCase().trim();
+          return l === 'so' || l === 'sobise';
+        });
+      }
       return currentUser.allowedCompanies.some(c => String(c).toLowerCase().trim() === target);
     }
     return false;
@@ -703,6 +711,7 @@ export default function App() {
   const hasStitchingAccess = isSuperOrAdmin || isCompanyAllowed('stitching');
   const hasEliteEditionAccess = isSuperOrAdmin || isCompanyAllowed('elite_edition');
   const hasEliteFabtexAccess = isSuperOrAdmin || isCompanyAllowed('elite_fabtex');
+  const hasSobiseAccess = isSuperOrAdmin || isCompanyAllowed('sobise');
 
   const hasCommunicationAccess = !currentUser || isSuperOrAdmin || 
     Boolean(currentUser?.canBroadcastChat) || 
@@ -739,6 +748,12 @@ export default function App() {
     return allowed[0] || 'ef_dashboard';
   };
 
+  const getFirstSOTab = () => {
+    if (!currentUser || isSuperOrAdmin) return 'so_dashboard';
+    const allowed = SOBISE_PERMISSIONS.filter(t => currentUser.permissions?.includes(t));
+    return allowed[0] || 'so_dashboard';
+  };
+
   const getFirstStitchingTab = () => {
     if (!currentUser || isSuperOrAdmin) return 'jobcards_list';
     const perms = currentUser.permissions || [];
@@ -762,6 +777,8 @@ export default function App() {
       setActiveDepartment('elite_edition');
     } else if (activeTab.startsWith('ef_')) {
       setActiveDepartment('elite_fabtex');
+    } else if (activeTab.startsWith('so_')) {
+      setActiveDepartment('sobise');
     } else if (activeTab.startsWith('eo_') || ELITE_ONLINE_PERMISSIONS.includes(activeTab)) {
       setActiveDepartment('elite_online');
     }
@@ -786,6 +803,7 @@ export default function App() {
     if (isCompanyAllowed('stitching') && hasStitchingAccess) allowedDepts.push('stitching');
     if (isCompanyAllowed('elite_edition') && hasEliteEditionAccess) allowedDepts.push('elite_edition');
     if (isCompanyAllowed('elite_fabtex') && hasEliteFabtexAccess) allowedDepts.push('elite_fabtex');
+    if (isCompanyAllowed('sobise') && hasSobiseAccess) allowedDepts.push('sobise');
 
     if (allowedDepts.length > 0) {
       if (!allowedDepts.includes(activeDepartment)) {
@@ -796,6 +814,7 @@ export default function App() {
           else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
           else if (targetDept === 'elite_edition') setActiveTab(getFirstEETab());
           else if (targetDept === 'elite_fabtex') setActiveTab(getFirstEFTab());
+          else if (targetDept === 'sobise') setActiveTab(getFirstSOTab());
           else if (targetDept === 'elite_online') setActiveTab(getFirstOnlineTab());
         }
       }
@@ -810,7 +829,7 @@ export default function App() {
         }
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment, hasEliteOnlineAccess, hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasCommunicationAccess, hasTaskAccess, isSuperOrAdmin]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment, hasEliteOnlineAccess, hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasCommunicationAccess, hasTaskAccess, isSuperOrAdmin]);
 
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -840,6 +859,8 @@ export default function App() {
       setActiveTab('ee_dashboard');
     } else if (dept === 'elite_fabtex') {
       setActiveTab('ef_dashboard');
+    } else if (dept === 'sobise') {
+      setActiveTab('so_dashboard');
     } else if (dept === 'elite_online') {
       const firstTab = getFirstOnlineTab();
       setActiveTab(firstTab);
@@ -880,6 +901,7 @@ export default function App() {
       'dashboard', 'workspace', 'communication', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
       'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
       'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
+      'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses',
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses', 'eo_settings',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
@@ -910,6 +932,9 @@ export default function App() {
     if (activeDepartment === 'elite_fabtex' && hasEliteFabtexAccess) {
       if (ELITE_FABTEX_PERMISSIONS.includes(activeTab) || activeTab.startsWith('ef_')) return;
     }
+    if (activeDepartment === 'sobise' && hasSobiseAccess) {
+      if (SOBISE_PERMISSIONS.includes(activeTab) || activeTab.startsWith('so_')) return;
+    }
 
     const userPerms = currentUser.permissions || [];
     const isAllowed = userPerms.some(p => {
@@ -918,6 +943,7 @@ export default function App() {
       if (activeTab === 'task_management' && (p === 'task_management' || p === 'task-manager' || p === 'tasks')) return true;
       if (activeTab.startsWith('ee_') && hasEliteEditionAccess) return p === activeTab || p === 'ee_dashboard';
       if (activeTab.startsWith('ef_') && hasEliteFabtexAccess) return p === activeTab || p === 'ef_dashboard';
+      if (activeTab.startsWith('so_') && hasSobiseAccess) return p === activeTab || p === 'so_dashboard';
       if (activeTab.startsWith('es_') && hasStitchingAccess) return true;
       if (activeTab.startsWith('eo_') && hasEliteOnlineAccess) return true;
       if (activeTab === 'catalog' && p === 'inventory') return true;
@@ -944,6 +970,8 @@ export default function App() {
         setActiveTab(getFirstEETab());
       } else if (activeDepartment === 'elite_fabtex' && hasEliteFabtexAccess) {
         setActiveTab(getFirstEFTab());
+      } else if (activeDepartment === 'sobise' && hasSobiseAccess) {
+        setActiveTab(getFirstSOTab());
       } else if (hasCommunicationAccess) {
         setActiveTab('communication');
       } else if (hasTaskAccess) {
@@ -954,7 +982,7 @@ export default function App() {
         setActiveTab('no-access');
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated, activeDepartment, hasCommunicationAccess, hasTaskAccess, hasEliteOnlineAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasDigitalPrintAccess, hasStitchingAccess, isSuperOrAdmin]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated, activeDepartment, hasCommunicationAccess, hasTaskAccess, hasEliteOnlineAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasDigitalPrintAccess, hasStitchingAccess, isSuperOrAdmin]);
 
 
   
@@ -1820,7 +1848,8 @@ export default function App() {
               hasDigitalPrintAccess ||
               hasStitchingAccess ||
               hasEliteEditionAccess ||
-              hasEliteFabtexAccess;
+              hasEliteFabtexAccess ||
+              hasSobiseAccess;
 
             if (!hasAnyAllowedDept && isCommActive) return null;
 
@@ -1856,6 +1885,7 @@ export default function App() {
                 if (company.id === 'stitching' && !hasStitchingAccess) return false;
                 if (company.id === 'elite_edition' && !hasEliteEditionAccess) return false;
                 if (company.id === 'elite_fabtex' && !hasEliteFabtexAccess) return false;
+                if (company.id === 'sobise' && !hasSobiseAccess) return false;
                 return true;
               });
 

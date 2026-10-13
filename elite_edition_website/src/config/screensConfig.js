@@ -38,6 +38,13 @@ export const AVAILABLE_SCREENS = [
   { id: 'ef_complaints', label: 'Elite Fabtex: Complaints Module', category: 'Elite Fabtex' },
   { id: 'ef_settings', label: 'Elite Fabtex: Company Settings', category: 'Elite Fabtex' },
 
+  // Sobise (Company)
+  { id: 'so_dashboard', label: 'Sobise: Dashboard Overview', category: 'Sobise' },
+  { id: 'so_invoices', label: 'Sobise: Finance & GST Billing', category: 'Sobise' },
+  { id: 'so_expenses', label: 'Sobise: Expense Ledger', category: 'Sobise' },
+  { id: 'so_complaints', label: 'Sobise: Complaints Module', category: 'Sobise' },
+  { id: 'so_settings', label: 'Sobise: Company Settings', category: 'Sobise' },
+
   // Elite Digital Print
   { id: 'jobcards', label: 'Elite Prints: Dashboard & Reports', category: 'Elite Digital Print' },
   { id: 'jobcards_status_dashboard', label: 'Elite Prints: Pending Status Overview', category: 'Elite Digital Print' },
@@ -55,6 +62,7 @@ export const AVAILABLE_SCREENS = [
   { id: 'jobcards_master', label: 'Elite Prints: Design Master (100 Pic)', category: 'Elite Digital Print' },
   { id: 'jobcards_billing_elite', label: 'Elite Prints: Elite Edition Billing', category: 'Elite Digital Print' },
   { id: 'jobcards_billing_fabtex', label: 'Elite Prints: Elite Fabtex Billing', category: 'Elite Digital Print' },
+  { id: 'jobcards_billing_sobise', label: 'Elite Prints: Sobise Billing', category: 'Elite Digital Print' },
   { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
   { id: 'jobcards_complain', label: 'Elite Prints: Complain Module', category: 'Elite Digital Print' },
   { id: 'jobcards_qa', label: 'Elite Prints: QA & Quality Checking', category: 'Elite Digital Print' },
@@ -93,7 +101,7 @@ export const SCREEN_GROUPS = {
     name: '[EDP] Billing & Invoicing',
     deptShort: 'EDP',
     screenName: 'Billing & Invoicing',
-    permissionKeys: ['jobcards_billing', 'jobcards_billing_elite', 'jobcards_billing_fabtex', 'invoices'],
+    permissionKeys: ['jobcards_billing', 'jobcards_billing_elite', 'jobcards_billing_fabtex', 'jobcards_billing_sobise', 'invoices'],
     description: 'GST Invoicing, Accounts & Receivables Group'
   },
   jobcards_costing: {
@@ -119,6 +127,14 @@ export const SCREEN_GROUPS = {
     screenName: 'Elite Fabtex Billing',
     permissionKeys: ['jobcards_billing_fabtex'],
     description: 'Elite Fabtex GST Billing & Invoicing Channel'
+  },
+  jobcards_billing_sobise: {
+    id: 'jobcards_billing_sobise',
+    name: '[EDP] Sobise Billing',
+    deptShort: 'EDP',
+    screenName: 'Sobise Billing',
+    permissionKeys: ['jobcards_billing_sobise'],
+    description: 'Sobise GST Billing & Invoicing Channel'
   },
   jobcards_catalogue: {
     id: 'jobcards_catalogue',

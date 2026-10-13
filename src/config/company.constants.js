@@ -39,6 +39,13 @@ const COMPANIES = [
     type: 'Fabric & Textile Sales Entity',
     aliases: ['elite_fabtex', 'ef', 'elite fabtex', 'fabtex'],
   },
+  {
+    id: 'sobise',
+    code: 'SO',
+    name: 'Sobise',
+    type: 'Fashion & Corporate Entity',
+    aliases: ['sobise', 'so', 'sobise entity'],
+  },
 ];
 
 const COMPANY_IDS = COMPANIES.map((c) => c.id);

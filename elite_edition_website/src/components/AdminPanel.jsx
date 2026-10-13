@@ -318,7 +318,7 @@ export default function AdminPanel() {
     canCreateStitchingJobs: true,
     canIssueStitchingChallans: true,
     canManageWorkerRates: true,
-    allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex'],
+    allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise'],
     permissions: []
   });
 
@@ -701,7 +701,7 @@ export default function AdminPanel() {
     });
   };
 
-  const ALL_COMPANY_NAMES = ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex'];
+  const ALL_COMPANY_NAMES = ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise'];
   const DEPARTMENTS_LIST = [
     'General',
     'Executive',
@@ -1650,6 +1650,7 @@ export default function AdminPanel() {
                   <option value="Elite Online">🏪 Elite Online ({users.filter(u => u.allowedCompanies?.includes('Elite Online')).length})</option>
                   <option value="Elite Stitching">✂️ Elite Stitching ({users.filter(u => u.allowedCompanies?.includes('Elite Stitching')).length})</option>
                   <option value="Elite Digital Print">🖨️ Elite Digital Print ({users.filter(u => u.allowedCompanies?.includes('Elite Digital Print')).length})</option>
+                  <option value="Sobise">✨ Sobise ({users.filter(u => u.allowedCompanies?.includes('Sobise')).length})</option>
                 </select>
               </div>
 

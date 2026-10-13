@@ -4022,6 +4022,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
         <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
       ) : effectiveSubTab === 'billing_fabtex' ? (
         <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Fabtex" />
+      ) : effectiveSubTab === 'billing_sobise' ? (
+        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Sobise" />
       ) : effectiveSubTab === 'printing_log' || effectiveSubTab === 'print_entry' ? (
         <JobPrintingLog />
       ) : effectiveSubTab === 'fusing_log' || effectiveSubTab === 'fusing' ? (
@@ -4954,6 +4956,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
           { id: 'Elite Online', label: '🛍️ Online', color: '#9333ea' },
           { id: 'Elite Edition', label: '🏢 Edition', color: '#0284c7' },
           { id: 'Elite Fabtex', label: '🧵 Fabtex', color: '#d97706' },
+          { id: 'Sobise', label: '👗 Sobise', color: '#e11d48' },
           { id: 'Elite Stitching', label: '✂️ Stitching', color: '#16a34a' },
           { id: '', label: '🌐 All Channels', color: '#475569' }
         ];
