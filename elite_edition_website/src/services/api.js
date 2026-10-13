@@ -1152,6 +1152,44 @@ export const api = {
     return request(`/expenses/${id}`, { method: 'DELETE' });
   },
 
+  // ─── Statutory GST Compliance & Freight GTA RCM ─────────────────────────────
+  async getGstTable12(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/gst/table12${qs}`);
+  },
+  async getFreightRcm(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/gst/freight-rcm${qs}`);
+  },
+  async createFreightBill(payload) {
+    return request('/gst/freight-rcm', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async updateFreightBill(id, payload) {
+    return request(`/gst/freight-rcm/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  },
+  async deleteFreightBill(id) {
+    return request(`/gst/freight-rcm/${id}`, { method: 'DELETE' });
+  },
+  async generateSelfInvoices(payload = {}) {
+    return request('/gst/freight-rcm/generate-self-invoices', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  getGstTable12ExcelUrl(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return `${getBaseUrl()}/gst/table12/export-excel${qs}`;
+  },
+  getFreightRcmExcelUrl(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return `${getBaseUrl()}/gst/freight-rcm/export-excel${qs}`;
+  },
+
   // ─── Monthly Costing & P&L Module ───────────────────────────────────────────
   async getMonthlyCostingReport(params = {}) {
     const query = new URLSearchParams();

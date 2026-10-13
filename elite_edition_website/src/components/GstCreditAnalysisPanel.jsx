@@ -21,12 +21,14 @@ import {
   ExternalLink,
   Percent,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Truck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import Gstr1Table12Panel from './Gstr1Table12Panel';
+import GtaFreightRcmPanel from './GtaFreightRcmPanel';
 
 // Indian currency formatter
 const fmtINR = (val) => {
@@ -1180,6 +1182,7 @@ export default function GstCreditAnalysisPanel({
         {[
           { id: 'summary', label: '📊 GST Summary & Calculation', icon: Scale },
           { id: 'table12', label: '📑 Table 12: HSN Summary', icon: Layers },
+          { id: 'gta_rcm', label: '🚚 Freight GTA RCM (Sec 9(3))', icon: Truck },
           { id: 'outward', label: `🧾 Sales Bills (${filteredInvoices.length})`, icon: ArrowUpRight },
           { id: 'inward', label: `📦 Purchase Bills (${filteredPurchases.length})`, icon: ArrowDownLeft },
           { id: 'tds', label: `💳 TDS List (${tdsLedger.length})`, icon: ShieldCheck }
@@ -1602,6 +1605,16 @@ export default function GstCreditAnalysisPanel({
           isExpandable={false}
           defaultExpanded={true}
           onViewInvoice={onViewInvoice}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          VIEW: GTA FREIGHT REVERSE CHARGE (RCM) TRACKER (SEC 9(3) & 31(3)(f))
+      ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'gta_rcm' && (
+        <GtaFreightRcmPanel
+          companyEntity={companyEntity}
+          companyGstin="24AANFE0044M1ZG"
         />
       )}
 

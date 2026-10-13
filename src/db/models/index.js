@@ -80,6 +80,7 @@ const db = {
   Lead: require('./lead.model'),
   PushSubscription: require('./pushSubscription.model'),
   ChangeApprovalRequest: require('./changeApprovalRequest.model'),
+  FreightBill: require('./freightBill.model'),
   mongoose,
 };
 
