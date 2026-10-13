@@ -58,6 +58,11 @@ function parseDateSafe(dateVal) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// ── STATUTORY GST COMPLIANCE ENGINE FEATURE FLAGS ──
+// Toggle to true whenever unhiding Table 12 HSN Summary & GTA Freight RCM Tracker
+export const SHOW_TABLE_12_TAB = false;
+export const SHOW_GTA_FREIGHT_RCM_TAB = false;
+
 export default function GstCreditAnalysisPanel({
   invoices = [],
   purchases = [],
@@ -1181,8 +1186,8 @@ export default function GstCreditAnalysisPanel({
       >
         {[
           { id: 'summary', label: '📊 GST Summary & Calculation', icon: Scale },
-          { id: 'table12', label: '📑 Table 12: HSN Summary', icon: Layers },
-          { id: 'gta_rcm', label: '🚚 Freight GTA RCM (Sec 9(3))', icon: Truck },
+          ...(SHOW_TABLE_12_TAB ? [{ id: 'table12', label: '📑 Table 12: HSN Summary', icon: Layers }] : []),
+          ...(SHOW_GTA_FREIGHT_RCM_TAB ? [{ id: 'gta_rcm', label: '🚚 Freight GTA RCM (Sec 9(3))', icon: Truck }] : []),
           { id: 'outward', label: `🧾 Sales Bills (${filteredInvoices.length})`, icon: ArrowUpRight },
           { id: 'inward', label: `📦 Purchase Bills (${filteredPurchases.length})`, icon: ArrowDownLeft },
           { id: 'tds', label: `💳 TDS List (${tdsLedger.length})`, icon: ShieldCheck }
@@ -1581,22 +1586,24 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           {/* ── TABLE 12: HSN/SAC SUMMARY EXPANDABLE SECTION (GSTR-1 COMPLIANCE) ── */}
-          <Gstr1Table12Panel
-            invoices={invoices}
-            companyEntity={companyEntity}
-            companyGstin="24AANFE0044M1ZG"
-            refreshData={refreshData}
-            isExpandable={true}
-            defaultExpanded={false}
-            onViewInvoice={onViewInvoice}
-          />
+          {SHOW_TABLE_12_TAB && (
+            <Gstr1Table12Panel
+              invoices={invoices}
+              companyEntity={companyEntity}
+              companyGstin="24AANFE0044M1ZG"
+              refreshData={refreshData}
+              isExpandable={true}
+              defaultExpanded={false}
+              onViewInvoice={onViewInvoice}
+            />
+          )}
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           VIEW: TABLE 12: HSN/SAC SUMMARY (GSTR-1 COMPLIANT DEDICATED FULL TAB)
       ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'table12' && (
+      {SHOW_TABLE_12_TAB && activeTab === 'table12' && (
         <Gstr1Table12Panel
           invoices={invoices}
           companyEntity={companyEntity}
@@ -1611,7 +1618,7 @@ export default function GstCreditAnalysisPanel({
       {/* ══════════════════════════════════════════════════════════════════════
           VIEW: GTA FREIGHT REVERSE CHARGE (RCM) TRACKER (SEC 9(3) & 31(3)(f))
       ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'gta_rcm' && (
+      {SHOW_GTA_FREIGHT_RCM_TAB && activeTab === 'gta_rcm' && (
         <GtaFreightRcmPanel
           companyEntity={companyEntity}
           companyGstin="24AANFE0044M1ZG"
