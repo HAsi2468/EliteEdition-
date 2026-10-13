@@ -2046,6 +2046,11 @@ export const api = {
     return request(`/billing/invoices?${query.toString()}`);
   },
 
+  async getGstr1Table12Summary(params = {}) {
+    const query = new URLSearchParams(params);
+    return request(`/billing/reports/gstr1-table12?${query.toString()}`);
+  },
+
   async getNextInvoiceNo(companyEntity = 'Elite Online') {
     return request(`/billing/invoices/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
   },

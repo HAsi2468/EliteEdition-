@@ -26,6 +26,7 @@ import {
 import * as XLSX from 'xlsx';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import Gstr1Table12Panel from './Gstr1Table12Panel';
 
 // Indian currency formatter
 const fmtINR = (val) => {
@@ -533,6 +534,62 @@ export default function GstCreditAnalysisPanel({
         }));
         const wsOutward = XLSX.utils.json_to_sheet(outwardRows);
         XLSX.utils.book_append_sheet(wb, wsOutward, 'GSTR1_Outward_Sales');
+
+        // GSTR-1 Table 12 HSN Summary Sheet
+        const hsnMapForExport = {};
+        filteredInvoices.forEach((inv) => {
+          const rawItems = Array.isArray(inv._raw?.items) && inv._raw.items.length > 0
+            ? inv._raw.items
+            : [{ itemName: 'Textile Supply', hsnCode: '998821', qty: 0, unit: 'OTH', totalAmount: inv.taxable || 0, taxRate: inv.gstRate || 5 }];
+          rawItems.forEach((it) => {
+            const hsn = String(it.hsnCode || '998821').trim();
+            const uqc = /meter|mtr/i.test(it.unit) ? 'MTR' : (hsn.startsWith('99') ? 'OTH' : 'MTR');
+            const rate = Number(it.taxRate != null ? it.taxRate : 5);
+            const key = `${hsn}_${uqc}_${rate}`;
+            if (!hsnMapForExport[key]) {
+              hsnMapForExport[key] = {
+                'HSN': hsn,
+                'Description': it.description || it.itemName || 'Textile Job Work / Supply',
+                'UQC': uqc,
+                'Total Quantity': 0,
+                'Total Value': 0,
+                'Taxable Value': 0,
+                'Rate (%)': `${rate}%`,
+                'Integrated Tax Amount': 0,
+                'Central Tax Amount': 0,
+                'State/UT Tax Amount': 0,
+                'Cess Amount': 0
+              };
+            }
+            const taxable = Number(it.totalAmount != null ? it.totalAmount : (Number(it.qty || 0) * Number(it.unitPrice || 0))) || 0;
+            const isInter = inv.isInterState;
+            const igst = isInter ? taxable * (rate / 100) : 0;
+            const cgst = !isInter ? taxable * (rate / 2 / 100) : 0;
+            const sgst = !isInter ? taxable * (rate / 2 / 100) : 0;
+            const qty = hsn.startsWith('99') && uqc === 'OTH' ? 0 : Number(it.qty || 0);
+
+            hsnMapForExport[key]['Total Quantity'] += qty;
+            hsnMapForExport[key]['Taxable Value'] += taxable;
+            hsnMapForExport[key]['Integrated Tax Amount'] += igst;
+            hsnMapForExport[key]['Central Tax Amount'] += cgst;
+            hsnMapForExport[key]['State/UT Tax Amount'] += sgst;
+            hsnMapForExport[key]['Total Value'] += taxable + igst + cgst + sgst;
+          });
+        });
+        const table12Rows = Object.values(hsnMapForExport).map((r) => ({
+          ...r,
+          'Total Quantity': Math.round(r['Total Quantity'] * 100) / 100,
+          'Total Value': Math.round(r['Total Value'] * 100) / 100,
+          'Taxable Value': Math.round(r['Taxable Value'] * 100) / 100,
+          'Integrated Tax Amount': Math.round(r['Integrated Tax Amount'] * 100) / 100,
+          'Central Tax Amount': Math.round(r['Central Tax Amount'] * 100) / 100,
+          'State/UT Tax Amount': Math.round(r['State/UT Tax Amount'] * 100) / 100,
+          'Cess Amount': 0
+        }));
+        if (table12Rows.length > 0) {
+          const wsTable12 = XLSX.utils.json_to_sheet(table12Rows);
+          XLSX.utils.book_append_sheet(wb, wsTable12, 'GSTR1_Table12_HSN');
+        }
       }
 
       // 3. Inward Purchases (GSTR-2B / ITC Format)
@@ -1122,6 +1179,7 @@ export default function GstCreditAnalysisPanel({
       >
         {[
           { id: 'summary', label: '📊 GST Summary & Calculation', icon: Scale },
+          { id: 'table12', label: '📑 Table 12: HSN Summary', icon: Layers },
           { id: 'outward', label: `🧾 Sales Bills (${filteredInvoices.length})`, icon: ArrowUpRight },
           { id: 'inward', label: `📦 Purchase Bills (${filteredPurchases.length})`, icon: ArrowDownLeft },
           { id: 'tds', label: `💳 TDS List (${tdsLedger.length})`, icon: ShieldCheck }
@@ -1518,7 +1576,33 @@ export default function GstCreditAnalysisPanel({
               </div>
             </div>
           </div>
+
+          {/* ── TABLE 12: HSN/SAC SUMMARY EXPANDABLE SECTION (GSTR-1 COMPLIANCE) ── */}
+          <Gstr1Table12Panel
+            invoices={invoices}
+            companyEntity={companyEntity}
+            companyGstin="24AANFE0044M1ZG"
+            refreshData={refreshData}
+            isExpandable={true}
+            defaultExpanded={false}
+            onViewInvoice={onViewInvoice}
+          />
         </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          VIEW: TABLE 12: HSN/SAC SUMMARY (GSTR-1 COMPLIANT DEDICATED FULL TAB)
+      ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'table12' && (
+        <Gstr1Table12Panel
+          invoices={invoices}
+          companyEntity={companyEntity}
+          companyGstin="24AANFE0044M1ZG"
+          refreshData={refreshData}
+          isExpandable={false}
+          defaultExpanded={true}
+          onViewInvoice={onViewInvoice}
+        />
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════

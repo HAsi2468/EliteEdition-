@@ -3542,6 +3542,240 @@ const bulkSyncPurchases = async (req, res) => {
   }
 };
 
+const HSN_STANDARD_DESCRIPTIONS = {
+  '9988': 'Textile Job Work / Manufacturing Services on Physical Inputs Owned by Others',
+  '998821': 'Textile Job Work / Digital Printing, Dyeing & Bleaching Services',
+  '998822': 'Knitting, Weaving and Stitching Job Work Services',
+  '998829': 'Other Manufacturing Services on Textile Inputs',
+  '9983': 'Design, Graphic and Artwork Services',
+  '5407': 'Woven Fabrics of Synthetic Filament Yarn',
+  '5408': 'Woven Fabrics of Artificial Filament Yarn',
+  '5208': 'Woven Fabrics of Cotton (Powerloom / Mill)',
+  '5209': 'Woven Fabrics of Cotton (Heavy Weight)',
+  '5512': 'Woven Fabrics of Synthetic Staple Fibres',
+  '5513': 'Woven Fabrics of Synthetic Staple Fibres (Mixed with Cotton)',
+  '5514': 'Woven Fabrics of Synthetic Staple Fibres (Heavy Weight)',
+  '5515': 'Other Woven Fabrics of Synthetic Staple Fibres',
+  '5516': 'Woven Fabrics of Artificial Staple Fibres',
+  '6001': 'Pile Fabrics (Including Terry Towelling)',
+  '6006': 'Other Knitted or Crocheted Fabrics',
+  '6203': 'Mens / Boys Suits, Ensembles, Trousers',
+  '6204': 'Womens / Girls Suits, Ensembles, Dresses, Skirts, Trousers',
+  '6302': 'Bed Linen, Table Linen, Toilet Linen and Kitchen Linen',
+  '6307': 'Other Made Up Textile Articles'
+};
+
+function normalizeUqc(unit, hsnCode) {
+  const u = String(unit || '').trim().toLowerCase();
+  const hsn = String(hsnCode || '').trim();
+  const isService = hsn.startsWith('99');
+
+  if (/meter|mtr/i.test(u)) return 'MTR';
+  if (/kg|kilo/i.test(u)) return 'KGS';
+  if (/pc|piece/i.test(u)) return 'PCS';
+  if (/no|number|nos/i.test(u)) return 'NOS';
+  if (/roll/i.test(u)) return 'ROL';
+  if (/yard|yd/i.test(u)) return 'YDS';
+  if (/sqm|sq\.mt|sq\s*mtr/i.test(u)) return 'SQM';
+  if (/sqf|sq\.ft/i.test(u)) return 'SQF';
+  if (isService && (!u || /na|none|oth|other|service|job/i.test(u))) return 'OTH';
+  if (u.length === 3 && /^[A-Z]{3}$/i.test(u)) return u.toUpperCase();
+  return isService ? 'OTH' : 'MTR';
+}
+
+function resolveHsnDescription(hsnCode, rawDesc, rawItemName) {
+  const code = String(hsnCode || '').trim();
+  if (HSN_STANDARD_DESCRIPTIONS[code]) return HSN_STANDARD_DESCRIPTIONS[code];
+  const prefix4 = code.substring(0, 4);
+  if (HSN_STANDARD_DESCRIPTIONS[prefix4]) return HSN_STANDARD_DESCRIPTIONS[prefix4];
+  if (rawDesc && rawDesc.trim() && rawDesc.trim().length > 2) return rawDesc.trim();
+  if (rawItemName && rawItemName.trim() && rawItemName.trim().length > 2) return rawItemName.trim();
+  if (code.startsWith('99')) return 'Textile Job Work / Processing Services';
+  return 'Textile Fabrics / Goods';
+}
+
+const getGstr1Table12Summary = async (req, res) => {
+  try {
+    const { dateStart, dateEnd, companyEntity, partyType = 'ALL', gstin } = req.query;
+
+    const filter = {
+      invoiceStatus: { $ne: 'CANCELLED' }
+    };
+
+    if (companyEntity && companyEntity !== 'ALL') {
+      Object.assign(filter, buildCompanyFilter(companyEntity));
+    }
+
+    if (dateStart || dateEnd) {
+      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+      const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000`).getTime()) : null;
+      const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999`).getTime()) : null;
+
+      const dateQuery = {};
+      if (minMs) dateQuery.$gte = new Date(minMs);
+      if (maxMs) dateQuery.$lte = new Date(maxMs);
+
+      filter.$or = [
+        { invoiceDate: dateQuery },
+        { invoiceDate: { $gte: dsStr, $lte: deStr } },
+        { created_at: dateQuery },
+        { createdAt: dateQuery }
+      ];
+    }
+
+    const invoices = await BillingInvoice.find(filter).lean();
+
+    const groups = {};
+
+    let grandTotalQty = 0;
+    let grandTotalTaxable = 0;
+    let grandTotalIgst = 0;
+    let grandTotalCgst = 0;
+    let grandTotalSgst = 0;
+    let grandTotalCess = 0;
+    let grandTotalValue = 0;
+
+    invoices.forEach(inv => {
+      const custGstin = (inv.customer?.gstin || '').trim();
+      const isB2B = !!custGstin && custGstin.length >= 15;
+      if (partyType === 'B2B' && !isB2B) return;
+      if (partyType === 'B2C' && isB2B) return;
+
+      const isInterState = inv.taxType === 'IGST' ||
+        (inv.customer?.stateCode && String(inv.customer.stateCode).trim() !== '24') ||
+        (inv.customer?.state && !inv.customer.state.toLowerCase().includes('gujarat')) ||
+        (Number(inv.igstAmount || 0) > 0);
+
+      const items = Array.isArray(inv.items) && inv.items.length > 0
+        ? inv.items
+        : [{
+            itemName: 'Textile Supply',
+            hsnCode: '998821',
+            qty: 0,
+            unit: 'OTH',
+            totalAmount: inv.taxableAmount || inv.subtotal || 0,
+            taxRate: 5
+          }];
+
+      items.forEach(it => {
+        const rawHsn = it.hsnCode || '998821';
+        const hsn = String(rawHsn).trim() || 'UNMAPPED';
+        const uqc = normalizeUqc(it.unit, hsn);
+        const taxRate = Number(it.taxRate != null ? it.taxRate : 5);
+        const isService = hsn.startsWith('99');
+        const qty = isService && (/oth/i.test(uqc) || Number(it.qty) <= 0) ? 0 : Number(it.qty || 0);
+
+        const taxable = Number(it.totalAmount != null ? it.totalAmount : (Number(it.qty || 0) * Number(it.unitPrice || 0) - Number(it.discountAmt || 0))) || 0;
+
+        let igst = 0;
+        let cgst = 0;
+        let sgst = 0;
+        const cess = 0;
+
+        if (isInterState) {
+          igst = taxable * (taxRate / 100);
+        } else {
+          cgst = taxable * (taxRate / 2 / 100);
+          sgst = taxable * (taxRate / 2 / 100);
+        }
+
+        const totalVal = taxable + igst + cgst + sgst + cess;
+
+        const groupKey = `${hsn}_${uqc}_${taxRate}`;
+        if (!groups[groupKey]) {
+          groups[groupKey] = {
+            hsn,
+            description: resolveHsnDescription(hsn, it.description, it.itemName),
+            uqc,
+            taxRate,
+            isService,
+            totalQuantity: 0,
+            totalValue: 0,
+            taxableValue: 0,
+            igstAmount: 0,
+            cgstAmount: 0,
+            sgstAmount: 0,
+            cessAmount: 0,
+            invoiceCount: 0,
+            contributingInvoices: []
+          };
+        }
+
+        const g = groups[groupKey];
+        g.totalQuantity += qty;
+        g.taxableValue += taxable;
+        g.igstAmount += igst;
+        g.cgstAmount += cgst;
+        g.sgstAmount += sgst;
+        g.cessAmount += cess;
+        g.totalValue += totalVal;
+        g.invoiceCount += 1;
+
+        if (!g.contributingInvoices.some(ci => ci.id === String(inv._id))) {
+          g.contributingInvoices.push({
+            id: String(inv._id),
+            invoiceNo: inv.invoiceNo,
+            invoiceDate: inv.invoiceDate,
+            partyName: inv.customer?.businessName || inv.customer?.name || 'Customer',
+            gstin: custGstin,
+            isB2B,
+            taxable,
+            qty
+          });
+        }
+
+        grandTotalQty += qty;
+        grandTotalTaxable += taxable;
+        grandTotalIgst += igst;
+        grandTotalCgst += cgst;
+        grandTotalSgst += sgst;
+        grandTotalCess += cess;
+        grandTotalValue += totalVal;
+      });
+    });
+
+    const rows = Object.values(groups).sort((a, b) => a.hsn.localeCompare(b.hsn));
+
+    rows.forEach(r => {
+      r.totalQuantity = Math.round(r.totalQuantity * 100) / 100;
+      r.totalValue = Math.round(r.totalValue * 100) / 100;
+      r.taxableValue = Math.round(r.taxableValue * 100) / 100;
+      r.igstAmount = Math.round(r.igstAmount * 100) / 100;
+      r.cgstAmount = Math.round(r.cgstAmount * 100) / 100;
+      r.sgstAmount = Math.round(r.sgstAmount * 100) / 100;
+      r.cessAmount = Math.round(r.cessAmount * 100) / 100;
+    });
+
+    const grandTotals = {
+      totalQuantity: Math.round(grandTotalQty * 100) / 100,
+      totalValue: Math.round(grandTotalValue * 100) / 100,
+      taxableValue: Math.round(grandTotalTaxable * 100) / 100,
+      igstAmount: Math.round(grandTotalIgst * 100) / 100,
+      cgstAmount: Math.round(grandTotalCgst * 100) / 100,
+      sgstAmount: Math.round(grandTotalSgst * 100) / 100,
+      cessAmount: Math.round(grandTotalCess * 100) / 100
+    };
+
+    res.json({
+      success: true,
+      data: {
+        gstin: gstin || '24AANFE0044M1ZG',
+        companyEntity: companyEntity || 'All Entities',
+        dateStart: dateStart || '',
+        dateEnd: dateEnd || '',
+        partyType,
+        rowCount: rows.length,
+        rows,
+        grandTotals
+      }
+    });
+  } catch (error) {
+    if (logger && logger.error) logger.error('Error generating GSTR-1 Table 12 summary:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   getBillingDashboardStats,
   getInvoices,
@@ -3573,5 +3807,6 @@ module.exports = {
   createPurchase,
   updatePurchase,
   deletePurchase,
-  bulkSyncPurchases
+  bulkSyncPurchases,
+  getGstr1Table12Summary
 };

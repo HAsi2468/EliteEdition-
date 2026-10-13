@@ -19,6 +19,9 @@ router.get('/invoices-bulk-pdf', billingController.downloadBulkInvoicesPdf);
 router.post('/invoices-bulk-pdf', billingController.downloadBulkInvoicesPdf);
 router.get('/invoices/:id/pdf', billingController.downloadInvoicePdf);
 
+// Reports & GST Compliance
+router.get('/reports/gstr1-table12', billingController.getGstr1Table12Summary);
+
 // Customers CRUD
 router.get('/customers', billingController.getCustomers);
 router.post('/customers', billingController.createCustomer);
