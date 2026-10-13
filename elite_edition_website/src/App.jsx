@@ -1732,7 +1732,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <Lock size={18} color="#ffffff" />
             <span>
-              <strong>SYSTEM MAINTENANCE MODE ACTIVE:</strong> Non-admin staff screens are locked with the maintenance loading screen.
+              <strong>SYSTEM LOCKED (404 ERROR ACTIVE):</strong> Non-admin screens are displaying a 404 Page Not Found error page.
             </span>
           </div>
           <button

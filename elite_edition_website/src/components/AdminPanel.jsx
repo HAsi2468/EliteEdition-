@@ -201,8 +201,8 @@ export default function AdminPanel() {
   const handleToggleSystemLock = async () => {
     const willLock = !isSystemLocked;
     const confirmMsg = willLock
-      ? '🔒 Lock ERP System for Non-Admin Users?\n\nWhen locked, all non-admin staff and clients will see ONLY a loading maintenance screen and cannot interact with the system.\n\nAdministrators retain full access to unlock anytime.\n\nDo you want to proceed?'
-      : '🔓 Unlock ERP System?\n\nThis will immediately remove the loading screen for all non-admin users and allow them to resume work.\n\nUnlock system now?';
+      ? '🔒 Lock ERP System (Show 404 Error Page)?\n\nWhen locked, all non-admin staff and visitors will see an authentic 404 Page Not Found error.\n\nAdministrators retain full access and can unlock anytime.\n\nLock system now?'
+      : '🔓 Unlock ERP System?\n\nThis will immediately remove the 404 error screen for all users and allow them to resume work.\n\nUnlock system now?';
 
     if (!window.confirm(confirmMsg)) return;
 
@@ -212,9 +212,9 @@ export default function AdminPanel() {
       if (res && res.success !== false) {
         setIsSystemLocked(willLock);
         triggerPushNotification(
-          willLock ? 'System Locked' : 'System Unlocked',
+          willLock ? 'System Locked (404 Active)' : 'System Unlocked',
           willLock
-            ? 'ERP is now locked for all non-admin users (loading screen displayed).'
+            ? 'ERP is now locked. Non-admin users will see a 404 Page Not Found error.'
             : 'ERP has been unlocked. Users can now resume normal operations.',
           willLock ? 'warning' : 'success'
         );
@@ -1335,8 +1335,8 @@ export default function AdminPanel() {
             style={isSystemLocked ? styles.systemLockBtnActive : styles.systemLockBtn}
             title={
               isSystemLocked
-                ? 'System is currently LOCKED. Non-admin users see only a loading screen. Click to Unlock.'
-                : 'Click to lock the ERP system. Non-admin users will immediately see only a loading screen.'
+                ? 'System is currently LOCKED. Non-admin users see a 404 Not Found error page. Click to Unlock.'
+                : 'Click to lock the ERP system. Non-admin users will immediately see a 404 Not Found error page.'
             }
           >
             {systemLockLoading ? (
@@ -1348,7 +1348,7 @@ export default function AdminPanel() {
               <>
                 <Unlock size={17} />
                 <span>System Locked • Click to Unlock</span>
-                <span style={styles.lockBadgeActive}>LOCKED</span>
+                <span style={styles.lockBadgeActive}>404 ACTIVE</span>
               </>
             ) : (
               <>
