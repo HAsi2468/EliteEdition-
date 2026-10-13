@@ -29,6 +29,12 @@ export default function DocumentDesignStudio({
   const [recentRecords, setRecentRecords] = useState([]);
   const [selectedRecordId, setSelectedRecordId] = useState('mock');
 
+  // Bulk Print & Batch PDF Merger
+  const [showBulkPrintModal, setShowBulkPrintModal] = useState(false);
+  const [selectedBatchRecordIds, setSelectedBatchRecordIds] = useState([]);
+  const [batchCopyOption, setBatchCopyOption] = useState('ORIGINAL');
+  const [generatingBatchPdf, setGeneratingBatchPdf] = useState(false);
+
   // Print History & Audit Logs
   const [printLogs, setPrintLogs] = useState([]);
   const [showPrintLogsModal, setShowPrintLogsModal] = useState(false);
@@ -387,6 +393,40 @@ export default function DocumentDesignStudio({
     setSelectedElementId(null);
   };
 
+  // 9. Batch PDF Generation & Merge
+  const handleGenerateBatchPdf = async () => {
+    if (selectedBatchRecordIds.length === 0) {
+      showStatus('Please select at least 1 document to merge', 'error');
+      return;
+    }
+    setGeneratingBatchPdf(true);
+    try {
+      const res = await api.generateBatchPdf({
+        documentType,
+        recordIds: selectedBatchRecordIds,
+        copyOption: batchCopyOption,
+        templateId: activeTemplate?._id,
+        templateOverride: activeTemplate
+      });
+
+      const url = window.URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Batch_${documentType}_Booklet_${selectedBatchRecordIds.length}_Docs.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showStatus(`Merged ${selectedBatchRecordIds.length} documents into PDF!`);
+      setShowBulkPrintModal(false);
+    } catch (err) {
+      console.error('Batch PDF generation failed:', err);
+      showStatus('Failed to generate batch PDF booklet', 'error');
+    } finally {
+      setGeneratingBatchPdf(false);
+    }
+  };
+
   const selectedElement = activeTemplate?.elements?.find((el) => el.id === selectedElementId);
   const selectedRecord = recentRecords.find((r) => r.id === selectedRecordId);
   const currentDataContext = selectedRecord ? selectedRecord.dataContext : (MOCK_DATA_CONTEXT[documentType] || MOCK_DATA_CONTEXT);
@@ -444,6 +484,25 @@ export default function DocumentDesignStudio({
 
         {/* Right Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {/* Bulk Print Queue */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedBatchRecordIds(recentRecords.map(r => r.id));
+              setShowBulkPrintModal(true);
+            }}
+            style={{
+              ...styles.headerBtn,
+              backgroundColor: '#f0fdf4',
+              color: '#15803d',
+              borderColor: '#bbf7d0'
+            }}
+            title="Batch merge 10-50 documents into 1 printable PDF booklet"
+          >
+            <Layers size={15} />
+            <span>Bulk Print ({recentRecords.length})</span>
+          </button>
+
           {/* Print Audit Log Tracker */}
           <button
             type="button"
@@ -837,6 +896,276 @@ export default function DocumentDesignStudio({
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* BULK PRINT & BATCH PDF BOOKLET MODAL                             */}
+      {/* ================================================================= */}
+      {showBulkPrintModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '14px',
+            width: '100%',
+            maxWidth: '820px',
+            maxHeight: '88vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1rem 1.25rem',
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '8px', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Layers size={18} color="#16a34a" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                    Bulk Print & Batch PDF Merger
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                    Select multiple {documentType.toLowerCase()}s and merge them into a single consolidated PDF booklet for mill dispatch
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkPrintModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '6px', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* 1. Copy Type Selector */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
+                  Statutory Copy Selection:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
+                  {[
+                    { id: 'ORIGINAL', title: 'Original Only', sub: 'Recipient copy (1 page/doc)', color: '#0284c7', bg: '#f0f9ff' },
+                    { id: 'DUPLICATE', title: 'Duplicate Only', sub: 'Transporter copy (1 page/doc)', color: '#dc2626', bg: '#fef2f2' },
+                    { id: 'BOTH', title: 'Both Copies (Pair)', sub: 'Original + Duplicate (2 pages/doc)', color: '#7c3aed', bg: '#f5f3ff' }
+                  ].map((opt) => {
+                    const isSelected = batchCopyOption === opt.id;
+                    return (
+                      <div
+                        key={opt.id}
+                        onClick={() => setBatchCopyOption(opt.id)}
+                        style={{
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '8px',
+                          border: `1.5px solid ${isSelected ? opt.color : '#e2e8f0'}`,
+                          backgroundColor: isSelected ? opt.bg : '#ffffff',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: isSelected ? opt.color : '#1e293b' }}>
+                            {opt.title}
+                          </span>
+                          <input
+                            type="radio"
+                            name="batchCopy"
+                            checked={isSelected}
+                            onChange={() => setBatchCopyOption(opt.id)}
+                            style={{ cursor: 'pointer', accentColor: opt.color }}
+                          />
+                        </div>
+                        <span style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
+                          {opt.sub}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Documents Checklist */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                    Select Documents to Merge:
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedBatchRecordIds.length === recentRecords.length) {
+                          setSelectedBatchRecordIds([]);
+                        } else {
+                          setSelectedBatchRecordIds(recentRecords.map(r => r.id));
+                        }
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {selectedBatchRecordIds.length === recentRecords.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
+                      {selectedBatchRecordIds.length} / {recentRecords.length} Selected
+                    </span>
+                  </div>
+                </div>
+
+                {recentRecords.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                    No recent records available for {documentType}. Create an invoice or delivery challan first.
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: '260px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'left', position: 'sticky', top: 0 }}>
+                          <th style={{ width: '36px', padding: '6px 10px', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={recentRecords.length > 0 && selectedBatchRecordIds.length === recentRecords.length}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedBatchRecordIds(recentRecords.map(r => r.id));
+                                else setSelectedBatchRecordIds([]);
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          </th>
+                          <th style={{ padding: '6px 10px' }}>Doc Number</th>
+                          <th style={{ padding: '6px 10px' }}>Party / Client Name</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'right' }}>Amount / Meters</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentRecords.map((r) => {
+                          const isChecked = selectedBatchRecordIds.includes(r.id);
+                          const docNum = r.dataContext?.invoice?.invoiceNumber || r.dataContext?.challan?.challanNumber || r.dataContext?.jobCard?.jobCardNumber || r.label;
+                          const party = r.dataContext?.customer?.name || '-';
+                          const amt = r.dataContext?.invoice?.grandTotal !== undefined
+                            ? `₹${Number(r.dataContext.invoice.grandTotal).toLocaleString('en-IN')}`
+                            : r.dataContext?.challan?.totalMeters !== undefined
+                            ? `${r.dataContext.challan.totalMeters} Mtr`
+                            : '-';
+
+                          return (
+                            <tr
+                              key={r.id}
+                              onClick={() => {
+                                setSelectedBatchRecordIds(prev => 
+                                  prev.includes(r.id) ? prev.filter(id => id !== r.id) : [...prev, r.id]
+                                );
+                              }}
+                              style={{
+                                borderBottom: '1px solid #f1f5f9',
+                                backgroundColor: isChecked ? '#f0fdf4' : '#ffffff',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {}}
+                                  style={{ cursor: 'pointer' }}
+                                />
+                              </td>
+                              <td style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a' }}>{docNum}</td>
+                              <td style={{ padding: '8px 10px', color: '#334155' }}>{party}</td>
+                              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{amt}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '0.85rem 1.25rem',
+              borderTop: '1px solid #e2e8f0',
+              backgroundColor: '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span style={{ fontSize: '0.73rem', color: '#64748b' }}>
+                Total Output: <strong>{selectedBatchRecordIds.length * (batchCopyOption === 'BOTH' ? 2 : 1)} Pages</strong> in single PDF booklet
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkPrintModal(false)}
+                  style={{
+                    padding: '0.45rem 1rem',
+                    borderRadius: '6px',
+                    backgroundColor: '#ffffff',
+                    color: '#64748b',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateBatchPdf}
+                  disabled={generatingBatchPdf || selectedBatchRecordIds.length === 0}
+                  style={{
+                    padding: '0.45rem 1.25rem',
+                    borderRadius: '6px',
+                    backgroundColor: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: (generatingBatchPdf || selectedBatchRecordIds.length === 0) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
+                  }}
+                >
+                  {generatingBatchPdf ? <RefreshCw size={15} className="spin-loader" /> : <Download size={15} />}
+                  <span>{generatingBatchPdf ? 'Rendering Booklet...' : `Merge & Print (${selectedBatchRecordIds.length} Docs)`}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

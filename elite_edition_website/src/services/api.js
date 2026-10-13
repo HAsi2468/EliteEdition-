@@ -3070,6 +3070,25 @@ export const api = {
     }
     const blob = await response.blob();
     return { data: blob };
+  },
+
+  async generateBatchPdf(payload) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+    const response = await fetch(`${baseUrl}/document-templates/batch-print-pdf`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to generate batch PDF booklet');
+    }
+    const blob = await response.blob();
+    return { data: blob };
   }
 };
 

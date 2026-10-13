@@ -1185,6 +1185,198 @@ const getPrintLogs = async (req, res) => {
   }
 };
 
+// 10. Generate Batch / Bulk Merged PDF Booklet
+const generateBatchPdf = async (req, res) => {
+  try {
+    const {
+      documentType = 'INVOICE',
+      recordIds = [],
+      copyOption = 'ORIGINAL', // 'ORIGINAL' | 'DUPLICATE' | 'BOTH'
+      templateOverride,
+      templateId
+    } = req.body;
+
+    const docTypeUpper = documentType.toUpperCase();
+    let template = templateOverride;
+
+    if (!template && templateId) {
+      template = await db.DocumentTemplate.findById(templateId);
+    }
+    if (!template) {
+      template = await db.DocumentTemplate.findOne({ documentType: docTypeUpper, isDefault: true });
+    }
+    if (!template) {
+      const defaults = getDefaultStarterTemplates();
+      template = defaults.find((t) => t.documentType === docTypeUpper) || defaults[0];
+    }
+
+    // Resolve dataContexts for each recordId
+    const dataContexts = [];
+
+    if (docTypeUpper === 'INVOICE' || docTypeUpper === 'BILL') {
+      const invoices = await db.BillingInvoice.find({ _id: { $in: recordIds } }).populate('vendorId');
+      for (const inv of invoices) {
+        const client = inv.clientDetails || {};
+        const items = (inv.items || []).map((it, idx) => ({
+          index: idx + 1,
+          description: it.description || it.fabricName || 'Digital Printed Fabric',
+          hsn: it.hsn || it.hsnCode || '5407',
+          quantity: it.quantity || it.meters || 0,
+          rate: it.rate || 0,
+          total: it.total || (it.quantity * it.rate) || 0
+        }));
+
+        dataContexts.push({
+          company: {
+            name: inv.companyEntity || 'Elite Edition',
+            legalName: `${inv.companyEntity || 'Elite Edition'} Digital Prints Pvt Ltd`,
+            address: 'Plot 42, GIDC Sachin Textile Hub, Surat, Gujarat - 394230',
+            gstin: '24AAACE0000A1Z5',
+            state: 'Gujarat (24)',
+            email: 'billing@eliteedition.in',
+            phone: '+91 98251 00000'
+          },
+          customer: {
+            name: client.name || inv.clientName || 'General Client',
+            address: client.address || 'Surat Textile Market',
+            gstin: client.gstin || '24AAAAA0000A1Z5',
+            state: client.state || 'Gujarat (24)',
+            phone: client.phone || ''
+          },
+          invoice: {
+            invoiceNumber: inv.invoiceNumber || 'INV-BATCH',
+            invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
+            dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
+            paymentTerms: 'Due on Receipt',
+            subTotal: inv.subTotal || 0,
+            taxTotal: (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0),
+            cgst: inv.cgst || 0,
+            sgst: inv.sgst || 0,
+            igst: inv.igst || 0,
+            grandTotal: inv.grandTotal || 0,
+            amountInWords: inv.amountInWords || ''
+          },
+          items
+        });
+      }
+    } else if (docTypeUpper === 'CHALLAN') {
+      const challans = await db.FabricChallan.find({ _id: { $in: recordIds } });
+      for (const ch of challans) {
+        const items = (ch.rolls || ch.items || []).map((it, idx) => ({
+          index: idx + 1,
+          description: it.quality || it.fabricType || 'Poly Crepe',
+          hsn: '5407',
+          quantity: it.meters || it.qty || 0,
+          rate: it.rate || 0,
+          total: (it.meters || it.qty || 0) * (it.rate || 0)
+        }));
+
+        dataContexts.push({
+          company: {
+            name: ch.companyEntity || 'Elite Edition',
+            legalName: `${ch.companyEntity || 'Elite Edition'} Digital Prints Pvt Ltd`,
+            address: 'Plot 42, GIDC Sachin Textile Hub, Surat, Gujarat - 394230',
+            gstin: '24AAACE0000A1Z5',
+            state: 'Gujarat (24)',
+            email: 'dispatch@eliteedition.in',
+            phone: '+91 98251 00000'
+          },
+          customer: {
+            name: ch.partyName || 'Party Client',
+            address: ch.partyAddress || 'Ring Road, Surat',
+            gstin: ch.partyGstin || '24BBBBB0000B1Z6',
+            state: 'Gujarat (24)',
+            phone: ch.partyPhone || ''
+          },
+          challan: {
+            challanNumber: ch.challanNumber || 'CH-BATCH',
+            challanDate: ch.challanDate ? new Date(ch.challanDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
+            vehicleNumber: ch.vehicleNumber || 'GJ-05-XX-0000',
+            dispatchThrough: ch.transporter || 'Self Delivery',
+            totalMeters: ch.totalMeters || 0,
+            totalRolls: ch.totalRolls || ch.rolls?.length || 0,
+            grandTotal: ch.totalAmount || 0
+          },
+          items
+        });
+      }
+    } else if (docTypeUpper === 'JOB_CARD') {
+      const jobCards = await db.SaleOrder.find({ _id: { $in: recordIds } });
+      for (const jc of jobCards) {
+        const items = (jc.designs || jc.items || []).map((it, idx) => ({
+          index: idx + 1,
+          description: it.designNumber || it.name || 'Job Card Design',
+          hsn: '9988',
+          quantity: it.meters || it.quantity || 0,
+          rate: it.rate || 0,
+          total: (it.meters || it.quantity || 0) * (it.rate || 0)
+        }));
+
+        dataContexts.push({
+          company: {
+            name: 'Elite Edition',
+            legalName: 'Elite Edition Digital Prints Pvt Ltd',
+            address: 'Plot 42, GIDC Sachin Textile Hub, Surat, Gujarat - 394230',
+            gstin: '24AAACE0000A1Z5',
+            state: 'Gujarat (24)'
+          },
+          customer: {
+            name: jc.customerName || 'Customer Client',
+            address: 'Surat Market',
+            gstin: '24AAAAA0000A1Z5',
+            state: 'Gujarat (24)'
+          },
+          jobCard: {
+            jobCardNumber: jc.orderNumber || 'JC-BATCH',
+            fabricQuality: jc.fabricQuality || 'Silk Blend',
+            printType: jc.printType || 'Sublimation',
+            totalMeters: jc.totalMeters || 0,
+            status: jc.status || 'In Production'
+          },
+          items
+        });
+      }
+    }
+
+    if (dataContexts.length === 0) {
+      dataContexts.push(getMockDataContext(docTypeUpper));
+    }
+
+    const pdfBuffer = await templatePdfService.generateBatchPdfFromTemplate(template, dataContexts, copyOption);
+
+    // Asynchronously log audit entries
+    dataContexts.forEach((ctx) => {
+      const docNum = ctx.invoice?.invoiceNumber || ctx.challan?.challanNumber || ctx.jobCard?.jobCardNumber || 'BULK_MERGE';
+      const party = ctx.customer?.name || 'General';
+      db.DocumentPrintLog.create({
+        templateId: template._id,
+        templateName: template.name || 'Batch Booklet',
+        documentType: template.documentType,
+        documentNumber: docNum,
+        partyName: party,
+        printedBy: req.user?.name || req.user?.username || 'Admin (Bulk Dispatch)',
+        printCount: copyOption === 'BOTH' ? 2 : 1,
+        copyType: copyOption === 'BOTH' ? 'ORIGINAL' : copyOption,
+        fileSize: pdfBuffer.length
+      }).catch((e) => logger.warn('Bulk print log save error:', e));
+    });
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="Batch_${docTypeUpper}_Booklet_${Date.now()}.pdf"`,
+      'Content-Length': pdfBuffer.length
+    });
+
+    return res.end(pdfBuffer);
+  } catch (error) {
+    logger.error('Error generating Batch Template PDF: %o', error);
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: error.message || 'Failed to render Batch PDF booklet'
+    });
+  }
+};
+
 module.exports = {
   getTemplates,
   getTemplateById,
@@ -1193,6 +1385,7 @@ module.exports = {
   deleteTemplate,
   setDefaultTemplate,
   generatePdf,
+  generateBatchPdf,
   getRecentRecords,
   getPrintLogs,
   getDefaultStarterTemplates,

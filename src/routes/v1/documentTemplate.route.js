@@ -8,6 +8,7 @@ router.post('/', documentTemplateController.createTemplate);
 router.post('/generate-pdf', documentTemplateController.generatePdf);
 router.get('/recent-records', documentTemplateController.getRecentRecords);
 router.get('/print-logs', documentTemplateController.getPrintLogs);
+router.post('/batch-print-pdf', documentTemplateController.generateBatchPdf);
 
 router.get('/:id', documentTemplateController.getTemplateById);
 router.put('/:id', documentTemplateController.updateTemplate);
