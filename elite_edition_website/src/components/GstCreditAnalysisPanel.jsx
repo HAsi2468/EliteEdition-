@@ -887,8 +887,20 @@ export default function GstCreditAnalysisPanel({
           </div>
 
           {/* Party Type Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontWeight: 600 }}>Type:</span>
+          <div
+            className="horizontal-scroll-tabs"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              flexWrap: 'nowrap',
+              maxWidth: '100%',
+              scrollbarWidth: 'none'
+            }}
+          >
+            <span style={{ fontWeight: 600, flexShrink: 0 }}>Type:</span>
             {[
               { id: 'ALL', label: 'All' },
               { id: 'B2B', label: 'With GST Number' },
@@ -899,14 +911,17 @@ export default function GstCreditAnalysisPanel({
                 type="button"
                 onClick={() => setPartyTypeFilter(p.id)}
                 style={{
-                  padding: '2px 8px',
+                  padding: '3px 10px',
                   borderRadius: '6px',
                   border: partyTypeFilter === p.id ? '1px solid #6366f1' : '1px solid #e2e8f0',
                   background: partyTypeFilter === p.id ? '#eef2ff' : '#ffffff',
                   color: partyTypeFilter === p.id ? '#4f46e5' : '#64748b',
                   fontSize: '0.74rem',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  flex: '0 0 auto',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {p.label}
@@ -1175,13 +1190,23 @@ export default function GstCreditAnalysisPanel({
 
       {/* ── SUB-VIEW NAVIGATION TABS ────────────────────────────────────────── */}
       <div
+        className="ent-tab-bar gst-sub-tab-bar horizontal-scroll-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
+          flexWrap: 'nowrap',
           gap: '0.5rem',
           borderBottom: '2px solid #e2e8f0',
-          paddingBottom: '2px',
-          overflowX: 'auto'
+          paddingBottom: '4px',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x pan-y',
+          overscrollBehaviorX: 'contain',
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
         }}
       >
         {[
@@ -1199,6 +1224,7 @@ export default function GstCreditAnalysisPanel({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
+              className="gst-tab-btn ent-tab-btn"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1210,8 +1236,13 @@ export default function GstCreditAnalysisPanel({
                 background: active ? '#ffffff' : 'transparent',
                 border: 'none',
                 borderBottom: active ? '3px solid #4f46e5' : '3px solid transparent',
+                borderRadius: '6px 6px 0 0',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
+                flexShrink: 0,
+                flex: '0 0 auto',
+                minWidth: 'max-content',
+                touchAction: 'manipulation',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -1269,8 +1300,8 @@ export default function GstCreditAnalysisPanel({
               </button>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+              <table style={{ width: '100%', minWidth: '640px', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
                     <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Tax Type</th>
@@ -1671,8 +1702,8 @@ export default function GstCreditAnalysisPanel({
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+            <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
                   <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Bill #</th>
@@ -1831,8 +1862,8 @@ export default function GstCreditAnalysisPanel({
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+            <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
                   <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Purchase # / Bill #</th>
@@ -1994,8 +2025,8 @@ export default function GstCreditAnalysisPanel({
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+            <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
                   <th style={{ textAlign: 'left', padding: '9px 10px', fontWeight: 800 }}>Type</th>

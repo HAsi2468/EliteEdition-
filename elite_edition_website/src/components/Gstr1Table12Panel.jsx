@@ -970,6 +970,10 @@ export default function Gstr1Table12Panel({
           <div
             style={{
               overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-x pan-y',
+              overscrollBehaviorX: 'contain',
+              maxWidth: '100%',
               border: '1px solid var(--border-light, #e2e8f0)',
               borderRadius: '12px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
@@ -979,6 +983,7 @@ export default function Gstr1Table12Panel({
               id="table-gstr1-table12"
               style={{
                 width: '100%',
+                minWidth: '920px',
                 borderCollapse: 'collapse',
                 fontSize: '0.83rem',
                 textAlign: 'left'

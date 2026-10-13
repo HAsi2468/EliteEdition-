@@ -611,14 +611,28 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
         {/* Filter Pills & Sorting */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
           {/* Status Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflowX: 'auto', paddingBottom: '2px' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginRight: '4px' }}>Status:</span>
+          <div
+            className="horizontal-scroll-tabs"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              flexWrap: 'nowrap',
+              maxWidth: '100%',
+              paddingBottom: '2px',
+              scrollbarWidth: 'none'
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginRight: '4px', flexShrink: 0 }}>Status:</span>
             {['All', 'Active', 'Lead', 'VIP Client', 'Inactive'].map((st) => {
               const isActive = statusFilter === st;
               return (
                 <button
                   key={st}
                   onClick={() => setStatusFilter(st)}
+                  className="filter-pill"
                   style={{
                     padding: '4px 12px',
                     borderRadius: '20px',
@@ -628,7 +642,10 @@ export default function CustomerProfilesPanel({ currentUser, onSwitchToLeads, on
                     border: isActive ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
                     background: isActive ? '#eff6ff' : '#f8fafc',
                     color: isActive ? '#1d4ed8' : '#64748b',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    flex: '0 0 auto',
+                    minWidth: 'max-content'
                   }}
                 >
                   {st}

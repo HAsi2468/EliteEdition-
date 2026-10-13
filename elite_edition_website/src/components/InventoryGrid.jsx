@@ -5086,11 +5086,17 @@ const styles = {
   },
   pillContainer: {
     display: 'flex',
+    alignItems: 'center',
     gap: '0.4rem',
     background: '#f1f5f9',
     padding: '4px',
     borderRadius: '10px',
     border: '1px solid #e2e8f0',
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    flexWrap: 'nowrap',
+    maxWidth: '100%',
+    scrollbarWidth: 'none',
   },
   statusPill: (active, type) => {
     let activeBg = '#4f46e5';
@@ -5107,6 +5113,10 @@ const styles = {
       fontSize: '0.78rem',
       fontWeight: active ? 800 : 600,
       cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      flexShrink: 0,
+      flex: '0 0 auto',
+      minWidth: 'max-content',
       transition: 'all 0.15s ease',
     };
   },

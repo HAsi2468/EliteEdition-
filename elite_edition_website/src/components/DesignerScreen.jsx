@@ -2112,13 +2112,19 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
       {/* ─── Operational Stage Navigation Tabs (Drawing, Colour Match, Hold, Approved, Revisions) ── */}
       <div
+        className="ent-tab-bar horizontal-scroll-tabs"
         style={{
           display: 'flex',
           gap: '0.45rem',
           overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x pan-y',
+          flexWrap: 'nowrap',
+          maxWidth: '100%',
+          width: '100%',
           paddingBottom: '0.4rem',
           marginBottom: '0.85rem',
-          scrollbarWidth: 'thin',
+          scrollbarWidth: 'none',
         }}
       >
         {[
@@ -2134,6 +2140,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             <button
               key={tab.id}
               onClick={() => setStageTab(tab.id)}
+              className="ent-tab-btn"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -2147,6 +2154,9 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 fontWeight: 800,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
+                flexShrink: 0,
+                flex: '0 0 auto',
+                minWidth: 'max-content',
                 boxShadow: isActive ? `0 2px 8px ${tab.color}35` : 'none',
                 transition: 'all 0.15s ease',
               }}

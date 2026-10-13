@@ -2241,27 +2241,64 @@ td,
 .tab-scroll-container,
 .status-chips-scroll,
 .ent-tab-bar,
+.gst-sub-tab-bar,
+.horizontal-scroll-tabs,
+.mobile-scroll-tabs,
 .subtabs-scroll-track,
-.fabric-subtab-track,
-[class*="table-responsive"],
-[class*="table-scroll"],
-div:has(> table) {
+.fabric-subtab-track {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
   overflow-x: auto !important;
   overflow-y: visible !important;
   -webkit-overflow-scrolling: touch !important;
   touch-action: pan-x pan-y !important;
   overscroll-behavior-x: contain !important;
   max-width: 100% !important;
+  width: 100% !important;
   box-sizing: border-box !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[class*="table-responsive"],
+[class*="table-scroll"],
+div:has(> table) {
+  display: block;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x pan-y !important;
+  overscroll-behavior-x: contain !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.gst-sub-tab-bar::-webkit-scrollbar,
+.horizontal-scroll-tabs::-webkit-scrollbar,
+.mobile-scroll-tabs::-webkit-scrollbar,
+.tab-scroll-container::-webkit-scrollbar {
+  display: none !important;
 }
 
 /* Universal Sub-Tabs & Filter Pills: NEVER shrink, overlap, or wrap */
 .ent-tab-bar button,
+.ent-tab-bar > *,
 .ent-tab-btn,
+.gst-sub-tab-bar button,
+.gst-sub-tab-bar > *,
+.gst-tab-btn,
+.horizontal-scroll-tabs button,
+.horizontal-scroll-tabs > *,
+.mobile-scroll-tabs button,
+.mobile-scroll-tabs > *,
+.tab-scroll-container button,
 .subtab-chip,
 .inv-sub-tab-bar button,
 .fabric-tab-chip,
 .status-chips-scroll button,
+.inv-pill-container button,
 .filter-pill,
 .tab-btn {
   flex: 0 0 auto !important;
