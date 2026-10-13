@@ -325,6 +325,16 @@ const generatePdfFromTemplate = async (template, dataContext = {}) => {
     }
 
     const pdfBuffer = await page.pdf(pdfOptions);
+    return pdfBuffer;
+  } catch (error) {
+    logger.error('Error generating PDF with Puppeteer: %o', error);
+    throw error;
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
+  }
+};
 
 /**
  * Generates a Consolidated Multi-Page PDF Booklet from an array of dataContexts
