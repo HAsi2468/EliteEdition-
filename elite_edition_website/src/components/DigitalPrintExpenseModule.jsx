@@ -264,7 +264,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const ledgerScrollRef = useRef(null);
   const scrollLedger = useCallback((direction) => {
     if (ledgerScrollRef.current) {
-      const scrollAmount = 470;
+      const card = ledgerScrollRef.current.querySelector('.ledger-bank-card');
+      const scrollAmount = card ? (card.offsetWidth + 16) : (ledgerScrollRef.current.clientWidth / 2);
       ledgerScrollRef.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
@@ -1556,7 +1557,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 Financial Ledgers &amp; Bank Accounts
               </span>
               <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 8px', borderRadius: '12px', background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
-                Cash in Hand • Kotak EDP • Elite ICICI • Consolidated
+                Cash in Hand • Kotak EDP • Elite ICICI
               </span>
             </div>
 
@@ -1636,23 +1637,42 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
             </div>
           </div>
 
-          {/* ── Horizontally Scrollable Ledger Cards Container ── */}
+          {/* ── Horizontally Scrollable Ledger Cards Container (2 Cards per Page / View) ── */}
           <div
             ref={ledgerScrollRef}
+            className="horizontal-scroll-container ledger-cards-scroll-track"
             style={{
               display: 'flex',
-              gap: '0.85rem',
+              gap: '1rem',
               overflowX: 'auto',
               overflowY: 'hidden',
               paddingBottom: '8px',
               marginBottom: '0.25rem',
-              scrollSnapType: 'x proximity',
+              scrollSnapType: 'x mandatory',
               WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'thin'
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
             }}
           >
-            {/* 1. Cash Ledger Group */}
-            <div className="glass-panel" style={{ flex: '0 0 auto', width: 'clamp(420px, 32vw, 480px)', minWidth: '420px', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', background: 'var(--bg-card, #ffffff)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem', scrollSnapAlign: 'start' }}>
+            {/* 1. Cash in Hand Ledger */}
+            <div
+              className="glass-panel ledger-bank-card"
+              style={{
+                flex: '0 0 calc(50% - 0.5rem)',
+                width: 'calc(50% - 0.5rem)',
+                minWidth: '460px',
+                padding: '0.95rem 1.15rem',
+                borderRadius: '14px',
+                border: '1px solid var(--border-light, #e2e8f0)',
+                background: 'var(--bg-card, #ffffff)',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                scrollSnapAlign: 'start',
+                boxSizing: 'border-box'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light, #f1f5f9)', paddingBottom: '0.6rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                   <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', border: '1px solid #a7f3d0' }}>
@@ -1660,7 +1680,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.84rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
                         Cash in Hand Ledger
                       </h4>
                       <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
@@ -1674,65 +1694,91 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </div>
               </div>
 
-              {/* 4 Cash Metrics Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
-                {/* Cash Opening */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Opening</span>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`₹${Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN')}`}>
-                    ₹{Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                {/* 1. Opening */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    Opening
+                  </span>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN')}`}>
+                    ₹{Number(ledgerBalances.cashOpening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pre-Period Bal</span>
+                  <span style={{ fontSize: '0.63rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
                 </div>
 
-                {/* Cash In */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* 2. Cash IN */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Cash IN</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                      Cash IN
+                    </span>
                     <TrendingUp size={13} color="#16a34a" />
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    +₹{Number(ledgerBalances.cashIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    +₹{Number(ledgerBalances.cashIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#15803d', fontWeight: 600 }}>Receipts</span>
+                  <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Receipts</span>
                 </div>
 
-                {/* Cash Out */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* 3. Cash OUT */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Cash OUT</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                      Cash OUT
+                    </span>
                     <TrendingDown size={13} color="#dc2626" />
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    -₹{Number(ledgerBalances.cashExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    -₹{Number(ledgerBalances.cashExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#b91c1c', fontWeight: 600 }}>Outflows</span>
+                  <span style={{ fontSize: '0.63rem', color: '#b91c1c', fontWeight: 600, whiteSpace: 'nowrap' }}>Outflows</span>
                 </div>
 
-                {/* Cash Closing */}
+                {/* 4. Closing */}
                 <div style={{
-                  padding: '0.6rem',
-                  borderRadius: '8px',
+                  padding: '0.65rem 0.6rem',
+                  borderRadius: '10px',
                   background: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#ecfdf5' : '#fef2f2',
                   border: Number(ledgerBalances.cashClosing || 0) >= 0 ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between'
+                  justifyContent: 'space-between',
+                  minWidth: 0
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c' }}>Closing</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c', whiteSpace: 'nowrap' }}>
+                      Closing
+                    </span>
                     <Wallet size={13} color={Number(ledgerBalances.cashClosing || 0) >= 0 ? '#16a34a' : '#dc2626'} />
                   </div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    ₹{Number(ledgerBalances.cashClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#15803d' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    ₹{Number(ledgerBalances.cashClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#166534' : '#991b1b' }}>Net Cash</span>
+                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(ledgerBalances.cashClosing || 0) >= 0 ? '#166534' : '#991b1b', whiteSpace: 'nowrap' }}>Net Cash</span>
                 </div>
               </div>
             </div>
 
             {/* 2. Kotak EDP Bank Ledger Card */}
-            <div className="glass-panel" style={{ flex: '0 0 auto', width: 'clamp(420px, 32vw, 480px)', minWidth: '420px', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', background: 'var(--bg-card, #ffffff)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem', scrollSnapAlign: 'start' }}>
+            <div
+              className="glass-panel ledger-bank-card"
+              style={{
+                flex: '0 0 calc(50% - 0.5rem)',
+                width: 'calc(50% - 0.5rem)',
+                minWidth: '460px',
+                padding: '0.95rem 1.15rem',
+                borderRadius: '14px',
+                border: '1px solid var(--border-light, #e2e8f0)',
+                background: 'var(--bg-card, #ffffff)',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                scrollSnapAlign: 'start',
+                boxSizing: 'border-box'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light, #f1f5f9)', paddingBottom: '0.6rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                   <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7', border: '1px solid #bae6fd' }}>
@@ -1740,7 +1786,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.84rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary, #0f172a)' }}>
                         Kotak EDP Bank Ledger
                       </h4>
                       <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
@@ -1754,67 +1800,93 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </div>
               </div>
 
-              {/* 4 Kotak Metrics Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
-                {/* Bank Opening */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Opening</span>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`₹${Number(kotakBankData.opening || 0).toLocaleString('en-IN')}`}>
-                    ₹{Number(kotakBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                {/* 1. Opening */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    Opening
+                  </span>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(kotakBankData.opening || 0).toLocaleString('en-IN')}`}>
+                    ₹{Number(kotakBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pre-Period Bal</span>
+                  <span style={{ fontSize: '0.63rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
                 </div>
 
-                {/* Bank In */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* 2. Cash IN */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank IN</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                      Cash IN
+                    </span>
                     <TrendingUp size={13} color="#16a34a" />
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    +₹{Number(kotakBankData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    +₹{Number(kotakBankData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#15803d', fontWeight: 600 }}>Deposits</span>
+                  <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Deposits</span>
                 </div>
 
-                {/* Bank Out */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#eef2ff', border: '1px solid #c7d2fe', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* 3. Cash OUT */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#eef2ff', border: '1px solid #c7d2fe', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank OUT</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                      Cash OUT
+                    </span>
                     <TrendingDown size={13} color="#4f46e5" />
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#4f46e5', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    -₹{Number(kotakBankData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#4f46e5', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    -₹{Number(kotakBankData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#4338ca', fontWeight: 600 }}>Transfers</span>
+                  <span style={{ fontSize: '0.63rem', color: '#4338ca', fontWeight: 600, whiteSpace: 'nowrap' }}>Transfers</span>
                 </div>
 
-                {/* Bank Closing */}
+                {/* 4. Closing */}
                 <div style={{
-                  padding: '0.6rem',
-                  borderRadius: '8px',
+                  padding: '0.65rem 0.6rem',
+                  borderRadius: '10px',
                   background: Number(kotakBankData.bankClosing || 0) >= 0 ? '#f0f9ff' : '#fffbeb',
                   border: Number(kotakBankData.bankClosing || 0) >= 0 ? '1.5px solid #7dd3fc' : '1.5px solid #fcd34d',
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between'
+                  justifyContent: 'space-between',
+                  minWidth: 0
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#0369a1' : '#b45309' }}>Closing</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#0369a1' : '#b45309', whiteSpace: 'nowrap' }}>
+                      Closing
+                    </span>
                     <CreditCard size={13} color={Number(kotakBankData.bankClosing || 0) >= 0 ? '#0284c7' : '#d97706'} />
                   </div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#0369a1' : '#b45309', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    ₹{Number(kotakBankData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#0369a1' : '#b45309', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    ₹{Number(kotakBankData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#075985' : '#92400e' }}>
+                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(kotakBankData.bankClosing || 0) >= 0 ? '#075985' : '#92400e', whiteSpace: 'nowrap' }}>
                     Net KOTAK EDP
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* 3. Elite ICICI Bank Ledger Card (Dedicated Card with warm signature ICICI styling) */}
-            <div className="glass-panel" style={{ flex: '0 0 auto', width: 'clamp(420px, 32vw, 480px)', minWidth: '420px', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid #fed7aa', background: 'var(--bg-card, #ffffff)', boxShadow: '0 2px 10px rgba(234, 88, 12, 0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem', scrollSnapAlign: 'start' }}>
+            {/* 3. Elite ICICI Bank Ledger Card */}
+            <div
+              className="glass-panel ledger-bank-card"
+              style={{
+                flex: '0 0 calc(50% - 0.5rem)',
+                width: 'calc(50% - 0.5rem)',
+                minWidth: '460px',
+                padding: '0.95rem 1.15rem',
+                borderRadius: '14px',
+                border: '1px solid #fed7aa',
+                background: 'var(--bg-card, #ffffff)',
+                boxShadow: '0 2px 10px rgba(234, 88, 12, 0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                scrollSnapAlign: 'start',
+                boxSizing: 'border-box'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #ffedd5', paddingBottom: '0.6rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                   <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', border: '1px solid #fed7aa' }}>
@@ -1822,7 +1894,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9a3412' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.84rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9a3412' }}>
                         Elite ICICI Bank Ledger
                       </h4>
                       <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#ffedd5', color: '#c2410c', border: '1px solid #fdba74' }}>
@@ -1836,142 +1908,69 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </div>
               </div>
 
-              {/* 4 ICICI Metrics Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
-                {/* Bank Opening */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#fffaf5', border: '1px solid #fed7aa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Opening</span>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`₹${Number(iciciBankData.opening || 0).toLocaleString('en-IN')}`}>
-                    ₹{Number(iciciBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              {/* 4 Metrics Grid (Opening, Cash IN, Cash OUT, Closing) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                {/* 1. Opening */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fffaf5', border: '1px solid #fed7aa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    Opening
+                  </span>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }} title={`₹${Number(iciciBankData.opening || 0).toLocaleString('en-IN')}`}>
+                    ₹{Number(iciciBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#9a3412', opacity: 0.75, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pre-Period Bal</span>
+                  <span style={{ fontSize: '0.63rem', color: '#9a3412', opacity: 0.75, whiteSpace: 'nowrap' }}>Pre-Period Bal</span>
                 </div>
 
-                {/* Bank In */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* 2. Cash IN */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank IN</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                      Cash IN
+                    </span>
                     <TrendingUp size={13} color="#16a34a" />
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    +₹{Number(iciciBankData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    +₹{Number(iciciBankData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#15803d', fontWeight: 600 }}>Deposits</span>
+                  <span style={{ fontSize: '0.63rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>Deposits</span>
                 </div>
 
-                {/* Bank Out */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#fff1f2', border: '1px solid #fecdd3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* 3. Cash OUT */}
+                <div style={{ padding: '0.65rem 0.6rem', borderRadius: '10px', background: '#fff1f2', border: '1px solid #fecdd3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#e11d48', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank OUT</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#e11d48', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                      Cash OUT
+                    </span>
                     <TrendingDown size={13} color="#e11d48" />
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#e11d48', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    -₹{Number(iciciBankData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#e11d48', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    -₹{Number(iciciBankData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', color: '#be123c', fontWeight: 600 }}>Transfers</span>
+                  <span style={{ fontSize: '0.63rem', color: '#be123c', fontWeight: 600, whiteSpace: 'nowrap' }}>Transfers</span>
                 </div>
 
-                {/* Bank Closing */}
+                {/* 4. Closing */}
                 <div style={{
-                  padding: '0.6rem',
-                  borderRadius: '8px',
+                  padding: '0.65rem 0.6rem',
+                  borderRadius: '10px',
                   background: Number(iciciBankData.bankClosing || 0) >= 0 ? '#fff7ed' : '#fef2f2',
                   border: Number(iciciBankData.bankClosing || 0) >= 0 ? '1.5px solid #fdba74' : '1.5px solid #fca5a5',
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between'
+                  justifyContent: 'space-between',
+                  minWidth: 0
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#c2410c' : '#b91c1c' }}>Closing</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#c2410c' : '#b91c1c', whiteSpace: 'nowrap' }}>
+                      Closing
+                    </span>
                     <Landmark size={13} color={Number(iciciBankData.bankClosing || 0) >= 0 ? '#ea580c' : '#dc2626'} />
                   </div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#c2410c' : '#b91c1c', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    ₹{Number(iciciBankData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div style={{ fontSize: '0.96rem', fontWeight: 900, color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#c2410c' : '#b91c1c', margin: '4px 0 2px 0', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                    ₹{Number(iciciBankData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#9a3412' : '#991b1b' }}>
+                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: Number(iciciBankData.bankClosing || 0) >= 0 ? '#9a3412' : '#991b1b', whiteSpace: 'nowrap' }}>
                     Net ELITE ICICI
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Consolidated (All Banks Total) Ledger Card */}
-            <div className="glass-panel" style={{ flex: '0 0 auto', width: 'clamp(420px, 32vw, 480px)', minWidth: '420px', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid #ddd6fe', background: 'var(--bg-card, #ffffff)', boxShadow: '0 2px 10px rgba(124, 58, 237, 0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem', scrollSnapAlign: 'start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #ede9fe', paddingBottom: '0.6rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
-                    <Building2 size={18} />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#5b21b6' }}>
-                        All Banks (Consolidated)
-                      </h4>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe' }}>
-                        Opening: ₹{Number(consolidatedBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '0.68rem', color: '#5b21b6', opacity: 0.8, fontWeight: 500 }}>
-                      Total Combined Liquid Position Across All Banks
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 Consolidated Metrics Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
-                {/* Bank Opening */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#faf5ff', border: '1px solid #ede9fe', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Opening</span>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e293b', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`₹${Number(consolidatedBankData.opening || 0).toLocaleString('en-IN')}`}>
-                    ₹{Number(consolidatedBankData.opening || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.62rem', color: '#6b21a8', opacity: 0.75, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pre-Period Bal</span>
-                </div>
-
-                {/* Bank In */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank IN</span>
-                    <TrendingUp size={13} color="#16a34a" />
-                  </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#16a34a', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    +₹{Number(consolidatedBankData.bankIn || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.62rem', color: '#15803d', fontWeight: 600 }}>Deposits</span>
-                </div>
-
-                {/* Bank Out */}
-                <div style={{ padding: '0.6rem', borderRadius: '8px', background: '#eef2ff', border: '1px solid #c7d2fe', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bank OUT</span>
-                    <TrendingDown size={13} color="#4f46e5" />
-                  </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#4f46e5', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    -₹{Number(consolidatedBankData.bankExpense || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.62rem', color: '#4338ca', fontWeight: 600 }}>Transfers</span>
-                </div>
-
-                {/* Bank Closing */}
-                <div style={{
-                  padding: '0.6rem',
-                  borderRadius: '8px',
-                  background: Number(consolidatedBankData.bankClosing || 0) >= 0 ? '#f5f3ff' : '#fffbeb',
-                  border: Number(consolidatedBankData.bankClosing || 0) >= 0 ? '1.5px solid #c4b5fd' : '1.5px solid #fcd34d',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em', color: Number(consolidatedBankData.bankClosing || 0) >= 0 ? '#6d28d9' : '#b45309' }}>Closing</span>
-                    <Building2 size={13} color={Number(consolidatedBankData.bankClosing || 0) >= 0 ? '#7c3aed' : '#d97706'} />
-                  </div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: Number(consolidatedBankData.bankClosing || 0) >= 0 ? '#6d28d9' : '#b45309', margin: '4px 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    ₹{Number(consolidatedBankData.bankClosing || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: Number(consolidatedBankData.bankClosing || 0) >= 0 ? '#5b21b6' : '#92400e' }}>
-                    Total Net Banks
                   </span>
                 </div>
               </div>

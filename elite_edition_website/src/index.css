@@ -2308,6 +2308,25 @@ div:has(> table) {
   touch-action: manipulation !important;
 }
 
+/* Ledger Bank Cards: Exactly 2 cards per view on desktop, smooth snap scrolling */
+.ledger-bank-card {
+  flex: 0 0 calc(50% - 0.5rem) !important;
+  width: calc(50% - 0.5rem) !important;
+  max-width: calc(50% - 0.5rem) !important;
+  min-width: 460px !important;
+  box-sizing: border-box !important;
+  scroll-snap-align: start !important;
+}
+
+@media (max-width: 992px) {
+  .ledger-bank-card {
+    flex: 0 0 min(90vw, 540px) !important;
+    width: min(90vw, 540px) !important;
+    max-width: min(90vw, 540px) !important;
+    min-width: 320px !important;
+  }
+}
+
 /* Mobile Specific Refinements (<= 768px) */
 @media (max-width: 768px) {
   /* Prevent tables from shrinking columns into illegibility; preserve horizontal swipe */
