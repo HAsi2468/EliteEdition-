@@ -19,7 +19,7 @@ export default function DocumentDesignStudio({
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const [isPreview, setIsPreview] = useState(false);
-  const [zoom, setZoom] = useState(0.85);
+  const [zoom, setZoom] = useState(0.70);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -187,16 +187,25 @@ export default function DocumentDesignStudio({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedElementId, activeTemplate, historyIndex, history]);
 
-  // 1. Add Element
+  // 1. Add Element with Smart Placement (Never collides with company header)
   const handleAddElement = (type, defaultProps = {}) => {
     if (!activeTemplate) return;
+    const isLandscape = activeTemplate.orientation === 'landscape';
+    const canvasWidth = isLandscape ? 842 : 595;
+    const width = defaultProps.width || 180;
+    const height = defaultProps.height || 36;
+    
+    // Calculate smart center position so new elements don't collide with header
+    const posX = Math.max(30, Math.round((canvasWidth - width) / 2));
+    const posY = 180 + ((activeTemplate.elements?.length || 0) % 5) * 25;
+
     const newElement = {
       id: `el_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       type,
-      x: 30,
-      y: 60,
-      width: defaultProps.width || 180,
-      height: defaultProps.height || 36,
+      x: posX,
+      y: posY,
+      width,
+      height,
       content: defaultProps.content || '',
       fieldBinding: defaultProps.fieldBinding || '',
       tableConfig: defaultProps.tableConfig || {},
@@ -559,28 +568,30 @@ export default function DocumentDesignStudio({
       </div>
 
       {/* ================================================================= */}
-      {/* SECONDARY SUB-BAR: TEMPLATE, REAL RECORD, ALIGNMENT & ZOOM       */}
+      {/* SECONDARY SUB-BAR: STREAMLINED DESIGN RIBBON                     */}
       {/* ================================================================= */}
       <div style={styles.subBar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Active Template:</span>
-          <select
-            value={activeTemplate?._id || ''}
-            onChange={(e) => {
-              const tpl = templates.find((t) => t._id === e.target.value);
-              if (tpl) {
-                setActiveTemplate(tpl);
-                setSelectedElementId(null);
-              }
-            }}
-            style={styles.templateSelect}
-          >
-            {templates.map((tpl) => (
-              <option key={tpl._id} value={tpl._id}>
-                {tpl.name} {tpl.isDefault ? '★ (Default)' : ''}
-              </option>
-            ))}
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'nowrap', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', backgroundColor: '#ffffff', padding: '2px 6px', borderRadius: '7px', border: '1px solid #cbd5e1' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#475569' }}>Template:</span>
+            <select
+              value={activeTemplate?._id || ''}
+              onChange={(e) => {
+                const tpl = templates.find((t) => t._id === e.target.value);
+                if (tpl) {
+                  setActiveTemplate(tpl);
+                  setSelectedElementId(null);
+                }
+              }}
+              style={{ ...styles.templateSelect, border: 'none', padding: '2px 4px' }}
+            >
+              {templates.map((tpl) => (
+                <option key={tpl._id} value={tpl._id}>
+                  {tpl.name} {tpl.isDefault ? '★ (Default)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <button
             type="button"
@@ -588,26 +599,25 @@ export default function DocumentDesignStudio({
             style={styles.subBtn}
             title="Create blank new template"
           >
-            <Plus size={13} /> New Blank
+            <Plus size={13} /> Blank
           </button>
 
           {/* Real ERP Data Source Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.5rem' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Data Source:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', backgroundColor: '#ffffff', padding: '2px 6px', borderRadius: '7px', border: '1px solid #cbd5e1' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#475569' }}>Data:</span>
             <select
               value={selectedRecordId}
               onChange={(e) => setSelectedRecordId(e.target.value)}
               style={{
-                padding: '0.3rem 0.55rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
+                border: 'none',
+                padding: '2px 4px',
                 fontSize: '0.72rem',
                 fontWeight: 600,
-                color: selectedRecordId === 'mock' ? '#64748b' : '#0284c7',
-                backgroundColor: selectedRecordId === 'mock' ? '#ffffff' : '#f0f9ff',
+                color: selectedRecordId === 'mock' ? '#475569' : '#0284c7',
+                backgroundColor: 'transparent',
                 outline: 'none',
                 cursor: 'pointer',
-                maxWidth: '240px'
+                maxWidth: '200px'
               }}
             >
               <option value="mock">🧪 Mock Test Data</option>
@@ -621,8 +631,8 @@ export default function DocumentDesignStudio({
 
           {/* Quick Alignment Toolbar (Shown when an element is selected) */}
           {selectedElementId && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', backgroundColor: '#e2e8f0', padding: '2px 4px', borderRadius: '6px', marginLeft: '0.5rem' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', padding: '0 3px' }}>Align:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', backgroundColor: '#e0f2fe', padding: '2px 6px', borderRadius: '7px', border: '1px solid #bae6fd' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0369a1', paddingRight: '2px' }}>Align:</span>
               <button type="button" onClick={() => handleAlignElement('left')} style={styles.alignBtn} title="Align Left Margins">⇥ Left</button>
               <button type="button" onClick={() => handleAlignElement('center-h')} style={styles.alignBtn} title="Center Horizontally">↔ Center</button>
               <button type="button" onClick={() => handleAlignElement('right')} style={styles.alignBtn} title="Align Right Margins">⇤ Right</button>
@@ -636,9 +646,9 @@ export default function DocumentDesignStudio({
         {statusMessage && (
           <div
             style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              padding: '3px 10px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              padding: '2px 8px',
               borderRadius: '6px',
               backgroundColor: statusMessage.type === 'error' ? '#fef2f2' : '#f0fdf4',
               color: statusMessage.type === 'error' ? '#ef4444' : '#16a34a',
@@ -650,35 +660,37 @@ export default function DocumentDesignStudio({
         )}
 
         {/* Zoom & History Undo/Redo Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
           <button
             type="button"
-            onClick={() => setZoom(Math.max(0.4, Number((zoom - 0.1).toFixed(2))))}
+            onClick={() => setZoom(Math.max(0.4, Number((zoom - 0.05).toFixed(2))))}
             style={styles.zoomBtn}
+            title="Zoom Out"
           >
             <ZoomOut size={13} />
           </button>
-          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', minWidth: '38px', textAlign: 'center' }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', minWidth: '34px', textAlign: 'center' }}>
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
-            onClick={() => setZoom(Math.min(1.4, Number((zoom + 0.1).toFixed(2))))}
+            onClick={() => setZoom(Math.min(1.4, Number((zoom + 0.05).toFixed(2))))}
             style={styles.zoomBtn}
+            title="Zoom In"
           >
             <ZoomIn size={13} />
           </button>
           <button
             type="button"
-            onClick={() => setZoom(0.85)}
-            style={styles.zoomBtn}
-            title="Reset Zoom to 85%"
+            onClick={() => setZoom(0.68)}
+            style={{ ...styles.zoomBtn, width: 'auto', padding: '0 6px', fontSize: '0.68rem', fontWeight: 800, color: '#0284c7' }}
+            title="Fit whole A4 sheet to screen height"
           >
-            <RotateCcw size={12} />
+            📐 Fit
           </button>
 
           {/* Undo / Redo Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', borderLeft: '1px solid #cbd5e1', paddingLeft: '0.4rem', marginLeft: '0.2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', borderLeft: '1px solid #cbd5e1', paddingLeft: '0.35rem', marginLeft: '0.2rem' }}>
             <button
               type="button"
               onClick={handleUndo}
@@ -1273,16 +1285,17 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '0.5rem 1.25rem',
+    padding: '0.35rem 1rem',
     backgroundColor: '#f8fafc',
-    borderBottom: '1px solid #e2e8f0'
+    borderBottom: '1px solid #e2e8f0',
+    minHeight: '40px'
   },
   templateSelect: {
-    padding: '0.35rem 0.65rem',
+    padding: '0.25rem 0.5rem',
     borderRadius: '6px',
     border: '1px solid #cbd5e1',
-    fontSize: '0.75rem',
-    fontWeight: '600',
+    fontSize: '0.74rem',
+    fontWeight: '700',
     backgroundColor: '#ffffff',
     color: '#0f172a',
     outline: 'none'
@@ -1291,7 +1304,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '3px',
-    padding: '0.35rem 0.65rem',
+    padding: '0.25rem 0.6rem',
     borderRadius: '6px',
     border: '1px solid #cbd5e1',
     backgroundColor: '#ffffff',

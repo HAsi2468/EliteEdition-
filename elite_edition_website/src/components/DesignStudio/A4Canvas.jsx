@@ -369,6 +369,8 @@ export default function A4Canvas({
               bounds="parent"
               scale={zoom}
               grid={[2, 2]}
+              enableResizing={isSelected ? undefined : false}
+              disableDragging={!isSelected}
               onDragStart={() => onSelectElement(el.id)}
               onDrag={(e, d) => handleDrag(el.id, d)}
               onDragStop={(e, d) => handleDragStop(el.id, d)}
@@ -386,16 +388,22 @@ export default function A4Canvas({
               }}
               style={{
                 zIndex: isSelected ? 999 : (style.zIndex || 1),
-                border: isSelected ? '1.5px solid #0284c7' : '1px dashed transparent',
-                cursor: 'move',
+                border: isSelected ? '1.5px solid #0284c7' : '1px solid transparent',
+                borderRadius: '2px',
+                cursor: isSelected ? 'move' : 'pointer',
                 boxSizing: 'border-box',
                 transition: 'border-color 0.1s'
               }}
-              resizeHandleStyles={{
-                topLeft: { width: 7, height: 7, backgroundColor: '#0284c7', borderRadius: '50%' },
-                topRight: { width: 7, height: 7, backgroundColor: '#0284c7', borderRadius: '50%' },
-                bottomLeft: { width: 7, height: 7, backgroundColor: '#0284c7', borderRadius: '50%' },
-                bottomRight: { width: 7, height: 7, backgroundColor: '#0284c7', borderRadius: '50%' }
+              resizeHandleStyles={isSelected ? {
+                topLeft: { width: 8, height: 8, backgroundColor: '#0284c7', borderRadius: '50%', border: '1.5px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
+                topRight: { width: 8, height: 8, backgroundColor: '#0284c7', borderRadius: '50%', border: '1.5px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
+                bottomLeft: { width: 8, height: 8, backgroundColor: '#0284c7', borderRadius: '50%', border: '1.5px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
+                bottomRight: { width: 8, height: 8, backgroundColor: '#0284c7', borderRadius: '50%', border: '1.5px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }
+              } : {
+                topLeft: { display: 'none' },
+                topRight: { display: 'none' },
+                bottomLeft: { display: 'none' },
+                bottomRight: { display: 'none' }
               }}
             >
               {renderedElementContent()}
