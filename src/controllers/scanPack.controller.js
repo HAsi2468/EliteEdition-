@@ -51,7 +51,44 @@ const lookupAwb = async (req, res) => {
       }).lean();
     }
 
-    // 3. Search for any return record matching this AWB
+    // 3. Fallback: Search live Unicommerce OMS if not in local cache
+    if (!order && !salesItem) {
+      try {
+        const { getAccessToken, getSaleOrderLive } = require('../services/api.service');
+        const token = await getAccessToken();
+        if (token) {
+          const liveRes = await getSaleOrderLive(token, cleanCode);
+          if (liveRes && liveRes.successful && liveRes.saleOrder) {
+            const so = liveRes.saleOrder;
+            order = {
+              displayOrderCode: so.displayOrderCode || so.code,
+              itemSKUCode: so.saleOrderItems?.[0]?.itemSkuCode || '',
+              itemTypeName: so.saleOrderItems?.[0]?.itemTypeName || '',
+              itemTypeColor: so.saleOrderItems?.[0]?.color || '',
+              itemTypeSize: so.saleOrderItems?.[0]?.size || '',
+              itemTypeBrand: so.saleOrderItems?.[0]?.brand || 'SOBISE',
+              channel: so.channel || 'Myntra',
+              totalPrice: so.totalPrice || 0,
+              mrp: so.saleOrderItems?.[0]?.maxRetailPrice || 0,
+              shippingAddressCity: so.addresses?.[0]?.city || '',
+              shippingAddressState: so.addresses?.[0]?.state || '',
+              shippingAddressPincode: so.addresses?.[0]?.pincode || '',
+              shippingAddressName: so.addresses?.[0]?.name || '',
+              shippingAddressPhone: so.addresses?.[0]?.phone || '',
+              shippingCourier: so.shippingPackages?.[0]?.shippingCourier || '',
+              trackingNumber: so.shippingPackages?.[0]?.trackingNumber || cleanCode,
+              orderDate: so.displayOrderDateTime,
+              invoiceCode: so.invoices?.[0]?.code || '',
+              cod: so.cod
+            };
+          }
+        }
+      } catch (liveErr) {
+        // Log quietly and proceed with local data
+      }
+    }
+
+    // 4. Search for any return record matching this AWB
     const returnRecord = await db.ReturnRecord.findOne({
       $or: [
         { referenceId: regex },
@@ -64,6 +101,16 @@ const lookupAwb = async (req, res) => {
     const itemSKUCode = order?.itemSKUCode || salesItem?.itemSKUCode || '';
     const itemName = order?.itemTypeName || salesItem?.skuName || itemSKUCode || 'Garment / Apparel';
     const courier = order?.shippingCourier || order?.shippingProvider || detectCourier(cleanCode);
+    const channel = order?.channel || salesItem?.channel || 'Myntra';
+    const brand = order?.itemTypeBrand || salesItem?.itemTypeBrand || 'SOBISE';
+    const isCod = order?.cod === true || order?.cod === 'true' || order?.cod === 'COD' || salesItem?.cod === true || salesItem?.cod === 'true';
+    const paymentMode = isCod ? 'COD' : 'PREPAID';
+    const customerName = order?.shippingAddressName || salesItem?.shippingAddressName || '';
+    const customerPhone = order?.shippingAddressPhone || order?.notificationMobile || salesItem?.shippingAddressPhone || '';
+    const invoiceCode = order?.invoiceCode || salesItem?.invoiceCode || '';
+    const shippingPackageCode = order?.ShippingPackageCode || order?.shippingPackageCode || salesItem?.shippingPackageCode || '';
+    const reversePickupCode = order?.reversePickupCode || returnRecord?.referenceId || '';
+    const returnReason = order?.reversePickupReason || order?.returnReason || returnRecord?.notes || '';
 
     // Get product thumbnail from catalog if available
     let productImage = salesItem?.productImage || '';
@@ -94,21 +141,32 @@ const lookupAwb = async (req, res) => {
         displayOrderCode,
         itemSKUCode,
         itemName,
+        brand,
+        channel,
         category: order?.category || salesItem?.category || 'Apparel',
         color: order?.itemTypeColor || salesItem?.itemTypeColor || '',
         size: order?.itemTypeSize || salesItem?.itemTypeSize || '',
         price: order?.totalPrice || salesItem?.totalPrice || 0,
         mrp: order?.mrp || salesItem?.mrp || 0,
+        paymentMode,
+        isCod,
+        customerName,
+        customerPhone,
+        invoiceCode,
+        shippingPackageCode,
         city: order?.shippingAddressCity || salesItem?.shippingAddressCity || '',
         state: order?.shippingAddressState || salesItem?.shippingAddressState || '',
         pincode: order?.shippingAddressPincode || salesItem?.shippingAddressPincode || '',
+        addressLine: [order?.shippingAddressLine1, order?.shippingAddressLine2].filter(Boolean).join(', ') || '',
         courier,
         currentStage,
-        orderDate: order?.orderDate || salesItem?.orderDate || null,
+        orderDate: order?.orderDate || salesItem?.orderDate || order?.displayOrderDateTime || null,
         dispatchDate: order?.dispatchDate || null,
         deliveryTime: order?.deliveryTime || null,
-        returnDate: order?.returnDate || returnRecord?.createdAt || null,
-        weightGrams: order?.weightGrams || 0,
+        returnDate: order?.returnDate || returnRecord?.createdAt || order?.returnedDate || null,
+        reversePickupCode,
+        returnReason,
+        weightGrams: order?.weightGrams || order?.actualWeight || 0,
         returnWeightGrams: order?.returnWeightGrams || returnRecord?.weightGrams || 0,
         productImage,
         returnRecord: returnRecord || null

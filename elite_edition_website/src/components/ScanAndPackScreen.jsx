@@ -1031,9 +1031,32 @@ export default function ScanAndPackScreen({ currentUser }) {
                     <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
                       AWB: {activeOrder.awb}
                     </span>
+                    {activeOrder.channel && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#fdf2f8', color: '#db2777', border: '1px solid #fbcfe8', textTransform: 'uppercase' }}>
+                        {activeOrder.channel}
+                      </span>
+                    )}
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
                       {activeOrder.courier}
                     </span>
+                    {activeOrder.paymentMode && (
+                      <span style={{ 
+                        fontSize: '0.72rem', 
+                        fontWeight: 800, 
+                        padding: '2px 8px', 
+                        borderRadius: '6px', 
+                        background: activeOrder.paymentMode === 'COD' ? '#fef3c7' : '#ecfdf5', 
+                        color: activeOrder.paymentMode === 'COD' ? '#b45309' : '#047857', 
+                        border: `1px solid ${activeOrder.paymentMode === 'COD' ? '#fde68a' : '#a7f3d0'}` 
+                      }}>
+                        {activeOrder.paymentMode === 'COD' ? '💵 COD' : '💳 PREPAID'}
+                      </span>
+                    )}
+                    {activeOrder.brand && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1' }}>
+                        {activeOrder.brand}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowBarcodeTagModal(true)}
@@ -1046,12 +1069,14 @@ export default function ScanAndPackScreen({ currentUser }) {
                   <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
                     {activeOrder.itemName}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', gap: '12px', marginTop: '3px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', gap: '12px', marginTop: '3px', flexWrap: 'wrap' }}>
                     <span>SKU: <strong>{activeOrder.itemSKUCode}</strong></span>
                     {activeOrder.size && <span>Size: <strong>{activeOrder.size}</strong></span>}
                     {activeOrder.color && <span>Color: <strong>{activeOrder.color}</strong></span>}
                     {activeOrder.price > 0 && <span>Value: <strong>{fmtINR(activeOrder.price)}</strong></span>}
                     {activeOrder.weightGrams > 0 && <span>Weight: <strong>{activeOrder.weightGrams}g</strong></span>}
+                    {activeOrder.invoiceCode && <span>Invoice: <strong>#{activeOrder.invoiceCode}</strong></span>}
+                    {activeOrder.shippingPackageCode && <span>Pkg: <strong>{activeOrder.shippingPackageCode}</strong></span>}
                   </div>
                 </div>
               </div>
@@ -1061,6 +1086,11 @@ export default function ScanAndPackScreen({ currentUser }) {
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
                   Order: #{activeOrder.displayOrderCode}
                 </div>
+                {activeOrder.customerName && (
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b', marginTop: '2px' }}>
+                    👤 {activeOrder.customerName}
+                  </div>
+                )}
                 {activeOrder.city && (
                   <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
                     <MapPin size={12} /> {activeOrder.city}, {activeOrder.state} ({activeOrder.pincode})
@@ -1068,6 +1098,30 @@ export default function ScanAndPackScreen({ currentUser }) {
                 )}
               </div>
             </div>
+
+            {/* Uniware Return / RTO Reason Banner (if order was returned/RTO) */}
+            {activeOrder.returnReason && (
+              <div style={{
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+                padding: '0.6rem 0.9rem',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                color: '#c2410c',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 600
+              }}>
+                <AlertCircle size={16} color="#ea580c" />
+                <span>Uniware Return Reason: <strong>{activeOrder.returnReason}</strong></span>
+                {activeOrder.reversePickupCode && (
+                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#9a3412', background: '#ffedd5', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                    Reverse AWB: {activeOrder.reversePickupCode}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Lifecycle Auto-Date Timestamps */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', background: '#ffffff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
