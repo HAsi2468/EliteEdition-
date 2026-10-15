@@ -50,6 +50,7 @@ router.use('/infra-bills', require('./infrastructureBill.route'));
 router.use('/infrastructure', require('../infrastructureRoutes'));
 router.use('/billing', require('./billing.route'));
 router.use('/delivery-challans', require('./deliveryChallan.route'));
+router.use('/scan-pack', require('./scanPack.route'));
 router.use('/jobPrintLogs', require('./jobPrintLog.route'));
 router.use('/jobFusingLogs', require('./jobFusingLog.route'));
 router.use('/garment-jobcards', require('./garmentJobCard.route'));

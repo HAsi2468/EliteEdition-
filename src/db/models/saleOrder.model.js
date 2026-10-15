@@ -200,6 +200,27 @@ const saleOrderSchema = new mongoose.Schema(
 			type: String,
 			default: null,
 		},
+		trackingNumber: {
+			type: String,
+			default: null,
+			index: true
+		},
+		dispatchDate: {
+			type: String,
+			default: null,
+		},
+		deliveryTime: {
+			type: String,
+			default: null,
+		},
+		shippingCourier: {
+			type: String,
+			default: null,
+		},
+		shippingProvider: {
+			type: String,
+			default: null,
+		},
 		returnDate: {
 			type: String,
 			default: null,
@@ -223,6 +244,8 @@ saleOrderSchema.index({ saleOrderItemCode: 1 });
 saleOrderSchema.index({ displayOrderCode: 1 });
 saleOrderSchema.index({ itemSKUCode: 1 });
 saleOrderSchema.index({ orderDate: 1 });
+saleOrderSchema.index({ trackingNumber: 1 });
+saleOrderSchema.index({ shippingPackageCode: 1 });
 saleOrderSchema.index({ addedOn: -1 });
 
 const SaleOrder = mongoose.model('SaleOrder', saleOrderSchema);

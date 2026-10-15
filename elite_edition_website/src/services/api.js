@@ -2182,6 +2182,36 @@ export const api = {
     downloadOrPreviewPdf(blob, pdfName, { title: `Delivery Challan #${challanNo || 'Draft'}` });
   },
 
+  // ── Scan & Pack Station (AWB Logistics, Deliveries & Returns) ───────────
+  async lookupAwb(code) {
+    return request(`/scan-pack/lookup?code=${encodeURIComponent(code)}`);
+  },
+
+  async packAwbOrder(data) {
+    return request('/scan-pack/pack', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async markAwbDelivered(data) {
+    return request('/scan-pack/deliver', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async processAwbReturn(data) {
+    return request('/scan-pack/return', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getScanPackHistory() {
+    return request('/scan-pack/history');
+  },
+
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();
