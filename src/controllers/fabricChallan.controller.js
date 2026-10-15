@@ -198,7 +198,16 @@ async function getLinkedJobFusingMetrics(jobNoStr) {
 // Automatically allocates lot numbers across TP details sequentially:
 // First lot is consumed until stock becomes EXACTLY ZERO (accounting for shortage),
 // then the second lot, then the third lot.
-async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails, defaultShortagePct = 0, excludeChallanNo = null) {
+async function allocateLotsForChallan(
+  fabricName,
+  panna,
+  rawLotNoStr,
+  tpDetails,
+  defaultShortagePct = 0,
+  excludeChallanNo = null,
+  proportionalWaste = 0,
+  totalMtr = 0
+) {
   const details = Array.isArray(tpDetails) ? tpDetails : [];
   if (details.length === 0) {
     return {
@@ -260,6 +269,7 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
     console.warn('Failed to query inward lot stock:', e.message);
   }
 
+  const wasteRatio = (totalMtr > 0 && proportionalWaste > 0) ? (proportionalWaste / totalMtr) : 0;
   const lotStockMap = [];
 
   if (specifiedLots.length > 0) {
@@ -279,8 +289,9 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
         }
       }
 
-      // Compute fresh meters available from raw stock
-      const remFresh = remRaw === Infinity ? Infinity : (remRaw / (1 + lotShortage / 100));
+      // Compute fresh meters available from raw stock taking into account fusing wastage ratio
+      const effDivider = (1 + wasteRatio) * (1 + lotShortage / 100);
+      const remFresh = remRaw === Infinity ? Infinity : (remRaw / (effDivider > 0 ? effDivider : 1));
       lotStockMap.push({
         lotNo: fLot,
         remRaw,
@@ -300,7 +311,8 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
         }
       }
       const remRaw = Math.max(0, aLot.currentStock);
-      const remFresh = remRaw / (1 + lotShortage / 100);
+      const effDivider = (1 + wasteRatio) * (1 + lotShortage / 100);
+      const remFresh = remRaw / (effDivider > 0 ? effDivider : 1);
       lotStockMap.push({
         lotNo: String(aLot.lotNo),
         remRaw,
@@ -314,6 +326,19 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
   const usedLotsSet = new Set();
   const lotGroups = {};
 
+  // If the operator explicitly assigned lots on rows, deduct their meters from lotStockMap first
+  for (const tp of details) {
+    const m = parseFloat(tp.tpMeter) || 0;
+    if (m > 0 && tp.lotNo && String(tp.lotNo).trim() !== '') {
+      const parsed = parseLotNo(tp.lotNo);
+      const lotKey = parsed ? String(parsed) : String(tp.lotNo).trim();
+      const stockEntry = lotStockMap.find(l => String(l.lotNo) === lotKey);
+      if (stockEntry && stockEntry.remFresh !== Infinity) {
+        stockEntry.remFresh = Math.max(0, stockEntry.remFresh - m);
+      }
+    }
+  }
+
   if (lotStockMap.length > 0) {
     let lotIdx = 0;
 
@@ -324,6 +349,20 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
         continue;
       }
 
+      // If this roll ALREADY has an explicit lot chosen by the user, PRESERVE IT!
+      if (tp.lotNo && String(tp.lotNo).trim() !== '') {
+        const parsed = parseLotNo(tp.lotNo);
+        const lotStr = parsed ? String(parsed) : String(tp.lotNo).trim();
+        usedLotsSet.add(lotStr);
+        lotGroups[lotStr] = (lotGroups[lotStr] || 0) + m;
+        sanitizedDetails.push({
+          ...tp,
+          lotNo: lotStr
+        });
+        continue;
+      }
+
+      // Otherwise, auto-allocate from remaining available stock in lotStockMap FIFO
       let needed = m;
       let assignedLots = [];
 
@@ -368,6 +407,7 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
       });
     }
   } else {
+    // No inward lot records found -> preserve row lot if present or fall back to specifiedLots[0]
     const defaultLot = specifiedLots[0] || '1';
     details.forEach((tp) => {
       const m = parseFloat(tp.tpMeter) || 0;
@@ -375,9 +415,12 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
         sanitizedDetails.push({ ...tp, lotNo: '' });
         return;
       }
-      usedLotsSet.add(defaultLot);
-      lotGroups[defaultLot] = (lotGroups[defaultLot] || 0) + m;
-      sanitizedDetails.push({ ...tp, lotNo: defaultLot });
+      const rawLot = tp.lotNo && String(tp.lotNo).trim() !== '' ? String(tp.lotNo).trim() : defaultLot;
+      const parsed = parseLotNo(rawLot);
+      const lotStr = parsed ? String(parsed) : rawLot;
+      usedLotsSet.add(lotStr);
+      lotGroups[lotStr] = (lotGroups[lotStr] || 0) + m;
+      sanitizedDetails.push({ ...tp, lotNo: lotStr });
     });
   }
 
@@ -536,48 +579,53 @@ const createChallan = async (req, res) => {
     const details = Array.isArray(tpDetails) ? tpDetails : [];
 
     const initialTotals = computeTotals(details);
+    const effectiveTotalMtrPre = initialTotals.totalMtr > 0 ? initialTotals.totalMtr : (parseFloat(req.body.totalMtr) || parseFloat(req.body.pcs) || 0);
+
     const sMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
     let parsedPct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
     let parsedMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;
 
-    if (sMode === 'mtr' && parsedMtr != null && initialTotals.totalMtr > 0) {
-      parsedPct = parseFloat(((parsedMtr / initialTotals.totalMtr) * 100).toFixed(2));
-    } else if (sMode === 'pct' && parsedPct != null && initialTotals.totalMtr > 0) {
-      parsedMtr = parseFloat(((initialTotals.totalMtr * parsedPct) / 100).toFixed(2));
+    if (sMode === 'mtr' && parsedMtr != null && effectiveTotalMtrPre > 0) {
+      parsedPct = parseFloat(((parsedMtr / effectiveTotalMtrPre) * 100).toFixed(2));
+    } else if (sMode === 'pct' && parsedPct != null && effectiveTotalMtrPre > 0) {
+      parsedMtr = parseFloat(((effectiveTotalMtrPre * parsedPct) / 100).toFixed(2));
     }
 
-    // Program-side automated lot allocation
+    // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
+    let challanProportionalWaste = 0;
+    if (jobNo && effectiveTotalMtrPre > 0) {
+      try {
+        const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(jobNo);
+        if (totalWaste > 0) {
+          const baseFresh = totalFresh > 0 ? totalFresh : effectiveTotalMtrPre;
+          const ratio = Math.min(1.0, effectiveTotalMtrPre / baseFresh);
+          challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
+        }
+      } catch (wErr) {
+        console.warn('Failed to calculate proportional fusing wastage for challan:', wErr.message);
+      }
+    }
+
+    // Program-side automated lot allocation (preserving user-specified TP lots)
     const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
       normFabric,
       normP,
       lotNo ? String(lotNo) : '',
       details,
-      parsedPct != null ? parsedPct : 0
+      parsedPct != null ? parsedPct : 0,
+      null,
+      challanProportionalWaste,
+      effectiveTotalMtrPre
     );
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
-    const effectiveTotalMtr = totalMtr > 0 ? totalMtr : (parseFloat(req.body.totalMtr) || parseFloat(req.body.pcs) || 0);
+    const effectiveTotalMtr = totalMtr > 0 ? totalMtr : effectiveTotalMtrPre;
 
     // If details array was empty but effectiveTotalMtr > 0 and a lot is specified, register lot group
     if (Object.keys(lotGroups).length === 0 && effectiveTotalMtr > 0 && (lotNo || finalLotNoStr)) {
       const primaryLot = String(lotNo || finalLotNoStr).split(',')[0].trim();
       if (primaryLot) {
         lotGroups[primaryLot] = effectiveTotalMtr;
-      }
-    }
-
-    // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
-    let challanProportionalWaste = 0;
-    if (jobNo && effectiveTotalMtr > 0) {
-      try {
-        const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(jobNo);
-        if (totalWaste > 0) {
-          const baseFresh = totalFresh > 0 ? totalFresh : effectiveTotalMtr;
-          const ratio = Math.min(1.0, effectiveTotalMtr / baseFresh);
-          challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
-        }
-      } catch (wErr) {
-        console.warn('Failed to calculate proportional fusing wastage for challan:', wErr.message);
       }
     }
 
@@ -1022,39 +1070,44 @@ const updateChallan = async (req, res) => {
     const rawLotStr = lotNo !== undefined ? String(lotNo) : challan.lotNo;
     const effShortage = challan.shortagePct != null ? challan.shortagePct : (challan.shortageMtr && challan.totalMtr > 0 ? (challan.shortageMtr / challan.totalMtr) * 100 : 0);
 
-    // Run program-side automated lot allocation (excluding current challan's own outward txs)
+    const initialTotals = computeTotals(details);
+    const effectiveTotalMtrPre = initialTotals.totalMtr > 0 ? initialTotals.totalMtr : (parseFloat(req.body.totalMtr) || parseFloat(req.body.pcs) || challan.totalMtr || 0);
+
+    // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
+    let challanProportionalWaste = 0;
+    if (challan.jobNo && effectiveTotalMtrPre > 0) {
+      try {
+        const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(challan.jobNo);
+        if (totalWaste > 0) {
+          const baseFresh = totalFresh > 0 ? totalFresh : effectiveTotalMtrPre;
+          const ratio = Math.min(1.0, effectiveTotalMtrPre / baseFresh);
+          challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
+        }
+      } catch (wErr) {
+        console.warn('Failed to calculate proportional fusing wastage for challan on update:', wErr.message);
+      }
+    }
+
+    // Run program-side automated lot allocation (preserving user-specified TP lots)
     const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
       challan.fabricName,
       challan.panna,
       rawLotStr,
       details,
       effShortage,
-      challan.challanNo ? 'EDP-' + challan.challanNo : null
+      challan.challanNo ? 'EDP-' + challan.challanNo : null,
+      challanProportionalWaste,
+      effectiveTotalMtrPre
     );
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
-    const effectiveTotalMtr = totalMtr > 0 ? totalMtr : (parseFloat(req.body.totalMtr) || parseFloat(req.body.pcs) || challan.totalMtr || 0);
+    const effectiveTotalMtr = totalMtr > 0 ? totalMtr : effectiveTotalMtrPre;
 
     // If details array was empty but effectiveTotalMtr > 0 and a lot is specified, register lot group
     if (Object.keys(lotGroups).length === 0 && effectiveTotalMtr > 0 && (rawLotStr || finalLotNoStr)) {
       const primaryLot = String(rawLotStr || finalLotNoStr).split(',')[0].trim();
       if (primaryLot) {
         lotGroups[primaryLot] = effectiveTotalMtr;
-      }
-    }
-
-    // Calculate proportional fusing wastage for this challan (e.g. 50m of 100m fresh takes 50% of west mtr)
-    let challanProportionalWaste = 0;
-    if (challan.jobNo && effectiveTotalMtr > 0) {
-      try {
-        const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(challan.jobNo);
-        if (totalWaste > 0) {
-          const baseFresh = totalFresh > 0 ? totalFresh : effectiveTotalMtr;
-          const ratio = Math.min(1.0, effectiveTotalMtr / baseFresh);
-          challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
-        }
-      } catch (wErr) {
-        console.warn('Failed to calculate proportional fusing wastage for challan on update:', wErr.message);
       }
     }
 
