@@ -860,6 +860,8 @@ class SocketManager {
     if (this.socket) {
       try {
         if (this.socket.connected) {
+          this._clearOfflineTimers();
+          this._setStatus('connected');
           this.resync('already-connected');
           return;
         }
@@ -944,6 +946,12 @@ class SocketManager {
     }
 
     if (newStatus === 'offline' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      if (this.socket && this.socket.connected) {
+        this._clearOfflineTimers();
+        this.status = 'connected';
+        this._notifyStatus('connected');
+        return;
+      }
       if (this._reconnectingDebounceTimer) {
         clearTimeout(this._reconnectingDebounceTimer);
         this._reconnectingDebounceTimer = null;

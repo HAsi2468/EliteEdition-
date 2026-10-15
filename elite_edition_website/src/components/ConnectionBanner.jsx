@@ -80,9 +80,10 @@ export function ConnectionBanner() {
     };
   }, []);
 
-  const isActuallyConnected = isBrowserOnline && status === 'connected';
-  const isOffline = !isBrowserOnline || status === 'offline';
-  const isReconnecting = !isOffline && status !== 'connected';
+  // If the WebSocket is connected, we are connected! Never display false offline if socket is healthy.
+  const isActuallyConnected = status === 'connected' || (isBrowserOnline && socketManager.isConnected());
+  const isOffline = !isActuallyConnected && (!isBrowserOnline || status === 'offline');
+  const isReconnecting = !isActuallyConnected && !isOffline;
 
   // Handle recovery confirmation badge transition
   useEffect(() => {
@@ -102,11 +103,25 @@ export function ConnectionBanner() {
 
   const handleManualRetry = () => {
     setIsRetrying(true);
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setIsBrowserOnline(true);
+    }
     socketManager.reconnect(true);
     try {
-      lifecycleManager.probeNow('manual-retry');
+      lifecycleManager.probeNow('manual-retry').then((isAlive) => {
+        if (isAlive) {
+          setIsBrowserOnline(true);
+          setStatus(socketManager.getStatus());
+        }
+      });
     } catch (e) {}
-    setTimeout(() => setIsRetrying(false), 1200);
+    setTimeout(() => {
+      setIsRetrying(false);
+      setStatus(socketManager.getStatus());
+      if (typeof navigator !== 'undefined') {
+        setIsBrowserOnline(navigator.onLine);
+      }
+    }, 1000);
   };
 
   const pendingCount = queueStatus?.count || 0;

@@ -4,6 +4,13 @@ const authLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
 	max: 100, // Generous limit for login attempts (100 per 15 min)
 	skipSuccessfulRequests: true,
+	skip: (req) => {
+		// Never rate-limit lightweight heartbeat pings or health probes
+		if (req.path === '/ping' || req.path === '/ping/' || req.url.includes('/ping')) {
+			return true;
+		}
+		return false;
+	},
 	message: {
 		code: 429,
 		message: 'Too many auth attempts from this IP, please try again after 15 minutes.',

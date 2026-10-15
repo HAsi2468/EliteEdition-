@@ -66,7 +66,7 @@ class ResilientLifecycleManager {
       pingEndpoint: customConfig.pingEndpoint || '/v1/auth/ping',
       activeIntervalMs: customConfig.activeIntervalMs || 10000,
       backgroundIntervalMs: customConfig.backgroundIntervalMs || 25000,
-      probeTimeoutMs: customConfig.probeTimeoutMs || 3000,
+      probeTimeoutMs: customConfig.probeTimeoutMs || 6000,
       baseReconnectDelayMs: customConfig.baseReconnectDelayMs || 500,
       maxReconnectDelayMs: customConfig.maxReconnectDelayMs || 10000,
       jitterFactor: customConfig.jitterFactor || 0.25,
@@ -260,12 +260,11 @@ class ResilientLifecycleManager {
       clearTimeout(timeoutId);
       const latencyMs = Math.round(performance.now() - startTime);
 
-      if (response.ok || response.status === 304 || response.status === 401) {
-        // 401 Unauthorized still proves valid IP connectivity to our backend!
+      if (response.ok || response.status === 304 || response.status === 401 || response.status === 429) {
+        // 401/429 still proves valid IP connectivity to our backend!
         this.consecutiveFailures = 0;
         this.lastSuccessfulPingTime = Date.now();
         this.setState('CONNECTED', { latencyMs, attempt: 0 });
-        this.isProbing = false;
         return true;
       } else {
         throw new Error(`Probe returned HTTP ${response.status}`);
@@ -282,8 +281,9 @@ class ResilientLifecycleManager {
       }
 
       this.scheduleReconnect();
-      this.isProbing = false;
       return false;
+    } finally {
+      this.isProbing = false;
     }
   }
 
