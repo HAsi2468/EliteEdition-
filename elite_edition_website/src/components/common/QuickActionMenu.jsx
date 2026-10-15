@@ -50,7 +50,7 @@ export default function QuickActionMenu({
       iconBg: '#eff6ff',
       action: onNewInvoice
     },
-    {
+    ...(onNewChallan ? [{
       id: 'challan',
       icon: Truck,
       label: 'New Challan',
@@ -58,7 +58,7 @@ export default function QuickActionMenu({
       iconColor: '#0284c7',
       iconBg: '#f0f9ff',
       action: onNewChallan
-    },
+    }] : []),
     {
       id: 'expense',
       icon: Receipt,

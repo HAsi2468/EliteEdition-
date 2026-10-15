@@ -188,7 +188,20 @@ export default function EliteBillingDepartment({
   companyEntity = (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : 'Elite Digital Prints'), 
   initialTab = null 
 }) {
-  const [activeTab, setActiveTab] = useState(() => (initialTab && initialTab !== 'costing') || (companyEntity === 'Elite Edition' || companyEntity === 'Elite Fabtex' || companyEntity === 'Sobise' ? 'invoices' : 'challans')); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
+  const supportsChallan = (
+    companyEntity === 'Elite Digital Prints' || 
+    companyEntity === 'Elite Digital Print' || 
+    companyEntity === 'Elite Stitching' || 
+    department === 'stitching'
+  ) && !['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online'].includes(companyEntity);
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (initialTab && initialTab !== 'costing') {
+      if (initialTab === 'challans' && !supportsChallan) return 'invoices';
+      return initialTab;
+    }
+    return supportsChallan ? 'challans' : 'invoices';
+  });
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
     totalInvoices: 0,
@@ -2675,10 +2688,16 @@ export default function EliteBillingDepartment({
   };
 
   useEffect(() => {
-    if (activeTab === 'challans' && department !== 'stitching') {
+    if (supportsChallan && activeTab === 'challans' && department !== 'stitching') {
       fetchDigitalChallans();
     }
-  }, [activeTab, department]);
+  }, [activeTab, department, supportsChallan]);
+
+  useEffect(() => {
+    if (!supportsChallan && activeTab === 'challans') {
+      setActiveTab('invoices');
+    }
+  }, [companyEntity, supportsChallan, activeTab]);
 
   const [viewInvoiceModal, setViewInvoiceModal] = useState(null);
   const [pdfDuplicateModal, setPdfDuplicateModal] = useState(null); // { inv } when open
@@ -3746,7 +3765,7 @@ export default function EliteBillingDepartment({
           <div className="ent-header-actions">
             <QuickActionMenu
               onNewInvoice={() => handleOpenCreateTab()}
-              onNewChallan={handleOpenCreateChallan}
+              onNewChallan={supportsChallan ? handleOpenCreateChallan : null}
               onExpenseEntry={() => {
                 setActiveTab('expense');
                 setAutoOpenExpenseModal(true);
@@ -3774,7 +3793,7 @@ export default function EliteBillingDepartment({
           }}
         >
           {[
-            { id: 'challans', label: 'Challan' },
+            ...(supportsChallan ? [{ id: 'challans', label: 'Challan' }] : []),
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
             { id: 'purchase', label: 'Purchases' },
             { id: 'gst', label: 'GST Summary' },
@@ -4291,7 +4310,7 @@ export default function EliteBillingDepartment({
       )}
 
       {/* ── TAB: DELIVERY CHALLANS HUB ─────────────────────────────────────── */}
-      {activeTab === 'challans' && (
+      {supportsChallan && activeTab === 'challans' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {department === 'stitching' ? (
             <StitchingChallanPanel

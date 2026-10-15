@@ -152,8 +152,10 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
         </div>
       </div>
 
-      {/* 📊 Job Card Pending Status Overview */}
-      <JobCardStatusDashboard department="digital_print" />
+      {/* 📊 Job Card Pending Status Overview (Only for Digital Printing factory) */}
+      {(companyEntity === 'Elite Digital Prints' || companyEntity === 'Elite Digital Print') && (
+        <JobCardStatusDashboard department="digital_print" />
+      )}
 
       {/* 📊 5 Key Metric Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>
