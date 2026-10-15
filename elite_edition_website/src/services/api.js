@@ -2212,6 +2212,42 @@ export const api = {
     return request('/scan-pack/history');
   },
 
+  async updateReturnClaim(id, data) {
+    return request(`/scan-pack/return-claim/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getManifestPending({ date, courier } = {}) {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (courier) params.append('courier', courier);
+    return request(`/scan-pack/manifest/pending?${params.toString()}`);
+  },
+
+  async generateManifest(data) {
+    return request('/scan-pack/manifest/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getManifestList() {
+    return request('/scan-pack/manifest/list');
+  },
+
+  async getManifestById(manifestId) {
+    return request(`/scan-pack/manifest/${manifestId}`);
+  },
+
+  async bulkMarkAwbDelivered(data) {
+    return request('/scan-pack/bulk-deliver', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();

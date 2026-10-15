@@ -46,6 +46,28 @@ const returnRecordSchema = new mongoose.Schema(
       enum: ['STOCKED_IN', 'PENDING_REFINISH', 'DISPUTED'],
       required: true,
     },
+    images: [{
+      type: String,
+    }],
+    claimStatus: {
+      type: String,
+      enum: ['NOT_APPLICABLE', 'CLAIM_PENDING', 'CLAIM_SUBMITTED', 'CLAIM_APPROVED', 'CLAIM_REJECTED'],
+      default: 'NOT_APPLICABLE',
+    },
+    claimId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    claimAmount: {
+      type: Number,
+      default: 0,
+    },
+    claimNotes: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,

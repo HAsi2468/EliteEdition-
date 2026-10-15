@@ -84,6 +84,7 @@ const db = {
   FreightBill: require('./freightBill.model'),
   DocumentTemplate: require('./documentTemplate.model'),
   DocumentPrintLog: require('./documentPrintLog.model'),
+  CourierManifest: require('./courierManifest.model'),
   mongoose,
 };
 

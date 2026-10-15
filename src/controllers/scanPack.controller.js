@@ -241,11 +241,21 @@ const processReturnScan = async (req, res) => {
     const cleanQty = parseInt(quantity, 10) || 1;
 
     let status = 'STOCKED_IN';
+    let defaultClaimStatus = 'NOT_APPLICABLE';
     if (condition === 'NEEDS_REFINISHING') {
       status = 'PENDING_REFINISH';
     } else if (condition === 'WRONG_ITEM' || condition === 'DAMAGED') {
       status = 'DISPUTED';
+      defaultClaimStatus = 'CLAIM_PENDING';
     }
+
+    const {
+      images = [],
+      claimStatus,
+      claimId = '',
+      claimAmount = 0,
+      claimNotes = ''
+    } = req.body;
 
     // 1. Create ReturnRecord
     const returnDoc = await db.ReturnRecord.create({
@@ -257,7 +267,12 @@ const processReturnScan = async (req, res) => {
       quantity: cleanQty,
       condition,
       notes: notes || `Return scanned via Scan & Pack station (${condition})`,
-      status
+      status,
+      images: Array.isArray(images) ? images : (images ? [images] : []),
+      claimStatus: claimStatus || defaultClaimStatus,
+      claimId,
+      claimAmount: Number(claimAmount) || 0,
+      claimNotes
     });
 
     // 2. Update SaleOrder record
@@ -308,6 +323,222 @@ const processReturnScan = async (req, res) => {
   }
 };
 
+// ── PUT /api/v1/scan-pack/return-claim/:id ───────────────────────────────────
+// Updates SPF Claim status and details on a return record
+const updateReturnClaim = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { claimStatus, claimId, claimAmount, claimNotes, addImage } = req.body;
+
+    const returnRec = await db.ReturnRecord.findById(id);
+    if (!returnRec) {
+      return res.status(404).json({ success: false, error: 'Return record not found' });
+    }
+
+    if (claimStatus) returnRec.claimStatus = claimStatus;
+    if (claimId !== undefined) returnRec.claimId = claimId;
+    if (claimAmount !== undefined) returnRec.claimAmount = Number(claimAmount) || 0;
+    if (claimNotes !== undefined) returnRec.claimNotes = claimNotes;
+    if (addImage) returnRec.images.push(addImage);
+
+    await returnRec.save();
+
+    res.json({
+      success: true,
+      message: 'Claim details updated successfully',
+      data: returnRec
+    });
+  } catch (error) {
+    logger.error('scanPack.updateReturnClaim error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── GET /api/v1/scan-pack/manifest/pending ───────────────────────────────────
+// Lists today's dispatched packages grouped by courier partner
+const getManifestPending = async (req, res) => {
+  try {
+    const { date, courier } = req.query;
+    let startOfDay, endOfDay;
+    if (date) {
+      startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+    } else {
+      startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+    }
+
+    const filter = {
+      $or: [
+        { dispatchDate: { $gte: startOfDay.toISOString(), $lte: endOfDay.toISOString() } },
+        { updatedAt: { $gte: startOfDay, $lte: endOfDay }, saleOrderStatus: 'DISPATCHED' }
+      ]
+    };
+    if (courier && courier !== 'ALL') {
+      filter.shippingCourier = new RegExp(courier, 'i');
+    }
+
+    const orders = await db.SaleOrder.find(filter).sort({ dispatchDate: -1 }).lean();
+
+    // Group by courier partner
+    const courierGroups = {};
+    orders.forEach(o => {
+      const c = o.shippingCourier || detectCourier(o.trackingNumber) || 'Standard Logistics';
+      if (!courierGroups[c]) {
+        courierGroups[c] = { courier: c, count: 0, orders: [] };
+      }
+      courierGroups[c].count += 1;
+      courierGroups[c].orders.push({
+        awb: o.trackingNumber || o.shippingPackageCode || o.displayOrderCode,
+        displayOrderCode: o.displayOrderCode,
+        sku: o.itemSKUCode,
+        itemName: o.itemTypeName || o.itemSKUCode,
+        city: o.shippingAddressCity || '',
+        customerName: o.shippingAddressName || o.billingAddressName || '',
+        price: o.totalPrice || 0,
+        dispatchedAt: o.dispatchDate
+      });
+    });
+
+    res.json({
+      success: true,
+      date: startOfDay.toISOString().split('T')[0],
+      totalDispatched: orders.length,
+      groups: Object.values(courierGroups),
+      orders
+    });
+  } catch (error) {
+    logger.error('scanPack.getManifestPending error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── POST /api/v1/scan-pack/manifest/generate ─────────────────────────────────
+// Saves an official courier handover manifest with sequential ID
+const generateManifest = async (req, res) => {
+  try {
+    const { courier, driverName, driverPhone, vehicleNumber, packages = [], notes = '' } = req.body;
+    if (!courier || !packages.length) {
+      return res.status(400).json({ success: false, error: 'Courier and at least one package are required' });
+    }
+
+    // Generate Manifest ID: MNF-YYYYMMDD-XXXX
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const countToday = await db.CourierManifest.countDocuments({ createdAt: { $gte: todayStart } });
+    const seq = String(countToday + 1).padStart(3, '0');
+    const manifestId = `MNF-${todayStr}-${seq}`;
+
+    const manifest = await db.CourierManifest.create({
+      manifestId,
+      courier,
+      dispatchDate: new Date(),
+      totalPackages: packages.length,
+      packages,
+      pickupDriverName: driverName || '',
+      pickupDriverPhone: driverPhone || '',
+      vehicleNumber: vehicleNumber || '',
+      notes,
+      status: 'HANDED_OVER'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Manifest ${manifestId} generated with ${packages.length} packages!`,
+      data: manifest
+    });
+  } catch (error) {
+    logger.error('scanPack.generateManifest error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── GET /api/v1/scan-pack/manifest/list ───────────────────────────────────────
+// Returns list of past generated manifests
+const getManifests = async (req, res) => {
+  try {
+    const manifests = await db.CourierManifest.find({})
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    res.json({
+      success: true,
+      data: manifests
+    });
+  } catch (error) {
+    logger.error('scanPack.getManifests error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── GET /api/v1/scan-pack/manifest/:manifestId ────────────────────────────────
+// Returns a single manifest by ID
+const getManifestById = async (req, res) => {
+  try {
+    const { manifestId } = req.params;
+    const manifest = await db.CourierManifest.findOne({ manifestId }).lean();
+    if (!manifest) {
+      return res.status(404).json({ success: false, error: 'Manifest not found' });
+    }
+
+    res.json({
+      success: true,
+      data: manifest
+    });
+  } catch (error) {
+    logger.error('scanPack.getManifestById error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── POST /api/v1/scan-pack/bulk-deliver ───────────────────────────────────────
+// Marks multiple AWBs as DELIVERED from Courier MIS Excel/CSV paste
+const bulkDeliver = async (req, res) => {
+  try {
+    const { awbs = [], deliveryDate } = req.body;
+    if (!Array.isArray(awbs) || awbs.length === 0) {
+      return res.status(400).json({ success: false, error: 'A list of AWB numbers is required' });
+    }
+
+    const cleanAwbs = [...new Set(awbs.map(a => String(a || '').trim()).filter(Boolean))];
+    const deliveredAt = deliveryDate ? new Date(deliveryDate).toISOString() : new Date().toISOString();
+
+    const result = await db.SaleOrder.updateMany(
+      {
+        $or: [
+          { trackingNumber: { $in: cleanAwbs } },
+          { shippingPackageCode: { $in: cleanAwbs } },
+          { displayOrderCode: { $in: cleanAwbs } }
+        ]
+      },
+      {
+        $set: {
+          deliveryTime: deliveredAt,
+          saleOrderStatus: 'DELIVERED',
+          saleOrderItemStatus: 'DELIVERED'
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully marked ${result.modifiedCount} orders as DELIVERED!`,
+      totalAwbsScanned: cleanAwbs.length,
+      modifiedCount: result.modifiedCount,
+      matchedCount: result.matchedCount
+    });
+  } catch (error) {
+    logger.error('scanPack.bulkDeliver error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // ── GET /api/v1/scan-pack/history ─────────────────────────────────────────────
 // Returns recent scans with counts
 const getScanHistory = async (req, res) => {
@@ -350,5 +581,11 @@ module.exports = {
   packOrder,
   markDelivered,
   processReturnScan,
+  updateReturnClaim,
+  getManifestPending,
+  generateManifest,
+  getManifests,
+  getManifestById,
+  bulkDeliver,
   getScanHistory
 };

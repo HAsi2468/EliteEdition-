@@ -24,7 +24,16 @@ import {
   ExternalLink,
   MapPin,
   Tag,
-  Undo2
+  Undo2,
+  Camera,
+  Image as ImageIcon,
+  Upload,
+  FileText,
+  ShieldAlert,
+  UserCheck,
+  Eye,
+  CheckCheck,
+  FileDown
 } from 'lucide-react';
 import { api } from '../services/api';
 import EntityBrandBadge from './common/EntityBrandBadge';
@@ -44,12 +53,48 @@ export default function ScanAndPackScreen({ currentUser }) {
   // Currently Active Scanned Order
   const [activeOrder, setActiveOrder] = useState(null);
   
-  // Return Processing Form State
+  // ── 🛡️ Double-Scan Verification System ──────────────────────────────────
+  const [doubleScanEnabled, setDoubleScanEnabled] = useState(true);
+  const [doubleScanStep, setDoubleScanStep] = useState('SKU_FIRST'); // 'SKU_FIRST' | 'AWB_SECOND'
+  const [scannedGarmentSku, setScannedGarmentSku] = useState('');
+  const [mismatchModal, setMismatchModal] = useState(null); // { garmentSku, orderSku, awb, orderCode }
+
+  // ── 📸 Return Processing & SPF Claim Evidence ──────────────────────────
   const [returnCondition, setReturnCondition] = useState('INTACT');
   const [returnType, setReturnType] = useState('RTO');
   const [returnNotes, setReturnNotes] = useState('');
-  
-  // Scanned history list
+  const [returnImages, setReturnImages] = useState([]);
+  const [claimAmount, setClaimAmount] = useState(0);
+  const [claimId, setClaimId] = useState('');
+  const [claimNotes, setClaimNotes] = useState('');
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const videoRef = useRef(null);
+
+  // Return Claim Detail Modal
+  const [selectedClaimRecord, setSelectedClaimRecord] = useState(null);
+  const [savingClaim, setSavingClaim] = useState(false);
+
+  // ── 📋 Daily Courier Pickup Manifest Generator ──────────────────────────
+  const [showManifestModal, setShowManifestModal] = useState(false);
+  const [manifestDate, setManifestDate] = useState(new Date().toISOString().slice(0, 10));
+  const [manifestCourier, setManifestCourier] = useState('ALL');
+  const [manifestPendingData, setManifestPendingData] = useState(null);
+  const [manifestDriverName, setManifestDriverName] = useState('');
+  const [manifestDriverPhone, setManifestDriverPhone] = useState('');
+  const [manifestVehicleNumber, setManifestVehicleNumber] = useState('');
+  const [manifestTab, setManifestTab] = useState('PENDING'); // 'PENDING' | 'HISTORY'
+  const [pastManifests, setPastManifests] = useState([]);
+  const [activePrintManifest, setActivePrintManifest] = useState(null);
+
+  // ── 📊 Bulk Delivery MIS Importer ──────────────────────────────────────
+  const [showBulkDeliveryModal, setShowBulkDeliveryModal] = useState(false);
+  const [bulkAwbText, setBulkAwbText] = useState('');
+  const [bulkDeliveryDate, setBulkDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+
+  // Scanned history list & Stats
   const [scanHistory, setScanHistory] = useState([]);
   const [stats, setStats] = useState({
     dispatchedToday: 0,
@@ -101,34 +146,140 @@ export default function ScanAndPackScreen({ currentUser }) {
       if (type === 'success') {
         osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
         osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
         osc.start();
         osc.stop(ctx.currentTime + 0.25);
-      } else {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(220, ctx.currentTime);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      } else if (type === 'step') {
+        osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
         osc.start();
-        osc.stop(ctx.currentTime + 0.3);
+        osc.stop(ctx.currentTime + 0.15);
+      } else {
+        // High alert buzzer for wrong item mismatch
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        osc.frequency.setValueAtTime(100, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.45);
       }
     } catch (err) {
       // AudioContext may be restricted by browser policy if no interaction
     }
   };
 
-  // Main processing pipeline when an AWB is scanned or typed
+  // Helper: Normalize SKU string for robust barcode tag matching
+  const normalizeSku = (str = '') => String(str).trim().toUpperCase().replace(/[\s\-_]/g, '');
+
+  // ── Main Processing Pipeline ──────────────────────────────────────────────
   const handleProcessScan = async (codeToProcess, source = 'Manual Input') => {
     const trimmed = (codeToProcess || '').trim();
     if (!trimmed) return;
 
-    setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // PACK MODE: Double-Scan Verification Branch
+    // ──────────────────────────────────────────────────────────────────────────
+    if (scanMode === 'PACK' && doubleScanEnabled) {
+      if (doubleScanStep === 'SKU_FIRST') {
+        // Step 1: Scan Garment / Polybag Barcode Tag
+        setScannedGarmentSku(trimmed);
+        setDoubleScanStep('AWB_SECOND');
+        playAudioCue('step');
+        setSuccessMsg(`🏷️ Step 1 Done: Garment tag "${trimmed}" captured. Now scan the Courier AWB shipping label!`);
+        setScanInput('');
+        focusInput();
+        return;
+      }
+
+      // Step 2: Scan Courier AWB Label
+      setLoading(true);
+      try {
+        const lookupRes = await api.lookupAwb(trimmed);
+        if (!lookupRes || !lookupRes.success) {
+          throw new Error(lookupRes?.error || 'AWB not found or invalid barcode');
+        }
+
+        const orderData = lookupRes.data;
+        setActiveOrder(orderData);
+
+        // Verification check: Does the scanned garment tag match order's SKU?
+        const expectedSku = orderData.itemSKUCode || '';
+        const normScanned = normalizeSku(scannedGarmentSku);
+        const normExpected = normalizeSku(expectedSku);
+
+        const isMatch = normScanned.includes(normExpected) || 
+                        normExpected.includes(normScanned) || 
+                        scannedGarmentSku === trimmed; // or single scan override
+
+        if (!isMatch && expectedSku) {
+          // ⚠️ MISMATCH DETECTED: Prevent packing!
+          playAudioCue('error');
+          setMismatchModal({
+            garmentSku: scannedGarmentSku,
+            orderSku: expectedSku,
+            awb: trimmed,
+            orderCode: orderData.displayOrderCode,
+            itemName: orderData.itemName
+          });
+          setErrorMsg(`⚠️ MISMATCH ALERT! Garment tag "${scannedGarmentSku}" does not match order SKU "${expectedSku}". Box NOT packed!`);
+          setDoubleScanStep('SKU_FIRST');
+          setScannedGarmentSku('');
+          return;
+        }
+
+        // ✅ SKU Matched! Auto-pack and stamp dispatch date
+        await api.packAwbOrder({
+          awb: trimmed,
+          displayOrderCode: orderData.displayOrderCode,
+          sku: orderData.itemSKUCode,
+          courier: orderData.courier
+        });
+
+        playAudioCue('success');
+        setSuccessMsg(`✅ MATCH VERIFIED! Garment "${scannedGarmentSku}" matches Order #${orderData.displayOrderCode}. Packed & Dispatched.`);
+
+        const historyEntry = {
+          id: Date.now(),
+          awb: trimmed,
+          orderCode: orderData.displayOrderCode,
+          sku: orderData.itemSKUCode,
+          courier: orderData.courier,
+          mode: 'PACK',
+          status: 'VERIFIED & PACKED',
+          time: new Date().toLocaleTimeString('en-IN'),
+          date: new Date().toLocaleDateString('en-IN')
+        };
+        setScanHistory(prev => [historyEntry, ...prev.slice(0, 49)]);
+        fetchStats();
+
+        // Reset for next order
+        setDoubleScanStep('SKU_FIRST');
+        setScannedGarmentSku('');
+
+      } catch (err) {
+        playAudioCue('error');
+        setErrorMsg(err.message || 'Error verifying AWB scan');
+        setDoubleScanStep('SKU_FIRST');
+        setScannedGarmentSku('');
+      } finally {
+        setLoading(false);
+        setScanInput('');
+        focusInput();
+      }
+      return;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Standard Single-Scan Mode (PACK, DELIVERY, or RETURN)
+    // ──────────────────────────────────────────────────────────────────────────
+    setLoading(true);
     try {
-      // 1. Lookup AWB details
       const lookupRes = await api.lookupAwb(trimmed);
       if (!lookupRes || !lookupRes.success) {
         throw new Error(lookupRes?.error || 'Failed to lookup AWB code');
@@ -136,11 +287,10 @@ export default function ScanAndPackScreen({ currentUser }) {
 
       const orderData = lookupRes.data;
       setActiveOrder(orderData);
+      setClaimAmount(orderData.price || 0);
 
-      // 2. Perform automated action based on current Scan Mode
       if (scanMode === 'PACK') {
-        // Mode 1: Auto-mark as PACKED & DISPATCHED
-        const packRes = await api.packAwbOrder({
+        await api.packAwbOrder({
           awb: trimmed,
           displayOrderCode: orderData.displayOrderCode,
           sku: orderData.itemSKUCode,
@@ -150,7 +300,6 @@ export default function ScanAndPackScreen({ currentUser }) {
         playAudioCue('success');
         setSuccessMsg(`✅ AWB ${trimmed} verified & packed! Dispatched date automatically stamped.`);
         
-        // Add to history list
         const historyEntry = {
           id: Date.now(),
           awb: trimmed,
@@ -166,7 +315,6 @@ export default function ScanAndPackScreen({ currentUser }) {
         fetchStats();
 
       } else if (scanMode === 'DELIVERY') {
-        // Mode 2: Auto-mark as DELIVERED
         await api.markAwbDelivered({
           awb: trimmed,
           deliveryDate: new Date().toISOString()
@@ -190,9 +338,8 @@ export default function ScanAndPackScreen({ currentUser }) {
         fetchStats();
 
       } else if (scanMode === 'RETURN') {
-        // Mode 3: Found order, ready for return condition check
         playAudioCue('success');
-        setSuccessMsg(`📦 Return parcel detected for Order #${orderData.displayOrderCode} (${orderData.itemSKUCode}). Select condition below.`);
+        setSuccessMsg(`📦 Return parcel detected for Order #${orderData.displayOrderCode} (${orderData.itemSKUCode}). Select condition & upload evidence below.`);
       }
 
     } catch (err) {
@@ -205,12 +352,62 @@ export default function ScanAndPackScreen({ currentUser }) {
     }
   };
 
-  // Submit Return Process
+  // ── 📸 Webcam Capture Helpers ─────────────────────────────────────────────
+  const startCamera = async () => {
+    setShowCameraModal(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      alert('Unable to access station camera: ' + err.message);
+      setShowCameraModal(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCameraModal(false);
+  };
+
+  const captureSnapshot = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.height = videoRef.current.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    setReturnImages(prev => [...prev, dataUrl]);
+    stopCamera();
+  };
+
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setReturnImages(prev => [...prev, ev.target.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // ── Submit Return Process with Photos & SPF Claims ────────────────────────
   const handleConfirmReturn = async () => {
     if (!activeOrder?.awb) return;
 
     setLoading(true);
     try {
+      const isDamagedOrWrong = returnCondition === 'DAMAGED' || returnCondition === 'WRONG_ITEM';
       const res = await api.processAwbReturn({
         awb: activeOrder.awb,
         displayOrderId: activeOrder.displayOrderCode,
@@ -218,7 +415,12 @@ export default function ScanAndPackScreen({ currentUser }) {
         returnType,
         condition: returnCondition,
         notes: returnNotes,
-        quantity: 1
+        quantity: 1,
+        images: returnImages,
+        claimStatus: isDamagedOrWrong ? 'CLAIM_PENDING' : 'NOT_APPLICABLE',
+        claimAmount: isDamagedOrWrong ? (Number(claimAmount) || activeOrder.price || 0) : 0,
+        claimId: claimId || '',
+        claimNotes: claimNotes || ''
       });
 
       if (res && res.success) {
@@ -233,12 +435,17 @@ export default function ScanAndPackScreen({ currentUser }) {
           courier: activeOrder.courier,
           mode: 'RETURN',
           status: returnCondition === 'INTACT' ? 'RESTOCKED (+1)' : 'RETURN_DISPUTE',
+          hasPhotos: returnImages.length > 0,
+          returnDoc: res.data,
           time: new Date().toLocaleTimeString('en-IN'),
           date: new Date().toLocaleDateString('en-IN')
         };
         setScanHistory(prev => [historyEntry, ...prev.slice(0, 49)]);
         setActiveOrder(null);
         setReturnNotes('');
+        setReturnImages([]);
+        setClaimId('');
+        setClaimNotes('');
         fetchStats();
       } else {
         alert(res?.error || 'Failed to process return');
@@ -248,6 +455,120 @@ export default function ScanAndPackScreen({ currentUser }) {
     } finally {
       setLoading(false);
       focusInput();
+    }
+  };
+
+  // ── 📋 Courier Manifest Handover Helpers ──────────────────────────────────
+  const openManifestModal = async () => {
+    setShowManifestModal(true);
+    setManifestTab('PENDING');
+    fetchManifestPending();
+  };
+
+  const fetchManifestPending = async () => {
+    try {
+      const res = await api.getManifestPending({ date: manifestDate, courier: manifestCourier });
+      if (res && res.success) {
+        setManifestPendingData(res);
+      }
+    } catch (e) {
+      console.warn('Error fetching pending manifest:', e);
+    }
+  };
+
+  const fetchPastManifests = async () => {
+    try {
+      const res = await api.getManifestList();
+      if (res && res.success) {
+        setPastManifests(res.data || []);
+      }
+    } catch (e) {
+      console.warn('Error fetching past manifests:', e);
+    }
+  };
+
+  const handleGenerateManifest = async (courierName, packages) => {
+    if (!packages || !packages.length) {
+      alert('No packages available for this courier');
+      return;
+    }
+    if (!manifestDriverName.trim()) {
+      alert('Please enter Pickup Driver Name for handover authorization');
+      return;
+    }
+
+    try {
+      const res = await api.generateManifest({
+        courier: courierName,
+        driverName: manifestDriverName,
+        driverPhone: manifestDriverPhone,
+        vehicleNumber: manifestVehicleNumber,
+        packages
+      });
+
+      if (res && res.success) {
+        alert(`✅ Handover Manifest ${res.data.manifestId} created! Opening print preview...`);
+        setActivePrintManifest(res.data);
+        fetchManifestPending();
+      } else {
+        alert(res?.error || 'Failed to generate manifest');
+      }
+    } catch (e) {
+      alert(e.message || 'Error generating manifest');
+    }
+  };
+
+  // ── 📊 Bulk Delivery MIS Importer ─────────────────────────────────────────
+  const handleBulkDeliverSubmit = async () => {
+    const rawLines = bulkAwbText.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean);
+    const uniqueAwbs = [...new Set(rawLines)];
+
+    if (!uniqueAwbs.length) {
+      alert('Please paste at least one AWB code');
+      return;
+    }
+
+    setBulkProcessing(true);
+    setBulkResult(null);
+    try {
+      const res = await api.bulkMarkAwbDelivered({
+        awbs: uniqueAwbs,
+        deliveryDate: bulkDeliveryDate
+      });
+
+      if (res && res.success) {
+        playAudioCue('success');
+        setBulkResult(res);
+        fetchStats();
+      } else {
+        alert(res?.error || 'Failed to process bulk delivery');
+      }
+    } catch (e) {
+      alert(e.message || 'Error processing bulk delivery');
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  // ── Save Claim Details Update ─────────────────────────────────────────────
+  const handleSaveClaimDetails = async () => {
+    if (!selectedClaimRecord?._id) return;
+    setSavingClaim(true);
+    try {
+      const res = await api.updateReturnClaim(selectedClaimRecord._id, {
+        claimStatus: selectedClaimRecord.claimStatus,
+        claimId: selectedClaimRecord.claimId,
+        claimAmount: selectedClaimRecord.claimAmount,
+        claimNotes: selectedClaimRecord.claimNotes
+      });
+      if (res && res.success) {
+        alert('✅ SPF Claim details updated successfully!');
+        setSelectedClaimRecord(null);
+      }
+    } catch (e) {
+      alert(e.message || 'Failed to update claim');
+    } finally {
+      setSavingClaim(false);
     }
   };
 
@@ -296,13 +617,87 @@ export default function ScanAndPackScreen({ currentUser }) {
               <EntityBrandBadge entityId="elite_online" />
             </div>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>
-              AWB Tracking, Automated Date Stamping, Deliveries & Inward RTO Return Management
+              AWB Tracking, Double-Scan Zero Error Check, SPF Return Claims & Courier Manifest Handover
             </p>
           </div>
         </div>
 
-        {/* Hardware Status & Controls */}
+        {/* Action Buttons: Manifest, Bulk Deliver & Double-Scan Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          
+          {/* Double Scan Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setDoubleScanEnabled(!doubleScanEnabled);
+              setDoubleScanStep('SKU_FIRST');
+              setScannedGarmentSku('');
+            }}
+            title="Toggle Double Scan Verification"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0.45rem 0.9rem',
+              borderRadius: '8px',
+              background: doubleScanEnabled ? 'rgba(34, 197, 94, 0.18)' : 'rgba(255, 255, 255, 0.08)',
+              border: `1px solid ${doubleScanEnabled ? '#22c55e' : 'rgba(255, 255, 255, 0.15)'}`,
+              color: doubleScanEnabled ? '#4ade80' : '#94a3b8',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <ShieldCheck size={15} />
+            <span>Double-Scan: {doubleScanEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Courier Handover Manifest Button */}
+          <button
+            type="button"
+            onClick={openManifestModal}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0.45rem 0.9rem',
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(14,165,233,0.3)'
+            }}
+          >
+            <FileSpreadsheet size={15} />
+            <span>Daily Manifest</span>
+          </button>
+
+          {/* Bulk Delivery MIS Importer */}
+          <button
+            type="button"
+            onClick={() => { setShowBulkDeliveryModal(true); setBulkResult(null); }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0.45rem 0.9rem',
+              borderRadius: '8px',
+              background: 'rgba(16, 185, 129, 0.2)',
+              border: '1px solid #10b981',
+              color: '#34d399',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <CheckCheck size={15} />
+            <span>Bulk Delivery MIS</span>
+          </button>
+
+          {/* Hardware Scanner Status */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -322,7 +717,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               background: hardwareDetected ? '#22c55e' : '#0ea5e9',
               boxShadow: hardwareDetected ? '0 0 10px #22c55e' : '0 0 8px #0ea5e9'
             }} />
-            <span>{hardwareDetected ? 'Laser Scanner Active' : 'Ready for AWB Scan Bursts'}</span>
+            <span>{hardwareDetected ? 'Laser Scanner Active' : 'Ready for Scans'}</span>
           </div>
 
           <button 
@@ -331,6 +726,8 @@ export default function ScanAndPackScreen({ currentUser }) {
               setActiveOrder(null);
               setErrorMsg('');
               setSuccessMsg('');
+              setScannedGarmentSku('');
+              setDoubleScanStep('SKU_FIRST');
               focusInput();
             }}
             title="Clear Workspace"
@@ -366,7 +763,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0ea5e9' }}>
             {stats.dispatchedToday}
           </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Auto-Dated & Manifested</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Auto-Dated & Manifest Ready</span>
         </div>
 
         {/* Metric 2: Delivered Today */}
@@ -398,7 +795,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f43f5e' }}>
             {stats.returnedToday}
           </div>
-          <span style={{ fontSize: '0.72rem', color: '#f43f5e', fontWeight: 600 }}>QC Inspected & Restocked</span>
+          <span style={{ fontSize: '0.72rem', color: '#f43f5e', fontWeight: 600 }}>QC & SPF Claim Protected</span>
         </div>
 
       </div>
@@ -422,7 +819,7 @@ export default function ScanAndPackScreen({ currentUser }) {
             {/* Mode 1: Pack Outward */}
             <button
               type="button"
-              onClick={() => { setScanMode('PACK'); focusInput(); }}
+              onClick={() => { setScanMode('PACK'); setDoubleScanStep('SKU_FIRST'); setScannedGarmentSku(''); focusInput(); }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -494,6 +891,74 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
         </div>
 
+        {/* 🛡️ Double Scan Progress Indicator (When in Pack Mode with Double Scan ON) */}
+        {scanMode === 'PACK' && doubleScanEnabled && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 800,
+              fontSize: '0.82rem',
+              color: doubleScanStep === 'SKU_FIRST' ? '#166534' : '#15803d'
+            }}>
+              <span style={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                background: doubleScanStep === 'SKU_FIRST' ? '#22c55e' : '#15803d',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.75rem'
+              }}>
+                1
+              </span>
+              <span>Step 1: Scan Garment SKU Tag</span>
+              {scannedGarmentSku && (
+                <span style={{ padding: '2px 8px', borderRadius: '4px', background: '#dcfce7', color: '#166534', fontWeight: 900 }}>
+                  ({scannedGarmentSku})
+                </span>
+              )}
+            </div>
+
+            <ArrowRight size={16} color="#86efac" />
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 800,
+              fontSize: '0.82rem',
+              color: doubleScanStep === 'AWB_SECOND' ? '#0369a1' : '#94a3b8'
+            }}>
+              <span style={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                background: doubleScanStep === 'AWB_SECOND' ? '#0ea5e9' : '#cbd5e1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.75rem'
+              }}>
+                2
+              </span>
+              <span>Step 2: Scan Courier AWB Label</span>
+            </div>
+          </div>
+        )}
+
         {/* 🎯 High-Visibility AWB Scan Input Box */}
         <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
           <div style={{ position: 'relative', flex: 1 }}>
@@ -505,7 +970,9 @@ export default function ScanAndPackScreen({ currentUser }) {
               onChange={(e) => setScanInput(e.target.value)}
               placeholder={
                 scanMode === 'PACK' 
-                  ? "Scan shipping label or enter AWB code (e.g. MYSC1359190430)..."
+                  ? (doubleScanEnabled && doubleScanStep === 'SKU_FIRST' 
+                      ? "STEP 1: Scan Garment / Polybag Barcode Tag (e.g. AC22111_M)..." 
+                      : "STEP 2: Now scan Courier Shipping Label AWB (e.g. MYSC1359190430)...")
                   : scanMode === 'DELIVERY'
                   ? "Scan AWB to mark Delivered (e.g. MYSC1359190430)..."
                   : "Scan incoming Return / RTO parcel AWB (e.g. MYSC1359190430)..."
@@ -517,7 +984,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 fontSize: '1.05rem',
                 fontWeight: 700,
                 borderRadius: '12px',
-                border: '2px solid #0ea5e9',
+                border: doubleScanEnabled && doubleScanStep === 'AWB_SECOND' ? '2px solid #0284c7' : '2px solid #0ea5e9',
                 background: '#f8fafc',
                 color: '#0f172a',
                 boxShadow: '0 4px 12px rgba(14,165,233,0.1)',
@@ -546,7 +1013,7 @@ export default function ScanAndPackScreen({ currentUser }) {
             }}
           >
             {loading ? <RefreshCw size={18} className="spin-loader" /> : <Barcode size={18} />}
-            <span>Process AWB</span>
+            <span>Process Scan</span>
           </button>
         </form>
 
@@ -652,7 +1119,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               </div>
             </div>
 
-            {/* Return QC Controls (If Mode === RETURN) */}
+            {/* Return QC Controls & Photo Evidence (If Mode === RETURN) */}
             {scanMode === 'RETURN' && (
               <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase' }}>
@@ -709,7 +1176,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                       cursor: 'pointer'
                     }}
                   >
-                    🔴 Damaged / Claim
+                    🔴 Damaged / SPF Claim
                   </button>
 
                   <button
@@ -730,10 +1197,111 @@ export default function ScanAndPackScreen({ currentUser }) {
                   </button>
                 </div>
 
+                {/* 📸 Photo Proof Capture for Damaged / Wrong Items */}
+                {(returnCondition === 'DAMAGED' || returnCondition === 'WRONG_ITEM' || returnCondition === 'NEEDS_REFINISHING') && (
+                  <div style={{ background: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Camera size={14} /> Photo Proof for SPF Claim ({returnImages.length} attached)
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            background: '#0ea5e9',
+                            color: '#fff',
+                            border: 'none',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Camera size={12} />
+                          <span>Webcam Snapshot</span>
+                        </button>
+
+                        <label style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          background: '#475569',
+                          color: '#fff',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}>
+                          <Upload size={12} />
+                          <span>Upload File</span>
+                          <input type="file" accept="image/*" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Image Preview Thumbnails */}
+                    {returnImages.length > 0 && (
+                      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '4px 0' }}>
+                        {returnImages.map((img, idx) => (
+                          <div key={idx} style={{ position: 'relative', width: 50, height: 50, flexShrink: 0 }}>
+                            <img src={img} alt={`Proof ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                            <button
+                              type="button"
+                              onClick={() => setReturnImages(prev => prev.filter((_, i) => i !== idx))}
+                              style={{
+                                position: 'absolute',
+                                top: -4,
+                                right: -4,
+                                width: 16,
+                                height: 16,
+                                borderRadius: '50%',
+                                background: '#ef4444',
+                                color: '#fff',
+                                border: 'none',
+                                fontSize: '10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Claim Details Input */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '6px', marginTop: '2px' }}>
+                      <input
+                        type="number"
+                        placeholder="Claim Amount (₹)"
+                        value={claimAmount}
+                        onChange={(e) => setClaimAmount(e.target.value)}
+                        style={{ padding: '0.4rem 0.6rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.75rem' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Myntra / Portal Claim Ticket ID (optional)"
+                        value={claimId}
+                        onChange={(e) => setClaimId(e.target.value)}
+                        style={{ padding: '0.4rem 0.6rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.75rem' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   <input
                     type="text"
-                    placeholder="Optional return inspection remarks..."
+                    placeholder="Inspection remarks / cloth defect description..."
                     value={returnNotes}
                     onChange={(e) => setReturnNotes(e.target.value)}
                     style={{ flex: 1, padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
@@ -789,12 +1357,13 @@ export default function ScanAndPackScreen({ currentUser }) {
                 <th style={{ padding: '10px 14px', fontWeight: 800 }}>Courier</th>
                 <th style={{ padding: '10px 14px', fontWeight: 800 }}>Mode</th>
                 <th style={{ padding: '10px 14px', fontWeight: 800, textAlign: 'center' }}>Status</th>
+                <th style={{ padding: '10px 14px', fontWeight: 800, textAlign: 'center' }}>SPF Action</th>
               </tr>
             </thead>
             <tbody>
               {scanHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
                     <Scan size={24} style={{ margin: '0 auto 6px', color: '#cbd5e1' }} />
                     <div>No AWB codes scanned yet in this session.</div>
                     <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Scan or type an AWB like <strong>MYSC1359190430</strong> above.</div>
@@ -814,9 +1383,36 @@ export default function ScanAndPackScreen({ currentUser }) {
                       </span>
                     </td>
                     <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: item.status.includes('RESTOCK') ? '#ecfdf5' : item.status.includes('PACK') ? '#eff6ff' : '#fff1f2', color: item.status.includes('RESTOCK') ? '#059669' : item.status.includes('PACK') ? '#0284c7' : '#be123c', border: '1px solid rgba(0,0,0,0.06)' }}>
                         {item.status}
                       </span>
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                      {item.returnDoc ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedClaimRecord(item.returnDoc)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Eye size={12} />
+                          <span>SPF Dossier</span>
+                          {item.hasPhotos && <Camera size={11} color="#0284c7" />}
+                        </button>
+                      ) : (
+                        <span style={{ color: '#cbd5e1' }}>—</span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -825,6 +1421,783 @@ export default function ScanAndPackScreen({ currentUser }) {
           </table>
         </div>
       </div>
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          MODAL 1: ⚠️ Double Scan Garment vs Label Mismatch Alert
+      ──────────────────────────────────────────────────────────────────────── */}
+      {mismatchModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '520px',
+            width: '100%',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(220, 38, 38, 0.35)',
+            border: '2px solid #ef4444',
+            animation: 'shake 0.3s ease-in-out'
+          }}>
+            <div style={{ background: '#fef2f2', padding: '1.25rem 1.5rem', borderBottom: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                <ShieldAlert size={26} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#991b1b' }}>
+                  PACKING MISMATCH PREVENTED!
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#b91c1c' }}>
+                  DO NOT SEAL BOX — Wrong garment detected for this shipping label.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.85rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase' }}>
+                    ❌ Scanned Garment Tag:
+                  </span>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#dc2626', marginTop: '4px' }}>
+                    {mismatchModal.garmentSku}
+                  </div>
+                </div>
+
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.85rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+                    ✅ Required Order SKU:
+                  </span>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#2563eb', marginTop: '4px' }}>
+                    {mismatchModal.orderSku}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: '#475569', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div>Order Code: <strong>#{mismatchModal.orderCode}</strong></div>
+                <div>AWB: <strong>{mismatchModal.awb}</strong></div>
+                <div>Product: <strong>{mismatchModal.itemName}</strong></div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => { setMismatchModal(null); focusInput(); }}
+                  style={{
+                    padding: '0.6rem 1.25rem',
+                    borderRadius: '8px',
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Got It, Change Garment
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          MODAL 2: 📸 Station Webcam Shutter
+      ──────────────────────────────────────────────────────────────────────── */}
+      {showCameraModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{ background: '#1e293b', borderRadius: '16px', overflow: 'hidden', maxWidth: '640px', width: '100%', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.9rem' }}>
+                Station Camera — Snap Return Defect / Wrong Item
+              </span>
+              <button type="button" onClick={stopCamera} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ position: 'relative', width: '100%', height: '360px', background: '#000' }}>
+              <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', background: '#0f172a' }}>
+              <button
+                type="button"
+                onClick={captureSnapshot}
+                style={{
+                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '0.65rem 1.75rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Camera size={18} />
+                <span>Capture Shutter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          MODAL 3: 📋 Daily Courier Handover Manifest
+      ──────────────────────────────────────────────────────────────────────── */}
+      {showManifestModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '850px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#0ea5e915', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0ea5e9' }}>
+                  <FileSpreadsheet size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                    Daily Courier Pickup Handover Manifest
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Official run-sheet for Ekart, Delhivery, Blue Dart & Shadowfax pickup vans
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowManifestModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Filter Bar & Tabs */}
+            <div style={{ padding: '0.85rem 1.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setManifestTab('PENDING'); fetchManifestPending(); }}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: manifestTab === 'PENDING' ? '#0ea5e9' : '#e2e8f0',
+                    color: manifestTab === 'PENDING' ? '#fff' : '#475569',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ready for Handover
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setManifestTab('HISTORY'); fetchPastManifests(); }}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: manifestTab === 'HISTORY' ? '#0ea5e9' : '#e2e8f0',
+                    color: manifestTab === 'HISTORY' ? '#fff' : '#475569',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Past Generated Manifests
+                </button>
+              </div>
+
+              {manifestTab === 'PENDING' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="date"
+                    value={manifestDate}
+                    onChange={(e) => setManifestDate(e.target.value)}
+                    style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.75rem' }}
+                  />
+                  <select
+                    value={manifestCourier}
+                    onChange={(e) => setManifestCourier(e.target.value)}
+                    style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.75rem' }}
+                  >
+                    <option value="ALL">All Logistics Partners</option>
+                    <option value="Flipkart">Flipkart Logistics / Ekart</option>
+                    <option value="Delhivery">Delhivery</option>
+                    <option value="Blue Dart">Blue Dart</option>
+                    <option value="Shadowfax">Shadowfax</option>
+                    <option value="Xpressbees">Xpressbees</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={fetchManifestPending}
+                    style={{ padding: '4px 8px', borderRadius: '6px', background: '#0ea5e9', color: '#fff', border: 'none', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Filter
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              {manifestTab === 'PENDING' ? (
+                <>
+                  {/* Courier Handover Driver Inputs */}
+                  <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                        Pickup Driver Name *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Ramesh Kumar"
+                        value={manifestDriverName}
+                        onChange={(e) => setManifestDriverName(e.target.value)}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                        Driver Mobile No
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 9876543210"
+                        value={manifestDriverPhone}
+                        onChange={(e) => setManifestDriverPhone(e.target.value)}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                        Vehicle / Van Number
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. GJ-05-XX-1234"
+                        value={manifestVehicleNumber}
+                        onChange={(e) => setManifestVehicleNumber(e.target.value)}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Groups by Courier Partner */}
+                  {!manifestPendingData || manifestPendingData.groups?.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                      No dispatched packages found for handover on this date.
+                    </div>
+                  ) : (
+                    manifestPendingData.groups.map((grp, idx) => (
+                      <div key={idx} style={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                              {grp.courier}
+                            </span>
+                            <span style={{ marginLeft: '10px', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#eff6ff', color: '#2563eb' }}>
+                              {grp.count} Parcels Ready
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateManifest(grp.courier, grp.orders)}
+                            style={{
+                              background: '#0ea5e9',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '6px 14px',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <Printer size={13} />
+                            <span>Generate & Print Run-Sheet</span>
+                          </button>
+                        </div>
+
+                        {/* Order Samples preview */}
+                        <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '6px' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                            <thead>
+                              <tr style={{ background: '#f8fafc', color: '#64748b' }}>
+                                <th style={{ padding: '6px 8px', textAlign: 'left' }}>AWB Code</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Order ID</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left' }}>SKU</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left' }}>City</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {grp.orders.map((o, oIdx) => (
+                                <tr key={oIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '6px 8px', fontWeight: 700, color: '#0ea5e9' }}>{o.awb}</td>
+                                  <td style={{ padding: '6px 8px' }}>#{o.displayOrderCode}</td>
+                                  <td style={{ padding: '6px 8px' }}>{o.sku}</td>
+                                  <td style={{ padding: '6px 8px', color: '#64748b' }}>{o.city || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
+              ) : (
+                /* History Tab */
+                pastManifests.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                    No past manifests saved yet.
+                  </div>
+                ) : (
+                  pastManifests.map((mnf) => (
+                    <div key={mnf._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0ea5e9' }}>
+                          {mnf.manifestId} — {mnf.courier}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                          Driver: {mnf.pickupDriverName || 'N/A'} ({mnf.pickupDriverPhone || 'No Phone'}) | Packages: {mnf.totalPackages} | Date: {new Date(mnf.createdAt).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActivePrintManifest(mnf)}
+                        style={{ padding: '4px 10px', borderRadius: '4px', background: '#0ea5e9', color: '#fff', border: 'none', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Printer size={12} />
+                        <span>Print</span>
+                      </button>
+                    </div>
+                  ))
+                )
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          MODAL 4: 📊 Bulk Delivery MIS Excel Importer
+      ──────────────────────────────────────────────────────────────────────── */}
+      {showBulkDeliveryModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '560px',
+            width: '100%',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#10b98115', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+                  <CheckCheck size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                    Bulk Carrier Delivery MIS Importer
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Mark 100+ AWBs as Delivered in 1 second from Logistics Excel sheet
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowBulkDeliveryModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  Delivery Date to Stamp
+                </label>
+                <input
+                  type="date"
+                  value={bulkDeliveryDate}
+                  onChange={(e) => setBulkDeliveryDate(e.target.value)}
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  Paste AWB Codes (One per line or comma-separated)
+                </label>
+                <textarea
+                  rows={8}
+                  placeholder="MYSC1359190430&#10;MYSC1359190431&#10;MYSC1359190432&#10;..."
+                  value={bulkAwbText}
+                  onChange={(e) => setBulkAwbText(e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                  {bulkAwbText.split(/[\r\n,;]+/).filter(s => s.trim()).length} unique codes detected
+                </span>
+              </div>
+
+              {bulkResult && (
+                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '0.75rem', borderRadius: '8px', color: '#065f46', fontSize: '0.82rem', fontWeight: 700 }}>
+                  {bulkResult.message}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkDeliveryModal(false)}
+                  style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: '#f1f5f9', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDeliverSubmit}
+                  disabled={bulkProcessing || !bulkAwbText.trim()}
+                  style={{
+                    padding: '0.6rem 1.25rem',
+                    borderRadius: '8px',
+                    background: '#10b981',
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    cursor: bulkProcessing || !bulkAwbText.trim() ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {bulkProcessing ? <RefreshCw size={14} className="spin-loader" /> : <CheckCheck size={14} />}
+                  <span>Execute Bulk Delivery Update</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          MODAL 5: 📄 SPF Return Claim Dossier Viewer & Editor
+      ──────────────────────────────────────────────────────────────────────── */}
+      {selectedClaimRecord && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.8)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '620px',
+            width: '100%',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f43f5e15', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f43f5e' }}>
+                  <ShieldAlert size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                    SPF Claim Evidence & Dispute Dossier
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    AWB: {selectedClaimRecord.referenceId} | Order #{selectedClaimRecord.displayOrderId}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setSelectedClaimRecord(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              {/* Photo Evidence Gallery */}
+              <div>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                  Damaged / Wrong Item Photos ({selectedClaimRecord.images?.length || 0})
+                </span>
+                {selectedClaimRecord.images?.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '8px' }}>
+                    {selectedClaimRecord.images.map((img, i) => (
+                      <a key={i} href={img} target="_blank" rel="noreferrer" style={{ display: 'block', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+                        <img src={img} alt={`Proof ${i}`} style={{ width: '100%', height: '80px', objectFit: 'cover' }} />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem' }}>
+                    No photos were attached during scan.
+                  </div>
+                )}
+              </div>
+
+              {/* Status and Claim ID */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                    Claim Status
+                  </label>
+                  <select
+                    value={selectedClaimRecord.claimStatus || 'CLAIM_PENDING'}
+                    onChange={(e) => setSelectedClaimRecord({ ...selectedClaimRecord, claimStatus: e.target.value })}
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                  >
+                    <option value="CLAIM_PENDING">Pending Submission</option>
+                    <option value="CLAIM_SUBMITTED">Submitted to Marketplace</option>
+                    <option value="CLAIM_APPROVED">Approved & Reimbursed</option>
+                    <option value="CLAIM_REJECTED">Rejected by Courier/Platform</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                    Claim Ticket / Case ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. SPF-MYNTRA-98421"
+                    value={selectedClaimRecord.claimId || ''}
+                    onChange={(e) => setSelectedClaimRecord({ ...selectedClaimRecord, claimId: e.target.value })}
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                  Claim Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  value={selectedClaimRecord.claimAmount || 0}
+                  onChange={(e) => setSelectedClaimRecord({ ...selectedClaimRecord, claimAmount: e.target.value })}
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                  Dispute & Investigation Notes
+                </label>
+                <textarea
+                  rows={3}
+                  value={selectedClaimRecord.claimNotes || ''}
+                  onChange={(e) => setSelectedClaimRecord({ ...selectedClaimRecord, claimNotes: e.target.value })}
+                  placeholder="Record communication with Flipkart/Myntra SPF manager..."
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClaimRecord(null)}
+                  style={{ padding: '0.5rem 1rem', borderRadius: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveClaimDetails}
+                  disabled={savingClaim}
+                  style={{ padding: '0.5rem 1.25rem', borderRadius: '6px', background: '#0ea5e9', color: '#fff', border: 'none', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  {savingClaim ? 'Saving...' : 'Save Claim Updates'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          PRINT TEMPLATE: 🖨️ Official Printable Handover Manifest
+      ──────────────────────────────────────────────────────────────────────── */}
+      {activePrintManifest && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          zIndex: 99999,
+          overflowY: 'auto',
+          padding: '2rem 1rem',
+          display: 'flex',
+          justifyContent: 'center'
+        }}>
+          <div style={{ background: '#fff', maxWidth: '800px', width: '100%', padding: '2.5rem', borderRadius: '8px', color: '#000', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            {/* Action Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '0.75rem' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 900, textTransform: 'uppercase' }}>
+                COURIER PICKUP HANDOVER MANIFEST
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{ background: '#000', color: '#fff', padding: '6px 14px', borderRadius: '4px', border: 'none', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Printer size={14} />
+                  <span>Print Manifest</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePrintManifest(null)}
+                  style={{ background: '#e2e8f0', color: '#000', padding: '6px 14px', borderRadius: '4px', border: 'none', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Manifest Metadata */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem' }}>
+              <div>
+                <div><strong>Manifest ID:</strong> {activePrintManifest.manifestId}</div>
+                <div><strong>Date & Time:</strong> {new Date(activePrintManifest.createdAt).toLocaleString('en-IN')}</div>
+                <div><strong>Transporter / Courier:</strong> {activePrintManifest.courier}</div>
+                <div><strong>Fulfillment Warehouse:</strong> {activePrintManifest.facility || 'WH-MAIN (Surat)'}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div><strong>Pickup Driver:</strong> {activePrintManifest.pickupDriverName || 'N/A'}</div>
+                <div><strong>Driver Phone:</strong> {activePrintManifest.pickupDriverPhone || 'N/A'}</div>
+                <div><strong>Vehicle Number:</strong> {activePrintManifest.vehicleNumber || 'N/A'}</div>
+                <div><strong>Total Package Count:</strong> <span style={{ fontSize: '1.1rem', fontWeight: 900 }}>{activePrintManifest.totalPackages}</span></div>
+              </div>
+            </div>
+
+            {/* Packages Table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #000', marginTop: '0.5rem' }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #000' }}>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid #000', textAlign: 'center', width: '35px' }}>#</th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid #000', textAlign: 'left' }}>AWB Tracking Number</th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid #000', textAlign: 'left' }}>Order ID</th>
+                  <th style={{ padding: '6px 8px', borderRight: '1px solid #000', textAlign: 'left' }}>SKU Code</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Destination City</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activePrintManifest.packages?.map((pkg, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
+                    <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc', fontFamily: 'monospace', fontWeight: 800 }}>{pkg.awb}</td>
+                    <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}>#{pkg.displayOrderCode}</td>
+                    <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}>{pkg.sku}</td>
+                    <td style={{ padding: '6px 8px' }}>{pkg.city || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Handover Signatures Block */}
+            <div style={{ marginTop: '2.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', fontSize: '0.85rem' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '0.5rem', textAlign: 'center' }}>
+                <strong>Warehouse Dispatch Supervisor</strong>
+                <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '2px' }}>Signature & Stamp</div>
+              </div>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '0.5rem', textAlign: 'center' }}>
+                <strong>Courier Pickup Driver Acknowledgment</strong>
+                <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '2px' }}>
+                  "I confirm receipt of {activePrintManifest.totalPackages} sealed packets in good condition"
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
