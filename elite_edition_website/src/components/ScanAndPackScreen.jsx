@@ -10,11 +10,9 @@ import {
   Layers, 
   Clock, 
   Truck, 
-  ArrowRight,
   Maximize2,
   RefreshCw,
   Printer,
-  ShieldCheck,
   RotateCcw,
   Check,
   AlertTriangle,
@@ -56,12 +54,6 @@ export default function ScanAndPackScreen({ currentUser }) {
   
   // Currently Active Scanned Order
   const [activeOrder, setActiveOrder] = useState(null);
-  
-  // ── 🛡️ Double-Scan Verification System ──────────────────────────────────
-  const [doubleScanEnabled, setDoubleScanEnabled] = useState(true);
-  const [doubleScanStep, setDoubleScanStep] = useState('SKU_FIRST'); // 'SKU_FIRST' | 'AWB_SECOND'
-  const [scannedGarmentSku, setScannedGarmentSku] = useState('');
-  const [mismatchModal, setMismatchModal] = useState(null); // { garmentSku, orderSku, awb, orderCode }
 
   // ── ⚖️ Digital Weighing Scale & Weight Discrepancy Guard ────────────────
   const [parcelWeight, setParcelWeight] = useState('350'); // in grams
@@ -196,10 +188,7 @@ export default function ScanAndPackScreen({ currentUser }) {
     }
   };
 
-  // Helper: Normalize SKU string for robust barcode tag matching
-  const normalizeSku = (str = '') => String(str).trim().toUpperCase().replace(/[\s\-_]/g, '');
-
-  // ── Main Processing Pipeline ──────────────────────────────────────────────
+  // ── Main Processing Pipeline (Single AWB Direct Scan) ──────────────────────
   const handleProcessScan = async (codeToProcess, source = 'Manual Input') => {
     const trimmed = (codeToProcess || '').trim();
     if (!trimmed) return;
@@ -208,114 +197,7 @@ export default function ScanAndPackScreen({ currentUser }) {
     setSuccessMsg('');
 
     // ──────────────────────────────────────────────────────────────────────────
-    // PACK MODE: Double-Scan Verification Branch
-    // ──────────────────────────────────────────────────────────────────────────
-    if (scanMode === 'PACK' && doubleScanEnabled) {
-      if (doubleScanStep === 'SKU_FIRST') {
-        // Step 1: Scan Garment / Polybag Barcode Tag
-        setScannedGarmentSku(trimmed);
-        setDoubleScanStep('AWB_SECOND');
-        playAudioCue('step');
-        setSuccessMsg(`🏷️ Step 1 Done: Garment tag "${trimmed}" captured. Now scan the Courier AWB shipping label!`);
-        setScanInput('');
-        focusInput();
-        return;
-      }
-
-      // Step 2: Scan Courier AWB Label
-      setLoading(true);
-      try {
-        const lookupRes = await api.lookupAwb(trimmed);
-        if (!lookupRes || !lookupRes.success) {
-          throw new Error(lookupRes?.error || 'AWB not found or invalid barcode');
-        }
-
-        const orderData = lookupRes.data;
-        setActiveOrder(orderData);
-
-        // Verification check: Does the scanned garment tag match order's SKU?
-        const expectedSku = orderData.itemSKUCode || '';
-        const normScanned = normalizeSku(scannedGarmentSku);
-        const normExpected = normalizeSku(expectedSku);
-
-        const isMatch = normScanned.includes(normExpected) || 
-                        normExpected.includes(normScanned) || 
-                        scannedGarmentSku === trimmed;
-
-        if (!isMatch && expectedSku) {
-          playAudioCue('error');
-          setMismatchModal({
-            garmentSku: scannedGarmentSku,
-            orderSku: expectedSku,
-            awb: trimmed,
-            orderCode: orderData.displayOrderCode,
-            itemName: orderData.itemName
-          });
-          setErrorMsg(`⚠️ MISMATCH ALERT! Garment tag "${scannedGarmentSku}" does not match order SKU "${expectedSku}". Box NOT packed!`);
-          setDoubleScanStep('SKU_FIRST');
-          setScannedGarmentSku('');
-          return;
-        }
-
-        // Weight verification
-        const numericWeight = Number(parcelWeight) || 0;
-
-        await api.packAwbOrder({
-          awb: trimmed,
-          displayOrderCode: orderData.displayOrderCode,
-          sku: orderData.itemSKUCode,
-          courier: orderData.courier,
-          weightGrams: numericWeight
-        });
-
-        playAudioCue('success');
-        setSuccessMsg(`✅ MATCH VERIFIED! Garment "${scannedGarmentSku}" matches Order #${orderData.displayOrderCode}. Packed & Dispatched (${numericWeight > 0 ? `${numericWeight}g` : 'Standard Weight'}).`);
-
-        const historyEntry = {
-          id: Date.now(),
-          awb: trimmed,
-          orderCode: orderData.displayOrderCode,
-          sku: orderData.itemSKUCode,
-          courier: orderData.courier,
-          weightGrams: numericWeight,
-          mode: 'PACK',
-          status: 'VERIFIED & PACKED',
-          time: new Date().toLocaleTimeString('en-IN'),
-          date: new Date().toLocaleDateString('en-IN')
-        };
-        setScanHistory(prev => [historyEntry, ...prev.slice(0, 49)]);
-        fetchStats();
-
-        // Setup barcode tag printing data for convenience
-        setBarcodeTagData({
-          sku: orderData.itemSKUCode,
-          brand: 'SOBISE',
-          itemName: orderData.itemName,
-          size: orderData.size || 'M',
-          color: orderData.color || '',
-          mrp: orderData.mrp || 1499,
-          barcode: trimmed
-        });
-
-        // Reset for next order
-        setDoubleScanStep('SKU_FIRST');
-        setScannedGarmentSku('');
-
-      } catch (err) {
-        playAudioCue('error');
-        setErrorMsg(err.message || 'Error verifying AWB scan');
-        setDoubleScanStep('SKU_FIRST');
-        setScannedGarmentSku('');
-      } finally {
-        setLoading(false);
-        setScanInput('');
-        focusInput();
-      }
-      return;
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Standard Single-Scan Mode (PACK, DELIVERY, or RETURN)
+    // Direct AWB Scan (PACK, DELIVERY, or RETURN)
     // ──────────────────────────────────────────────────────────────────────────
     setLoading(true);
     try {
@@ -696,35 +578,8 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
         </div>
 
-        {/* Action Buttons: Manifest, Analytics, Barcode Tag & Double-Scan */}
+        {/* Action Buttons: Manifest, Analytics, Barcode Tag */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          
-          {/* Double Scan Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setDoubleScanEnabled(!doubleScanEnabled);
-              setDoubleScanStep('SKU_FIRST');
-              setScannedGarmentSku('');
-            }}
-            title="Toggle Double Scan Verification"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0.45rem 0.9rem',
-              borderRadius: '8px',
-              background: doubleScanEnabled ? 'rgba(34, 197, 94, 0.18)' : 'rgba(255, 255, 255, 0.08)',
-              border: `1px solid ${doubleScanEnabled ? '#22c55e' : 'rgba(255, 255, 255, 0.15)'}`,
-              color: doubleScanEnabled ? '#4ade80' : '#94a3b8',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <ShieldCheck size={15} />
-            <span>Double-Scan: {doubleScanEnabled ? 'ON' : 'OFF'}</span>
-          </button>
 
           {/* Courier Handover Manifest Button */}
           <button
@@ -844,8 +699,6 @@ export default function ScanAndPackScreen({ currentUser }) {
               setActiveOrder(null);
               setErrorMsg('');
               setSuccessMsg('');
-              setScannedGarmentSku('');
-              setDoubleScanStep('SKU_FIRST');
               focusInput();
             }}
             title="Clear Workspace"
@@ -937,7 +790,7 @@ export default function ScanAndPackScreen({ currentUser }) {
             {/* Mode 1: Pack Outward */}
             <button
               type="button"
-              onClick={() => { setScanMode('PACK'); setDoubleScanStep('SKU_FIRST'); setScannedGarmentSku(''); focusInput(); }}
+              onClick={() => { setScanMode('PACK'); focusInput(); }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1009,73 +862,6 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
         </div>
 
-        {/* 🛡️ Double Scan Progress Indicator (When in Pack Mode with Double Scan ON) */}
-        {scanMode === 'PACK' && doubleScanEnabled && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 800,
-              fontSize: '0.82rem',
-              color: doubleScanStep === 'SKU_FIRST' ? '#166534' : '#15803d'
-            }}>
-              <span style={{
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                background: doubleScanStep === 'SKU_FIRST' ? '#22c55e' : '#15803d',
-                color: '#fff',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.75rem'
-              }}>
-                1
-              </span>
-              <span>Step 1: Scan Garment SKU Tag</span>
-              {scannedGarmentSku && (
-                <span style={{ padding: '2px 8px', borderRadius: '4px', background: '#dcfce7', color: '#166534', fontWeight: 900 }}>
-                  ({scannedGarmentSku})
-                </span>
-              )}
-            </div>
-
-            <ArrowRight size={16} color="#86efac" />
-
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 800,
-              fontSize: '0.82rem',
-              color: doubleScanStep === 'AWB_SECOND' ? '#0369a1' : '#94a3b8'
-            }}>
-              <span style={{
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                background: doubleScanStep === 'AWB_SECOND' ? '#0ea5e9' : '#cbd5e1',
-                color: '#fff',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.75rem'
-              }}>
-                2
-              </span>
-              <span>Step 2: Scan Courier AWB Label</span>
-            </div>
-          </div>
-        )}
 
         {/* ⚖️ Weighing Scale Check Widget */}
         {scanMode === 'PACK' && (
@@ -1155,9 +941,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               onChange={(e) => setScanInput(e.target.value)}
               placeholder={
                 scanMode === 'PACK' 
-                  ? (doubleScanEnabled && doubleScanStep === 'SKU_FIRST' 
-                      ? "STEP 1: Scan Garment / Polybag Barcode Tag (e.g. AC22111_M)..." 
-                      : "STEP 2: Now scan Courier Shipping Label AWB (e.g. MYSC1359190430)...")
+                  ? "Scan or enter Courier AWB to Pack & Dispatch (e.g. MYSC1359190430)..."
                   : scanMode === 'DELIVERY'
                   ? "Scan AWB to mark Delivered (e.g. MYSC1359190430)..."
                   : "Scan incoming Return / RTO parcel AWB (e.g. MYSC1359190430)..."
@@ -1169,7 +953,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 fontSize: '1.05rem',
                 fontWeight: 700,
                 borderRadius: '12px',
-                border: doubleScanEnabled && doubleScanStep === 'AWB_SECOND' ? '2px solid #0284c7' : '2px solid #0ea5e9',
+                border: '2px solid #0ea5e9',
                 background: '#f8fafc',
                 color: '#0f172a',
                 boxShadow: '0 4px 12px rgba(14,165,233,0.1)',
@@ -1677,99 +1461,6 @@ export default function ScanAndPackScreen({ currentUser }) {
         </div>
       </div>
 
-      {/* ────────────────────────────────────────────────────────────────────────
-          MODAL 1: ⚠️ Double Scan Garment vs Label Mismatch Alert
-      ──────────────────────────────────────────────────────────────────────── */}
-      {mismatchModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '1rem'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '16px',
-            maxWidth: '520px',
-            width: '100%',
-            overflow: 'hidden',
-            boxShadow: '0 25px 50px -12px rgba(220, 38, 38, 0.35)',
-            border: '2px solid #ef4444',
-            animation: 'shake 0.3s ease-in-out'
-          }}>
-            <div style={{ background: '#fef2f2', padding: '1.25rem 1.5rem', borderBottom: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                <ShieldAlert size={26} />
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#991b1b' }}>
-                  PACKING MISMATCH PREVENTED!
-                </h3>
-                <span style={{ fontSize: '0.78rem', color: '#b91c1c' }}>
-                  DO NOT SEAL BOX — Wrong garment detected for this shipping label.
-                </span>
-              </div>
-            </div>
-
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.85rem' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase' }}>
-                    ❌ Scanned Garment Tag:
-                  </span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#dc2626', marginTop: '4px' }}>
-                    {mismatchModal.garmentSku}
-                  </div>
-                </div>
-
-                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.85rem' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
-                    ✅ Required Order SKU:
-                  </span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#2563eb', marginTop: '4px' }}>
-                    {mismatchModal.orderSku}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ fontSize: '0.8rem', color: '#475569', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div>Order Code: <strong>#{mismatchModal.orderCode}</strong></div>
-                <div>AWB: <strong>{mismatchModal.awb}</strong></div>
-                <div>Product: <strong>{mismatchModal.itemName}</strong></div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => { setMismatchModal(null); focusInput(); }}
-                  style={{
-                    padding: '0.6rem 1.25rem',
-                    borderRadius: '8px',
-                    background: '#dc2626',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 800,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Got It, Change Garment
-                </button>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ────────────────────────────────────────────────────────────────────────
           MODAL 2: 📸 Station Webcam Shutter
