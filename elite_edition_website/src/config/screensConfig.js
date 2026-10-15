@@ -24,6 +24,7 @@ export const AVAILABLE_SCREENS = [
   { id: 'catalog', label: 'Elite Online: Product Catalog', category: 'Elite Online' },
   { id: 'returns', label: 'Elite Online: Returns Department', category: 'Elite Online' },
   { id: 'sales', label: 'Elite Online: Sales Orders', category: 'Elite Online' },
+  { id: 'eo_scan_pack', label: 'Elite Online: Scan & Pack', category: 'Elite Online' },
   { id: 'eo_complaints', label: 'Elite Online: Complaints Module', category: 'Elite Online' },
 
   // Elite Edition (Company)

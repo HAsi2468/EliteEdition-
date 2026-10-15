@@ -4,7 +4,8 @@ import {
   Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, ArrowUpFromLine, ArrowDownToLine,
-  Zap, Droplets, TrendingUp, BarChart3, ListFilter, PlayCircle
+  Zap, Droplets, TrendingUp, BarChart3, ListFilter, PlayCircle,
+  ChevronDown, ChevronUp, History, Filter, FileSpreadsheet
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD, formatForInputDate } from '../utils/dateUtils';
@@ -114,6 +115,32 @@ export default function JobPrintingLog() {
   const [reportSearchJob, setReportSearchJob] = useState('');
   const [reportLoadingPdf, setReportLoadingPdf] = useState(false);
 
+  // ── PREVIOUS REPORTS ARCHIVE & PREVIEW MODAL STATES ──
+  const [archivePreset, setArchivePreset] = useState('last_7_days');
+  const [archiveDateStart, setArchiveDateStart] = useState(() => {
+    const { dateStart: ds } = getDatePresetRange('last_7_days');
+    return ds || toLocalYMD();
+  });
+  const [archiveDateEnd, setArchiveDateEnd] = useState(() => {
+    const { dateEnd: de } = getDatePresetRange('last_7_days');
+    return de || toLocalYMD();
+  });
+  const [archiveCustomStart, setArchiveCustomStart] = useState('');
+  const [archiveCustomEnd, setArchiveCustomEnd] = useState('');
+  const [archiveShift, setArchiveShift] = useState('All');
+  const [archiveMachine, setArchiveMachine] = useState('All');
+  const [archiveOperator, setArchiveOperator] = useState('All');
+  const [archiveSearch, setArchiveSearch] = useState('');
+  const [archiveLogs, setArchiveLogs] = useState([]);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [archiveGroupBy, setArchiveGroupBy] = useState('shift'); // 'shift' | 'date'
+  const [expandedArchiveKey, setExpandedArchiveKey] = useState(null);
+
+  // Dedicated Interactive Preview Report Modal State
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewReportConfig, setPreviewReportConfig] = useState(null);
+  const [previewLoadingPdf, setPreviewLoadingPdf] = useState(false);
+
   // Dedicated Raw Material Usage Form Modal State
   const [showRawMaterialModal, setShowRawMaterialModal] = useState(false);
   const [rawMaterialSubmitting, setRawMaterialSubmitting] = useState(false);
@@ -194,6 +221,85 @@ export default function JobPrintingLog() {
     outward: { grando: { C: 0, M: 0, Y: 0, K: 0 }, printdot: { C: 0, M: 0, Y: 0, K: 0 }, paper: [] }
   });
 
+  const parseRawTransactionsForSummary = (rawList = [], activeStart, activeEnd) => {
+    const inGrando = { C: 0, M: 0, Y: 0, K: 0 };
+    const inPrintdot = { C: 0, M: 0, Y: 0, K: 0 };
+    const inPaperList = [];
+
+    const outGrando = { C: 0, M: 0, Y: 0, K: 0 };
+    const outPrintdot = { C: 0, M: 0, Y: 0, K: 0 };
+    const outPaperList = [];
+
+    let foundStart = '';
+    let foundStop = '';
+    let foundShift = '';
+    let foundOperator = '';
+
+    rawList.forEach(t => {
+      if (!t.date) return;
+      const dObj = new Date(t.date);
+      const yyyy = dObj.getFullYear();
+      const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(dObj.getDate()).padStart(2, '0');
+      const dStr = `${yyyy}-${mm}-${dd}`;
+
+      if (activeStart && dStr < activeStart) return;
+      if (activeEnd && dStr > activeEnd) return;
+
+      if (t.notes) {
+        const tm = t.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
+          t.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
+        if (tm) {
+          if (!foundStart) foundStart = tm[1];
+          if (!foundStop) foundStop = tm[2];
+        }
+        const sh = t.notes.match(/Shift:\s*([^|\]]+)/i);
+        if (sh && !foundShift) foundShift = sh[1].trim();
+
+        const op = t.notes.match(/Operator:\s*([^|\]]+)/i);
+        if (op && !foundOperator && op[1].trim() !== '—') foundOperator = op[1].trim();
+      }
+
+      const mName = (t.materialName || '').toLowerCase();
+      const q = Number(t.qty) || 0;
+      const isIn = t.type === 'INWARD';
+      const targetG = isIn ? inGrando : outGrando;
+      const targetP = isIn ? inPrintdot : outPrintdot;
+      const targetPaperList = isIn ? inPaperList : outPaperList;
+
+      if (mName.includes('grando')) {
+        if (mName.includes('cyan') || t.color === 'Cyan') targetG.C += q;
+        else if (mName.includes('magenta') || t.color === 'Magenta') targetG.M += q;
+        else if (mName.includes('yellow') || t.color === 'Yellow') targetG.Y += q;
+        else if (mName.includes('black') || t.color === 'Black') targetG.K += q;
+      } else if (mName.includes('printdot')) {
+        if (mName.includes('cyan') || t.color === 'Cyan') targetP.C += q;
+        else if (mName.includes('magenta') || t.color === 'Magenta') targetP.M += q;
+        else if (mName.includes('yellow') || t.color === 'Yellow') targetP.Y += q;
+        else if (mName.includes('black') || t.color === 'Black') targetP.K += q;
+      } else if (mName.includes('paper') || t.panna) {
+        const mtrVal = t.metersPerRoll || (t.notes ? (t.notes.match(/Mtr:\s*([\d.]+)/i) || [])[1] : '');
+        targetPaperList.push({
+          id: targetPaperList.length + 1,
+          paperType: t.materialName || 'A++',
+          paperPanna: t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : '44" Panna',
+          paperCustomPanna: '',
+          paperRollsQty: q ? q.toString() : '',
+          paperMtrQty: mtrVal ? mtrVal.toString() : ''
+        });
+      }
+    });
+
+    return {
+      inward: { grando: inGrando, printdot: inPrintdot, paper: inPaperList },
+      outward: { grando: outGrando, printdot: outPrintdot, paper: outPaperList },
+      foundStart,
+      foundStop,
+      foundShift,
+      foundOperator
+    };
+  };
+
   const fetchRawMaterialSummary = async (overrideStart, overrideEnd) => {
     try {
       const activeStart = overrideStart !== undefined ? overrideStart : (dateStart || rawDate);
@@ -204,112 +310,46 @@ export default function JobPrintingLog() {
 
       const res = await api.getRawMaterialTransactions(params);
       if (res && res.data && Array.isArray(res.data)) {
-        const inGrando = { C: 0, M: 0, Y: 0, K: 0 };
-        const inPrintdot = { C: 0, M: 0, Y: 0, K: 0 };
-        const inPaperList = [];
+        const parsed = parseRawTransactionsForSummary(res.data, activeStart, activeEnd);
 
-        const outGrando = { C: 0, M: 0, Y: 0, K: 0 };
-        const outPrintdot = { C: 0, M: 0, Y: 0, K: 0 };
-        const outPaperList = [];
-
-        let foundStart = '';
-        let foundStop = '';
-        let foundShift = '';
-        let foundOperator = '';
-
-        res.data.forEach(t => {
-          if (!t.date) return;
-          const dObj = new Date(t.date);
-          const yyyy = dObj.getFullYear();
-          const mm = String(dObj.getMonth() + 1).padStart(2, '0');
-          const dd = String(dObj.getDate()).padStart(2, '0');
-          const dStr = `${yyyy}-${mm}-${dd}`;
-
-          if (activeStart && dStr < activeStart) return;
-          if (activeEnd && dStr > activeEnd) return;
-
-          if (t.notes) {
-            const tm = t.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
-              t.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
-            if (tm) {
-              if (!foundStart) foundStart = tm[1];
-              if (!foundStop) foundStop = tm[2];
-            }
-            const sh = t.notes.match(/Shift:\s*([^|\]]+)/i);
-            if (sh && !foundShift) foundShift = sh[1].trim();
-
-            const op = t.notes.match(/Operator:\s*([^|\]]+)/i);
-            if (op && !foundOperator && op[1].trim() !== '—') foundOperator = op[1].trim();
-          }
-
-          const mName = (t.materialName || '').toLowerCase();
-          const q = Number(t.qty) || 0;
-          const isIn = t.type === 'INWARD';
-          const targetG = isIn ? inGrando : outGrando;
-          const targetP = isIn ? inPrintdot : outPrintdot;
-          const targetPaperList = isIn ? inPaperList : outPaperList;
-
-          if (mName.includes('grando')) {
-            if (mName.includes('cyan') || t.color === 'Cyan') targetG.C += q;
-            else if (mName.includes('magenta') || t.color === 'Magenta') targetG.M += q;
-            else if (mName.includes('yellow') || t.color === 'Yellow') targetG.Y += q;
-            else if (mName.includes('black') || t.color === 'Black') targetG.K += q;
-          } else if (mName.includes('printdot')) {
-            if (mName.includes('cyan') || t.color === 'Cyan') targetP.C += q;
-            else if (mName.includes('magenta') || t.color === 'Magenta') targetP.M += q;
-            else if (mName.includes('yellow') || t.color === 'Yellow') targetP.Y += q;
-            else if (mName.includes('black') || t.color === 'Black') targetP.K += q;
-          } else if (mName.includes('paper') || t.panna) {
-            const mtrVal = t.metersPerRoll || (t.notes ? (t.notes.match(/Mtr:\s*([\d.]+)/i) || [])[1] : '');
-            targetPaperList.push({
-              id: targetPaperList.length + 1,
-              paperType: t.materialName || 'A++',
-              paperPanna: t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : '44" Panna',
-              paperCustomPanna: '',
-              paperRollsQty: q ? q.toString() : '',
-              paperMtrQty: mtrVal ? mtrVal.toString() : ''
-            });
-          }
-        });
-
-        if (foundStart) setRawStartTime(foundStart);
-        if (foundStop) setRawStopTime(foundStop);
-        if (foundShift) setRawShift(foundShift);
-        if (foundOperator) setRawOperator(foundOperator);
+        if (parsed.foundStart) setRawStartTime(parsed.foundStart);
+        if (parsed.foundStop) setRawStopTime(parsed.foundStop);
+        if (parsed.foundShift) setRawShift(parsed.foundShift);
+        if (parsed.foundOperator) setRawOperator(parsed.foundOperator);
 
         // Populate Inward Inputs
-        setGrandoInC(inGrando.C > 0 ? inGrando.C.toString() : '');
-        setGrandoInM(inGrando.M > 0 ? inGrando.M.toString() : '');
-        setGrandoInY(inGrando.Y > 0 ? inGrando.Y.toString() : '');
-        setGrandoInK(inGrando.K > 0 ? inGrando.K.toString() : '');
+        setGrandoInC(parsed.inward.grando.C > 0 ? parsed.inward.grando.C.toString() : '');
+        setGrandoInM(parsed.inward.grando.M > 0 ? parsed.inward.grando.M.toString() : '');
+        setGrandoInY(parsed.inward.grando.Y > 0 ? parsed.inward.grando.Y.toString() : '');
+        setGrandoInK(parsed.inward.grando.K > 0 ? parsed.inward.grando.K.toString() : '');
 
-        setPrintdotInC(inPrintdot.C > 0 ? inPrintdot.C.toString() : '');
-        setPrintdotInM(inPrintdot.M > 0 ? inPrintdot.M.toString() : '');
-        setPrintdotInY(inPrintdot.Y > 0 ? inPrintdot.Y.toString() : '');
-        setPrintdotInK(inPrintdot.K > 0 ? inPrintdot.K.toString() : '');
+        setPrintdotInC(parsed.inward.printdot.C > 0 ? parsed.inward.printdot.C.toString() : '');
+        setPrintdotInM(parsed.inward.printdot.M > 0 ? parsed.inward.printdot.M.toString() : '');
+        setPrintdotInY(parsed.inward.printdot.Y > 0 ? parsed.inward.printdot.Y.toString() : '');
+        setPrintdotInK(parsed.inward.printdot.K > 0 ? parsed.inward.printdot.K.toString() : '');
 
-        setInwardPaperEntries(inPaperList.length > 0 ? inPaperList : [
+        setInwardPaperEntries(parsed.inward.paper.length > 0 ? parsed.inward.paper : [
           { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
         ]);
 
         // Populate Outward Inputs
-        setGrandoOutC(outGrando.C > 0 ? outGrando.C.toString() : '');
-        setGrandoOutM(outGrando.M > 0 ? outGrando.M.toString() : '');
-        setGrandoOutY(outGrando.Y > 0 ? outGrando.Y.toString() : '');
-        setGrandoOutK(outGrando.K > 0 ? outGrando.K.toString() : '');
+        setGrandoOutC(parsed.outward.grando.C > 0 ? parsed.outward.grando.C.toString() : '');
+        setGrandoOutM(parsed.outward.grando.M > 0 ? parsed.outward.grando.M.toString() : '');
+        setGrandoOutY(parsed.outward.grando.Y > 0 ? parsed.outward.grando.Y.toString() : '');
+        setGrandoOutK(parsed.outward.grando.K > 0 ? parsed.outward.grando.K.toString() : '');
 
-        setPrintdotOutC(outPrintdot.C > 0 ? outPrintdot.C.toString() : '');
-        setPrintdotOutM(outPrintdot.M > 0 ? outPrintdot.M.toString() : '');
-        setPrintdotOutY(outPrintdot.Y > 0 ? outPrintdot.Y.toString() : '');
-        setPrintdotOutK(outPrintdot.K > 0 ? outPrintdot.K.toString() : '');
+        setPrintdotOutC(parsed.outward.printdot.C > 0 ? parsed.outward.printdot.C.toString() : '');
+        setPrintdotOutM(parsed.outward.printdot.M > 0 ? parsed.outward.printdot.M.toString() : '');
+        setPrintdotOutY(parsed.outward.printdot.Y > 0 ? parsed.outward.printdot.Y.toString() : '');
+        setPrintdotOutK(parsed.outward.printdot.K > 0 ? parsed.outward.printdot.K.toString() : '');
 
-        setOutwardPaperEntries(outPaperList.length > 0 ? outPaperList : [
+        setOutwardPaperEntries(parsed.outward.paper.length > 0 ? parsed.outward.paper : [
           { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
         ]);
 
         setRawMaterialSummary({
-          inward: { grando: inGrando, printdot: inPrintdot, paper: inPaperList },
-          outward: { grando: outGrando, printdot: outPrintdot, paper: outPaperList }
+          inward: parsed.inward,
+          outward: parsed.outward
         });
       }
     } catch (err) {
@@ -764,6 +804,206 @@ export default function JobPrintingLog() {
   useEffect(() => {
     fetchLogs();
   }, [searchJob, printFilters, dateStart, dateEnd]);
+
+  // ── ARCHIVE LOGS FETCHER ──
+  const fetchArchiveLogs = async (overrideStart, overrideEnd) => {
+    setLoadingArchive(true);
+    try {
+      const s = overrideStart !== undefined ? overrideStart : archiveDateStart;
+      const e = overrideEnd !== undefined ? overrideEnd : archiveDateEnd;
+      const res = await api.getJobPrintLogs({
+        dateStart: s,
+        dateEnd: e,
+        limit: 2000
+      });
+      if (res && res.data) {
+        setArchiveLogs(Array.isArray(res.data) ? res.data : []);
+      }
+    } catch (err) {
+      console.warn('Failed to load archive logs:', err);
+    } finally {
+      setLoadingArchive(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === 'reports') {
+      fetchArchiveLogs(archiveDateStart, archiveDateEnd);
+    }
+  }, [activeView, archiveDateStart, archiveDateEnd]);
+
+  // Group Archive logs by Shift or Full Day
+  const archiveGroups = useMemo(() => {
+    if (!archiveLogs || archiveLogs.length === 0) return [];
+
+    let filtered = archiveLogs;
+    if (archiveShift && archiveShift !== 'All') {
+      filtered = filtered.filter(l => (l.shift || 'Morning').toLowerCase() === archiveShift.toLowerCase());
+    }
+    if (archiveMachine && archiveMachine !== 'All') {
+      filtered = filtered.filter(l => (l.machineName || '').toLowerCase() === archiveMachine.toLowerCase());
+    }
+    if (archiveOperator && archiveOperator !== 'All') {
+      filtered = filtered.filter(l => (l.operatorName || '').toLowerCase() === archiveOperator.toLowerCase());
+    }
+    if (archiveSearch && archiveSearch.trim()) {
+      filtered = filtered.filter(l => matchSearchQuery(l, archiveSearch, ['jobNo', 'machineName', 'operatorName', 'notes', 'pass', 'shift']));
+    }
+
+    const groupsMap = {};
+    filtered.forEach(log => {
+      let dStr = '';
+      if (log.date) {
+        dStr = toLocalYMD(log.date);
+      } else if (log.created_date_time || log.createdAt) {
+        dStr = toLocalYMD(log.created_date_time || log.createdAt);
+      } else {
+        dStr = toLocalYMD();
+      }
+
+      const shiftStr = log.shift || 'Morning';
+      const key = archiveGroupBy === 'shift' ? `${dStr}__${shiftStr}` : dStr;
+
+      if (!groupsMap[key]) {
+        groupsMap[key] = {
+          key,
+          date: dStr,
+          shift: archiveGroupBy === 'shift' ? shiftStr : 'All Shifts',
+          logs: [],
+          totalMeters: 0,
+          uniqueJobs: new Set(),
+          machines: new Set(),
+          operators: new Set(),
+          passes: new Set()
+        };
+      }
+
+      groupsMap[key].logs.push(log);
+      groupsMap[key].totalMeters += Number(log.meters) || 0;
+      if (log.jobNo) groupsMap[key].uniqueJobs.add(log.jobNo);
+      if (log.machineName) groupsMap[key].machines.add(log.machineName);
+      if (log.operatorName) groupsMap[key].operators.add(log.operatorName);
+      if (log.pass) groupsMap[key].passes.add(log.pass);
+    });
+
+    return Object.values(groupsMap).sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      if (a.shift === 'Night' && b.shift === 'Morning') return -1;
+      if (a.shift === 'Morning' && b.shift === 'Night') return 1;
+      return 0;
+    });
+  }, [archiveLogs, archiveShift, archiveMachine, archiveOperator, archiveSearch, archiveGroupBy]);
+
+  // Aggregate KPI stats for archive
+  const archiveKpis = useMemo(() => {
+    let totalMeters = 0;
+    const uniqueJobs = new Set();
+    const activeMachines = new Set();
+    const activeOperators = new Set();
+    let morningMtr = 0;
+    let nightMtr = 0;
+
+    archiveGroups.forEach(g => {
+      totalMeters += g.totalMeters;
+      g.uniqueJobs.forEach(j => uniqueJobs.add(j));
+      g.machines.forEach(m => activeMachines.add(m));
+      g.operators.forEach(o => activeOperators.add(o));
+      if (g.shift === 'Morning') morningMtr += g.totalMeters;
+      else if (g.shift === 'Night') nightMtr += g.totalMeters;
+    });
+
+    return {
+      totalMeters,
+      totalGroups: archiveGroups.length,
+      jobCount: uniqueJobs.size,
+      machineCount: activeMachines.size,
+      operatorCount: activeOperators.size,
+      morningMtr,
+      nightMtr
+    };
+  }, [archiveGroups]);
+
+  // Open Interactive Preview Report Modal
+  const handleOpenPreviewReport = async (cfg = {}) => {
+    const targetStart = cfg.dateStart || dateStart;
+    const targetEnd = cfg.dateEnd || dateEnd;
+    const targetShift = cfg.shift || 'All Shifts';
+
+    let repLogs = cfg.logs;
+    if (!repLogs || repLogs.length === 0) {
+      try {
+        const queryParams = {
+          dateStart: targetStart,
+          dateEnd: targetEnd,
+          limit: 1000
+        };
+        if (targetShift && targetShift !== 'All' && targetShift !== 'All Shifts') {
+          queryParams.shift = targetShift;
+        }
+        if (cfg.machine && cfg.machine !== 'All' && cfg.machine !== 'All Machines') {
+          queryParams.machineName = cfg.machine;
+        }
+        if (cfg.operator && cfg.operator !== 'All' && cfg.operator !== 'All Operators') {
+          queryParams.operatorName = cfg.operator;
+        }
+        const res = await api.getJobPrintLogs(queryParams);
+        repLogs = (res && res.data && Array.isArray(res.data)) ? res.data : logs;
+      } catch (e) {
+        repLogs = logs;
+      }
+    }
+
+    // Fetch raw material summary for target range
+    let rawSumm = null;
+    try {
+      const rmRes = await api.getRawMaterialTransactions({
+        dateStart: targetStart,
+        dateEnd: targetEnd
+      });
+      if (rmRes && rmRes.data && Array.isArray(rmRes.data)) {
+        rawSumm = parseRawTransactionsForSummary(rmRes.data, targetStart, targetEnd);
+      }
+    } catch (e) {
+      rawSumm = rawMaterialSummary;
+    }
+
+    setPreviewReportConfig({
+      dateStart: targetStart,
+      dateEnd: targetEnd,
+      shift: targetShift,
+      machine: cfg.machine || 'All Machines',
+      operator: cfg.operator || 'All Operators',
+      pass: cfg.pass || 'All Passes',
+      logs: repLogs || [],
+      rawSummary: rawSumm || rawMaterialSummary
+    });
+    setShowPreviewModal(true);
+  };
+
+  // Export specific group logs to CSV
+  const handleExportGroupCSV = (groupLogs, fileName) => {
+    if (!groupLogs || groupLogs.length === 0) return;
+    const headers = ['Date', 'Job No', 'Machine Name', 'Pass', 'Meters Printed', 'Operator', 'Shift', 'Notes'];
+    const rows = groupLogs.map(l => [
+      formatDateDDMMYYYY(l.date || l.created_date_time),
+      l.jobNo,
+      `"${l.machineName || ''}"`,
+      `"${l.pass || ''}"`,
+      l.meters || 0,
+      `"${l.operatorName || ''}"`,
+      l.shift || '',
+      `"${l.notes || ''}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', fileName || `Printing_Report_${toLocalYMD()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const printFilterCategories = useMemo(() => [
     {
@@ -1309,9 +1549,52 @@ export default function JobPrintingLog() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView('reports');
+              fetchArchiveLogs(archiveDateStart, archiveDateEnd);
+            }}
+            className="btn-secondary"
+            style={{
+              padding: '0.55rem 1.1rem',
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid rgba(168,85,247,0.4)',
+              background: 'rgba(168,85,247,0.1)',
+              color: '#c084fc',
+              fontWeight: 700
+            }}
+          >
+            <History size={15} /> Previous Reports
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setReportStartDate(dateStart);
+              setReportEndDate(dateEnd);
+              setShowReportModal(true);
+            }}
+            className="btn-primary"
+            style={{
+              padding: '0.55rem 1.1rem',
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+              fontWeight: 700
+            }}
+          >
+            <FileText size={15} /> Download Report
+          </button>
+
           {/* Export CSV */}
           <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Download size={15} /> Export CSV Report
+            <Download size={15} /> Export CSV
           </button>
         </div>
       </div>
@@ -1448,6 +1731,40 @@ export default function JobPrintingLog() {
           }}
         >
           <Cpu size={15} /> Live Machine Fleet Monitor
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveView('reports');
+            fetchArchiveLogs(archiveDateStart, archiveDateEnd);
+          }}
+          style={{
+            padding: '0.55rem 1.1rem',
+            borderRadius: '8px',
+            fontSize: '0.84rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            border: activeView === 'reports' ? '1px solid #a855f7' : '1px solid transparent',
+            background: activeView === 'reports' ? 'rgba(168,85,247,0.18)' : 'transparent',
+            color: activeView === 'reports' ? '#c084fc' : 'var(--text-muted)',
+            cursor: 'pointer'
+          }}
+        >
+          <History size={15} /> Previous Reports & Archives
+          <span style={{
+            marginLeft: 4,
+            padding: '0.1rem 0.45rem',
+            borderRadius: '999px',
+            background: activeView === 'reports' ? '#a855f7' : 'rgba(255,255,255,0.1)',
+            color: activeView === 'reports' ? '#fff' : 'var(--text-muted)',
+            fontSize: '0.72rem',
+            fontWeight: 800
+          }}>
+            {archiveGroups.length}
+          </span>
         </button>
       </div>
 
@@ -1809,7 +2126,32 @@ export default function JobPrintingLog() {
                 <Sparkles size={14} /> GENERATE REPORT
               </button>
 
-              {/* Button 2: Download Report */}
+              {/* Button 2: Previous Reports */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveView('reports');
+                  fetchArchiveLogs(archiveDateStart, archiveDateEnd);
+                }}
+                className="btn-secondary"
+                style={{
+                  padding: '0.4rem 0.85rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: 'rgba(168,85,247,0.12)',
+                  color: '#c084fc',
+                  border: '1px solid rgba(168,85,247,0.35)',
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <History size={14} /> Previous Reports
+              </button>
+
+              {/* Button 3: Download Report */}
               <button
                 type="button"
                 onClick={() => {
@@ -2462,6 +2804,650 @@ export default function JobPrintingLog() {
       </>
       )}
 
+      {/* ── 3. PREVIOUS REPORTS ARCHIVE VIEW (When activeView === 'reports') ── */}
+      {activeView === 'reports' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Section 1: Previous Reports Header Banner */}
+          <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderLeft: '4px solid #a855f7' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #a855f7 0%, #6366f1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(168,85,247,0.3)' }}>
+                <History size={22} color="#fff" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  Previous Production Reports & Historical Shift Archive
+                </h2>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
+                  Browse, review, and print past shift reports, inspect operator meterage, and download official PDF statements.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setActiveView('log')}
+                className="btn-secondary"
+                style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Printer size={15} /> Back to Print Log
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fetchArchiveLogs(archiveDateStart, archiveDateEnd)}
+                className="btn-primary"
+                style={{
+                  padding: '0.55rem 1.1rem',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                  fontWeight: 700
+                }}
+              >
+                <RefreshCw size={15} className={loadingArchive ? 'animate-spin' : ''} /> {loadingArchive ? 'Refreshing...' : 'Refresh Archive'}
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: Historical Archive KPI Highlights */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+            <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #a855f7' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(168,85,247,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Activity size={18} color="#c084fc" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Period Output</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#c084fc' }}>
+                  {archiveKpis.totalMeters.toFixed(1)} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>mtr</span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                  ☀️ Day: <strong style={{ color: '#38bdf8' }}>{archiveKpis.morningMtr.toFixed(0)}m</strong> | 🌙 Night: <strong style={{ color: '#a78bfa' }}>{archiveKpis.nightMtr.toFixed(0)}m</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #38bdf8' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(56,189,248,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={18} color="#38bdf8" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Shifts / Reports Logged</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                  {archiveKpis.totalGroups} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>recorded shifts</span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                  Selected historical period
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #10b981' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(16,185,129,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle2 size={18} color="#10b981" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Unique Job Cards Processed</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#10b981' }}>
+                  {archiveKpis.jobCount} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Cards</span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                  Across all active shifts
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(245,158,11,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Cpu size={18} color="#f59e0b" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Active Machinery & Crew</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                  {archiveKpis.machineCount} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Machines</span> • {archiveKpis.operatorCount} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Operators</span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                  Total active production crew
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Comprehensive Filter Toolbar */}
+          <div className="glass-panel" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+              {/* Presets */}
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#c084fc', textTransform: 'uppercase', marginRight: 4 }}>
+                  QUICK PRESETS:
+                </span>
+                {[
+                  { id: 'yesterday', label: 'Yesterday' },
+                  { id: 'today', label: 'Today' },
+                  { id: 'last_3_days', label: 'Last 3 Days' },
+                  { id: 'last_7_days', label: 'Last 7 Days' },
+                  { id: 'this_month', label: 'This Month' },
+                  { id: 'all', label: 'All Time' }
+                ].map(p => {
+                  const isActive = archivePreset === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setArchivePreset(p.id);
+                        if (p.id === 'last_3_days') {
+                          const now = new Date();
+                          const end = toLocalYMD(now);
+                          const st = new Date(now);
+                          st.setDate(st.getDate() - 2);
+                          const start = toLocalYMD(st);
+                          setArchiveDateStart(start);
+                          setArchiveDateEnd(end);
+                          fetchArchiveLogs(start, end);
+                        } else {
+                          const { dateStart: ds, dateEnd: de } = getDatePresetRange(p.id);
+                          setArchiveDateStart(ds || '');
+                          setArchiveDateEnd(de || '');
+                          fetchArchiveLogs(ds || '', de || '');
+                        }
+                      }}
+                      style={{
+                        padding: '0.32rem 0.75rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        borderRadius: '6px',
+                        border: isActive ? '1px solid #a855f7' : '1px solid var(--border-light)',
+                        background: isActive ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
+                        color: isActive ? '#c084fc' : 'var(--text-primary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Group By Selector */}
+              <div style={{ display: 'flex', gap: '0.35rem', background: 'rgba(255,255,255,0.04)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                <button
+                  type="button"
+                  onClick={() => setArchiveGroupBy('shift')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    borderRadius: '5px',
+                    border: 'none',
+                    background: archiveGroupBy === 'shift' ? '#a855f7' : 'transparent',
+                    color: archiveGroupBy === 'shift' ? '#ffffff' : 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🌅 By Shift (Morning / Night)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setArchiveGroupBy('date')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    borderRadius: '5px',
+                    border: 'none',
+                    background: archiveGroupBy === 'date' ? '#38bdf8' : 'transparent',
+                    color: archiveGroupBy === 'date' ? '#ffffff' : 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📅 By Full Day
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Dropdowns Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', alignItems: 'flex-end' }}>
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.7rem', fontWeight: 800, color: '#38bdf8' }}>FROM DATE</label>
+                <input
+                  type="date"
+                  value={archiveDateStart}
+                  onChange={e => {
+                    setArchiveDateStart(e.target.value);
+                    setArchivePreset('custom');
+                    fetchArchiveLogs(e.target.value, archiveDateEnd);
+                  }}
+                  style={{ ...inputStyle, padding: '0.5rem 0.7rem', fontSize: '0.8rem', fontWeight: 700 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.7rem', fontWeight: 800, color: '#a78bfa' }}>TO DATE</label>
+                <input
+                  type="date"
+                  value={archiveDateEnd}
+                  onChange={e => {
+                    setArchiveDateEnd(e.target.value);
+                    setArchivePreset('custom');
+                    fetchArchiveLogs(archiveDateStart, e.target.value);
+                  }}
+                  style={{ ...inputStyle, padding: '0.5rem 0.7rem', fontSize: '0.8rem', fontWeight: 700 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.7rem', fontWeight: 800, color: '#f59e0b' }}>SHIFT FILTER</label>
+                <select
+                  value={archiveShift}
+                  onChange={e => setArchiveShift(e.target.value)}
+                  style={{ ...inputStyle, padding: '0.5rem 0.7rem', fontSize: '0.8rem', fontWeight: 700 }}
+                >
+                  <option value="All">All Shifts (Day & Night)</option>
+                  <option value="Morning">Morning Shift Only</option>
+                  <option value="Night">Night Shift Only</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.7rem', fontWeight: 800, color: '#10b981' }}>MACHINE</label>
+                <select
+                  value={archiveMachine}
+                  onChange={e => setArchiveMachine(e.target.value)}
+                  style={{ ...inputStyle, padding: '0.5rem 0.7rem', fontSize: '0.8rem', fontWeight: 700 }}
+                >
+                  <option value="All">All Machines</option>
+                  {machinesList.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.7rem', fontWeight: 800, color: '#ec4899' }}>OPERATOR</label>
+                <select
+                  value={archiveOperator}
+                  onChange={e => setArchiveOperator(e.target.value)}
+                  style={{ ...inputStyle, padding: '0.5rem 0.7rem', fontSize: '0.8rem', fontWeight: 700 }}
+                >
+                  <option value="All">All Operators</option>
+                  {operatorsList.map(op => (
+                    <option key={op} value={op}>{op}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>SEARCH</label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    value={archiveSearch}
+                    onChange={e => setArchiveSearch(e.target.value)}
+                    placeholder="Search Job No, operator..."
+                    style={{ ...inputStyle, paddingLeft: 28, padding: '0.5rem 0.7rem 0.5rem 28px', fontSize: '0.8rem' }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Previous Reports List / Cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <History size={16} color="#a855f7" />
+                Previous Reports ({archiveGroups.length} Shift Statements Available)
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Click <strong>Preview Report</strong> to review full details or <strong>Download PDF</strong> to save official statement.
+              </span>
+            </div>
+
+            {loadingArchive ? (
+              <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <RefreshCw size={26} className="animate-spin" style={{ margin: '0 auto 10px', color: '#a855f7' }} />
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Loading Historical Production Reports...</div>
+                <div style={{ fontSize: '0.78rem', marginTop: 4 }}>Retrieving past machine logs and shift summaries</div>
+              </div>
+            ) : archiveGroups.length === 0 ? (
+              <div className="glass-panel" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(168,85,247,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                  <History size={28} color="#c084fc" />
+                </div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  No Previous Reports Found
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: 440, margin: '0.5rem auto 1.25rem' }}>
+                  No print run records match your selected date range ({archiveDateStart || 'all'} to {archiveDateEnd || 'all'}) and filter criteria.
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { dateStart: ds, dateEnd: de } = getDatePresetRange('last_30_days');
+                      setArchivePreset('last_30_days');
+                      setArchiveDateStart(ds || '');
+                      setArchiveDateEnd(de || '');
+                      fetchArchiveLogs(ds || '', de || '');
+                    }}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                  >
+                    View Last 30 Days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setArchivePreset('all');
+                      setArchiveDateStart('');
+                      setArchiveDateEnd('');
+                      fetchArchiveLogs('', '');
+                    }}
+                    className="btn-primary"
+                    style={{ fontSize: '0.8rem', padding: '0.45rem 1rem', background: 'linear-gradient(135deg, #a855f7, #6366f1)' }}
+                  >
+                    View All Historical Records
+                  </button>
+                </div>
+              </div>
+            ) : (
+              archiveGroups.map(group => {
+                const isExpanded = expandedArchiveKey === group.key;
+                const isMorning = group.shift === 'Morning';
+                const isNight = group.shift === 'Night';
+                const accentColor = isMorning ? '#0284c7' : isNight ? '#a855f7' : '#10b981';
+
+                return (
+                  <div
+                    key={group.key}
+                    className="glass-panel"
+                    style={{
+                      padding: '1.15rem 1.25rem',
+                      borderLeft: `5px solid ${accentColor}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.85rem',
+                      transition: 'all 0.2s ease',
+                      background: isExpanded ? 'rgba(255,255,255,0.03)' : undefined
+                    }}
+                  >
+                    {/* Top Row: Date, Shift, Output & Main Actions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+                        {/* Calendar Day Icon */}
+                        <div style={{
+                          padding: '0.4rem 0.75rem',
+                          borderRadius: '8px',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid var(--border-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <Calendar size={15} color={accentColor} />
+                          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            {formatDateDDMMYYYY(group.date)}
+                          </span>
+                        </div>
+
+                        {/* Shift Badge */}
+                        <span
+                          style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            padding: '3px 9px',
+                            borderRadius: '6px',
+                            background: isMorning ? 'rgba(2, 132, 199, 0.15)' : isNight ? 'rgba(168, 85, 247, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                            color: isMorning ? '#38bdf8' : isNight ? '#c084fc' : '#34d399',
+                            border: `1px solid ${isMorning ? 'rgba(2, 132, 199, 0.3)' : isNight ? 'rgba(168, 85, 247, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
+                          }}
+                        >
+                          {isMorning ? '☀️ Morning Shift (09:00 AM – 08:59 PM)' : isNight ? '🌙 Night Shift (09:00 PM – 08:59 AM)' : '📅 Full Day Summary'}
+                        </span>
+                      </div>
+
+                      {/* Right: Large Output Badge & Action Buttons */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {/* Output Meter Badge */}
+                        <div style={{
+                          padding: '0.35rem 0.85rem',
+                          borderRadius: '8px',
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          display: 'flex',
+                          alignItems: 'baseline',
+                          gap: '4px',
+                          marginRight: 6
+                        }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Printed:</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981' }}>
+                            {group.totalMeters.toFixed(2)}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981' }}>mtr</span>
+                        </div>
+
+                        {/* 1. PREVIEW REPORT BUTTON */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPreviewReport({
+                            dateStart: group.date,
+                            dateEnd: group.date,
+                            shift: group.shift,
+                            logs: group.logs
+                          })}
+                          className="btn-primary"
+                          style={{
+                            padding: '0.45rem 0.95rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+                            cursor: 'pointer'
+                          }}
+                          title="Open Interactive On-Screen Report Preview"
+                        >
+                          <Eye size={14} /> Preview Report
+                        </button>
+
+                        {/* 2. PRINT DIALOG BUTTON */}
+                        <button
+                          type="button"
+                          onClick={() => handlePrintOperatorReport(group.logs)}
+                          className="btn-secondary"
+                          style={{
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            cursor: 'pointer'
+                          }}
+                          title="Open Printable Layout in Browser"
+                        >
+                          <Printer size={14} /> Print
+                        </button>
+
+                        {/* 3. DOWNLOAD PDF BUTTON */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              let shiftTag = 'All_Shifts';
+                              if (group.shift === 'Morning') shiftTag = 'Morning_Shift';
+                              else if (group.shift === 'Night') shiftTag = 'Night_Shift';
+                              const fileName = `Printing_Report_${shiftTag}_${group.date}.pdf`;
+
+                              await api.downloadFabricCombinedReportPdf(
+                                group.date,
+                                group.date,
+                                ['machine'],
+                                fileName,
+                                {
+                                  shift: group.shift === 'All Shifts' ? '' : group.shift
+                                }
+                              );
+                            } catch (err) {
+                              alert(err.message || 'Failed to download report PDF.');
+                            }
+                          }}
+                          className="btn-secondary"
+                          style={{
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'rgba(168,85,247,0.1)',
+                            border: '1px solid rgba(168,85,247,0.3)',
+                            color: '#c084fc',
+                            cursor: 'pointer'
+                          }}
+                          title="Download Official PDF Report"
+                        >
+                          <Download size={14} /> PDF
+                        </button>
+
+                        {/* 4. EXPORT CSV BUTTON */}
+                        <button
+                          type="button"
+                          onClick={() => handleExportGroupCSV(group.logs, `Printing_Report_${group.date}_${group.shift || 'shift'}.csv`)}
+                          className="btn-secondary"
+                          style={{
+                            padding: '0.45rem 0.75rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer'
+                          }}
+                          title="Export CSV data for this shift"
+                        >
+                          <FileSpreadsheet size={14} /> CSV
+                        </button>
+
+                        {/* 5. TOGGLE INLINE RUNS ACCORDION */}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedArchiveKey(isExpanded ? null : group.key)}
+                          className="btn-icon"
+                          style={{
+                            padding: '0.45rem',
+                            borderRadius: '6px',
+                            background: isExpanded ? 'rgba(255,255,255,0.1)' : 'transparent',
+                            color: isExpanded ? '#38bdf8' : 'var(--text-muted)'
+                          }}
+                          title={isExpanded ? 'Collapse Run Logs' : 'Expand Run Logs'}
+                        >
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Middle Row: Quick Summary Stats Tags */}
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                        <FileText size={13} color="#38bdf8" />
+                        <strong>{group.uniqueJobs.size}</strong> Job Cards
+                      </span>
+
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                        <Cpu size={13} color="#10b981" />
+                        Machines: <strong style={{ color: 'var(--text-primary)' }}>{Array.from(group.machines).join(', ') || 'Standard'}</strong>
+                      </span>
+
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                        <User size={13} color="#f59e0b" />
+                        Operators: <strong style={{ color: 'var(--text-primary)' }}>{Array.from(group.operators).join(', ') || 'Operator'}</strong>
+                      </span>
+
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                        <Layers size={13} color="#a855f7" />
+                        Passes: <strong style={{ color: 'var(--text-primary)' }}>{Array.from(group.passes).join(', ') || '1 PASS'}</strong>
+                      </span>
+
+                      <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {group.logs.length} individual run log entries recorded
+                      </span>
+                    </div>
+
+                    {/* Expandable Inline Runs Table */}
+                    {isExpanded && (
+                      <div style={{ marginTop: '0.4rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', animation: 'fadeIn 0.15s ease' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Activity size={13} /> Complete Machine Run Entries for {formatDateDDMMYYYY(group.date)} ({group.shift})
+                        </div>
+                        <div style={{ overflowX: 'auto', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', textAlign: 'left' }}>
+                            <thead>
+                              <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Time / Date</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Job No</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Party</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Design</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Machine</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Pass</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)', textAlign: 'right' }}>Meters</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Operator</th>
+                                <th style={{ padding: '6px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Remarks</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.logs.map((l, lIdx) => {
+                                const matchedJob = jobCards.find(c => String(c.jobNo) === String(l.jobNo) || c._id === l.jobCardId);
+                                return (
+                                  <tr key={l._id || lIdx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                    <td style={{ padding: '6px 10px' }}>{formatDateTimeDDMMYYYY(l.date || l.created_date_time)}</td>
+                                    <td style={{ padding: '6px 10px', fontWeight: 800, color: '#38bdf8' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => loadJobCardHistory(l.jobNo)}
+                                        style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                                      >
+                                        #{l.jobNo}
+                                      </button>
+                                    </td>
+                                    <td style={{ padding: '6px 10px' }}>{matchedJob ? (matchedJob.party || '—') : '—'}</td>
+                                    <td style={{ padding: '6px 10px' }}>{matchedJob ? (matchedJob.designName || matchedJob.designNo || '—') : '—'}</td>
+                                    <td style={{ padding: '6px 10px', fontWeight: 700 }}>{l.machineName}</td>
+                                    <td style={{ padding: '6px 10px' }}>{l.pass}</td>
+                                    <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#34d399' }}>
+                                      {Number(l.meters).toFixed(2)} mtr
+                                    </td>
+                                    <td style={{ padding: '6px 10px' }}>{l.operatorName || '—'}</td>
+                                    <td style={{ padding: '6px 10px', color: 'var(--text-muted)' }}>{l.notes || '—'}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+        </div>
+      )}
+
+
       {/* ── 4. JOB CARD MULTI-RUN HISTORY MODAL ── */}
       {jobHistoryData && viewingJobHistory && (
         <div className="modal-overlay" onClick={() => setJobHistoryData(null)}>
@@ -2692,8 +3678,8 @@ export default function JobPrintingLog() {
               </div>
             </div>
 
-            {/* Modal Footer: DOWNLOAD REPORT & CLOSE WINDOW */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
+            {/* Modal Footer: PREVIEW REPORT, DOWNLOAD REPORT & CLOSE WINDOW */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => setShowReportModal(false)}
@@ -2701,6 +3687,35 @@ export default function JobPrintingLog() {
                 style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', fontWeight: 700 }}
               >
                 Close Window
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowReportModal(false);
+                  await handleOpenPreviewReport({
+                    dateStart: reportStartDate,
+                    dateEnd: reportEndDate,
+                    shift: reportShift || 'All Shifts',
+                    machine: reportMachine || 'All',
+                    pass: reportPass || 'All'
+                  });
+                }}
+                className="btn-secondary"
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  background: 'rgba(56,189,248,0.12)',
+                  color: '#38bdf8',
+                  border: '1px solid rgba(56,189,248,0.35)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Eye size={15} /> Preview Report
               </button>
 
               <button
@@ -2760,6 +3775,443 @@ export default function JobPrintingLog() {
           </div>
         </div>
       )}
+
+
+      {/* ── 5B. DEDICATED INTERACTIVE PREVIEW REPORT MODAL ── */}
+      {showPreviewModal && previewReportConfig && (() => {
+        const pLogs = previewReportConfig.logs || [];
+        const totalMtr = pLogs.reduce((s, l) => s + (Number(l.meters) || 0), 0);
+        const uniqueJobs = new Set(pLogs.map(l => l.jobNo)).size;
+        const morningMtr = pLogs.filter(l => l.shift === 'Morning').reduce((s, l) => s + (Number(l.meters) || 0), 0);
+        const nightMtr = pLogs.filter(l => l.shift === 'Night').reduce((s, l) => s + (Number(l.meters) || 0), 0);
+
+        // Machine & Pass aggregations
+        const machPassMap = {};
+        pLogs.forEach(l => {
+          const m = l.machineName || 'Standard Machine';
+          const p = l.pass || '1 PASS';
+          const k = `${m}__${p}`;
+          if (!machPassMap[k]) {
+            machPassMap[k] = { machine: m, pass: p, totalMtr: 0, count: 0, jobs: new Set() };
+          }
+          machPassMap[k].totalMtr += Number(l.meters) || 0;
+          machPassMap[k].count += 1;
+          if (l.jobNo) machPassMap[k].jobs.add(l.jobNo);
+        });
+        const machPassList = Object.values(machPassMap);
+
+        const rawSumm = previewReportConfig.rawSummary || rawMaterialSummary;
+        const outG = rawSumm?.outward?.grando || { C: 0, M: 0, Y: 0, K: 0 };
+        const outP = rawSumm?.outward?.printdot || { C: 0, M: 0, Y: 0, K: 0 };
+        const outPapers = rawSumm?.outward?.paper || [];
+
+        return (
+          <div
+            className="modal-overlay"
+            onClick={() => setShowPreviewModal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 99999,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+              animation: 'fadeIn 0.15s ease-out'
+            }}
+          >
+            <div
+              className="modal-content"
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: 1040,
+                maxHeight: '92vh',
+                background: 'var(--bg-card, #131722)',
+                borderRadius: '16px',
+                border: '1px solid var(--border-light, #2a324b)',
+                boxShadow: '0 25px 70px rgba(0,0,0,0.85)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                animation: 'scaleUp 0.18s ease-out'
+              }}
+            >
+              {/* Modal Header */}
+              <div style={{
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1.5px solid var(--border-light)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'rgba(255,255,255,0.02)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 10,
+                    background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)'
+                  }}>
+                    <FileText size={22} color="#fff" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                      ELITE DIGITAL PRINTS — PRINTING PRODUCTION REPORT PREVIEW
+                    </h3>
+                    <div style={{ display: 'flex', gap: '0.6rem', marginTop: 4, alignItems: 'center', flexWrap: 'wrap', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      <span>
+                        Period: <strong style={{ color: '#38bdf8' }}>{formatDateDDMMYYYY(previewReportConfig.dateStart)}</strong> to <strong style={{ color: '#38bdf8' }}>{formatDateDDMMYYYY(previewReportConfig.dateEnd)}</strong>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Shift: <strong style={{ color: '#c084fc' }}>{previewReportConfig.shift}</strong>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Total Entries: <strong style={{ color: 'var(--text-primary)' }}>{pLogs.length}</strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="btn-icon"
+                  style={{ borderRadius: 8, padding: 6 }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Scrollable Modal Content */}
+              <div style={{
+                overflowY: 'auto',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem'
+              }}>
+                {/* 1. Top KPI Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
+                  <div className="glass-panel" style={{ padding: '0.85rem 1rem', borderLeft: '4px solid #0284c7' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Printed Output</div>
+                    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7', marginTop: 2 }}>
+                      {totalMtr.toFixed(2)} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>mtr</span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                      ☀️ Day: <strong style={{ color: '#38bdf8' }}>{morningMtr.toFixed(1)}m</strong> | 🌙 Night: <strong style={{ color: '#a78bfa' }}>{nightMtr.toFixed(1)}m</strong>
+                    </div>
+                  </div>
+
+                  <div className="glass-panel" style={{ padding: '0.85rem 1rem', borderLeft: '4px solid #7c3aed' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Job Cards Processed</div>
+                    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>
+                      {uniqueJobs} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Cards</span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                      {pLogs.length} total run entries logged
+                    </div>
+                  </div>
+
+                  <div className="glass-panel" style={{ padding: '0.85rem 1rem', borderLeft: '4px solid #ec4899' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Estimated Ink Consumption</div>
+                    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ec4899', marginTop: 2 }}>
+                      {(totalMtr * 0.016).toFixed(1)} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Liters</span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                      Avg. 16 ml / meter across colors
+                    </div>
+                  </div>
+
+                  <div className="glass-panel" style={{ padding: '0.85rem 1rem', borderLeft: '4px solid #f59e0b' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Estimated Paper Used</div>
+                    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#f59e0b', marginTop: 2 }}>
+                      {(totalMtr * 1.15).toFixed(0)} <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>sq. mtr</span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                      Approx. {((totalMtr * 1.15) / 100).toFixed(1)} paper rolls
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Machine & Pass Output Breakdown Table */}
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Cpu size={15} /> Machine & Pass Speed Breakdown
+                  </div>
+                  <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Machine</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Pass</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)', textAlign: 'right' }}>Total Meters</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)', textAlign: 'right' }}>Run Entries</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)', textAlign: 'right' }}>Job Cards</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {machPassList.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ padding: '0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                              No machine breakdown data available.
+                            </td>
+                          </tr>
+                        ) : (
+                          machPassList.map((mp, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                              <td style={{ padding: '7px 10px', fontWeight: 700, color: 'var(--text-primary)' }}>{mp.machine}</td>
+                              <td style={{ padding: '7px 10px' }}>
+                                <span style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(56,189,248,0.1)', color: '#38bdf8', fontWeight: 800, fontSize: '0.72rem' }}>
+                                  {mp.pass}
+                                </span>
+                              </td>
+                              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 900, color: '#10b981' }}>
+                                {mp.totalMtr.toFixed(2)} mtr
+                              </td>
+                              <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--text-muted)' }}>{mp.count} runs</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{mp.jobs.size} jobs</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 3. Raw Material Usage Section (if recorded) */}
+                {(outG.C > 0 || outG.M > 0 || outG.Y > 0 || outG.K > 0 || outP.C > 0 || outP.M > 0 || outP.Y > 0 || outP.K > 0 || outPapers.length > 0) && (
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sparkles size={15} /> Raw Material Consumption Summary
+                    </div>
+                    <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                            <th style={{ padding: '7px 10px', fontWeight: 800 }}>Machine Name</th>
+                            <th style={{ padding: '7px 10px', fontWeight: 800, textAlign: 'right', color: '#0284c7' }}>Cyan (C)</th>
+                            <th style={{ padding: '7px 10px', fontWeight: 800, textAlign: 'right', color: '#ec4899' }}>Magenta (M)</th>
+                            <th style={{ padding: '7px 10px', fontWeight: 800, textAlign: 'right', color: '#ca8a04' }}>Yellow (Y)</th>
+                            <th style={{ padding: '7px 10px', fontWeight: 800, textAlign: 'right', color: '#94a3b8' }}>Black (K)</th>
+                            <th style={{ padding: '7px 10px', fontWeight: 800 }}>Paper Types Consumed</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                            <td style={{ padding: '7px 10px', fontWeight: 800, color: '#38bdf8' }}>GRANDO</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>{outG.C ? `${outG.C.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#ec4899' }}>{outG.M ? `${outG.M.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#ca8a04' }}>{outG.Y ? `${outG.Y.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#94a3b8' }}>{outG.K ? `${outG.K.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', color: 'var(--text-muted)' }}>
+                              {outPapers.map(p => `${p.paperType || 'A++'} (${p.paperPanna || ''}) : ${p.paperRollsQty || 0} Rolls`).join(', ') || 'Standard paper'}
+                            </td>
+                          </tr>
+                          <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                            <td style={{ padding: '7px 10px', fontWeight: 800, color: '#a78bfa' }}>PRINTDOT</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>{outP.C ? `${outP.C.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#ec4899' }}>{outP.M ? `${outP.M.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#ca8a04' }}>{outP.Y ? `${outP.Y.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#94a3b8' }}>{outP.K ? `${outP.K.toFixed(2)} L` : '—'}</td>
+                            <td style={{ padding: '7px 10px', color: 'var(--text-muted)' }}>—</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Complete Printing Run Entries Table */}
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Printer size={15} /> Detailed Print Run Logs ({pLogs.length} Records)
+                  </div>
+                  <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Time / Date</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Shift</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Job No</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Party / Client</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Design</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Machine</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Pass</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)', textAlign: 'right' }}>Meters</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Operator</th>
+                          <th style={{ padding: '7px 10px', fontWeight: 800, color: 'var(--text-muted)' }}>Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={10} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                              No print entries logged for this period.
+                            </td>
+                          </tr>
+                        ) : (
+                          pLogs.map((l, idx) => {
+                            const matched = jobCards.find(c => c._id === l.jobCardId || String(c.jobNo) === String(l.jobNo));
+                            const isMorn = l.shift === 'Morning';
+                            return (
+                              <tr key={l._id || idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{formatDateTimeDDMMYYYY(l.date || l.created_date_time)}</td>
+                                <td style={{ padding: '6px 10px' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 5px', borderRadius: 3, background: isMorn ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', color: isMorn ? '#38bdf8' : '#a78bfa' }}>
+                                    {l.shift || 'General'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '6px 10px', fontWeight: 800, color: '#38bdf8' }}>
+                                  #{l.jobNo}
+                                </td>
+                                <td style={{ padding: '6px 10px' }}>{matched ? (matched.party || '—') : '—'}</td>
+                                <td style={{ padding: '6px 10px' }}>{matched ? (matched.designName || matched.designNo || '—') : '—'}</td>
+                                <td style={{ padding: '6px 10px', fontWeight: 700 }}>{l.machineName}</td>
+                                <td style={{ padding: '6px 10px' }}>{l.pass}</td>
+                                <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#34d399' }}>
+                                  {Number(l.meters).toFixed(2)} mtr
+                                </td>
+                                <td style={{ padding: '6px 10px' }}>{l.operatorName || '—'}</td>
+                                <td style={{ padding: '6px 10px', color: 'var(--text-muted)' }}>{l.notes || '—'}</td>
+                              </tr>
+                            );
+                          })
+                        )}
+                        <tr style={{ background: 'rgba(255,255,255,0.04)', fontWeight: 900 }}>
+                          <td colSpan={7} style={{ padding: '8px 10px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                            GRAND TOTAL PRINTED METERS ({pLogs.length} LOG ENTRIES)
+                          </td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '0.95rem', color: '#10b981' }}>
+                            {totalMtr.toFixed(2)} mtr
+                          </td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1.5px solid var(--border-light)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+                background: 'rgba(255,255,255,0.02)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="btn-secondary"
+                  style={{ padding: '0.6rem 1.25rem', fontSize: '0.84rem', fontWeight: 700 }}
+                >
+                  Close Preview
+                </button>
+
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  {/* Export CSV */}
+                  <button
+                    type="button"
+                    onClick={() => handleExportGroupCSV(pLogs, `Printing_Report_Preview_${previewReportConfig.dateStart}_to_${previewReportConfig.dateEnd}.csv`)}
+                    className="btn-secondary"
+                    style={{ padding: '0.6rem 1.1rem', fontSize: '0.84rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <FileSpreadsheet size={15} /> Export CSV
+                  </button>
+
+                  {/* Print / Format Options */}
+                  <button
+                    type="button"
+                    onClick={() => handlePrintOperatorReport(pLogs)}
+                    className="btn-secondary"
+                    style={{
+                      padding: '0.6rem 1.15rem',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'rgba(56,189,248,0.1)',
+                      border: '1px solid rgba(56,189,248,0.3)',
+                      color: '#38bdf8'
+                    }}
+                  >
+                    <Printer size={15} /> Print / Thermal Dialog
+                  </button>
+
+                  {/* Download Official PDF */}
+                  <button
+                    type="button"
+                    disabled={previewLoadingPdf}
+                    onClick={async () => {
+                      setPreviewLoadingPdf(true);
+                      try {
+                        let shiftTag = 'All_Shifts';
+                        if (previewReportConfig.shift === 'Morning') shiftTag = 'Morning_Shift';
+                        else if (previewReportConfig.shift === 'Night') shiftTag = 'Night_Shift';
+
+                        const fileName = `Printing_Production_Report_${shiftTag}_${previewReportConfig.dateStart}_to_${previewReportConfig.dateEnd}.pdf`;
+
+                        await api.downloadFabricCombinedReportPdf(
+                          previewReportConfig.dateStart,
+                          previewReportConfig.dateEnd,
+                          ['machine'],
+                          fileName,
+                          {
+                            startTime: rawStartTime || '',
+                            stopTime: rawStopTime || '',
+                            operator: rawOperator || '',
+                            shift: previewReportConfig.shift === 'All Shifts' ? '' : previewReportConfig.shift,
+                            machineName: previewReportConfig.machine === 'All Machines' ? '' : previewReportConfig.machine,
+                            pass: previewReportConfig.pass === 'All Passes' ? '' : previewReportConfig.pass
+                          }
+                        );
+                      } catch (err) {
+                        alert(err.message || 'Failed to download report PDF.');
+                      } finally {
+                        setPreviewLoadingPdf(false);
+                      }
+                    }}
+                    className="btn-primary"
+                    style={{
+                      padding: '0.6rem 1.35rem',
+                      fontSize: '0.84rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Download size={16} /> {previewLoadingPdf ? 'Generating PDF...' : 'Download Official PDF'}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
 
       {/* ── 6. RAW MATERIAL FORM MODAL — PREMIUM REDESIGN (50% INWARD | 50% OUTWARD SPLIT VIEW) ── */}

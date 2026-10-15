@@ -34,6 +34,7 @@ const ReportsCenter = lazy(() => import('./components/ReportsCenter'));
 const UnicommerceHub = lazy(() => import('./components/UnicommerceHub'));
 const MyntraHub = lazy(() => import('./components/MyntraHub'));
 const ReturnsManager = lazy(() => import('./components/ReturnsManager'));
+const ScanAndPackScreen = lazy(() => import('./components/ScanAndPackScreen'));
 const DesignerModule = lazy(() => import('./components/DesignerModule'));
 const DesignerScreen = lazy(() => import('./components/DesignerScreen'));
 
@@ -59,6 +60,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   PackageMinus,
+  PackageCheck,
   ChevronDown,
   ChevronRight,
   Store,
@@ -635,7 +637,7 @@ export default function App() {
   };
 
   // Department permission helpers
-  const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses', 'eo_settings'];
+  const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'eo_scan_pack', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses', 'eo_settings'];
   const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses'];
   const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses'];
   const SOBISE_PERMISSIONS = ['so_dashboard', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses'];
@@ -902,7 +904,7 @@ export default function App() {
       'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
       'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
       'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses',
-      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses', 'eo_settings',
+      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
@@ -2363,6 +2365,7 @@ export default function App() {
                   if (company.id === 'stitching' && !hasStitchingAccess) return null;
                   if (company.id === 'elite_edition' && !hasEliteEditionAccess) return null;
                   if (company.id === 'elite_fabtex' && !hasEliteFabtexAccess) return null;
+                  if (company.id === 'sobise' && !hasSobiseAccess) return null;
 
                   const isCurrent = activeDepartment === company.id;
                   return (
@@ -2525,6 +2528,11 @@ export default function App() {
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
                       <button onClick={() => { setActiveTab('sales'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'sales' ? 'active' : ''}`}>
                         Sales Orders
+                      </button>
+                    )}
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_scan_pack')) && (
+                      <button onClick={() => { setActiveTab('eo_scan_pack'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_scan_pack' ? 'active' : ''}`}>
+                        Scan & Pack
                       </button>
                     )}
                     <button onClick={() => { setActiveTab('eo_complaints'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_complaints' ? 'active' : ''}`}>
@@ -2811,6 +2819,7 @@ export default function App() {
               if (hasStitchingAccess) allowedCompanyDepts.push('stitching');
               if (hasEliteEditionAccess) allowedCompanyDepts.push('elite_edition');
               if (hasEliteFabtexAccess) allowedCompanyDepts.push('elite_fabtex');
+              if (hasSobiseAccess) allowedCompanyDepts.push('sobise');
 
               if (['workspace', 'communication', 'task_management'].includes(activeTab) || allowedCompanyDepts.length === 0) {
                 return (
@@ -2855,6 +2864,25 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_settings')) &&
                       renderNavItem('ef_settings', 'Settings', Settings, null, 'Settings')
+                    }
+                  </>
+                );
+              }
+
+              if (activeDepartment === 'sobise' && hasSobiseAccess) {
+                return (
+                  <>
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_dashboard')) &&
+                      renderNavItem('so_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_invoices')) &&
+                      renderNavItem('so_invoices', 'Finance', Receipt, null, 'Finance')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_complaints')) &&
+                      renderNavItem('so_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_settings')) &&
+                      renderNavItem('so_settings', 'Settings', Settings, null, 'Settings')
                     }
                   </>
                 );
@@ -2947,6 +2975,9 @@ export default function App() {
                   }
                   {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) &&
                     renderNavItem('sales', 'Sales Orders', ShoppingBag, null, 'Sales')
+                  }
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_scan_pack')) &&
+                    renderNavItem('eo_scan_pack', 'Scan & Pack', PackageCheck, null, 'Scan & Pack')
                   }
                   {renderNavItem('eo_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
                   {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) &&
@@ -3095,6 +3126,8 @@ export default function App() {
             <ReturnsManager />
           ) : activeTab === 'sales' ? (
             <SalesGrid />
+          ) : activeTab === 'eo_scan_pack' ? (
+            <ScanAndPackScreen currentUser={currentUser} />
           ) : activeTab === 'reports' ? (
             <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
           ) : activeTab === 'document_design_studio' ? (
@@ -3125,6 +3158,16 @@ export default function App() {
             <DigitalPrintExpenseModule companyEntity="Elite Fabtex" />
           ) : activeTab === 'ef_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Fabtex" />
+          ) : activeTab === 'so_dashboard' ? (
+            <CompanyDedicatedDashboard companyEntity="Sobise" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'so_settings' ? (
+            <CompanySettingsPanel companyEntity="Sobise" />
+          ) : activeTab === 'so_complaints' ? (
+            <DigitalPrintComplainModule companyEntity="Sobise" />
+          ) : activeTab === 'so_expenses' ? (
+            <DigitalPrintExpenseModule companyEntity="Sobise" />
+          ) : activeTab === 'so_invoices' ? (
+            <EliteBillingDepartment companyEntity="Sobise" />
           ) : activeTab === 'es_dashboard' ? (
             <GarmentJobCardDashboard />
           ) : activeTab === 'es_settings' || activeTab === 'jobcards_stitching_settings' ? (
@@ -3162,6 +3205,8 @@ export default function App() {
             <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeDepartment === 'elite_fabtex' && hasEliteFabtexAccess ? (
             <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeDepartment === 'sobise' && hasSobiseAccess ? (
+            <CompanyDedicatedDashboard companyEntity="Sobise" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeDepartment === 'stitching' && hasStitchingAccess ? (
             <GarmentJobCardDashboard />
           ) : activeDepartment === 'digital_print' && hasDigitalPrintAccess ? (
@@ -3480,6 +3525,7 @@ export default function App() {
                 if (company.id === 'stitching' && !hasStitchingAccess) return null;
                 if (company.id === 'elite_edition' && !hasEliteEditionAccess) return null;
                 if (company.id === 'elite_fabtex' && !hasEliteFabtexAccess) return null;
+                if (company.id === 'sobise' && !hasSobiseAccess) return null;
 
                 const isActive = activeDepartment === company.id && activeTab !== 'workspace';
                 const CompIcon = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : company.iconName === 'Layers' ? Layers : Building;
