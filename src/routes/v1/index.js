@@ -49,6 +49,7 @@ router.use('/raw-materials', require('./rawMaterial.route'));
 router.use('/infra-bills', require('./infrastructureBill.route'));
 router.use('/infrastructure', require('../infrastructureRoutes'));
 router.use('/billing', require('./billing.route'));
+router.use('/delivery-challans', require('./deliveryChallan.route'));
 router.use('/jobPrintLogs', require('./jobPrintLog.route'));
 router.use('/jobFusingLogs', require('./jobFusingLog.route'));
 router.use('/garment-jobcards', require('./garmentJobCard.route'));

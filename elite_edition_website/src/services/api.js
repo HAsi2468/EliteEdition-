@@ -2129,6 +2129,59 @@ export const api = {
     });
   },
 
+  // ── Delivery Challans (Corporate & Fashion entities: Sobise, EE, EF) ─────
+  async getDeliveryChallans(params = {}) {
+    const query = new URLSearchParams(params);
+    return request(`/delivery-challans?${query.toString()}`);
+  },
+
+  async getNextDeliveryChallanNo(companyEntity = 'Sobise') {
+    return request(`/delivery-challans/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
+  },
+
+  async getDeliveryChallanById(id) {
+    return request(`/delivery-challans/${id}`);
+  },
+
+  async createDeliveryChallan(data) {
+    return request('/delivery-challans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateDeliveryChallan(id, data) {
+    return request(`/delivery-challans/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteDeliveryChallan(id) {
+    return request(`/delivery-challans/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async convertDeliveryChallanToInvoice(id) {
+    return request(`/delivery-challans/${id}/convert-to-invoice`, {
+      method: 'POST',
+    });
+  },
+
+  async downloadDeliveryChallanPdf(id, challanNo) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const url = `${baseUrl}/delivery-challans/${id}/pdf`;
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Delivery Challan PDF');
+    const blob = await response.blob();
+    const pdfName = `Delivery_Challan_${challanNo || 'Draft'}.pdf`;
+    downloadOrPreviewPdf(blob, pdfName, { title: `Delivery Challan #${challanNo || 'Draft'}` });
+  },
+
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();

@@ -5,6 +5,7 @@ import { formatDateDDMMYYYY, formatForInputDate, toLocalYMD } from '../utils/dat
 import { matchSearchQuery } from '../utils/searchUtils';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import FabricInventoryPanel from './FabricInventoryPanel';
+import CorporateDeliveryChallanPanel from './CorporateDeliveryChallanPanel';
 import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
 import GstCreditAnalysisPanel from './GstCreditAnalysisPanel';
 
@@ -188,19 +189,14 @@ export default function EliteBillingDepartment({
   companyEntity = (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : 'Elite Digital Prints'), 
   initialTab = null 
 }) {
-  const supportsChallan = (
-    companyEntity === 'Elite Digital Prints' || 
-    companyEntity === 'Elite Digital Print' || 
-    companyEntity === 'Elite Stitching' || 
-    department === 'stitching'
-  ) && !['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online'].includes(companyEntity);
+  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex'].includes(companyEntity);
+  const isStitchingEntity = department === 'stitching' || companyEntity === 'Elite Stitching';
 
   const [activeTab, setActiveTab] = useState(() => {
     if (initialTab && initialTab !== 'costing') {
-      if (initialTab === 'challans' && !supportsChallan) return 'invoices';
       return initialTab;
     }
-    return supportsChallan ? 'challans' : 'invoices';
+    return isCorporateEntity ? 'invoices' : 'challans';
   });
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
@@ -2688,16 +2684,10 @@ export default function EliteBillingDepartment({
   };
 
   useEffect(() => {
-    if (supportsChallan && activeTab === 'challans' && department !== 'stitching') {
+    if (!isCorporateEntity && activeTab === 'challans' && department !== 'stitching') {
       fetchDigitalChallans();
     }
-  }, [activeTab, department, supportsChallan]);
-
-  useEffect(() => {
-    if (!supportsChallan && activeTab === 'challans') {
-      setActiveTab('invoices');
-    }
-  }, [companyEntity, supportsChallan, activeTab]);
+  }, [activeTab, department, isCorporateEntity]);
 
   const [viewInvoiceModal, setViewInvoiceModal] = useState(null);
   const [pdfDuplicateModal, setPdfDuplicateModal] = useState(null); // { inv } when open
@@ -3765,7 +3755,7 @@ export default function EliteBillingDepartment({
           <div className="ent-header-actions">
             <QuickActionMenu
               onNewInvoice={() => handleOpenCreateTab()}
-              onNewChallan={supportsChallan ? handleOpenCreateChallan : null}
+              onNewChallan={handleOpenCreateChallan}
               onExpenseEntry={() => {
                 setActiveTab('expense');
                 setAutoOpenExpenseModal(true);
@@ -3793,7 +3783,7 @@ export default function EliteBillingDepartment({
           }}
         >
           {[
-            ...(supportsChallan ? [{ id: 'challans', label: 'Challan' }] : []),
+            { id: 'challans', label: isCorporateEntity ? 'Delivery Challan' : department === 'stitching' ? 'Stitching Challan' : 'Challan' },
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
             { id: 'purchase', label: 'Purchases' },
             { id: 'gst', label: 'GST Summary' },
@@ -4310,9 +4300,17 @@ export default function EliteBillingDepartment({
       )}
 
       {/* ── TAB: DELIVERY CHALLANS HUB ─────────────────────────────────────── */}
-      {supportsChallan && activeTab === 'challans' && (
+      {activeTab === 'challans' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {department === 'stitching' ? (
+          {isCorporateEntity ? (
+            <CorporateDeliveryChallanPanel
+              companyEntity={companyEntity}
+              onNavigateToBilling={(newInv) => {
+                loadData();
+                setActiveTab('invoices');
+              }}
+            />
+          ) : department === 'stitching' ? (
             <StitchingChallanPanel
               onNavigateToBilling={(ch) => {
                 loadInvoiceFromChallan(ch);
