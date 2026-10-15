@@ -2248,6 +2248,10 @@ export const api = {
     });
   },
 
+  async getCourierAnalytics() {
+    return request('/scan-pack/analytics');
+  },
+
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();

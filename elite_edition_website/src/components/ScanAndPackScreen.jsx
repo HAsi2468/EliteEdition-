@@ -33,7 +33,11 @@ import {
   UserCheck,
   Eye,
   CheckCheck,
-  FileDown
+  FileDown,
+  Scale,
+  TrendingUp,
+  BarChart2,
+  Sliders
 } from 'lucide-react';
 import { api } from '../services/api';
 import EntityBrandBadge from './common/EntityBrandBadge';
@@ -58,6 +62,10 @@ export default function ScanAndPackScreen({ currentUser }) {
   const [doubleScanStep, setDoubleScanStep] = useState('SKU_FIRST'); // 'SKU_FIRST' | 'AWB_SECOND'
   const [scannedGarmentSku, setScannedGarmentSku] = useState('');
   const [mismatchModal, setMismatchModal] = useState(null); // { garmentSku, orderSku, awb, orderCode }
+
+  // ── ⚖️ Digital Weighing Scale & Weight Discrepancy Guard ────────────────
+  const [parcelWeight, setParcelWeight] = useState('350'); // in grams
+  const [returnWeight, setReturnWeight] = useState('');
 
   // ── 📸 Return Processing & SPF Claim Evidence ──────────────────────────
   const [returnCondition, setReturnCondition] = useState('INTACT');
@@ -93,6 +101,23 @@ export default function ScanAndPackScreen({ currentUser }) {
   const [bulkDeliveryDate, setBulkDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
+
+  // ── 📈 Courier Analytics Dashboard Modal ───────────────────────────────
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // ── 🏷️ Barcode Thermal Label Printing Modal ────────────────────────────
+  const [showBarcodeTagModal, setShowBarcodeTagModal] = useState(false);
+  const [barcodeTagData, setBarcodeTagData] = useState({
+    sku: 'AC22111_M',
+    brand: 'SOBISE',
+    itemName: 'Designer Kurta Set',
+    size: 'M',
+    color: 'Teal Green',
+    mrp: 1499,
+    barcode: 'MYSC1359190430'
+  });
 
   // Scanned history list & Stats
   const [scanHistory, setScanHistory] = useState([]);
@@ -157,7 +182,7 @@ export default function ScanAndPackScreen({ currentUser }) {
         osc.start();
         osc.stop(ctx.currentTime + 0.15);
       } else {
-        // High alert buzzer for wrong item mismatch
+        // High alert buzzer for wrong item mismatch or suspicious empty box
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(150, ctx.currentTime);
         osc.frequency.setValueAtTime(100, ctx.currentTime + 0.15);
@@ -215,10 +240,9 @@ export default function ScanAndPackScreen({ currentUser }) {
 
         const isMatch = normScanned.includes(normExpected) || 
                         normExpected.includes(normScanned) || 
-                        scannedGarmentSku === trimmed; // or single scan override
+                        scannedGarmentSku === trimmed;
 
         if (!isMatch && expectedSku) {
-          // ⚠️ MISMATCH DETECTED: Prevent packing!
           playAudioCue('error');
           setMismatchModal({
             garmentSku: scannedGarmentSku,
@@ -233,16 +257,19 @@ export default function ScanAndPackScreen({ currentUser }) {
           return;
         }
 
-        // ✅ SKU Matched! Auto-pack and stamp dispatch date
+        // Weight verification
+        const numericWeight = Number(parcelWeight) || 0;
+
         await api.packAwbOrder({
           awb: trimmed,
           displayOrderCode: orderData.displayOrderCode,
           sku: orderData.itemSKUCode,
-          courier: orderData.courier
+          courier: orderData.courier,
+          weightGrams: numericWeight
         });
 
         playAudioCue('success');
-        setSuccessMsg(`✅ MATCH VERIFIED! Garment "${scannedGarmentSku}" matches Order #${orderData.displayOrderCode}. Packed & Dispatched.`);
+        setSuccessMsg(`✅ MATCH VERIFIED! Garment "${scannedGarmentSku}" matches Order #${orderData.displayOrderCode}. Packed & Dispatched (${numericWeight > 0 ? `${numericWeight}g` : 'Standard Weight'}).`);
 
         const historyEntry = {
           id: Date.now(),
@@ -250,6 +277,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: orderData.displayOrderCode,
           sku: orderData.itemSKUCode,
           courier: orderData.courier,
+          weightGrams: numericWeight,
           mode: 'PACK',
           status: 'VERIFIED & PACKED',
           time: new Date().toLocaleTimeString('en-IN'),
@@ -257,6 +285,17 @@ export default function ScanAndPackScreen({ currentUser }) {
         };
         setScanHistory(prev => [historyEntry, ...prev.slice(0, 49)]);
         fetchStats();
+
+        // Setup barcode tag printing data for convenience
+        setBarcodeTagData({
+          sku: orderData.itemSKUCode,
+          brand: 'SOBISE',
+          itemName: orderData.itemName,
+          size: orderData.size || 'M',
+          color: orderData.color || '',
+          mrp: orderData.mrp || 1499,
+          barcode: trimmed
+        });
 
         // Reset for next order
         setDoubleScanStep('SKU_FIRST');
@@ -289,16 +328,29 @@ export default function ScanAndPackScreen({ currentUser }) {
       setActiveOrder(orderData);
       setClaimAmount(orderData.price || 0);
 
+      // Auto setup barcode print data
+      setBarcodeTagData({
+        sku: orderData.itemSKUCode,
+        brand: 'SOBISE',
+        itemName: orderData.itemName,
+        size: orderData.size || 'M',
+        color: orderData.color || '',
+        mrp: orderData.mrp || 1499,
+        barcode: trimmed
+      });
+
       if (scanMode === 'PACK') {
+        const numericWeight = Number(parcelWeight) || 0;
         await api.packAwbOrder({
           awb: trimmed,
           displayOrderCode: orderData.displayOrderCode,
           sku: orderData.itemSKUCode,
-          courier: orderData.courier
+          courier: orderData.courier,
+          weightGrams: numericWeight
         });
 
         playAudioCue('success');
-        setSuccessMsg(`✅ AWB ${trimmed} verified & packed! Dispatched date automatically stamped.`);
+        setSuccessMsg(`✅ AWB ${trimmed} verified & packed! Dispatched date automatically stamped (${numericWeight > 0 ? `${numericWeight}g` : 'Standard'}).`);
         
         const historyEntry = {
           id: Date.now(),
@@ -306,6 +358,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: orderData.displayOrderCode,
           sku: orderData.itemSKUCode,
           courier: orderData.courier,
+          weightGrams: numericWeight,
           mode: 'PACK',
           status: 'DISPATCHED',
           time: new Date().toLocaleTimeString('en-IN'),
@@ -408,6 +461,8 @@ export default function ScanAndPackScreen({ currentUser }) {
     setLoading(true);
     try {
       const isDamagedOrWrong = returnCondition === 'DAMAGED' || returnCondition === 'WRONG_ITEM';
+      const numericReturnWeight = Number(returnWeight) || 0;
+
       const res = await api.processAwbReturn({
         awb: activeOrder.awb,
         displayOrderId: activeOrder.displayOrderCode,
@@ -420,7 +475,8 @@ export default function ScanAndPackScreen({ currentUser }) {
         claimStatus: isDamagedOrWrong ? 'CLAIM_PENDING' : 'NOT_APPLICABLE',
         claimAmount: isDamagedOrWrong ? (Number(claimAmount) || activeOrder.price || 0) : 0,
         claimId: claimId || '',
-        claimNotes: claimNotes || ''
+        claimNotes: claimNotes || '',
+        weightGrams: numericReturnWeight
       });
 
       if (res && res.success) {
@@ -436,6 +492,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           mode: 'RETURN',
           status: returnCondition === 'INTACT' ? 'RESTOCKED (+1)' : 'RETURN_DISPUTE',
           hasPhotos: returnImages.length > 0,
+          weightGrams: numericReturnWeight,
           returnDoc: res.data,
           time: new Date().toLocaleTimeString('en-IN'),
           date: new Date().toLocaleDateString('en-IN')
@@ -446,6 +503,7 @@ export default function ScanAndPackScreen({ currentUser }) {
         setReturnImages([]);
         setClaimId('');
         setClaimNotes('');
+        setReturnWeight('');
         fetchStats();
       } else {
         alert(res?.error || 'Failed to process return');
@@ -550,6 +608,22 @@ export default function ScanAndPackScreen({ currentUser }) {
     }
   };
 
+  // ── 📈 Fetch Courier Analytics ────────────────────────────────────────────
+  const openAnalytics = async () => {
+    setShowAnalyticsModal(true);
+    setAnalyticsLoading(true);
+    try {
+      const res = await api.getCourierAnalytics();
+      if (res && res.success) {
+        setAnalyticsData(res);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch courier analytics:', e);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   // ── Save Claim Details Update ─────────────────────────────────────────────
   const handleSaveClaimDetails = async () => {
     if (!selectedClaimRecord?._id) return;
@@ -617,12 +691,12 @@ export default function ScanAndPackScreen({ currentUser }) {
               <EntityBrandBadge entityId="elite_online" />
             </div>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>
-              AWB Tracking, Double-Scan Zero Error Check, SPF Return Claims & Courier Manifest Handover
+              AWB Tracking, Double-Scan Zero Error Check, Weight Scale Guard & Courier Manifest Handover
             </p>
           </div>
         </div>
 
-        {/* Action Buttons: Manifest, Bulk Deliver & Double-Scan Toggle */}
+        {/* Action Buttons: Manifest, Analytics, Barcode Tag & Double-Scan */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           
           {/* Double Scan Toggle */}
@@ -675,6 +749,28 @@ export default function ScanAndPackScreen({ currentUser }) {
             <span>Daily Manifest</span>
           </button>
 
+          {/* Courier Performance Analytics */}
+          <button
+            type="button"
+            onClick={openAnalytics}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0.45rem 0.9rem',
+              borderRadius: '8px',
+              background: 'rgba(168, 85, 247, 0.2)',
+              border: '1px solid #a855f7',
+              color: '#c084fc',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <BarChart2 size={15} />
+            <span>Courier Analytics</span>
+          </button>
+
           {/* Bulk Delivery MIS Importer */}
           <button
             type="button"
@@ -694,7 +790,29 @@ export default function ScanAndPackScreen({ currentUser }) {
             }}
           >
             <CheckCheck size={15} />
-            <span>Bulk Delivery MIS</span>
+            <span>Bulk Delivery</span>
+          </button>
+
+          {/* Barcode Tag Print */}
+          <button
+            type="button"
+            onClick={() => setShowBarcodeTagModal(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0.45rem 0.9rem',
+              borderRadius: '8px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <Tag size={15} />
+            <span>Tag Printer</span>
           </button>
 
           {/* Hardware Scanner Status */}
@@ -717,7 +835,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               background: hardwareDetected ? '#22c55e' : '#0ea5e9',
               boxShadow: hardwareDetected ? '0 0 10px #22c55e' : '0 0 8px #0ea5e9'
             }} />
-            <span>{hardwareDetected ? 'Laser Scanner Active' : 'Ready for Scans'}</span>
+            <span>{hardwareDetected ? 'Laser Active' : 'Ready'}</span>
           </div>
 
           <button 
@@ -763,7 +881,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0ea5e9' }}>
             {stats.dispatchedToday}
           </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Auto-Dated & Manifest Ready</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Auto-Dated & Weight Stamped</span>
         </div>
 
         {/* Metric 2: Delivered Today */}
@@ -795,7 +913,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f43f5e' }}>
             {stats.returnedToday}
           </div>
-          <span style={{ fontSize: '0.72rem', color: '#f43f5e', fontWeight: 600 }}>QC & SPF Claim Protected</span>
+          <span style={{ fontSize: '0.72rem', color: '#f43f5e', fontWeight: 600 }}>QC & Empty Box Guarded</span>
         </div>
 
       </div>
@@ -959,6 +1077,73 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
         )}
 
+        {/* ⚖️ Weighing Scale Check Widget */}
+        {scanMode === 'PACK' && (
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Scale size={18} color="#0ea5e9" />
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>
+                Parcel Weight (Grams):
+              </span>
+              <input
+                type="number"
+                placeholder="350"
+                value={parcelWeight}
+                onChange={(e) => setParcelWeight(e.target.value)}
+                style={{
+                  width: '90px',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: Number(parcelWeight) > 0 && Number(parcelWeight) < 120 ? '2px solid #f59e0b' : '1px solid #cbd5e1',
+                  fontWeight: 800,
+                  fontSize: '0.85rem'
+                }}
+              />
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>g</span>
+
+              {Number(parcelWeight) > 0 && Number(parcelWeight) < 120 && (
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>
+                  ⚠️ Low weight (&lt;120g). Check if all items are inside box!
+                </span>
+              )}
+            </div>
+
+            {/* Quick Presets */}
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Presets:</span>
+              {['300', '380', '500', '1000'].map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setParcelWeight(w)}
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #cbd5e1',
+                    background: parcelWeight === w ? '#0ea5e9' : '#fff',
+                    color: parcelWeight === w ? '#fff' : '#475569',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {w}g
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 🎯 High-Visibility AWB Scan Input Box */}
         <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
           <div style={{ position: 'relative', flex: 1 }}>
@@ -1065,6 +1250,14 @@ export default function ScanAndPackScreen({ currentUser }) {
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
                       {activeOrder.courier}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowBarcodeTagModal(true)}
+                      style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Tag size={12} />
+                      <span>Print Garment Tag</span>
+                    </button>
                   </div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
                     {activeOrder.itemName}
@@ -1074,6 +1267,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                     {activeOrder.size && <span>Size: <strong>{activeOrder.size}</strong></span>}
                     {activeOrder.color && <span>Color: <strong>{activeOrder.color}</strong></span>}
                     {activeOrder.price > 0 && <span>Value: <strong>{fmtINR(activeOrder.price)}</strong></span>}
+                    {activeOrder.weightGrams > 0 && <span>Weight: <strong>{activeOrder.weightGrams}g</strong></span>}
                   </div>
                 </div>
               </div>
@@ -1195,6 +1389,37 @@ export default function ScanAndPackScreen({ currentUser }) {
                   >
                     ❌ Wrong Item Return
                   </button>
+                </div>
+
+                {/* ⚖️ Return Weight Scale Inspection & Empty Box Guard */}
+                <div style={{ background: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '1px solid #fecaca', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <Scale size={16} color="#be123c" />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#991b1b' }}>
+                      Weigh Returned Box (Grams):
+                    </span>
+                    <input
+                      type="number"
+                      placeholder="e.g. 350"
+                      value={returnWeight}
+                      onChange={(e) => setReturnWeight(e.target.value)}
+                      style={{ width: '80px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>g</span>
+
+                    {activeOrder.weightGrams > 0 && (
+                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        (Dispatched at: <strong>{activeOrder.weightGrams}g</strong>)
+                      </span>
+                    )}
+
+                    {/* Empty Box Discrepancy Alert */}
+                    {Number(returnWeight) > 0 && activeOrder.weightGrams > 200 && Number(returnWeight) < 120 && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ffffff', background: '#ef4444', padding: '2px 8px', borderRadius: '4px' }}>
+                        🚨 EMPTY BOX SUSPECTED! Weight is under 120g! File SPF Claim!
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* 📸 Photo Proof Capture for Damaged / Wrong Items */}
@@ -1354,6 +1579,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 <th style={{ padding: '10px 14px', fontWeight: 800 }}>AWB Code</th>
                 <th style={{ padding: '10px 14px', fontWeight: 800 }}>Order ID</th>
                 <th style={{ padding: '10px 14px', fontWeight: 800 }}>SKU</th>
+                <th style={{ padding: '10px 14px', fontWeight: 800 }}>Weight</th>
                 <th style={{ padding: '10px 14px', fontWeight: 800 }}>Courier</th>
                 <th style={{ padding: '10px 14px', fontWeight: 800 }}>Mode</th>
                 <th style={{ padding: '10px 14px', fontWeight: 800, textAlign: 'center' }}>Status</th>
@@ -1363,7 +1589,7 @@ export default function ScanAndPackScreen({ currentUser }) {
             <tbody>
               {scanHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
                     <Scan size={24} style={{ margin: '0 auto 6px', color: '#cbd5e1' }} />
                     <div>No AWB codes scanned yet in this session.</div>
                     <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Scan or type an AWB like <strong>MYSC1359190430</strong> above.</div>
@@ -1376,6 +1602,9 @@ export default function ScanAndPackScreen({ currentUser }) {
                     <td style={{ padding: '10px 14px', fontWeight: 800, color: '#0ea5e9' }}>{item.awb}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0f172a' }}>{item.orderCode}</td>
                     <td style={{ padding: '10px 14px', color: '#334155' }}>{item.sku}</td>
+                    <td style={{ padding: '10px 14px', color: '#64748b', fontSize: '0.76rem' }}>
+                      {item.weightGrams ? `${item.weightGrams}g` : '—'}
+                    </td>
                     <td style={{ padding: '10px 14px', color: '#64748b' }}>{item.courier}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: item.mode === 'PACK' ? '#eff6ff' : item.mode === 'DELIVERY' ? '#ecfdf5' : '#fff1f2', color: item.mode === 'PACK' ? '#0284c7' : item.mode === 'DELIVERY' ? '#059669' : '#be123c' }}>
@@ -1411,7 +1640,33 @@ export default function ScanAndPackScreen({ currentUser }) {
                           {item.hasPhotos && <Camera size={11} color="#0284c7" />}
                         </button>
                       ) : (
-                        <span style={{ color: '#cbd5e1' }}>—</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBarcodeTagData({
+                              sku: item.sku,
+                              brand: 'SOBISE',
+                              itemName: 'Garment / Apparel',
+                              size: 'M',
+                              color: '',
+                              mrp: 1499,
+                              barcode: item.awb
+                            });
+                            setShowBarcodeTagModal(true);
+                          }}
+                          title="Print Barcode Tag"
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#64748b',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}
+                        >
+                          <Tag size={13} />
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -1600,7 +1855,6 @@ export default function ScanAndPackScreen({ currentUser }) {
             overflow: 'hidden',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
           }}>
-            {/* Header */}
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: 38, height: 38, borderRadius: 10, background: '#0ea5e915', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0ea5e9' }}>
@@ -1620,7 +1874,6 @@ export default function ScanAndPackScreen({ currentUser }) {
               </button>
             </div>
 
-            {/* Filter Bar & Tabs */}
             <div style={{ padding: '0.85rem 1.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -1688,12 +1941,10 @@ export default function ScanAndPackScreen({ currentUser }) {
               )}
             </div>
 
-            {/* Modal Body */}
             <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               {manifestTab === 'PENDING' ? (
                 <>
-                  {/* Courier Handover Driver Inputs */}
                   <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
                     <div>
                       <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '2px' }}>
@@ -1733,7 +1984,6 @@ export default function ScanAndPackScreen({ currentUser }) {
                     </div>
                   </div>
 
-                  {/* Groups by Courier Partner */}
                   {!manifestPendingData || manifestPendingData.groups?.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
                       No dispatched packages found for handover on this date.
@@ -1772,7 +2022,6 @@ export default function ScanAndPackScreen({ currentUser }) {
                           </button>
                         </div>
 
-                        {/* Order Samples preview */}
                         <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '6px' }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
                             <thead>
@@ -1800,7 +2049,6 @@ export default function ScanAndPackScreen({ currentUser }) {
                   )}
                 </>
               ) : (
-                /* History Tab */
                 pastManifests.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
                     No past manifests saved yet.
@@ -1952,7 +2200,279 @@ export default function ScanAndPackScreen({ currentUser }) {
       )}
 
       {/* ────────────────────────────────────────────────────────────────────────
-          MODAL 5: 📄 SPF Return Claim Dossier Viewer & Editor
+          MODAL 5: 📈 Courier Performance & RTO Rate Analytics Modal
+      ──────────────────────────────────────────────────────────────────────── */}
+      {showAnalyticsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '750px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#a855f715', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                  <TrendingUp size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                    Courier SLA & RTO Performance Analytics
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Compare transit success, RTO percentages & SPF Claim recovery
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowAnalyticsModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {analyticsLoading ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                  <RefreshCw size={24} className="spin-loader" style={{ margin: '0 auto 8px' }} />
+                  <div>Loading courier metrics...</div>
+                </div>
+              ) : analyticsData?.overview ? (
+                <>
+                  {/* Top Overview Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                    <div style={{ background: '#eff6ff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Total Dispatched</span>
+                      <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb', marginTop: '2px' }}>{analyticsData.overview.totalDispatched}</div>
+                    </div>
+                    <div style={{ background: '#ecfdf5', padding: '0.85rem', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#065f46', textTransform: 'uppercase' }}>Delivered</span>
+                      <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{analyticsData.overview.totalDelivered}</div>
+                    </div>
+                    <div style={{ background: '#fff1f2', padding: '0.85rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase' }}>Overall RTO Rate</span>
+                      <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#f43f5e', marginTop: '2px' }}>{analyticsData.overview.overallRtoRate}%</div>
+                    </div>
+                    <div style={{ background: '#faf5ff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e9d5ff' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#6b21a8', textTransform: 'uppercase' }}>SPF Claims Value</span>
+                      <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#a855f7', marginTop: '2px' }}>{fmtINR(analyticsData.overview.totalClaimAmount)}</div>
+                    </div>
+                  </div>
+
+                  {/* Courier Breakdown Table */}
+                  <div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                      Partner SLA & Delivery Efficiency
+                    </span>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>Courier Partner</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center' }}>Dispatched</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center' }}>Delivered</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center' }}>Returned</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center' }}>Success Rate</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center' }}>RTO %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analyticsData.couriers?.map((c, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{c.courier}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600 }}>{c.dispatched}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', color: '#10b981', fontWeight: 700 }}>{c.delivered}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', color: '#ef4444', fontWeight: 700 }}>{c.returned}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: '#ecfdf5', color: '#059669' }}>
+                                {c.deliveryRate}%
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: c.rtoRate > 20 ? '#fee2e2' : '#f8fafc', color: c.rtoRate > 20 ? '#dc2626' : '#475569' }}>
+                                {c.rtoRate}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          MODAL 6: 🏷️ Thermal Barcode Tag Sticker Printer (50x25mm)
+      ──────────────────────────────────────────────────────────────────────── */}
+      {showBarcodeTagModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '460px',
+            width: '100%',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Tag size={18} color="#0ea5e9" />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                  Thermal Barcode Sticker Tag
+                </h3>
+              </div>
+              <button type="button" onClick={() => setShowBarcodeTagModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+              
+              {/* Thermal Label Preview (50x25mm / 2x1 inch ratio) */}
+              <div id="thermal-barcode-tag" style={{
+                width: '280px',
+                height: '140px',
+                border: '2px dashed #000',
+                borderRadius: '6px',
+                padding: '10px 12px',
+                background: '#ffffff',
+                color: '#000000',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                fontFamily: 'system-ui, -apple-system, sans-serif'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 900, letterSpacing: '0.05em' }}>
+                    {barcodeTagData.brand || 'SOBISE'}
+                  </span>
+                  <span style={{ fontSize: '10px', fontWeight: 700, border: '1px solid #000', padding: '1px 4px', borderRadius: '2px' }}>
+                    SIZE: {barcodeTagData.size || 'M'}
+                  </span>
+                </div>
+
+                <div style={{ textAlign: 'center', margin: '2px 0' }}>
+                  {/* High Contrast Barcode Representation */}
+                  <div style={{
+                    height: '34px',
+                    background: 'repeating-linear-gradient(90deg, #000 0px, #000 2px, #fff 2px, #fff 4px, #000 4px, #000 7px, #fff 7px, #fff 9px)',
+                    margin: '0 auto',
+                    width: '85%'
+                  }} />
+                  <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.15em', fontFamily: 'monospace' }}>
+                    {barcodeTagData.barcode || barcodeTagData.sku}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '9.5px', borderTop: '1px solid #000', paddingTop: '3px' }}>
+                  <div>
+                    <div style={{ fontWeight: 800 }}>SKU: {barcodeTagData.sku}</div>
+                    {barcodeTagData.color && <div style={{ fontSize: '8.5px', color: '#444' }}>Color: {barcodeTagData.color}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 900 }}>MRP: ₹ {barcodeTagData.mrp}</div>
+                    <div style={{ fontSize: '7px', color: '#666' }}>Inc. of all taxes</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tag Controls */}
+              <div style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>Brand / Entity</label>
+                  <input
+                    type="text"
+                    value={barcodeTagData.brand}
+                    onChange={(e) => setBarcodeTagData({ ...barcodeTagData, brand: e.target.value })}
+                    style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>SKU Code</label>
+                  <input
+                    type="text"
+                    value={barcodeTagData.sku}
+                    onChange={(e) => setBarcodeTagData({ ...barcodeTagData, sku: e.target.value })}
+                    style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>Size</label>
+                  <input
+                    type="text"
+                    value={barcodeTagData.size}
+                    onChange={(e) => setBarcodeTagData({ ...barcodeTagData, size: e.target.value })}
+                    style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>MRP (₹)</label>
+                  <input
+                    type="number"
+                    value={barcodeTagData.mrp}
+                    onChange={(e) => setBarcodeTagData({ ...barcodeTagData, mrp: e.target.value })}
+                    style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBarcodeTagModal(false)}
+                  style={{ padding: '6px 12px', borderRadius: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{ padding: '6px 16px', borderRadius: '6px', background: '#000000', color: '#ffffff', border: 'none', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Printer size={14} />
+                  <span>Print to Thermal Printer</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────────
+          MODAL 7: 📄 SPF Return Claim Dossier Viewer & Editor
       ──────────────────────────────────────────────────────────────────────── */}
       {selectedClaimRecord && (
         <div style={{
@@ -2117,7 +2637,6 @@ export default function ScanAndPackScreen({ currentUser }) {
         }}>
           <div style={{ background: '#fff', maxWidth: '800px', width: '100%', padding: '2.5rem', borderRadius: '8px', color: '#000', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             
-            {/* Action Bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '0.75rem' }}>
               <span style={{ fontSize: '1.25rem', fontWeight: 900, textTransform: 'uppercase' }}>
                 COURIER PICKUP HANDOVER MANIFEST
@@ -2141,7 +2660,6 @@ export default function ScanAndPackScreen({ currentUser }) {
               </div>
             </div>
 
-            {/* Manifest Metadata */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem' }}>
               <div>
                 <div><strong>Manifest ID:</strong> {activePrintManifest.manifestId}</div>
@@ -2157,7 +2675,6 @@ export default function ScanAndPackScreen({ currentUser }) {
               </div>
             </div>
 
-            {/* Packages Table */}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #000', marginTop: '0.5rem' }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #000' }}>
@@ -2181,7 +2698,6 @@ export default function ScanAndPackScreen({ currentUser }) {
               </tbody>
             </table>
 
-            {/* Handover Signatures Block */}
             <div style={{ marginTop: '2.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', fontSize: '0.85rem' }}>
               <div style={{ borderTop: '1px solid #000', paddingTop: '0.5rem', textAlign: 'center' }}>
                 <strong>Warehouse Dispatch Supervisor</strong>

@@ -63,6 +63,10 @@ const returnRecordSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    weightGrams: {
+      type: Number,
+      default: 0,
+    },
     claimNotes: {
       type: String,
       trim: true,

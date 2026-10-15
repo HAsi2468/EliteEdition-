@@ -13,6 +13,7 @@ router.post('/manifest/generate', scanPackController.generateManifest);
 router.get('/manifest/list', scanPackController.getManifests);
 router.get('/manifest/:manifestId', scanPackController.getManifestById);
 router.post('/bulk-deliver', scanPackController.bulkDeliver);
+router.get('/analytics', scanPackController.getCourierAnalytics);
 router.get('/history', scanPackController.getScanHistory);
 
 module.exports = router;

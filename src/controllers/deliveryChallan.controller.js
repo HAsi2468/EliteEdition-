@@ -431,7 +431,7 @@ const downloadChallanPdf = async (req, res) => {
 
     // Challan Meta Box
     const metaY = 82;
-    doc.rect(36, metaY, 523, 70).stroke('#e2e8f0');
+    doc.rect(36, metaY, 523, 78).stroke('#e2e8f0');
 
     // Left Column: Customer details
     doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold').text('CONSIGNEE / DELIVER TO:', 46, metaY + 8);
@@ -446,22 +446,31 @@ const downloadChallanPdf = async (req, res) => {
     }
 
     // Right Column: Challan & Dispatch Details
-    const rightX = 340;
-    doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text('Challan No:', rightX, metaY + 8);
-    doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(challan.challanNo, rightX + 65, metaY + 8);
+    const rightX = 330;
+    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Challan No:', rightX, metaY + 8);
+    doc.fillColor(textColor).fontSize(9.5).font('Helvetica-Bold').text(challan.challanNo, rightX + 65, metaY + 8);
 
-    doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text('Date:', rightX, metaY + 23);
+    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Date:', rightX, metaY + 21);
     const dt = challan.challanDate ? new Date(challan.challanDate).toLocaleDateString('en-IN') : '-';
-    doc.fillColor(textColor).fontSize(9).font('Helvetica').text(dt, rightX + 65, metaY + 23);
+    doc.fillColor(textColor).fontSize(8.5).font('Helvetica').text(dt, rightX + 65, metaY + 21);
 
-    doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text('Vehicle No:', rightX, metaY + 38);
-    doc.fillColor(textColor).fontSize(9).font('Helvetica-Bold').text(challan.dispatchDetails?.vehicleNo || 'N/A', rightX + 65, metaY + 38);
+    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Vehicle No:', rightX, metaY + 34);
+    doc.fillColor(textColor).fontSize(8.5).font('Helvetica-Bold').text(challan.dispatchDetails?.vehicleNo || 'N/A', rightX + 65, metaY + 34);
 
-    doc.fillColor(mutedColor).fontSize(8.5).font('Helvetica').text('Transporter:', rightX, metaY + 53);
-    doc.fillColor(textColor).fontSize(8.5).font('Helvetica').text(challan.dispatchDetails?.transporter || 'Direct', rightX + 65, metaY + 53);
+    doc.fillColor(mutedColor).fontSize(8).font('Helvetica').text('Transporter:', rightX, metaY + 47);
+    doc.fillColor(textColor).fontSize(8).font('Helvetica').text(challan.dispatchDetails?.transporter || 'Direct', rightX + 65, metaY + 47);
+
+    const extraDispatch = [
+      challan.dispatchDetails?.lrNo ? `LR: ${challan.dispatchDetails.lrNo}` : '',
+      challan.dispatchDetails?.eWayBillNo ? `E-Way: ${challan.dispatchDetails.eWayBillNo}` : ''
+    ].filter(Boolean).join(' | ');
+
+    if (extraDispatch) {
+      doc.fillColor(mutedColor).fontSize(7.5).font('Helvetica').text(extraDispatch, rightX, metaY + 61);
+    }
 
     // Line Items Table Header
-    const tableY = metaY + 85;
+    const tableY = metaY + 90;
     doc.rect(36, tableY, 523, 22).fill('#f8fafc').stroke('#cbd5e1');
     doc.fillColor(textColor).fontSize(8.5).font('Helvetica-Bold');
     doc.text('#', 44, tableY + 6);

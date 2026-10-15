@@ -213,6 +213,14 @@ const saleOrderSchema = new mongoose.Schema(
 			type: String,
 			default: null,
 		},
+		weightGrams: {
+			type: Number,
+			default: 0,
+		},
+		returnWeightGrams: {
+			type: Number,
+			default: 0,
+		},
 		shippingCourier: {
 			type: String,
 			default: null,

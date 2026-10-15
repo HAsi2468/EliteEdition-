@@ -22,7 +22,9 @@ import {
   Hash,
   MapPin,
   Phone,
-  FileSpreadsheet
+  FileSpreadsheet,
+  MessageCircle,
+  Share2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { EntityBrandBadge } from './common/EntityBrandBadge';
@@ -767,6 +769,29 @@ export default function CorporateDeliveryChallanPanel({
                             <Printer size={14} />
                           </button>
 
+                          {/* Share on WhatsApp */}
+                          <button
+                            onClick={() => {
+                              const phone = (ch.customer?.phone || '').replace(/[^0-9]/g, '');
+                              const cleanPhone = phone.length === 10 ? `91${phone}` : phone;
+                              const itemsText = (ch.items || []).slice(0, 3).map(it => `• ${it.itemName} (${it.qty} ${it.unit})`).join('\n');
+                              const msg = `*DELIVERY CHALLAN #${ch.challanNo}* - ${companyEntity}\n*Consignee:* ${ch.customer?.name || 'Party'}\n*Date:* ${new Date(ch.challanDate).toLocaleDateString('en-IN')}\n*Items:* ${ch.totalQty} Pcs / Mtr\n${itemsText}${ch.items?.length > 3 ? '\n• ...and more' : ''}\n*Total Value:* ₹ ${Number(ch.grandTotal || 0).toLocaleString('en-IN')}\n*Vehicle No:* ${ch.dispatchDetails?.vehicleNo || 'Direct'}\n*Transporter:* ${ch.dispatchDetails?.transporter || 'N/A'}\n*LR No:* ${ch.dispatchDetails?.lrNo || 'N/A'}\n*Status:* ${ch.status}\n\n_Dispatched in sound condition from Surat Fulfillment Hub._`;
+                              const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                              window.open(url, '_blank');
+                            }}
+                            title="Share Delivery Challan on WhatsApp"
+                            style={{
+                              background: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              color: '#059669',
+                              padding: '5px 7px',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <MessageCircle size={14} />
+                          </button>
+
                           {/* Edit */}
                           {!isInv && (
                             <button
@@ -1030,14 +1055,45 @@ export default function CorporateDeliveryChallanPanel({
                   </div>
 
                   <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>LR No / Bilty No</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. LR-98421"
+                      value={form.dispatchDetails.lrNo || ''}
+                      onChange={(e) => setForm(prev => ({ ...prev, dispatchDetails: { ...prev.dispatchDetails, lrNo: e.target.value } }))}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                    />
+                  </div>
+
+                  <div>
                     <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>E-Way Bill No</label>
                     <input
                       type="text"
                       placeholder="Optional E-Way Bill"
-                      value={form.dispatchDetails.eWayBillNo}
+                      value={form.dispatchDetails.eWayBillNo || ''}
                       onChange={(e) => setForm(prev => ({ ...prev, dispatchDetails: { ...prev.dispatchDetails, eWayBillNo: e.target.value } }))}
                       style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
                     />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>Driver Name & Phone</label>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <input
+                        type="text"
+                        placeholder="Driver Name"
+                        value={form.dispatchDetails.driverName || ''}
+                        onChange={(e) => setForm(prev => ({ ...prev, dispatchDetails: { ...prev.dispatchDetails, driverName: e.target.value } }))}
+                        style={{ flex: 1, padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Phone"
+                        value={form.dispatchDetails.driverPhone || ''}
+                        onChange={(e) => setForm(prev => ({ ...prev, dispatchDetails: { ...prev.dispatchDetails, driverPhone: e.target.value } }))}
+                        style={{ width: '110px', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -1045,7 +1101,7 @@ export default function CorporateDeliveryChallanPanel({
                     <input
                       type="text"
                       placeholder="By Road, Hand Delivery"
-                      value={form.dispatchDetails.dispatchThrough}
+                      value={form.dispatchDetails.dispatchThrough || ''}
                       onChange={(e) => setForm(prev => ({ ...prev, dispatchDetails: { ...prev.dispatchDetails, dispatchThrough: e.target.value } }))}
                       style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
                     />

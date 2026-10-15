@@ -108,6 +108,8 @@ const lookupAwb = async (req, res) => {
         dispatchDate: order?.dispatchDate || null,
         deliveryTime: order?.deliveryTime || null,
         returnDate: order?.returnDate || returnRecord?.createdAt || null,
+        weightGrams: order?.weightGrams || 0,
+        returnWeightGrams: order?.returnWeightGrams || returnRecord?.weightGrams || 0,
         productImage,
         returnRecord: returnRecord || null
       }
@@ -119,10 +121,10 @@ const lookupAwb = async (req, res) => {
 };
 
 // ── POST /api/v1/scan-pack/pack ───────────────────────────────────────────────
-// Marks AWB as Packed & Dispatched with auto-timestamp
+// Marks AWB as Packed & Dispatched with auto-timestamp & weight check
 const packOrder = async (req, res) => {
   try {
-    const { awb, displayOrderCode, sku, courier, facility, notes } = req.body;
+    const { awb, displayOrderCode, sku, courier, facility, weightGrams, notes } = req.body;
     if (!awb || !awb.trim()) {
       return res.status(400).json({ success: false, error: 'AWB code is required' });
     }
@@ -130,6 +132,7 @@ const packOrder = async (req, res) => {
     const cleanAwb = String(awb).trim();
     const nowIso = new Date().toISOString();
     const cleanCourier = courier || detectCourier(cleanAwb);
+    const weight = Number(weightGrams) || 0;
 
     // Update or upsert in SaleOrder
     const filter = {
@@ -147,6 +150,7 @@ const packOrder = async (req, res) => {
       order.shippingCourier = cleanCourier;
       order.saleOrderStatus = 'DISPATCHED';
       order.saleOrderItemStatus = 'PACKED';
+      if (weight > 0) order.weightGrams = weight;
       if (sku && !order.itemSKUCode) order.itemSKUCode = sku;
       if (facility) order.facility = facility;
       await order.save();
@@ -161,13 +165,14 @@ const packOrder = async (req, res) => {
         shippingCourier: cleanCourier,
         saleOrderStatus: 'DISPATCHED',
         saleOrderItemStatus: 'PACKED',
+        weightGrams: weight,
         facility: facility || 'WH-MAIN'
       });
     }
 
     res.status(200).json({
       success: true,
-      message: `AWB ${cleanAwb} marked as PACKED & DISPATCHED at ${new Date().toLocaleTimeString('en-IN')}`,
+      message: `AWB ${cleanAwb} marked as PACKED & DISPATCHED (${weight > 0 ? `${weight}g` : 'Standard Weight'}) at ${new Date().toLocaleTimeString('en-IN')}`,
       data: order
     });
   } catch (error) {
@@ -229,7 +234,8 @@ const processReturnScan = async (req, res) => {
       sku,
       quantity = 1,
       notes = '',
-      party = 'Myntra'
+      party = 'Myntra',
+      weightGrams = 0
     } = req.body;
 
     if (!awb || !awb.trim()) {
@@ -239,6 +245,7 @@ const processReturnScan = async (req, res) => {
     const cleanAwb = String(awb).trim();
     const nowIso = new Date().toISOString();
     const cleanQty = parseInt(quantity, 10) || 1;
+    const returnWeight = Number(weightGrams) || 0;
 
     let status = 'STOCKED_IN';
     let defaultClaimStatus = 'NOT_APPLICABLE';
@@ -268,6 +275,7 @@ const processReturnScan = async (req, res) => {
       condition,
       notes: notes || `Return scanned via Scan & Pack station (${condition})`,
       status,
+      weightGrams: returnWeight,
       images: Array.isArray(images) ? images : (images ? [images] : []),
       claimStatus: claimStatus || defaultClaimStatus,
       claimId,
@@ -289,6 +297,7 @@ const processReturnScan = async (req, res) => {
           returnDate: nowIso,
           returnReason: returnType,
           returnRemarks: `${condition} - ${notes}`,
+          returnWeightGrams: returnWeight,
           saleOrderStatus: 'RETURNED'
         }
       }
@@ -576,6 +585,88 @@ const getScanHistory = async (req, res) => {
   }
 };
 
+// ── GET /api/v1/scan-pack/analytics ──────────────────────────────────────────
+// Computes courier partner performance, SLA turnaround & RTO return rates
+const getCourierAnalytics = async (req, res) => {
+  try {
+    const orders = await db.SaleOrder.find({
+      $or: [
+        { dispatchDate: { $exists: true, $ne: null } },
+        { trackingNumber: { $exists: true, $ne: null } }
+      ]
+    }).lean();
+
+    const courierStats = {};
+    let totalDispatched = 0;
+    let totalDelivered = 0;
+    let totalReturned = 0;
+
+    orders.forEach(o => {
+      const c = o.shippingCourier || detectCourier(o.trackingNumber) || 'Standard Logistics';
+      if (!courierStats[c]) {
+        courierStats[c] = {
+          courier: c,
+          dispatched: 0,
+          delivered: 0,
+          returned: 0,
+          inTransit: 0,
+          totalValue: 0
+        };
+      }
+
+      courierStats[c].dispatched += 1;
+      totalDispatched += 1;
+      courierStats[c].totalValue += (o.totalPrice || 0);
+
+      if (o.returnDate || o.saleOrderStatus === 'RETURNED') {
+        courierStats[c].returned += 1;
+        totalReturned += 1;
+      } else if (o.deliveryTime || o.saleOrderStatus === 'DELIVERED') {
+        courierStats[c].delivered += 1;
+        totalDelivered += 1;
+      } else {
+        courierStats[c].inTransit += 1;
+      }
+    });
+
+    const summaryList = Object.values(courierStats).map(c => {
+      const deliveryRate = c.dispatched > 0 ? ((c.delivered / c.dispatched) * 100).toFixed(1) : 0;
+      const rtoRate = c.dispatched > 0 ? ((c.returned / c.dispatched) * 100).toFixed(1) : 0;
+      return {
+        ...c,
+        deliveryRate: Number(deliveryRate),
+        rtoRate: Number(rtoRate)
+      };
+    });
+
+    // Claim stats
+    const [pendingClaims, approvedClaims, totalClaims] = await Promise.all([
+      db.ReturnRecord.countDocuments({ claimStatus: 'CLAIM_PENDING' }),
+      db.ReturnRecord.countDocuments({ claimStatus: 'CLAIM_APPROVED' }),
+      db.ReturnRecord.find({ claimStatus: { $ne: 'NOT_APPLICABLE' } }).lean()
+    ]);
+
+    const totalClaimAmount = totalClaims.reduce((acc, c) => acc + (c.claimAmount || 0), 0);
+
+    res.json({
+      success: true,
+      overview: {
+        totalDispatched,
+        totalDelivered,
+        totalReturned,
+        overallRtoRate: totalDispatched > 0 ? ((totalReturned / totalDispatched) * 100).toFixed(1) : 0,
+        pendingClaims,
+        approvedClaims,
+        totalClaimAmount
+      },
+      couriers: summaryList
+    });
+  } catch (error) {
+    logger.error('scanPack.getCourierAnalytics error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   lookupAwb,
   packOrder,
@@ -587,5 +678,6 @@ module.exports = {
   getManifests,
   getManifestById,
   bulkDeliver,
-  getScanHistory
+  getScanHistory,
+  getCourierAnalytics
 };
