@@ -213,7 +213,7 @@ export default function ScanAndPackScreen({ currentUser }) {
       // Auto setup barcode print data
       setBarcodeTagData({
         sku: orderData.itemSKUCode,
-        brand: 'SOBISE',
+        brand: orderData.brand || 'SOBISE',
         itemName: orderData.itemName,
         size: orderData.size || 'M',
         color: orderData.color || '',
@@ -221,7 +221,48 @@ export default function ScanAndPackScreen({ currentUser }) {
         barcode: trimmed
       });
 
-      if (scanMode === 'PACK') {
+      // ── 🧠 Smart Auto-Detection: Return vs New Order vs Delivered ────────────
+      
+      // Auto-Rule 1: Scanned parcel is a RETURN or RTO
+      if (orderData.isReturn) {
+        if (scanMode !== 'RETURN') {
+          setScanMode('RETURN');
+        }
+        playAudioCue('success');
+        setSuccessMsg(`🔄 AUTO-DETECTED: AWB ${trimmed} is a ${orderData.orderClassificationLabel}! Switched to Return QC & Restock mode.`);
+        return;
+      }
+
+      // Auto-Rule 2: Scanned parcel is ALREADY DELIVERED to customer
+      if (orderData.orderClassification === 'DELIVERED') {
+        playAudioCue('success');
+        setSuccessMsg(`✅ AWB ${trimmed} is an already DELIVERED shipment (Delivered on ${orderData.deliveryTime ? new Date(orderData.deliveryTime).toLocaleString('en-IN') : 'Confirmed Delivery'}).`);
+        if (scanMode === 'DELIVERY') {
+          const historyEntry = {
+            id: Date.now(),
+            awb: trimmed,
+            orderCode: orderData.displayOrderCode,
+            sku: orderData.itemSKUCode,
+            courier: orderData.courier,
+            mode: 'DELIVERY',
+            status: 'ALREADY_DELIVERED',
+            time: new Date().toLocaleTimeString('en-IN'),
+            date: new Date().toLocaleDateString('en-IN')
+          };
+          setScanHistory(prev => [historyEntry, ...prev.slice(0, 49)]);
+          fetchStats();
+        }
+        return;
+      }
+
+      // Auto-Rule 3: User is in RETURN mode, but scans a fresh NEW un-dispatched order
+      if (scanMode === 'RETURN' && orderData.isNewOrder) {
+        setScanMode('PACK');
+        setSuccessMsg(`✨ AUTO-DETECTED: AWB ${trimmed} is a NEW FORWARD ORDER! Switched to Pack & Dispatch mode.`);
+      }
+
+      // ── Process Mode Execution ─────────────────────────────────────────────
+      if (scanMode === 'PACK' || (orderData.isNewOrder && scanMode !== 'DELIVERY')) {
         const numericWeight = Number(parcelWeight) || 0;
         await api.packAwbOrder({
           awb: trimmed,
@@ -232,7 +273,7 @@ export default function ScanAndPackScreen({ currentUser }) {
         });
 
         playAudioCue('success');
-        setSuccessMsg(`✅ AWB ${trimmed} verified & packed! Dispatched date automatically stamped (${numericWeight > 0 ? `${numericWeight}g` : 'Standard'}).`);
+        setSuccessMsg(`✅ [${orderData.orderClassificationLabel}] AWB ${trimmed} verified & packed! Dispatched date automatically stamped (${numericWeight > 0 ? `${numericWeight}g` : 'Standard'}).`);
         
         const historyEntry = {
           id: Date.now(),
@@ -1013,6 +1054,75 @@ export default function ScanAndPackScreen({ currentUser }) {
             gap: '1rem',
             animation: 'fadeIn 0.2s ease-out'
           }}>
+            {/* 🏷️ Smart AWB Order Classification Banner */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              padding: '0.65rem 1rem',
+              borderRadius: '10px',
+              background: activeOrder.isReturn 
+                ? (activeOrder.orderClassification === 'RETURN_RTO' ? '#fff7ed' : '#fff1f2')
+                : activeOrder.orderClassification === 'DELIVERED' 
+                ? '#ecfdf5' 
+                : activeOrder.orderClassification === 'IN_TRANSIT'
+                ? '#eff6ff'
+                : '#f0fdf4',
+              border: `1.5px solid ${
+                activeOrder.isReturn
+                  ? (activeOrder.orderClassification === 'RETURN_RTO' ? '#fdba74' : '#fecdd3')
+                  : activeOrder.orderClassification === 'DELIVERED'
+                  ? '#a7f3d0'
+                  : activeOrder.orderClassification === 'IN_TRANSIT'
+                  ? '#bfdbfe'
+                  : '#86efac'
+              }`,
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {activeOrder.isReturn ? (
+                  <RotateCcw size={18} color={activeOrder.orderClassification === 'RETURN_RTO' ? '#ea580c' : '#e11d48'} />
+                ) : activeOrder.orderClassification === 'DELIVERED' ? (
+                  <CheckCircle2 size={18} color="#059669" />
+                ) : activeOrder.orderClassification === 'IN_TRANSIT' ? (
+                  <Truck size={18} color="#2563eb" />
+                ) : (
+                  <PackageCheck size={18} color="#16a34a" />
+                )}
+                <span style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.02em',
+                  color: activeOrder.isReturn 
+                    ? (activeOrder.orderClassification === 'RETURN_RTO' ? '#c2410c' : '#be123c')
+                    : activeOrder.orderClassification === 'DELIVERED'
+                    ? '#047857'
+                    : activeOrder.orderClassification === 'IN_TRANSIT'
+                    ? '#1d4ed8'
+                    : '#15803d'
+                }}>
+                  {activeOrder.orderClassification === 'RETURN_CUSTOMER' && '🔴 INCOMING CUSTOMER RETURN (CIR)'}
+                  {activeOrder.orderClassification === 'RETURN_RTO' && '🟠 COURIER RTO (UNDELIVERED RETURN)'}
+                  {activeOrder.orderClassification === 'NEW_DISPATCH' && '🟢 NEW FORWARD ORDER — READY TO PACK & DISPATCH'}
+                  {activeOrder.orderClassification === 'IN_TRANSIT' && '🚚 IN-TRANSIT — DISPATCHED FORWARD SHIPMENT'}
+                  {activeOrder.orderClassification === 'DELIVERED' && '✅ CONFIRMED DELIVERED SHIPMENT'}
+                </span>
+              </div>
+
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '3px 10px',
+                borderRadius: '999px',
+                background: '#ffffff',
+                color: '#475569',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+              }}>
+                Uniware Type: {activeOrder.orderClassificationLabel || activeOrder.currentStage}
+              </span>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 {activeOrder.productImage ? (

@@ -121,13 +121,48 @@ const lookupAwb = async (req, res) => {
       else if (catalog?.images && catalog.images.length > 0) productImage = catalog.images[0];
     }
 
-    // Extract current status
+    // Extract current status & Intelligent Classification (Return vs New Order)
+    const hasReturnRecord = !!returnRecord;
+    const hasReverseCode = !!(order?.reversePickupCode || cleanCode.toUpperCase().startsWith('RPC') || cleanCode.toUpperCase().startsWith('RP'));
+    const hasReturnDate = !!(order?.returnedDate || order?.returnDate || returnRecord?.createdAt);
+    const hasReturnReason = !!(order?.reversePickupReason || order?.returnReason || returnRecord?.notes);
+    const pkgStatus = String(order?.shippingPackageStatusCode || order?.saleOrderStatus || order?.shippingCourierStatus || '').toUpperCase();
+    const isRto = pkgStatus.includes('RTO') || (returnRecord?.returnType === 'RTO');
+    const isCustomerReturn = hasReverseCode || pkgStatus.includes('RETURN') || (!isRto && (hasReturnDate || hasReturnReason || hasReturnRecord));
+    const isDelivered = !!(order?.deliveryTime || pkgStatus === 'DELIVERED');
+    const isDispatched = !!(order?.dispatchDate || ['DISPATCHED', 'SHIPPED'].includes(pkgStatus));
+
+    let orderClassification = 'NEW_DISPATCH';
+    let orderClassificationLabel = 'NEW FORWARD ORDER (READY TO PACK)';
+    let isReturn = false;
+
+    if (isRto) {
+      orderClassification = 'RETURN_RTO';
+      orderClassificationLabel = 'COURIER RTO (UNDELIVERED RETURN)';
+      isReturn = true;
+    } else if (isCustomerReturn) {
+      orderClassification = 'RETURN_CUSTOMER';
+      orderClassificationLabel = 'CUSTOMER RETURN (CIR)';
+      isReturn = true;
+    } else if (isDelivered) {
+      orderClassification = 'DELIVERED';
+      orderClassificationLabel = 'DELIVERED TO CUSTOMER';
+    } else if (isDispatched) {
+      orderClassification = 'IN_TRANSIT';
+      orderClassificationLabel = 'IN-TRANSIT (DISPATCHED)';
+    } else {
+      orderClassification = 'NEW_DISPATCH';
+      orderClassificationLabel = 'NEW FORWARD ORDER (READY TO PACK)';
+    }
+
+    const isNewOrder = !isDispatched && !isReturn && !isDelivered;
+
     let currentStage = 'PACKED';
-    if (returnRecord) {
+    if (isReturn) {
       currentStage = 'RETURNED';
-    } else if (order?.deliveryTime) {
+    } else if (isDelivered) {
       currentStage = 'DELIVERED';
-    } else if (order?.dispatchDate || order?.saleOrderStatus === 'DISPATCHED' || order?.saleOrderStatus === 'SHIPPED') {
+    } else if (isDispatched) {
       currentStage = 'IN_TRANSIT';
     } else if (order?.saleOrderStatus === 'COMPLETE') {
       currentStage = 'COMPLETE';
@@ -160,6 +195,11 @@ const lookupAwb = async (req, res) => {
         addressLine: [order?.shippingAddressLine1, order?.shippingAddressLine2].filter(Boolean).join(', ') || '',
         courier,
         currentStage,
+        orderClassification,
+        orderClassificationLabel,
+        isReturn,
+        isNewOrder,
+        isDelivered,
         orderDate: order?.orderDate || salesItem?.orderDate || order?.displayOrderDateTime || null,
         dispatchDate: order?.dispatchDate || null,
         deliveryTime: order?.deliveryTime || null,
