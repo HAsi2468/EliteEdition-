@@ -1968,6 +1968,10 @@ export const api = {
     return request(`/fabric-challan/lot-info/${lotNo}`);
   },
 
+  async reconcileFabricChallans() {
+    return request('/fabric-challan/reconcile-outward', { method: 'POST' });
+  },
+
   // ── Stitching Challan (PCH-1) ──────────────────────────────────────────────
   async getStitchingChallans(params = {}) {
     const query = new URLSearchParams();
@@ -2208,8 +2212,30 @@ export const api = {
     });
   },
 
-  async getScanPackHistory() {
-    return request('/scan-pack/history');
+  async getScanPackHistory({ limit, page, mode, search, startDate, endDate } = {}) {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit);
+    if (page) params.append('page', page);
+    if (mode && mode !== 'ALL') params.append('mode', mode);
+    if (search) params.append('search', search);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const qs = params.toString();
+    return request(`/scan-pack/history${qs ? `?${qs}` : ''}`);
+  },
+
+  async logScan(data) {
+    return request('/scan-pack/log-scan', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async clearScanHistory(daysOld = 0) {
+    return request('/scan-pack/history/clear', {
+      method: 'DELETE',
+      body: JSON.stringify({ daysOld }),
+    });
   },
 
   async updateReturnClaim(id, data) {

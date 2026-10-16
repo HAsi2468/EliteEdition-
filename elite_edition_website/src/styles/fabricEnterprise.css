@@ -314,9 +314,9 @@
 /* Desktop Grid for TP Row */
 .challan-tp-grid-header {
   display: grid;
-  grid-template-columns: 65px 150px 1fr 36px;
-  gap: 0.5rem;
-  font-size: 0.75rem;
+  grid-template-columns: 55px 130px 1fr 1fr 1.1fr 34px;
+  gap: 0.45rem;
+  font-size: 0.72rem;
   color: #64748b;
   font-weight: 800;
   text-transform: uppercase;
@@ -326,9 +326,9 @@
 
 .challan-tp-row {
   display: grid;
-  grid-template-columns: 65px 150px 1fr 36px;
-  grid-template-areas: "badge lot meter remove";
-  gap: 0.5rem;
+  grid-template-columns: 55px 130px 1fr 1fr 1.1fr 34px;
+  grid-template-areas: "badge lot fresh west meter remove";
+  gap: 0.45rem;
   align-items: center;
 }
 
@@ -338,6 +338,14 @@
 
 .challan-tp-lot-container {
   grid-area: lot;
+}
+
+.challan-tp-fresh-wrapper {
+  grid-area: fresh;
+}
+
+.challan-tp-west-wrapper {
+  grid-area: west;
 }
 
 .challan-tp-meter-wrapper {
@@ -448,10 +456,10 @@
   }
 
   .challan-tp-row {
-    grid-template-columns: 56px 1fr 36px !important;
+    grid-template-columns: 50px 1fr 34px !important;
     grid-template-areas:
       "badge lot remove"
-      "meter meter meter" !important;
+      "fresh west meter" !important;
     gap: 0.45rem !important;
     background: #f8fafc !important;
     border: 1.5px solid #e2e8f0 !important;

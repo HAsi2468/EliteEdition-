@@ -207,7 +207,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [deliveryByOptions, setDeliveryByOptions] = useState([]);
   const [lotPartyMap, setLotPartyMap] = useState({});
 
-  const emptyTpRows = () => [{ tpNo: 1, tpMeter: '', lotNo: '' }];
+  const emptyTpRows = () => [{ tpNo: 1, tpMeter: '', freshMtr: '', westMtr: '', lotNo: '' }];
   const [challanForm, setChallanForm] = useState({
     date: new Date().toISOString().split('T')[0],
     partyName: '',
@@ -1760,7 +1760,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const updateTpRow = (index, field, value) => {
     setChallanForm(prev => {
       const tpDetails = [...prev.tpDetails];
-      tpDetails[index] = { ...tpDetails[index], [field]: value };
+      const currentRow = { ...tpDetails[index] };
+
+      if (field === 'freshMtr' || field === 'westMtr') {
+        currentRow[field] = value;
+        const fresh = field === 'freshMtr' ? (parseFloat(value) || 0) : (parseFloat(currentRow.freshMtr) || 0);
+        const west = field === 'westMtr' ? (parseFloat(value) || 0) : (parseFloat(currentRow.westMtr) || 0);
+        const sum = fresh + west;
+        if (value !== '' || (currentRow.freshMtr !== '' && currentRow.freshMtr != null) || (currentRow.westMtr !== '' && currentRow.westMtr != null)) {
+          currentRow.tpMeter = sum > 0 ? (sum % 1 === 0 ? String(sum) : sum.toFixed(2)) : '';
+        }
+      } else {
+        currentRow[field] = value;
+      }
+
+      tpDetails[index] = currentRow;
       return { ...prev, tpDetails };
     });
   };
@@ -1775,7 +1789,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         .map(s => s.trim())
         .filter(s => s.length > 0);
       const defaultLot = lots[0] || '';
-      return { ...prev, tpDetails: [...prevTp, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot }] };
+      return { ...prev, tpDetails: [...prevTp, { tpNo: nextNo, tpMeter: '', freshMtr: '', westMtr: '', lotNo: defaultLot }] };
     });
     setChallanMobileTab('tp');
   };
@@ -2016,6 +2030,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           .map((r, i) => ({
             tpNo: i + 1,
             tpMeter: parseFloat(r.tpMeter) || 0,
+            freshMtr: r.freshMtr !== '' && r.freshMtr != null ? (parseFloat(r.freshMtr) || 0) : undefined,
+            westMtr: r.westMtr !== '' && r.westMtr != null ? (parseFloat(r.westMtr) || 0) : undefined,
             lotNo: r.lotNo || (challanForm.lotNo ? String(challanForm.lotNo).split(/[,\s&]+/)[0] : '') || ''
           })),
       };
@@ -2057,6 +2073,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       ? c.tpDetails.map((r, idx) => ({
           tpNo: idx + 1,
           tpMeter: String(r.tpMeter != null ? r.tpMeter : (parseFloat(r.freshMtr) || '')),
+          freshMtr: r.freshMtr != null ? String(r.freshMtr) : '',
+          westMtr: r.westMtr != null ? String(r.westMtr) : '',
           lotNo: r.lotNo || ''
         }))
       : emptyTpRows();
@@ -2091,6 +2109,33 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
 
     setIsChallanOpen(true);
+  };
+
+  const handleReconcileChallans = async () => {
+    const confirmed = await triggerEliteConfirm({
+      title: '🔄 Reconcile Delivery Challans',
+      message: 'This will inspect all Delivery Challans, link them to the Outward Fabric stock ledger, and ensure stock is correctly deducted. Continue?',
+      confirmText: 'Run Reconciliation',
+      cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
+    setLoading(true);
+    try {
+      const res = await api.reconcileFabricChallans();
+      if (res.success) {
+        triggerEliteAlert(
+          'Reconciliation Complete',
+          `Checked ${res.stats?.totalChallans || 0} challans.\nLinked: ${res.stats?.linkedCount || 0}\nCreated: ${res.stats?.createdOutwardCount || 0}`,
+          'success'
+        );
+        fetchChallans();
+        fetchData();
+      }
+    } catch (err) {
+      triggerEliteAlert('Reconciliation Error', err.message || 'Failed to reconcile challans.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChallanDelete = async () => {
@@ -5061,6 +5106,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <button className="btn-primary" onClick={() => { resetChallanForm(); setEditingChallan(null); setIsChallanOpen(true); }} style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', fontWeight: 800 }}>
                 <PlusCircle size={16} /> New Challan
               </button>
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  title="Reconcile unlinked challans with fabric outward stock ledger"
+                  onClick={handleReconcileChallans}
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <RefreshCw size={14} /> Reconcile Outwards
+                </button>
+              )}
             </div>
           </div>
 
@@ -6298,7 +6354,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <div className="challan-tp-grid-header">
                     <span>TP No</span>
                     <span>Assigned Lot</span>
-                    <span>TP Meters (mtr)</span>
+                    <span>Fresh Mtr</span>
+                    <span>West Mtr</span>
+                    <span>Total Mtr</span>
                     <span></span>
                   </div>
 
@@ -6424,6 +6482,54 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             )}
                           </div>
 
+                          <div className="challan-tp-fresh-wrapper" style={{ position: 'relative', width: '100%' }}>
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              value={row.freshMtr ?? ''}
+                              onChange={e => updateTpRow(idx, 'freshMtr', e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.45rem',
+                                fontSize: '0.88rem',
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                background: '#f0fdf4',
+                                border: '1.5px solid #86efac',
+                                borderRadius: '6px',
+                                boxSizing: 'border-box',
+                                textAlign: 'right'
+                              }}
+                              placeholder="Fresh (m)"
+                              title="Fresh roll meters"
+                            />
+                          </div>
+
+                          <div className="challan-tp-west-wrapper" style={{ position: 'relative', width: '100%' }}>
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              value={row.westMtr ?? ''}
+                              onChange={e => updateTpRow(idx, 'westMtr', e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.45rem',
+                                fontSize: '0.88rem',
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                background: '#fff7ed',
+                                border: '1.5px solid #fed7aa',
+                                borderRadius: '6px',
+                                boxSizing: 'border-box',
+                                textAlign: 'right'
+                              }}
+                              placeholder="West (m)"
+                              title="Westage / Short meters"
+                            />
+                          </div>
+
                           <div className="challan-tp-meter-wrapper" style={{ position: 'relative', width: '100%' }}>
                             <input
                               type="number"
@@ -6444,8 +6550,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 boxSizing: 'border-box',
                                 textAlign: 'right'
                               }}
-                              placeholder="Meters (mtr)"
-                              title="Roll / TP meters"
+                              placeholder="Total (m)"
+                              title="Total roll meters (Fresh + West)"
                             />
                           </div>
 

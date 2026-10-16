@@ -27,6 +27,9 @@ router.delete('/:id', verifyRecordOwnership('FabricChallan', 'partyName'), c.del
 // Reset all challans
 router.post('/reset-all', c.resetAllChallans);
 
+// Reconcile and backfill outward transactions
+router.post('/reconcile-outward', c.reconcileChallanOutwards);
+
 // Download challan summary report PDF
 router.get('/report/pdf', c.downloadChallanSummaryPdf);
 

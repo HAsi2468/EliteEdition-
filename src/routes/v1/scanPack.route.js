@@ -15,5 +15,7 @@ router.get('/manifest/:manifestId', scanPackController.getManifestById);
 router.post('/bulk-deliver', scanPackController.bulkDeliver);
 router.get('/analytics', scanPackController.getCourierAnalytics);
 router.get('/history', scanPackController.getScanHistory);
+router.post('/log-scan', scanPackController.recordScanLog);
+router.delete('/history/clear', scanPackController.clearScanHistory);
 
 module.exports = router;

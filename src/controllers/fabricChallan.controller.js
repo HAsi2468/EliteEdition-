@@ -351,13 +351,25 @@ async function allocateLotsForChallan(
 
       // If this roll ALREADY has an explicit lot chosen by the user, PRESERVE IT!
       if (tp.lotNo && String(tp.lotNo).trim() !== '') {
-        const parsed = parseLotNo(tp.lotNo);
-        const lotStr = parsed ? String(parsed) : String(tp.lotNo).trim();
-        usedLotsSet.add(lotStr);
-        lotGroups[lotStr] = (lotGroups[lotStr] || 0) + m;
+        const rawLot = String(tp.lotNo).trim();
+        const subLots = rawLot.split(',').map(s => s.trim()).filter(Boolean);
+        if (subLots.length > 1) {
+          const splitMtr = m / subLots.length;
+          subLots.forEach(sLot => {
+            const parsed = parseLotNo(sLot);
+            const lotStr = parsed ? String(parsed) : sLot;
+            usedLotsSet.add(lotStr);
+            lotGroups[lotStr] = (lotGroups[lotStr] || 0) + splitMtr;
+          });
+        } else {
+          const parsed = parseLotNo(rawLot);
+          const lotStr = parsed ? String(parsed) : rawLot;
+          usedLotsSet.add(lotStr);
+          lotGroups[lotStr] = (lotGroups[lotStr] || 0) + m;
+        }
         sanitizedDetails.push({
           ...tp,
-          lotNo: lotStr
+          lotNo: rawLot
         });
         continue;
       }
@@ -804,12 +816,12 @@ const createChallan = async (req, res) => {
         actorId: uId,
         actorName: uName,
         action: 'CREATE',
-        module: 'Fabric Inward',
+        module: 'Fabric Delivery',
         recordRef: String(challan.challanNo || 'N/A'),
         recordId: challan._id,
         permissionScope: 'jobcards_fabric',
         department: 'Fabric',
-        description: `🧵 **New Fabric Inward Challan #${challan.challanNo}** created for Party: **"${partyName || 'Vendor'}"** | Fabric: **${normFabric}** | Qty: **${totalMtr}m** (${totalTp} T.P.) | Lot: **${finalLotNoStr || 'N/A'}** by **${uName}**.`
+        description: `🚚 **New Fabric Delivery Challan #EDP-${challan.challanNo}** created for Party: **"${partyName || 'Customer'}"** | Fabric: **${normFabric}** | Qty: **${totalMtr}m** (${totalTp} T.P.) | Lot: **${finalLotNoStr || 'N/A'}** by **${uName}**.`
       }).catch(e => console.warn('publishActivity fabric challan failed:', e.message));
     } catch (e) {
       console.warn('Failed to publish activity for fabric challan:', e.message);
@@ -886,7 +898,7 @@ const createChallan = async (req, res) => {
             partyName: partyName || '',
             billTo: billTo || partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            forceAllowNegative: false,
+            forceAllowNegative: true,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
@@ -986,7 +998,9 @@ const getChallans = async (req, res) => {
       const safeSearch = rawSearch.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
       const re = new RegExp(safeSearch, 'i');
 
-      const numMatch = rawSearch.match(/\d+/);
+      // Strip optional "EDP-" or "EDP" prefix to extract pure number
+      const cleanSearch = rawSearch.replace(/^EDP-?/i, '').trim();
+      const numMatch = cleanSearch.match(/^\d+$/) || rawSearch.match(/\d+/);
       const numVal = numMatch ? parseInt(numMatch[0], 10) : null;
 
       const searchConditions = [
@@ -1006,7 +1020,7 @@ const getChallans = async (req, res) => {
 
       if (numVal !== null && !isNaN(numVal)) {
         searchConditions.push({ challanNo: numVal });
-        searchConditions.push({ lotNo: numVal });
+        searchConditions.push({ lotNo: String(numVal) });
       }
 
       andConditions.push({ $or: searchConditions });
@@ -1221,7 +1235,7 @@ const updateChallan = async (req, res) => {
             partyName: challan.partyName || '',
             billTo: challan.billTo || challan.partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            forceAllowNegative: false,
+            forceAllowNegative: true,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Dispatched=${groupMtr}m${lotWasteShare > 0 ? ` + West=${lotWasteShare}m (${lotFinishedMtr}m)` : ''} + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
@@ -2475,6 +2489,126 @@ const downloadChallanSummaryPdf = async (req, res) => {
   }
 };
 
+// ── POST /fabric-challan/reconcile-outward ──────────────────────────────────
+// Automatically audits and self-heals any challan missing fabricOutwardIds or outward transactions
+const reconcileChallanOutwards = async (req, res) => {
+  try {
+    const allChallans = await FabricChallan.find().lean();
+    let linkedCount = 0;
+    let createdCount = 0;
+    let jobsSynced = 0;
+
+    for (const c of allChallans) {
+      if (!c.fabricOutwardIds || c.fabricOutwardIds.length === 0) {
+        const cNo = 'EDP-' + c.challanNo;
+        const existingTxs = await FabricTransaction.find({ challanNo: cNo }).lean();
+
+        if (existingTxs.length > 0) {
+          const ids = existingTxs.map(t => t._id);
+          await FabricChallan.findByIdAndUpdate(c._id, { $set: { fabricOutwardIds: ids } });
+          linkedCount++;
+        } else if (c.fabricName && c.totalMtr > 0) {
+          // Calculate proportional wastage if available
+          let challanProportionalWaste = 0;
+          if (c.jobNo && c.totalMtr > 0) {
+            try {
+              const { totalFresh, totalWaste } = await getLinkedJobFusingMetrics(c.jobNo);
+              if (totalWaste > 0) {
+                const baseFresh = totalFresh > 0 ? totalFresh : c.totalMtr;
+                const ratio = Math.min(1.0, c.totalMtr / baseFresh);
+                challanProportionalWaste = parseFloat((ratio * totalWaste).toFixed(3));
+              }
+            } catch (wErr) {}
+          }
+
+          const rawLot = c.lotNo ? String(c.lotNo) : '';
+          const subLots = rawLot.split(',').map(s => s.trim()).filter(Boolean);
+          const createdTxIds = [];
+
+          if (subLots.length > 1) {
+            const splitMtr = c.totalMtr / subLots.length;
+            const splitWaste = challanProportionalWaste / subLots.length;
+            for (const sLot of subLots) {
+              const lotNum = parseLotNo(sLot);
+              const lotFinishedMtr = parseFloat((splitMtr + splitWaste).toFixed(3));
+              const sPct = c.shortagePct != null ? c.shortagePct : 0;
+              const rawMtr = computeRawMeters(lotFinishedMtr, sPct, c.shortageMtr, c.shortageMode);
+
+              const outwardTx = new FabricTransaction({
+                type: 'OUTWARD',
+                fabricQuality: c.fabricName,
+                panna: c.panna || '',
+                lotNo: lotNum,
+                qty: rawMtr,
+                shortagePct: sPct,
+                date: c.date || new Date(),
+                jobNo: c.jobNo || '',
+                partyName: c.partyName || '',
+                billTo: c.billTo || c.partyName || '',
+                challanNo: cNo,
+                forceAllowNegative: true,
+                notes: `Auto: ${cNo} | Lot #${sLot} | Dispatched=${splitMtr}m + ${sPct}% shortage = ${rawMtr}m raw`,
+              });
+              await outwardTx.save();
+              createdTxIds.push(outwardTx._id);
+            }
+          } else {
+            const lotNum = parseLotNo(rawLot);
+            const lotFinishedMtr = parseFloat((c.totalMtr + challanProportionalWaste).toFixed(3));
+            const sPct = c.shortagePct != null ? c.shortagePct : 0;
+            const rawMtr = computeRawMeters(lotFinishedMtr, sPct, c.shortageMtr, c.shortageMode);
+
+            const outwardTx = new FabricTransaction({
+              type: 'OUTWARD',
+              fabricQuality: c.fabricName,
+              panna: c.panna || '',
+              lotNo: lotNum,
+              qty: rawMtr,
+              shortagePct: sPct,
+              date: c.date || new Date(),
+              jobNo: c.jobNo || '',
+              partyName: c.partyName || '',
+              billTo: c.billTo || c.partyName || '',
+              challanNo: cNo,
+              forceAllowNegative: true,
+              notes: `Auto: ${cNo} | Lot #${rawLot || 'N/A'} | Dispatched=${c.totalMtr}m + ${sPct}% shortage = ${rawMtr}m raw`,
+            });
+            await outwardTx.save();
+            createdTxIds.push(outwardTx._id);
+          }
+
+          if (createdTxIds.length > 0) {
+            await FabricChallan.findByIdAndUpdate(c._id, { 
+              $set: { 
+                fabricOutwardIds: createdTxIds,
+                proportionalWasteMtr: challanProportionalWaste
+              } 
+            });
+            createdCount++;
+          }
+        }
+      }
+
+      // Sync linked Job Card delivery totals
+      if (c.jobNo) {
+        await syncJobCardDeliveryTotals(c.jobNo);
+        jobsSynced++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Reconciliation complete: ${linkedCount} pre-existing outwards re-linked, ${createdCount} missing outwards created, ${jobsSynced} jobcards resynced.`,
+      linkedCount,
+      createdCount,
+      jobsSynced
+    });
+  } catch (err) {
+    console.error('Error reconciling challan outwards:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   createChallan,
   getChallans,
@@ -2487,5 +2621,6 @@ module.exports = {
   downloadBulkChallansPdf,
   downloadChallanSummaryPdf,
   allocateLotsForChallan,
+  reconcileChallanOutwards,
 };
 

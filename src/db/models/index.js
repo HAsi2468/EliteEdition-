@@ -85,6 +85,7 @@ const db = {
   DocumentTemplate: require('./documentTemplate.model'),
   DocumentPrintLog: require('./documentPrintLog.model'),
   CourierManifest: require('./courierManifest.model'),
+  ScanLog: require('./scanLog.model'),
   mongoose,
 };
 

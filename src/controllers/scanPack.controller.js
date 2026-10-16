@@ -15,6 +15,80 @@ const detectCourier = (code = '') => {
   return 'Standard Courier / Logistics';
 };
 
+// Helper: Persistently record every scan operation into MongoDB ScanLog
+const logScanEvent = async ({
+  awb,
+  shippingPackageCode = '',
+  orderCode = '',
+  sku = '',
+  itemName = '',
+  courier = '',
+  channel = 'Myntra',
+  mode = 'PACK',
+  status = 'SCANNED',
+  weightGrams = 0,
+  price = 0,
+  paymentMode = 'PREPAID',
+  paymentStatus = 'PAID',
+  codAmount = 0,
+  customerName = '',
+  city = '',
+  brand = 'SOBISE',
+  size = '',
+  color = '',
+  operator = 'Warehouse Operator',
+  operatorId = null,
+  facility = 'eliteedition',
+  source = 'Barcode Scanner',
+  notes = '',
+  meta = {}
+}) => {
+  try {
+    if (!awb || !db.ScanLog) return null;
+    const cleanAwb = String(awb).trim().toUpperCase();
+    if (!cleanAwb || cleanAwb === 'UNDEFINED' || cleanAwb === 'NULL' || cleanAwb === 'NAN' || cleanAwb.length < 4) {
+      return null;
+    }
+
+    const payload = {
+      awb: cleanAwb,
+      shippingPackageCode: String(shippingPackageCode || '').trim(),
+      orderCode: String(orderCode || '').trim(),
+      sku: String(sku || '').trim(),
+      itemName: String(itemName || '').trim(),
+      courier: courier || detectCourier(cleanAwb),
+      channel: channel || 'Myntra',
+      customerName: String(customerName || '').trim(),
+      city: String(city || '').trim(),
+      brand: String(brand || 'SOBISE').trim(),
+      size: String(size || '').trim(),
+      color: String(color || '').trim(),
+      mode,
+      status,
+      weightGrams: Number(weightGrams) || 0,
+      price: Number(price) || 0,
+      paymentMode: String(paymentMode || 'PREPAID').toUpperCase(),
+      paymentStatus: String(paymentStatus || 'PAID').toUpperCase(),
+      codAmount: Number(codAmount) || 0,
+      operator: operator || 'Warehouse Operator',
+      operatorId,
+      facility: facility || 'eliteedition',
+      source: source || 'Barcode Scanner',
+      notes: notes || '',
+      meta: meta || {}
+    };
+
+    return await db.ScanLog.findOneAndUpdate(
+      { awb: cleanAwb },
+      { $set: payload },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (err) {
+    logger.warn('Failed to log scan event to db: %s', err.message);
+    return null;
+  }
+};
+
 // ── GET /api/v1/scan-pack/lookup ──────────────────────────────────────────────
 // Looks up an order/package by AWB code (e.g. MYSC1359190430) or Order Code
 const lookupAwb = async (req, res) => {
@@ -103,8 +177,15 @@ const lookupAwb = async (req, res) => {
     const courier = order?.shippingCourier || order?.shippingProvider || detectCourier(cleanCode);
     const channel = order?.channel || salesItem?.channel || 'Myntra';
     const brand = order?.itemTypeBrand || salesItem?.itemTypeBrand || 'SOBISE';
-    const isCod = order?.cod === true || order?.cod === 'true' || order?.cod === 'COD' || salesItem?.cod === true || salesItem?.cod === 'true';
+    const isCod = order?.cod === true || order?.cod === 'true' || order?.cod === 'COD' ||
+      (typeof order?.cod === 'number' && order?.cod > 0) || Number(order?.cod) > 0 ||
+      salesItem?.cod === true || salesItem?.cod === 'true' ||
+      (typeof salesItem?.cod === 'number' && salesItem?.cod > 0) || Number(salesItem?.cod) > 0 ||
+      String(order?.paymentMethod || '').toUpperCase() === 'COD' ||
+      String(order?.paymentType || '').toUpperCase() === 'COD';
     const paymentMode = isCod ? 'COD' : 'PREPAID';
+    const priceVal = Number(order?.totalPrice || salesItem?.totalPrice) || 0;
+    const codAmount = isCod ? (Number(order?.cod) > 1 ? Number(order.cod) : priceVal) : 0;
     const customerName = order?.shippingAddressName || salesItem?.shippingAddressName || '';
     const customerPhone = order?.shippingAddressPhone || order?.notificationMobile || salesItem?.shippingAddressPhone || '';
     const invoiceCode = order?.invoiceCode || salesItem?.invoiceCode || '';
@@ -168,6 +249,42 @@ const lookupAwb = async (req, res) => {
       currentStage = 'COMPLETE';
     }
 
+    // Determine Payment Status (Paid / Pending / Refund Under Process / Not Collected)
+    let paymentStatus = 'PAID';
+    let paymentStatusLabel = 'Payment Done (Prepaid)';
+
+    const orderStatusRaw = String(order?.saleOrderStatus || salesItem?.saleOrderStatus || '').toUpperCase();
+
+    if (orderStatusRaw === 'CANCELLED') {
+      paymentStatus = 'CANCELLED';
+      paymentStatusLabel = 'Order Cancelled';
+    } else if (isReturn) {
+      if (isCod) {
+        paymentStatus = 'NOT_COLLECTED';
+        paymentStatusLabel = 'COD Not Collected (Returned / RTO)';
+      } else {
+        paymentStatus = 'REFUND_PENDING';
+        paymentStatusLabel = 'Prepaid (Refund Under Process)';
+      }
+    } else if (isDelivered) {
+      if (isCod) {
+        paymentStatus = 'PAID';
+        paymentStatusLabel = 'COD Collected (Payment Done)';
+      } else {
+        paymentStatus = 'PAID';
+        paymentStatusLabel = 'Payment Done (Prepaid)';
+      }
+    } else {
+      // Forward order in packing, dispatch, or in-transit
+      if (isCod) {
+        paymentStatus = 'PENDING';
+        paymentStatusLabel = `Payment Pending (Collect ₹${codAmount || priceVal})`;
+      } else {
+        paymentStatus = 'PAID';
+        paymentStatusLabel = 'Payment Done (Prepaid)';
+      }
+    }
+
     res.json({
       success: true,
       found: !!(order || salesItem),
@@ -181,9 +298,12 @@ const lookupAwb = async (req, res) => {
         category: order?.category || salesItem?.category || 'Apparel',
         color: order?.itemTypeColor || salesItem?.itemTypeColor || '',
         size: order?.itemTypeSize || salesItem?.itemTypeSize || '',
-        price: order?.totalPrice || salesItem?.totalPrice || 0,
+        price: priceVal,
         mrp: order?.mrp || salesItem?.mrp || 0,
         paymentMode,
+        paymentStatus,
+        paymentStatusLabel,
+        codAmount,
         isCod,
         customerName,
         customerPhone,
@@ -268,6 +388,35 @@ const packOrder = async (req, res) => {
       });
     }
 
+    const isCod = order.cod === true || order.cod === 'true' || order.cod === 'COD' ||
+      (typeof order.cod === 'number' && order.cod > 0) || Number(order.cod) > 0 ||
+      String(order.paymentMethod || '').toUpperCase() === 'COD';
+    const paymentMode = isCod ? 'COD' : 'PREPAID';
+    const priceVal = Number(order.totalPrice) || 0;
+    const codAmount = isCod ? (Number(order.cod) > 1 ? Number(order.cod) : priceVal) : 0;
+
+    // Persist to ScanLog data store
+    logScanEvent({
+      awb: cleanAwb,
+      shippingPackageCode: order.shippingPackageCode || cleanAwb,
+      orderCode: order.displayOrderCode || displayOrderCode || cleanAwb,
+      sku: order.itemSKUCode || sku,
+      itemName: order.itemTypeName || '',
+      courier: cleanCourier,
+      channel: order.channel || 'Myntra',
+      mode: 'PACK',
+      status: 'PACKED',
+      weightGrams: weight,
+      price: priceVal,
+      paymentMode,
+      paymentStatus: isCod ? 'PENDING' : 'PAID',
+      codAmount,
+      facility: order.facility || facility || 'eliteedition',
+      notes: notes || '',
+      operator: req.user?.name || 'Warehouse Operator',
+      operatorId: req.user?._id
+    });
+
     res.status(200).json({
       success: true,
       message: `AWB ${cleanAwb} marked as PACKED & DISPATCHED (${weight > 0 ? `${weight}g` : 'Standard Weight'}) at ${new Date().toLocaleTimeString('en-IN')}`,
@@ -308,6 +457,33 @@ const markDelivered = async (req, res) => {
       },
       { new: true, upsert: true }
     );
+
+    const isCod = order?.cod === true || order?.cod === 'true' || order?.cod === 'COD' ||
+      (typeof order?.cod === 'number' && order?.cod > 0) || Number(order?.cod) > 0 ||
+      String(order?.paymentMethod || '').toUpperCase() === 'COD';
+    const paymentMode = isCod ? 'COD' : 'PREPAID';
+    const priceVal = Number(order?.totalPrice) || 0;
+    const codAmount = isCod ? (Number(order?.cod) > 1 ? Number(order.cod) : priceVal) : 0;
+
+    // Persist to ScanLog data store
+    logScanEvent({
+      awb: cleanAwb,
+      shippingPackageCode: order?.shippingPackageCode || '',
+      orderCode: order?.displayOrderCode || '',
+      sku: order?.itemSKUCode || '',
+      itemName: order?.itemTypeName || '',
+      courier: order?.shippingCourier,
+      channel: order?.channel || 'Myntra',
+      mode: 'DELIVERY',
+      status: 'DELIVERED',
+      price: priceVal,
+      paymentMode,
+      paymentStatus: 'PAID', // Delivered means payment has been settled/collected
+      codAmount,
+      facility: order?.facility || 'eliteedition',
+      operator: req.user?.name || 'Warehouse Operator',
+      operatorId: req.user?._id
+    });
 
     res.status(200).json({
       success: true,
@@ -417,6 +593,43 @@ const processReturnScan = async (req, res) => {
       }
       stockUpdated = true;
     }
+
+    // Retrieve order to get financial details
+    const origOrder = await db.SaleOrder.findOne({
+      $or: [{ trackingNumber: cleanAwb }, { shippingPackageCode: cleanAwb }, { displayOrderCode: displayOrderId }]
+    }).lean();
+    const isCod = origOrder?.cod === true || origOrder?.cod === 'true' || origOrder?.cod === 'COD' ||
+      (typeof origOrder?.cod === 'number' && origOrder?.cod > 0) || Number(origOrder?.cod) > 0;
+    const paymentMode = isCod ? 'COD' : 'PREPAID';
+    const priceVal = Number(origOrder?.totalPrice) || 0;
+
+    // Persist to ScanLog data store
+    logScanEvent({
+      awb: cleanAwb,
+      shippingPackageCode: origOrder?.shippingPackageCode || '',
+      orderCode: displayOrderId || origOrder?.displayOrderCode || '',
+      sku: sku || origOrder?.itemSKUCode || '',
+      itemName: origOrder?.itemTypeName || '',
+      brand: origOrder?.itemTypeBrand || 'SOBISE',
+      channel: origOrder?.channel || 'Myntra',
+      customerName: origOrder?.shippingAddressName || '',
+      city: origOrder?.shippingAddressCity || '',
+      size: origOrder?.itemTypeSize || '',
+      color: origOrder?.itemTypeColor || '',
+      courier: detectCourier(cleanAwb),
+      mode: returnType === 'RTO' ? 'RTO' : 'RETURN',
+      status: status === 'STOCKED_IN' ? 'RESTOCKED' : 'SPF_CLAIM_FILED',
+      weightGrams: returnWeight,
+      price: priceVal,
+      paymentMode,
+      paymentStatus: isCod ? 'NOT_COLLECTED' : 'REFUND_PENDING',
+      codAmount: 0,
+      facility: 'eliteedition',
+      notes: notes || '',
+      operator: req.user?.name || 'Warehouse QC Desk',
+      operatorId: req.user?._id,
+      meta: { returnType, condition, returnRecordId: returnDoc._id }
+    });
 
     res.status(201).json({
       success: true,
@@ -646,39 +859,287 @@ const bulkDeliver = async (req, res) => {
   }
 };
 
+// ── POST /api/v1/scan-pack/log-scan ───────────────────────────────────────────
+// Manually / directly persists a scan action into the ScanLog database
+const recordScanLog = async (req, res) => {
+  try {
+    const {
+      awb,
+      shippingPackageCode,
+      orderCode,
+      sku,
+      itemName,
+      brand = 'SOBISE',
+      channel = 'Myntra',
+      size = '',
+      color = '',
+      customerName = '',
+      city = '',
+      courier,
+      mode = 'PACK',
+      status = 'SCANNED',
+      weightGrams = 0,
+      price = 0,
+      paymentMode = 'PREPAID',
+      paymentStatus = 'PAID',
+      codAmount = 0,
+      source = 'Barcode Scanner',
+      notes = '',
+      meta = {}
+    } = req.body;
+
+    if (!awb || !String(awb).trim()) {
+      return res.status(400).json({ success: false, error: 'AWB code is required' });
+    }
+
+    const log = await logScanEvent({
+      awb,
+      shippingPackageCode,
+      orderCode,
+      sku,
+      itemName,
+      brand,
+      channel,
+      size,
+      color,
+      customerName,
+      city,
+      courier,
+      mode,
+      status,
+      weightGrams,
+      price,
+      paymentMode,
+      paymentStatus,
+      codAmount,
+      operator: req.user?.name || 'Warehouse Operator',
+      operatorId: req.user?._id,
+      facility: req.body.facility || 'eliteedition',
+      source,
+      notes,
+      meta
+    });
+
+    res.status(201).json({ success: true, data: log });
+  } catch (error) {
+    logger.error('scanPack.recordScanLog error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // ── GET /api/v1/scan-pack/history ─────────────────────────────────────────────
-// Returns recent scans with counts
+// Returns persistent scan history from MongoDB with search, filters & pagination
 const getScanHistory = async (req, res) => {
   try {
+    const { limit = 50, page = 1, mode, search, startDate, endDate } = req.query;
+    const cleanLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 300);
+    const cleanPage = Math.max(parseInt(page, 10) || 1, 1);
+    const skip = (cleanPage - 1) * cleanLimit;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [dispatchedCount, deliveredCount, returnCount, recentDispatches, recentReturns] = await Promise.all([
+    const query = {};
+    if (mode && mode !== 'ALL') {
+      if (mode === 'RETURN') {
+        query.mode = { $in: ['RETURN', 'RTO'] };
+      } else if (mode === 'PACK' || mode === 'DISPATCH') {
+        query.mode = { $in: ['PACK', 'DISPATCH'] };
+      } else if (mode === 'LOOKUP') {
+        query.mode = { $in: ['LOOKUP', 'ALL'] };
+      } else {
+        query.mode = String(mode).toUpperCase();
+      }
+    }
+    if (search && search.trim()) {
+      const sRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { awb: sRegex },
+        { shippingPackageCode: sRegex },
+        { orderCode: sRegex },
+        { sku: sRegex },
+        { courier: sRegex },
+        { customerName: sRegex },
+        { city: sRegex }
+      ];
+    }
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    const [dbLogs, totalLogsCount, dispatchedCount, deliveredCount, returnCount] = await Promise.all([
+      db.ScanLog ? db.ScanLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(cleanLimit).lean() : [],
+      db.ScanLog ? db.ScanLog.countDocuments(query) : 0,
       db.SaleOrder.countDocuments({ dispatchDate: { $gte: today.toISOString() } }),
       db.SaleOrder.countDocuments({ deliveryTime: { $gte: today.toISOString() } }),
-      db.ReturnRecord.countDocuments({ createdAt: { $gte: today } }),
-      db.SaleOrder.find({ dispatchDate: { $exists: true, $ne: null } })
-        .sort({ updatedAt: -1 })
-        .limit(25)
-        .lean(),
-      db.ReturnRecord.find({})
-        .sort({ createdAt: -1 })
-        .limit(25)
-        .lean()
+      db.ReturnRecord.countDocuments({ createdAt: { $gte: today } })
     ]);
+
+    // Deduplicate dbLogs by unique AWB - each AWB code is strictly unique
+    const uniqueLogsMap = new Map();
+    for (const l of (dbLogs || [])) {
+      const awbKey = String(l.awb || '').trim().toUpperCase();
+      if (!awbKey || awbKey === 'UNDEFINED' || awbKey === 'NULL' || awbKey === 'NAN' || awbKey.length < 4) continue;
+      if (!uniqueLogsMap.has(awbKey)) {
+        uniqueLogsMap.set(awbKey, l);
+      }
+    }
+    const cleanDbLogs = Array.from(uniqueLogsMap.values());
+
+    // Format logs for frontend table
+    let history = cleanDbLogs.map(l => ({
+      id: l._id,
+      awb: l.awb,
+      shippingPackageCode: l.shippingPackageCode || '',
+      orderCode: l.orderCode || '',
+      sku: l.sku || '',
+      itemName: l.itemName || '',
+      brand: l.brand || 'SOBISE',
+      channel: l.channel || 'Myntra',
+      customerName: l.customerName || '',
+      city: l.city || '',
+      size: l.size || '',
+      color: l.color || '',
+      weightGrams: l.weightGrams || 0,
+      price: l.price || 0,
+      paymentMode: l.paymentMode || 'PREPAID',
+      paymentStatus: l.paymentStatus || 'PAID',
+      codAmount: l.codAmount || 0,
+      courier: l.courier || '',
+      mode: l.mode,
+      status: l.status,
+      time: new Date(l.updatedAt || l.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      date: new Date(l.updatedAt || l.createdAt).toLocaleDateString('en-IN'),
+      createdAt: l.updatedAt || l.createdAt,
+      operator: l.operator || 'Warehouse Operator',
+      notes: l.notes || '',
+      source: l.source || '',
+      meta: l.meta || {}
+    }));
+
+    // If ScanLog collection is new and has no entries yet, fall back gracefully to SaleOrders + ReturnRecords
+    if (history.length === 0 && !search && (!mode || mode === 'ALL') && !startDate) {
+      const [recentDispatches, recentReturns] = await Promise.all([
+        db.SaleOrder.find({ dispatchDate: { $exists: true, $ne: null } })
+          .sort({ updatedAt: -1 })
+          .limit(50)
+          .lean(),
+        db.ReturnRecord.find({})
+          .sort({ createdAt: -1 })
+          .limit(50)
+          .lean()
+      ]);
+
+      const synthDispatches = recentDispatches.map(o => {
+        const isCod = o.cod === true || o.cod === 'true' || o.cod === 'COD' || (typeof o.cod === 'number' && o.cod > 0) || Number(o.cod) > 0;
+        const priceVal = Number(o.totalPrice) || 0;
+        const codAmount = isCod ? (Number(o.cod) > 1 ? Number(o.cod) : priceVal) : 0;
+        return {
+          id: o._id,
+          awb: o.trackingNumber || o.shippingPackageCode || o.displayOrderCode,
+          shippingPackageCode: o.shippingPackageCode || '',
+          orderCode: o.displayOrderCode || '',
+          sku: o.itemSKUCode || '',
+          itemName: o.itemTypeName || o.itemSKUCode || '',
+          brand: o.itemTypeBrand || 'SOBISE',
+          channel: o.channel || 'Myntra',
+          size: o.itemTypeSize || '',
+          color: o.itemTypeColor || '',
+          customerName: o.shippingAddressName || '',
+          city: o.shippingAddressCity || '',
+          weightGrams: o.weightGrams || 0,
+          price: priceVal,
+          paymentMode: isCod ? 'COD' : 'PREPAID',
+          paymentStatus: isCod ? (o.saleOrderStatus === 'DELIVERED' ? 'PAID' : 'PENDING') : 'PAID',
+          codAmount,
+          courier: o.shippingCourier || detectCourier(o.trackingNumber),
+          mode: 'PACK',
+          status: 'DISPATCHED',
+          time: new Date(o.dispatchDate || o.updatedAt).toLocaleTimeString('en-IN'),
+          date: new Date(o.dispatchDate || o.updatedAt).toLocaleDateString('en-IN'),
+          createdAt: o.dispatchDate || o.updatedAt,
+          operator: 'System'
+        };
+      });
+
+      const synthReturns = recentReturns.map(r => ({
+        id: r._id,
+        awb: r.trackingNumber || r.awb || r.referenceId,
+        shippingPackageCode: '',
+        orderCode: r.referenceId || '',
+        sku: r.sku || '',
+        weightGrams: 0,
+        price: 0,
+        paymentMode: 'PREPAID',
+        paymentStatus: 'REFUND_PENDING',
+        codAmount: 0,
+        courier: r.courier || detectCourier(r.trackingNumber),
+        mode: r.returnType === 'RTO' ? 'RTO' : 'RETURN',
+        status: r.condition === 'INTACT' ? 'RESTOCKED' : 'SPF_CLAIM_FILED',
+        time: new Date(r.createdAt).toLocaleTimeString('en-IN'),
+        date: new Date(r.createdAt).toLocaleDateString('en-IN'),
+        createdAt: r.createdAt,
+        operator: 'Return QC Desk',
+        returnDoc: r
+      }));
+
+      // Strictly deduplicate by unique AWB
+      const synthMap = new Map();
+      for (const item of [...synthDispatches, ...synthReturns]) {
+        const k = String(item.awb || '').trim().toUpperCase();
+        if (!k || k === 'UNDEFINED' || k === 'NULL' || k.length < 4 || synthMap.has(k)) continue;
+        synthMap.set(k, item);
+      }
+
+      history = Array.from(synthMap.values())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, cleanLimit);
+    }
 
     res.json({
       success: true,
       stats: {
         dispatchedToday: dispatchedCount,
         deliveredToday: deliveredCount,
-        returnedToday: returnCount
+        returnedToday: returnCount,
+        totalScansToday: dispatchedCount + deliveredCount + returnCount
       },
-      recentDispatches,
-      recentReturns
+      history,
+      total: totalLogsCount || history.length,
+      page: cleanPage,
+      limit: cleanLimit
     });
   } catch (error) {
     logger.error('scanPack.getScanHistory error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── DELETE /api/v1/scan-pack/history/clear ──────────────────────────────────
+// Optional purge for supervisors / clear test session logs
+const clearScanHistory = async (req, res) => {
+  try {
+    const { daysOld = 0 } = req.body || {};
+    let query = {};
+    if (daysOld > 0) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - parseInt(daysOld, 10));
+      query = { createdAt: { $lt: cutoff } };
+    }
+    const result = await db.ScanLog.deleteMany(query);
+    res.json({
+      success: true,
+      message: `Cleared ${result.deletedCount} scan history records.`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    logger.error('scanPack.clearScanHistory error: %o', error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -777,5 +1238,7 @@ module.exports = {
   getManifestById,
   bulkDeliver,
   getScanHistory,
+  recordScanLog,
+  clearScanHistory,
   getCourierAnalytics
 };
