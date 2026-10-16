@@ -100,6 +100,10 @@ const fabricTransactionSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    forceAllowNegative: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
