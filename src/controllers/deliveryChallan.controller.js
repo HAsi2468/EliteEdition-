@@ -327,7 +327,12 @@ const convertToInvoice = async (req, res) => {
       totalAmount: it.totalAmount || 0,
       ourChallanNo: challan.challanNo,
       partyChallan: challan.challanNo,
-      challanId: String(challan._id)
+      challanId: String(challan._id),
+      jobNo: it.jobNo || challan.jobNo || '',
+      designNo: it.designNo || challan.designNo || '',
+      fabric: it.fabric || it.fabricName || challan.fabric || '',
+      lotNo: it.lotNo || challan.lotNo || '',
+      imageUrl: it.imageUrl || it.image || it.designImage || challan.designImage || challan.imageUrl || ''
     }));
 
     // Tax computation (CGST+SGST vs IGST based on State)

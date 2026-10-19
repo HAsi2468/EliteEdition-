@@ -162,48 +162,95 @@ const getBillingDashboardStats = async (req, res) => {
   }
 };
 
-// Helper to enrich invoice line items with design images from JobCards if missing
+// Helper to enrich invoice line items with design images from JobCards / Designs if missing
 const enrichInvoiceItemsWithImages = async (invoices) => {
   if (!invoices) return;
   const list = Array.isArray(invoices) ? invoices : [invoices];
   const missingJobs = [];
+  const missingDesigns = [];
 
   list.forEach(inv => {
     (inv.items || []).forEach(it => {
-      if (!it.imageUrl && it.jobNo) {
-        const c = String(it.jobNo).replace(/[^0-9]/g, '');
+      if (!it.imageUrl) {
+        let c = it.jobNo ? String(it.jobNo).replace(/[^0-9]/g, '') : '';
+        if (!c && it.description) {
+          const m = String(it.description).match(/Job\s*(?:Card|No\.?)?[:\s#-]*(\d+)/i) || String(it.description).match(/\b(\d{3,6})\b/);
+          if (m) c = m[1];
+        }
         if (c) missingJobs.push(c);
+
+        let d = it.designNo ? String(it.designNo).trim() : '';
+        if (!d && it.description) {
+          const dm = String(it.description).match(/Design\s*(?:No\.?)?[:\s#-]*([A-Za-z0-9_-]+)/i);
+          if (dm) d = dm[1];
+        }
+        if (d) missingDesigns.push(d);
       }
     });
   });
 
-  if (missingJobs.length === 0) return;
+  if (missingJobs.length === 0 && missingDesigns.length === 0) return;
 
   try {
     const JobCard = require('../db/models/jobCard.model');
-    const uniqueClean = [...new Set(missingJobs)];
-    const orQueries = [];
-    uniqueClean.forEach(c => {
-      orQueries.push({ jobNo: `JOB-${c}` });
-      orQueries.push({ jobNo: `JOB NO.- ${c}` });
-      orQueries.push({ jobNo: c });
-      orQueries.push({ jobNo: Number(c) });
-    });
+    const Design = require('../db/models/design.model');
 
-    const foundJobs = await JobCard.find({ $or: orQueries }).select('jobNo imageUrl1 imageUrl2 image').lean();
-    const map = new Map();
-    foundJobs.forEach(j => {
-      const img = j.imageUrl1 || j.imageUrl2 || j.image || '';
-      const c = String(j.jobNo || '').replace(/[^0-9]/g, '');
-      if (img && c) map.set(c, img);
-    });
+    const uniqueCleanJobs = [...new Set(missingJobs)];
+    const jobMap = new Map();
+    if (uniqueCleanJobs.length > 0) {
+      const orQueries = [];
+      uniqueCleanJobs.forEach(c => {
+        orQueries.push({ jobNo: `JOB-${c}` });
+        orQueries.push({ jobNo: `JOB NO.- ${c}` });
+        orQueries.push({ jobNo: c });
+        orQueries.push({ jobNo: Number(c) });
+      });
+
+      const foundJobs = await JobCard.find({ $or: orQueries }).select('jobNo imageUrl1 imageUrl2 image proofing.artworkUrl').lean();
+      foundJobs.forEach(j => {
+        const img = j.imageUrl1 || j.imageUrl2 || j.image || (j.proofing && j.proofing.artworkUrl) || '';
+        const c = String(j.jobNo || '').replace(/[^0-9]/g, '');
+        if (img && c) jobMap.set(c, img);
+      });
+    }
+
+    const uniqueCleanDesigns = [...new Set(missingDesigns)];
+    const designMap = new Map();
+    if (uniqueCleanDesigns.length > 0) {
+      const dOrQueries = [];
+      uniqueCleanDesigns.forEach(d => {
+        dOrQueries.push({ designNo: d });
+        dOrQueries.push({ designNo: new RegExp(`^${d.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
+      });
+      const foundDesigns = await Design.find({ $or: dOrQueries }).select('designNo image imageUrl thumbnail photo').lean();
+      foundDesigns.forEach(d => {
+        const img = d.imageUrl || d.image || d.thumbnail || d.photo || '';
+        if (img && d.designNo) {
+          designMap.set(String(d.designNo).trim().toUpperCase(), img);
+        }
+      });
+    }
 
     list.forEach(inv => {
       (inv.items || []).forEach(it => {
-        if (!it.imageUrl && it.jobNo) {
-          const c = String(it.jobNo).replace(/[^0-9]/g, '');
-          if (map.has(c)) {
-            it.imageUrl = map.get(c);
+        if (!it.imageUrl) {
+          let c = it.jobNo ? String(it.jobNo).replace(/[^0-9]/g, '') : '';
+          if (!c && it.description) {
+            const m = String(it.description).match(/Job\s*(?:Card|No\.?)?[:\s#-]*(\d+)/i) || String(it.description).match(/\b(\d{3,6})\b/);
+            if (m) c = m[1];
+          }
+          if (c && jobMap.has(c)) {
+            it.imageUrl = jobMap.get(c);
+            return;
+          }
+
+          let d = it.designNo ? String(it.designNo).trim().toUpperCase() : '';
+          if (!d && it.description) {
+            const dm = String(it.description).match(/Design\s*(?:No\.?)?[:\s#-]*([A-Za-z0-9_-]+)/i);
+            if (dm) d = dm[1].toUpperCase();
+          }
+          if (d && designMap.has(d)) {
+            it.imageUrl = designMap.get(d);
           }
         }
       });
@@ -1262,9 +1309,23 @@ const findLocalImageByDesignToken = (dName) => {
   return null;
 };
 
+// Converts any image buffer or file (WebP, PNG, AVIF, HEIC, TIFF, JPEG) to a high-quality baseline JPEG buffer compatible with PDFKit
+const ensureJpegBuffer = async (bufferOrFile) => {
+  if (!bufferOrFile) return null;
+  try {
+    const sharp = require('sharp');
+    return await sharp(bufferOrFile).jpeg({ quality: 92 }).toBuffer();
+  } catch (sharpErr) {
+    console.warn('ensureJpegBuffer conversion warning:', sharpErr.message);
+    return bufferOrFile;
+  }
+};
+
 const resolveInvoiceImagePath = async (urlOrPath, designNameHint = '', cache = null) => {
   if (!urlOrPath) return null;
-  if (Buffer.isBuffer(urlOrPath)) return urlOrPath;
+  if (Buffer.isBuffer(urlOrPath)) {
+    return await ensureJpegBuffer(urlOrPath);
+  }
 
   const str = String(urlOrPath).trim();
   if (!str) return null;
@@ -1276,17 +1337,19 @@ const resolveInvoiceImagePath = async (urlOrPath, designNameHint = '', cache = n
     try {
       const base64Data = str.split(',')[1];
       if (base64Data) {
-        const buf = Buffer.from(base64Data, 'base64');
-        if (cache) cache.set(str, buf);
-        return buf;
+        const rawBuf = Buffer.from(base64Data, 'base64');
+        const jpegBuf = await ensureJpegBuffer(rawBuf);
+        if (cache && jpegBuf) cache.set(str, jpegBuf);
+        return jpegBuf;
       }
     } catch (e) {}
   }
 
   // 2. Direct local file path
   if (fs.existsSync(str) && fs.statSync(str).isFile()) {
-    if (cache) cache.set(str, str);
-    return str;
+    const jpegBuf = await ensureJpegBuffer(str);
+    if (cache && jpegBuf) cache.set(str, jpegBuf);
+    return jpegBuf;
   }
 
   // 3. Remote HTTP / HTTPS URL (Cloudflare R2, Google Drive, AWS S3, CloudFront)
@@ -1304,18 +1367,18 @@ const resolveInvoiceImagePath = async (urlOrPath, designNameHint = '', cache = n
       const axios = require('axios');
       const r = await axios.get(targetUrl, {
         responseType: 'arraybuffer',
-        timeout: 7000,
+        timeout: 10000,
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
       });
-      if (r.data && Buffer.isBuffer(r.data)) {
-        if (cache) cache.set(str, r.data);
-        return r.data;
-      } else if (r.data) {
-        const buf = Buffer.from(r.data);
-        if (cache) cache.set(str, buf);
-        return buf;
+      if (r.data) {
+        const rawBuf = Buffer.isBuffer(r.data) ? r.data : Buffer.from(r.data);
+        const jpegBuf = await ensureJpegBuffer(rawBuf);
+        if (cache && jpegBuf) cache.set(str, jpegBuf);
+        return jpegBuf;
       }
-    } catch (netErr) {}
+    } catch (netErr) {
+      console.warn('resolveInvoiceImagePath download error for', targetUrl, netErr.message);
+    }
   }
 
   // 4. Local directories check for filename
@@ -1341,16 +1404,18 @@ const resolveInvoiceImagePath = async (urlOrPath, designNameHint = '', cache = n
     if (!fs.existsSync(d)) continue;
     const direct = path.join(d, filename);
     if (fs.existsSync(direct) && fs.statSync(direct).isFile()) {
-      if (cache) cache.set(str, direct);
-      return direct;
+      const jpegBuf = await ensureJpegBuffer(direct);
+      if (cache && jpegBuf) cache.set(str, jpegBuf);
+      return jpegBuf;
     }
     try {
       const f = fs.readdirSync(d).find(x => x.toLowerCase() === filename.toLowerCase());
       if (f) {
         const fullP = path.join(d, f);
         if (fs.statSync(fullP).isFile()) {
-          if (cache) cache.set(str, fullP);
-          return fullP;
+          const jpegBuf = await ensureJpegBuffer(fullP);
+          if (cache && jpegBuf) cache.set(str, jpegBuf);
+          return jpegBuf;
         }
       }
     } catch(e) {}
@@ -1361,8 +1426,9 @@ const resolveInvoiceImagePath = async (urlOrPath, designNameHint = '', cache = n
   if (tokenToSearch) {
     const found = findLocalImageByDesignToken(tokenToSearch);
     if (found) {
-      if (cache) cache.set(str, found);
-      return found;
+      const jpegBuf = await ensureJpegBuffer(found);
+      if (cache && jpegBuf) cache.set(str, jpegBuf);
+      return jpegBuf;
     }
   }
 
@@ -1378,13 +1444,13 @@ const resolveItemsImages = async (items, jobCardMap, cache) => {
       if (res) return res;
     }
 
-    // 2. Strict job card lookup ONLY using item.jobNo
+    // 2. Strict job card lookup using item.jobNo
     if (item.jobNo) {
       const nums = String(item.jobNo).match(/\d+/g) || [];
       for (const num of nums) {
         const jd = jobCardMap[num];
         if (jd) {
-          const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
+          const url = jd.imageUrl1 || jd.imageUrl2 || jd.image || jd.proofing?.artworkUrl;
           if (url) {
             const res = await resolveInvoiceImagePath(url, jd.designNo || jd.designName, cache);
             if (res) return res;
@@ -1402,9 +1468,34 @@ const resolveItemsImages = async (items, jobCardMap, cache) => {
     if (item.designNo) {
       const res = await resolveInvoiceImagePath(item.designNo, item.designNo, cache);
       if (res) return res;
+      try {
+        const Design = require('../db/models/design.model');
+        const dDoc = await Design.findOne({ $or: [{ designNo: item.designNo }, { designName: item.designNo }] }).lean();
+        if (dDoc && (dDoc.imageUrl || dDoc.thumbnailUrl)) {
+          const res = await resolveInvoiceImagePath(dDoc.imageUrl || dDoc.thumbnailUrl, item.designNo, cache);
+          if (res) return res;
+        }
+      } catch (e) {}
     }
 
-    // 4. Fallback: check if item.challanId is linked to a FabricChallan
+    // 4. Fallback: Design No extracted from item.description or item.itemName (e.g. "Design No: ED-740")
+    const descText = `${item.description || ''} ${item.itemName || ''}`;
+    const designMatch = descText.match(/Design\s*(?:No\.?|#)?\s*:?\s*([A-Za-z0-9_-]+)/i);
+    if (designMatch && designMatch[1]) {
+      const dCode = designMatch[1].trim();
+      const res = await resolveInvoiceImagePath(dCode, dCode, cache);
+      if (res) return res;
+      try {
+        const Design = require('../db/models/design.model');
+        const dDoc = await Design.findOne({ $or: [{ designNo: dCode }, { designName: dCode }] }).lean();
+        if (dDoc && (dDoc.imageUrl || dDoc.thumbnailUrl)) {
+          const res = await resolveInvoiceImagePath(dDoc.imageUrl || dDoc.thumbnailUrl, dCode, cache);
+          if (res) return res;
+        }
+      } catch (e) {}
+    }
+
+    // 5. Fallback: check if item.challanId is linked to a FabricChallan
     if (item.challanId) {
       try {
         const FabricChallan = require('../db/models/fabricChallan.model');
@@ -1412,6 +1503,21 @@ const resolveItemsImages = async (items, jobCardMap, cache) => {
         if (chDoc && (chDoc.designImage || chDoc.imageUrl)) {
           const res = await resolveInvoiceImagePath(chDoc.designImage || chDoc.imageUrl, chDoc.designNo, cache);
           if (res) return res;
+        }
+      } catch (e) {}
+    }
+
+    // 6. Fallback: check item.ourChallanNo in FabricChallan (e.g. EDP-1262)
+    if (item.ourChallanNo) {
+      try {
+        const chNumMatch = String(item.ourChallanNo).match(/\d+/);
+        if (chNumMatch) {
+          const FabricChallan = require('../db/models/fabricChallan.model');
+          const chDoc = await FabricChallan.findOne({ challanNo: Number(chNumMatch[0]) }).lean();
+          if (chDoc && (chDoc.designImage || chDoc.imageUrl)) {
+            const res = await resolveInvoiceImagePath(chDoc.designImage || chDoc.imageUrl, chDoc.designNo, cache);
+            if (res) return res;
+          }
         }
       } catch (e) {}
     }
@@ -1464,7 +1570,7 @@ const downloadInvoicePdf = async (req, res) => {
     if (!invoice) return res.status(404).send('Invoice not found');
     await enrichInvoiceItemsWithImages(invoice);
 
-    const includeDuplicate = req.query.duplicate === 'true';
+    const includeDuplicate = req.query?.duplicate === 'true';
 
     const PrintConfig = require('../db/models/printConfig.model');
     const JobCard = require('../db/models/jobCard.model');
@@ -1526,12 +1632,11 @@ const downloadInvoicePdf = async (req, res) => {
 
     const allJobNumsSet = new Set();
     items.forEach(it => {
-      if (it.jobNo) {
-        const matches = String(it.jobNo).match(/\d+/g) || [];
-        matches.forEach(n => {
-          if (n.length >= 2 && n.length <= 6) allJobNumsSet.add(n);
-        });
-      }
+      const textToScan = [it.jobNo, it.description, it.itemName].filter(Boolean).join(' ');
+      const matches = textToScan.match(/\d+/g) || [];
+      matches.forEach(n => {
+        if (n.length >= 2 && n.length <= 6) allJobNumsSet.add(n);
+      });
     });
     const jobNumArray = Array.from(allJobNumsSet);
 
@@ -1540,9 +1645,9 @@ const downloadInvoicePdf = async (req, res) => {
       try {
         const queryOr = [];
         jobNumArray.forEach(n => {
-          queryOr.push({ jobNo: n }, { jobNo: `JOB-${n}` }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` });
+          queryOr.push({ jobNo: n }, { jobNo: `JOB-${n}` }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` }, { jobNo: Number(n) });
         });
-        const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo designNo designName imageUrl1 imageUrl2 proofing.artworkUrl').lean();
+        const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo designNo designName imageUrl1 imageUrl2 image proofing.artworkUrl').lean();
         foundJobCards.forEach(jc => {
           const nums = String(jc.jobNo).match(/\d+/g) || [];
           nums.forEach(n => { if (!jobCardMap[n]) jobCardMap[n] = jc; });
@@ -2279,12 +2384,11 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 
       const allJobNumsSet = new Set();
       items.forEach(it => {
-        if (it.jobNo) {
-          const matches = String(it.jobNo).match(/\d+/g) || [];
-          matches.forEach(n => {
-            if (n.length >= 2 && n.length <= 6) allJobNumsSet.add(n);
-          });
-        }
+        const textToScan = [it.jobNo, it.description, it.itemName].filter(Boolean).join(' ');
+        const matches = textToScan.match(/\d+/g) || [];
+        matches.forEach(n => {
+          if (n.length >= 2 && n.length <= 6) allJobNumsSet.add(n);
+        });
       });
       const jobNumArray = Array.from(allJobNumsSet);
 
@@ -2293,9 +2397,9 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         try {
           const queryOr = [];
           jobNumArray.forEach(n => {
-            queryOr.push({ jobNo: n }, { jobNo: `JOB-${n}` }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` });
+            queryOr.push({ jobNo: n }, { jobNo: `JOB-${n}` }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` }, { jobNo: Number(n) });
           });
-          const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo designNo designName imageUrl1 imageUrl2 proofing.artworkUrl').lean();
+          const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo designNo designName imageUrl1 imageUrl2 image proofing.artworkUrl').lean();
           foundJobCards.forEach(jc => {
             const nums = String(jc.jobNo).match(/\d+/g) || [];
             nums.forEach(n => { if (!jobCardMap[n]) jobCardMap[n] = jc; });
