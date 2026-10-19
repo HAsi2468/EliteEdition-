@@ -1403,51 +1403,6 @@ export default function ScanAndPackScreen({ currentUser }) {
             }} />
             <span>{hardwareDetected ? 'Laser Active' : 'Ready'}</span>
           </div>
-
-          <button 
-            type="button"
-            onClick={handleClearHistory}
-            title="Clear all scan history and start a fresh session"
-            style={{
-              padding: '0.5rem 0.9rem',
-              borderRadius: '8px',
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#b91c1c',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
-          >
-            <Trash2 size={13} />
-            <span>New Session</span>
-          </button>
-
-          <button 
-            type="button"
-            onClick={() => {
-              setActiveOrder(null);
-              setErrorMsg('');
-              setSuccessMsg('');
-              focusInput();
-            }}
-            title="Clear Workspace"
-            style={{
-              padding: '0.5rem 0.9rem',
-              borderRadius: '8px',
-              background: '#f1f5f9',
-              border: '1px solid #cbd5e1',
-              color: '#334155',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            Clear
-          </button>
         </div>
       </div>
 
@@ -2900,29 +2855,6 @@ export default function ScanAndPackScreen({ currentUser }) {
             >
               <FileDown size={12} />
               <span>Export CSV</span>
-            </button>
-
-            {/* Clear / New Session Button */}
-            <button
-              type="button"
-              onClick={handleClearHistory}
-              title="Clear all records and start a fresh scanning session"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '5px 10px',
-                borderRadius: '6px',
-                background: '#fee2e2',
-                border: '1px solid #fecaca',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                color: '#b91c1c',
-                cursor: 'pointer'
-              }}
-            >
-              <Trash2 size={12} />
-              <span>Clear / New Session</span>
             </button>
           </div>
         </div>
