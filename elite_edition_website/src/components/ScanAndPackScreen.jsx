@@ -1247,10 +1247,10 @@ export default function ScanAndPackScreen({ currentUser }) {
   };
 
   return (
-    <div className="scan-and-pack-screen" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', minHeight: '100%' }}>
+    <div className="scan-and-pack-screen" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', minHeight: '100%', paddingBottom: '4.5rem' }}>
       
       {/* 👑 Top Header Banner */}
-      <div className="glass-panel" style={{
+      <div style={{
         padding: '1.25rem 1.75rem',
         borderRadius: '16px',
         display: 'flex',
@@ -1258,32 +1258,32 @@ export default function ScanAndPackScreen({ currentUser }) {
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1rem',
-        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95))',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 4px 20px rgba(15, 23, 42, 0.04)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{
-            width: '48px',
-            height: '48px',
+            width: '46px',
+            height: '46px',
             borderRadius: '12px',
-            background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.3), rgba(99, 102, 241, 0.3))',
-            border: '1px solid rgba(14, 165, 233, 0.45)',
+            background: '#f0f9ff',
+            border: '1px solid #bae6fd',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#38bdf8'
+            color: '#0284c7'
           }}>
             <PackageCheck size={26} />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '700', color: '#ffffff', letterSpacing: '-0.02em' }}>
+              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em' }}>
                 Scan & Pack Hub
               </h2>
               <EntityBrandBadge entityId="elite_online" />
             </div>
-            <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>
+            <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>
               AWB Tracking, Double-Scan Zero Error Check, Weight Scale Guard & Courier Manifest Handover
             </p>
           </div>
@@ -1300,15 +1300,15 @@ export default function ScanAndPackScreen({ currentUser }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '0.45rem 0.9rem',
+              padding: '0.5rem 1rem',
               borderRadius: '8px',
-              background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+              background: 'linear-gradient(135deg, #0284c7, #0369a1)',
               border: 'none',
               color: '#ffffff',
-              fontSize: '0.78rem',
+              fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(14,165,233,0.3)'
+              boxShadow: '0 2px 6px rgba(2,132,199,0.25)'
             }}
           >
             <FileSpreadsheet size={15} />
@@ -1323,12 +1323,12 @@ export default function ScanAndPackScreen({ currentUser }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '0.45rem 0.9rem',
+              padding: '0.5rem 1rem',
               borderRadius: '8px',
-              background: 'rgba(168, 85, 247, 0.2)',
-              border: '1px solid #a855f7',
-              color: '#c084fc',
-              fontSize: '0.78rem',
+              background: '#f5f3ff',
+              border: '1px solid #ddd6fe',
+              color: '#7c3aed',
+              fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer'
             }}
@@ -1345,12 +1345,12 @@ export default function ScanAndPackScreen({ currentUser }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '0.45rem 0.9rem',
+              padding: '0.5rem 1rem',
               borderRadius: '8px',
-              background: 'rgba(16, 185, 129, 0.2)',
-              border: '1px solid #10b981',
-              color: '#34d399',
-              fontSize: '0.78rem',
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#047857',
+              fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer'
             }}
@@ -1367,12 +1367,12 @@ export default function ScanAndPackScreen({ currentUser }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '0.45rem 0.9rem',
+              padding: '0.5rem 1rem',
               borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: '#ffffff',
-              fontSize: '0.78rem',
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              color: '#1e293b',
+              fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer'
             }}
@@ -1388,18 +1388,18 @@ export default function ScanAndPackScreen({ currentUser }) {
             gap: '0.45rem',
             padding: '0.45rem 0.9rem',
             borderRadius: '999px',
-            background: hardwareDetected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(14, 165, 233, 0.15)',
-            border: `1px solid ${hardwareDetected ? 'rgba(34, 197, 94, 0.35)' : 'rgba(14, 165, 233, 0.3)'}`,
-            fontSize: '0.75rem',
+            background: hardwareDetected ? '#ecfdf5' : '#eff6ff',
+            border: `1px solid ${hardwareDetected ? '#86efac' : '#bfdbfe'}`,
+            fontSize: '0.78rem',
             fontWeight: 700,
-            color: hardwareDetected ? '#4ade80' : '#38bdf8'
+            color: hardwareDetected ? '#15803d' : '#0284c7'
           }}>
             <span style={{
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              background: hardwareDetected ? '#22c55e' : '#0ea5e9',
-              boxShadow: hardwareDetected ? '0 0 10px #22c55e' : '0 0 8px #0ea5e9'
+              background: hardwareDetected ? '#16a34a' : '#0284c7',
+              boxShadow: hardwareDetected ? '0 0 10px #16a34a' : '0 0 8px #0284c7'
             }} />
             <span>{hardwareDetected ? 'Laser Active' : 'Ready'}</span>
           </div>
@@ -1409,12 +1409,12 @@ export default function ScanAndPackScreen({ currentUser }) {
             onClick={handleClearHistory}
             title="Clear all scan history and start a fresh session"
             style={{
-              padding: '0.45rem 0.85rem',
+              padding: '0.5rem 0.9rem',
               borderRadius: '8px',
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              color: '#fca5a5',
-              fontSize: '0.78rem',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#b91c1c',
+              fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer',
               display: 'inline-flex',
@@ -1436,13 +1436,13 @@ export default function ScanAndPackScreen({ currentUser }) {
             }}
             title="Clear Workspace"
             style={{
-              padding: '0.45rem 0.85rem',
+              padding: '0.5rem 0.9rem',
               borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#94a3b8',
-              fontSize: '0.78rem',
-              fontWeight: 600,
+              background: '#f1f5f9',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              fontSize: '0.8rem',
+              fontWeight: 700,
               cursor: 'pointer'
             }}
           >
