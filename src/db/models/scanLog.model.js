@@ -47,7 +47,7 @@ const scanLogSchema = new mongoose.Schema(
     },
     brand: {
       type: String,
-      default: 'SOBISE',
+      default: '',
     },
     size: {
       type: String,

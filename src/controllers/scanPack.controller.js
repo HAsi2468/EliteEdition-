@@ -33,7 +33,7 @@ const logScanEvent = async ({
   codAmount = 0,
   customerName = '',
   city = '',
-  brand = 'SOBISE',
+  brand = '',
   size = '',
   color = '',
   operator = 'Warehouse Operator',
@@ -60,7 +60,7 @@ const logScanEvent = async ({
       channel: channel || 'Myntra',
       customerName: String(customerName || '').trim(),
       city: String(city || '').trim(),
-      brand: String(brand || 'SOBISE').trim(),
+      brand: String(brand || '').trim(),
       size: String(size || '').trim(),
       color: String(color || '').trim(),
       mode,
@@ -140,7 +140,7 @@ const lookupAwb = async (req, res) => {
               itemTypeName: so.saleOrderItems?.[0]?.itemTypeName || '',
               itemTypeColor: so.saleOrderItems?.[0]?.color || '',
               itemTypeSize: so.saleOrderItems?.[0]?.size || '',
-              itemTypeBrand: so.saleOrderItems?.[0]?.brand || 'SOBISE',
+              itemTypeBrand: so.saleOrderItems?.[0]?.brand || '',
               channel: so.channel || 'Myntra',
               totalPrice: so.totalPrice || 0,
               mrp: so.saleOrderItems?.[0]?.maxRetailPrice || 0,
@@ -176,7 +176,7 @@ const lookupAwb = async (req, res) => {
     const itemName = order?.itemTypeName || salesItem?.skuName || itemSKUCode || 'Garment / Apparel';
     const courier = order?.shippingCourier || order?.shippingProvider || detectCourier(cleanCode);
     const channel = order?.channel || salesItem?.channel || 'Myntra';
-    const brand = order?.itemTypeBrand || salesItem?.itemTypeBrand || 'SOBISE';
+    const brand = order?.itemTypeBrand || salesItem?.itemTypeBrand || '';
     const isCod = order?.cod === true || order?.cod === 'true' || order?.cod === 'COD' ||
       (typeof order?.cod === 'number' && order?.cod > 0) || Number(order?.cod) > 0 ||
       salesItem?.cod === true || salesItem?.cod === 'true' ||
@@ -610,7 +610,7 @@ const processReturnScan = async (req, res) => {
       orderCode: displayOrderId || origOrder?.displayOrderCode || '',
       sku: sku || origOrder?.itemSKUCode || '',
       itemName: origOrder?.itemTypeName || '',
-      brand: origOrder?.itemTypeBrand || 'SOBISE',
+      brand: origOrder?.itemTypeBrand || '',
       channel: origOrder?.channel || 'Myntra',
       customerName: origOrder?.shippingAddressName || '',
       city: origOrder?.shippingAddressCity || '',
@@ -869,7 +869,7 @@ const recordScanLog = async (req, res) => {
       orderCode,
       sku,
       itemName,
-      brand = 'SOBISE',
+      brand = '',
       channel = 'Myntra',
       size = '',
       color = '',
@@ -1000,7 +1000,7 @@ const getScanHistory = async (req, res) => {
       orderCode: l.orderCode || '',
       sku: l.sku || '',
       itemName: l.itemName || '',
-      brand: l.brand || 'SOBISE',
+      brand: l.brand || '',
       channel: l.channel || 'Myntra',
       customerName: l.customerName || '',
       city: l.city || '',

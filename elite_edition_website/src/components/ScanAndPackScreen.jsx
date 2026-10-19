@@ -135,7 +135,7 @@ export default function ScanAndPackScreen({ currentUser }) {
   const [showBarcodeTagModal, setShowBarcodeTagModal] = useState(false);
   const [barcodeTagData, setBarcodeTagData] = useState({
     sku: 'AC22111_M',
-    brand: 'SOBISE',
+    brand: '',
     itemName: 'Designer Kurta Set',
     size: 'M',
     color: 'Teal Green',
@@ -299,7 +299,7 @@ export default function ScanAndPackScreen({ currentUser }) {
       orderCode: entry.orderCode || '',
       sku: entry.sku || '',
       itemName: entry.itemName || '',
-      brand: entry.brand || 'SOBISE',
+      brand: entry.brand || '',
       channel: entry.channel || '',
       customerName: entry.customerName || '',
       city: entry.city || '',
@@ -436,7 +436,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: order.displayOrderCode,
           sku: order.itemSKUCode || order.sku,
           itemName: order.itemName || '',
-          brand: order.brand || 'SOBISE',
+          brand: order.brand || '',
           channel: order.channel || '',
           customerName: order.customerName || '',
           city: order.city || '',
@@ -529,7 +529,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: order.displayOrderCode,
           sku: order.itemSKUCode || order.sku,
           itemName: order.itemName || '',
-          brand: order.brand || 'SOBISE',
+          brand: order.brand || '',
           channel: order.channel || '',
           customerName: order.customerName || '',
           city: order.city || '',
@@ -617,7 +617,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: order.displayOrderCode,
           sku: order.itemSKUCode || order.sku,
           itemName: order.itemName || '',
-          brand: order.brand || 'SOBISE',
+          brand: order.brand || '',
           channel: order.channel || '',
           customerName: order.customerName || '',
           city: order.city || '',
@@ -707,7 +707,7 @@ export default function ScanAndPackScreen({ currentUser }) {
         setClaimAmount(orderData.price || 0);
         setBarcodeTagData({
           sku: orderData.itemSKUCode,
-          brand: orderData.brand || 'SOBISE',
+          brand: orderData.brand || '',
           itemName: orderData.itemName,
           size: orderData.size || 'M',
           color: orderData.color || '',
@@ -725,7 +725,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: orderData.displayOrderCode,
           sku: orderData.itemSKUCode,
           itemName: orderData.itemName || '',
-          brand: orderData.brand || 'SOBISE',
+          brand: orderData.brand || '',
           channel: orderData.channel || '',
           customerName: orderData.customerName || '',
           city: orderData.city || '',
@@ -762,7 +762,7 @@ export default function ScanAndPackScreen({ currentUser }) {
         setClaimAmount(orderData.price || 0);
         setBarcodeTagData({
           sku: orderData.itemSKUCode,
-          brand: orderData.brand || 'SOBISE',
+          brand: orderData.brand || '',
           itemName: orderData.itemName,
           size: orderData.size || 'M',
           color: orderData.color || '',
@@ -789,7 +789,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: orderData.displayOrderCode,
           sku: orderData.itemSKUCode,
           itemName: orderData.itemName || '',
-          brand: orderData.brand || 'SOBISE',
+          brand: orderData.brand || '',
           channel: orderData.channel || '',
           customerName: orderData.customerName || '',
           city: orderData.city || '',
@@ -819,7 +819,7 @@ export default function ScanAndPackScreen({ currentUser }) {
       setClaimAmount(orderData.price || 0);
       setBarcodeTagData({
         sku: orderData.itemSKUCode,
-        brand: orderData.brand || 'SOBISE',
+        brand: orderData.brand || '',
         itemName: orderData.itemName,
         size: orderData.size || 'M',
         color: orderData.color || '',
@@ -874,7 +874,7 @@ export default function ScanAndPackScreen({ currentUser }) {
         orderCode: orderData.displayOrderCode,
         sku: orderData.itemSKUCode,
         itemName: orderData.itemName || '',
-        brand: orderData.brand || 'SOBISE',
+        brand: orderData.brand || '',
         channel: orderData.channel || '',
         customerName: orderData.customerName || '',
         city: orderData.city || '',
@@ -998,7 +998,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           orderCode: activeOrder.displayOrderCode,
           sku: activeOrder.itemSKUCode,
           itemName: activeOrder.itemName || '',
-          brand: activeOrder.brand || 'SOBISE',
+          brand: activeOrder.brand || '',
           channel: activeOrder.channel || '',
           customerName: activeOrder.customerName || '',
           city: activeOrder.city || '',
@@ -2124,7 +2124,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                         </span>
                       );
                     })()}
-                    {activeOrder.brand && (
+                    {activeOrder.brand && activeOrder.brand.trim() && (
                       <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1' }}>
                         {activeOrder.brand}
                       </span>
@@ -2465,7 +2465,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                           orderCode: activeOrder.displayOrderCode,
                           sku: activeOrder.itemSKUCode,
                           itemName: activeOrder.itemName || '',
-                          brand: activeOrder.brand || 'SOBISE',
+                          brand: activeOrder.brand || '',
                           channel: activeOrder.channel || '',
                           customerName: activeOrder.customerName || '',
                           city: activeOrder.city || '',
@@ -2862,7 +2862,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                   `"${h.channel || ''}"`,
                   `"${h.sku || ''}"`,
                   `"${(h.itemName || '').replace(/"/g, '""')}"`,
-                  `"${h.brand || 'SOBISE'}"`,
+                  `"${h.brand || ''}"`,
                   `"${h.size || ''}"`,
                   `"${h.color || ''}"`,
                   `"${(h.customerName || '').replace(/"/g, '""')}"`,
@@ -4059,7 +4059,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '11px', fontWeight: 900, letterSpacing: '0.05em' }}>
-                    {barcodeTagData.brand || 'SOBISE'}
+                    {barcodeTagData.brand || ''}
                   </span>
                   <span style={{ fontSize: '10px', fontWeight: 700, border: '1px solid #000', padding: '1px 4px', borderRadius: '2px' }}>
                     SIZE: {barcodeTagData.size || 'M'}
@@ -4632,7 +4632,11 @@ export default function ScanAndPackScreen({ currentUser }) {
                         >
                           {copiedRecordField === 'sku' ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
                         </button>
-                        <EntityBrandBadge brandName={rec.brand || 'SOBISE'} size="sm" />
+                        {rec.brand && (
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1' }}>
+                            {rec.brand}
+                          </span>
+                        )}
                         {rec.category && (
                           <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: '#f1f5f9', color: '#475569' }}>
                             {rec.category}
@@ -4798,7 +4802,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                     onClick={() => {
                       setBarcodeTagData({
                         sku: skuCode,
-                        brand: rec.brand || 'SOBISE',
+                        brand: rec.brand || '',
                         itemName: rec.itemName || 'Garment / Apparel',
                         size: rec.size || 'M',
                         color: rec.color || '',
