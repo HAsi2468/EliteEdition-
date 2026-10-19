@@ -807,6 +807,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           date: new Date().toLocaleDateString('en-IN')
         };
         recordScanToHistory(historyEntry);
+        setActiveOrder(null);
         fetchStats();
         return;
       }
@@ -833,6 +834,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           await handleStoreReturn(orderData, orderData.orderClassification === 'RETURN_RTO' ? 'RTO' : 'CUSTOMER_RETURN');
           setSessionReturnCount(c => c + 1);
           setExpandedRowAwb(trimmed.toUpperCase());
+          setActiveOrder(null);
           playAudioCue('success');
           setSuccessMsg(`🔄 [AUTO-SET TO RETURN SCREEN] AWB "${trimmed}" identified as ${orderData.orderClassificationLabel} & automatically stored into Screen 3 (Return QC)!`);
           return;
@@ -841,6 +843,7 @@ export default function ScanAndPackScreen({ currentUser }) {
           await handleStoreDispatch(orderData);
           setSessionDispatchCount(c => c + 1);
           setExpandedRowAwb(trimmed.toUpperCase());
+          setActiveOrder(null);
           playAudioCue('success');
           setSuccessMsg(`📦 [AUTO-SET TO DISPATCH SCREEN] AWB "${trimmed}" identified as Forward Order & automatically packed to Screen 2 (Dispatch)!`);
           return;
@@ -1999,17 +2002,39 @@ export default function ScanAndPackScreen({ currentUser }) {
                 </span>
               </div>
 
-              <span style={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                padding: '3px 10px',
-                borderRadius: '999px',
-                background: '#ffffff',
-                color: '#475569',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-              }}>
-                Uniware Type: {activeOrder.orderClassificationLabel || activeOrder.currentStage}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '3px 10px',
+                  borderRadius: '999px',
+                  background: '#ffffff',
+                  color: '#475569',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                }}>
+                  Uniware Type: {activeOrder.orderClassificationLabel || activeOrder.currentStage}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveOrder(null)}
+                  title="Close Inspection Card"
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '999px',
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                >
+                  ✕ Close
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
@@ -2396,8 +2421,8 @@ export default function ScanAndPackScreen({ currentUser }) {
             {/* Screen 2: Dispatch Desk Execution Bar */}
             {scanMode === 'PACK' && !activeOrder.isReturn && (
               <div style={{
-                background: '#eff6ff',
-                border: '1.5px solid #93c5fd',
+                background: (activeOrder.dispatchDate || activeOrder.orderClassification === 'IN_TRANSIT') ? '#ecfdf5' : '#eff6ff',
+                border: `1.5px solid ${(activeOrder.dispatchDate || activeOrder.orderClassification === 'IN_TRANSIT') ? '#a7f3d0' : '#93c5fd'}`,
                 borderRadius: '8px',
                 padding: '0.85rem 1.25rem',
                 display: 'flex',
@@ -2407,82 +2432,103 @@ export default function ScanAndPackScreen({ currentUser }) {
                 gap: '10px'
               }}>
                 <div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Truck size={17} color="#2563eb" />
-                    <span>Dispatch Forward Order #{activeOrder.displayOrderCode} ({activeOrder.itemSKUCode})</span>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: (activeOrder.dispatchDate || activeOrder.orderClassification === 'IN_TRANSIT') ? '#047857' : '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Truck size={17} color={(activeOrder.dispatchDate || activeOrder.orderClassification === 'IN_TRANSIT') ? '#059669' : '#2563eb'} />
+                    <span>{(activeOrder.dispatchDate || activeOrder.orderClassification === 'IN_TRANSIT') ? 'Shipment Already Dispatched & In-Transit' : `Dispatch Forward Order #${activeOrder.displayOrderCode}`} ({activeOrder.itemSKUCode})</span>
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
-                    Courier: <strong>{activeOrder.courier}</strong> • Parcel Weight: <strong>{parcelWeight || 350}g</strong>
+                    Courier: <strong>{activeOrder.courier}</strong> • Parcel Weight: <strong>{activeOrder.weightGrams || parcelWeight || 350}g</strong>
+                    {activeOrder.dispatchDate && ` • Dispatched: ${new Date(activeOrder.dispatchDate).toLocaleTimeString('en-IN')}`}
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      const numericWeight = Number(parcelWeight) || activeOrder.weightGrams || 350;
-                      await api.packAwbOrder({
-                        awb: activeOrder.awb,
-                        displayOrderCode: activeOrder.displayOrderCode,
-                        sku: activeOrder.itemSKUCode,
-                        courier: activeOrder.courier,
-                        weightGrams: numericWeight
-                      });
-                      playAudioCue('success');
-                      setSuccessMsg(`✅ [DISPATCHED] AWB ${activeOrder.awb} verified & packed! Dispatched date automatically stamped (${numericWeight}g).`);
-                      const historyEntry = {
-                        id: Date.now(),
-                        awb: activeOrder.awb,
-                        shippingPackageCode: activeOrder.shippingPackageCode || '',
-                        orderCode: activeOrder.displayOrderCode,
-                        sku: activeOrder.itemSKUCode,
-                        itemName: activeOrder.itemName || '',
-                        brand: activeOrder.brand || 'SOBISE',
-                        channel: activeOrder.channel || '',
-                        customerName: activeOrder.customerName || '',
-                        city: activeOrder.city || '',
-                        size: activeOrder.size || '',
-                        color: activeOrder.color || '',
-                        courier: activeOrder.courier,
-                        weightGrams: numericWeight,
-                        price: activeOrder.price || 0,
-                        paymentMode: activeOrder.paymentMode || 'PREPAID',
-                        paymentStatus: activeOrder.paymentStatus || 'PAID',
-                        codAmount: activeOrder.codAmount || 0,
-                        mode: 'PACK',
-                        status: 'DISPATCHED',
-                        time: new Date().toLocaleTimeString('en-IN'),
-                        date: new Date().toLocaleDateString('en-IN')
-                      };
-                      recordScanToHistory(historyEntry);
-                      fetchStats();
-                    } catch (err) {
-                      playAudioCue('error');
-                      setErrorMsg(err.message || 'Error packing order');
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                  style={{
-                    padding: '0.6rem 1.4rem',
-                    borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 12px rgba(14,165,233,0.3)'
-                  }}
-                >
-                  <CheckCircle2 size={16} />
-                  <span>Execute Dispatch ({parcelWeight || 350}g)</span>
-                </button>
+                {!(activeOrder.dispatchDate || activeOrder.orderClassification === 'IN_TRANSIT') ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const numericWeight = Number(parcelWeight) || activeOrder.weightGrams || 350;
+                        await api.packAwbOrder({
+                          awb: activeOrder.awb,
+                          displayOrderCode: activeOrder.displayOrderCode,
+                          sku: activeOrder.itemSKUCode,
+                          courier: activeOrder.courier,
+                          weightGrams: numericWeight
+                        });
+                        playAudioCue('success');
+                        setSuccessMsg(`✅ [DISPATCHED] AWB ${activeOrder.awb} verified & packed! Dispatched date automatically stamped (${numericWeight}g).`);
+                        const historyEntry = {
+                          id: Date.now(),
+                          awb: activeOrder.awb,
+                          shippingPackageCode: activeOrder.shippingPackageCode || '',
+                          orderCode: activeOrder.displayOrderCode,
+                          sku: activeOrder.itemSKUCode,
+                          itemName: activeOrder.itemName || '',
+                          brand: activeOrder.brand || 'SOBISE',
+                          channel: activeOrder.channel || '',
+                          customerName: activeOrder.customerName || '',
+                          city: activeOrder.city || '',
+                          size: activeOrder.size || '',
+                          color: activeOrder.color || '',
+                          courier: activeOrder.courier,
+                          weightGrams: numericWeight,
+                          price: activeOrder.price || 0,
+                          paymentMode: activeOrder.paymentMode || 'PREPAID',
+                          paymentStatus: activeOrder.paymentStatus || 'PAID',
+                          codAmount: activeOrder.codAmount || 0,
+                          mode: 'PACK',
+                          status: 'DISPATCHED',
+                          time: new Date().toLocaleTimeString('en-IN'),
+                          date: new Date().toLocaleDateString('en-IN')
+                        };
+                        recordScanToHistory(historyEntry);
+                        setActiveOrder(null);
+                        fetchStats();
+                      } catch (err) {
+                        playAudioCue('error');
+                        setErrorMsg(err.message || 'Error packing order');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    style={{
+                      padding: '0.6rem 1.4rem',
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 12px rgba(14,165,233,0.3)'
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>Execute Dispatch ({parcelWeight || 350}g)</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setActiveOrder(null)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '6px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      color: '#334155',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                )}
               </div>
             )}
 
