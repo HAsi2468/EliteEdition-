@@ -42,7 +42,10 @@ import {
   User,
   Hash,
   Info,
-  Zap
+  Zap,
+  ChevronDown,
+  ChevronUp,
+  Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
 import EntityBrandBadge from './common/EntityBrandBadge';
@@ -51,12 +54,16 @@ import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function ScanAndPackScreen({ currentUser }) {
-  // Operational Screens: 'ALL' (1st: All Data), 'PACK' (2nd: Dispatch), 'RETURN' (3rd: Return QC)
+  // Operational Screens: 'ALL' (1st: Data Collection Hub), 'PACK' (2nd: Dispatch), 'RETURN' (3rd: Return QC)
   const [scanMode, setScanMode] = useState('ALL');
   
-  // Screen 1 Direct Storage Action Mode: 'REVIEW' (default), 'AUTO_DELIVERY', 'AUTO_RETURN', 'AUTO_DISPATCH'
-  const [screen1TargetMode, setScreen1TargetMode] = useState('REVIEW');
-  const [storingActionLoading, setStoringActionLoading] = useState(false);
+  // Screen 1 Direct Storage Action Mode: 'AUTO_CLASSIFY' (default: API auto-detects Dispatch vs Return and auto-sets both screens), 'REVIEW'
+  const [screen1TargetMode, setScreen1TargetMode] = useState('AUTO_CLASSIFY');
+  const [sessionDispatchCount, setSessionDispatchCount] = useState(0);
+  const [sessionReturnCount, setSessionReturnCount] = useState(0);
+  
+  // 🔽 Expandable Table Row Accordion State
+  const [expandedRowAwb, setExpandedRowAwb] = useState(null);
   
   // ⚡ Hands-Free Continuous Scanning State (Zero-Click Mode)
   const [handsFreeMode, setHandsFreeMode] = useState(() => {
@@ -218,7 +225,11 @@ export default function ScanAndPackScreen({ currentUser }) {
           }
           setScanHistory(uniqueList);
           try {
-            localStorage.setItem('elite_scan_history_cache', JSON.stringify(uniqueList.slice(0, 100)));
+            if (uniqueList.length === 0) {
+              localStorage.removeItem('elite_scan_history_cache');
+            } else {
+              localStorage.setItem('elite_scan_history_cache', JSON.stringify(uniqueList.slice(0, 100)));
+            }
           } catch (e) {
             // ignore localStorage quota errors
           }
@@ -232,6 +243,34 @@ export default function ScanAndPackScreen({ currentUser }) {
   };
 
   const fetchStats = () => fetchHistoryAndStats(scanMode, historySearchQuery);
+
+  const handleClearHistory = async () => {
+    if (!window.confirm('Clear all scan history and start a fresh scanning session?')) return;
+    try {
+      if (api.clearScanHistory) {
+        await api.clearScanHistory(0);
+      }
+    } catch (err) {
+      console.warn('Failed to clear scan history on server:', err);
+    }
+    try {
+      localStorage.removeItem('elite_scan_history_cache');
+    } catch (e) {}
+    setScanHistory([]);
+    setExpandedRowAwb(null);
+    setActiveOrder(null);
+    setSessionDispatchCount(0);
+    setSessionReturnCount(0);
+    setErrorMsg('');
+    setSuccessMsg('✨ Session cleared! Ready to scan fresh items.');
+    setStats({
+      dispatchedToday: 0,
+      deliveredToday: 0,
+      returnedToday: 0,
+      totalScansToday: 0
+    });
+    focusInput();
+  };
 
   const recordScanToHistory = (entry) => {
     if (!entry || !entry.awb) return;
@@ -652,12 +691,13 @@ export default function ScanAndPackScreen({ currentUser }) {
       const orderData = lookupRes.data;
 
       // ── SCREEN 3: RETURN / RTO INWARD (STRICT RETURN CHECK) ──────────────────
-      // "if that awb code is return then and only then show the data in return"
       if (scanMode === 'RETURN') {
         if (!orderData.isReturn) {
-          setActiveOrder(null);
-          playAudioCue('error');
-          setErrorMsg(`⛔ NOT A RETURN SHIPMENT: AWB "${trimmed}" is ${orderData.orderClassificationLabel} (Status: ${orderData.currentStage || 'Forward Order'}). Non-return parcels cannot be displayed or inwarded in Return QC! Please switch to 1. All Data or 2. Dispatch.`);
+          // Auto-route forward parcels to Screen 2 (Dispatch) seamlessly
+          await handleStoreDispatch(orderData);
+          setSessionDispatchCount(c => c + 1);
+          playAudioCue('success');
+          setSuccessMsg(`📦 [AUTO-ROUTED TO DISPATCH] AWB "${trimmed}" is a Forward Order! Automatically redirected and packed into Screen 2 (Dispatch).`);
           return;
         }
 
@@ -709,9 +749,11 @@ export default function ScanAndPackScreen({ currentUser }) {
       // ── SCREEN 2: DISPATCH (PACK & SHIP) ────────────────────────────────────
       if (scanMode === 'PACK') {
         if (orderData.isReturn) {
-          setActiveOrder(null);
-          playAudioCue('error');
-          setErrorMsg(`⚠️ CANNOT DISPATCH RETURN PARCEL: AWB "${trimmed}" is a ${orderData.orderClassificationLabel}! Return parcels cannot be packed for forward dispatch. Switch to Screen 3 (Return) to inward this parcel.`);
+          // Auto-route return parcels to Screen 3 (Return) seamlessly
+          await handleStoreReturn(orderData, orderData.orderClassification === 'RETURN_RTO' ? 'RTO' : 'CUSTOMER_RETURN');
+          setSessionReturnCount(c => c + 1);
+          playAudioCue('success');
+          setSuccessMsg(`🔄 [AUTO-ROUTED TO RETURN] AWB "${trimmed}" is a ${orderData.orderClassificationLabel}! Automatically redirected and stored into Screen 3 (Return QC).`);
           return;
         }
 
@@ -768,8 +810,9 @@ export default function ScanAndPackScreen({ currentUser }) {
         return;
       }
 
-      // ── SCREEN 1: ALL DATA (UNIVERSAL LOOKUP & DIRECT STORAGE) ─────────────
-      // Shows complete data for ANY scanned AWB (Forward, Dispatched, Delivered, Return)
+      // ── SCREEN 1: DATA COLLECTION HUB & INTELLIGENT AUTO-ROUTER ─────────────
+      // One-by-one scan: API determines whether AWB is Dispatch or Return,
+      // and automatically sets both Screen 2 (Dispatch) and Screen 3 (Return)!
       setActiveOrder(orderData);
       setClaimAmount(orderData.price || 0);
       setBarcodeTagData({
@@ -782,7 +825,28 @@ export default function ScanAndPackScreen({ currentUser }) {
         barcode: trimmed
       });
 
-      // Quick Auto-Store pipeline if enabled on Screen 1
+      // ⚡ Smart Auto-Routing Pipeline (Default behavior)
+      if (screen1TargetMode === 'AUTO_CLASSIFY') {
+        if (orderData.isReturn) {
+          // AUTO-SET TO SCREEN 3 (RETURN QC / INWARD)
+          await handleStoreReturn(orderData, orderData.orderClassification === 'RETURN_RTO' ? 'RTO' : 'CUSTOMER_RETURN');
+          setSessionReturnCount(c => c + 1);
+          setExpandedRowAwb(trimmed.toUpperCase());
+          playAudioCue('success');
+          setSuccessMsg(`🔄 [AUTO-SET TO RETURN SCREEN] AWB "${trimmed}" identified as ${orderData.orderClassificationLabel} & automatically stored into Screen 3 (Return QC)!`);
+          return;
+        } else {
+          // AUTO-SET TO SCREEN 2 (DISPATCH / PACK)
+          await handleStoreDispatch(orderData);
+          setSessionDispatchCount(c => c + 1);
+          setExpandedRowAwb(trimmed.toUpperCase());
+          playAudioCue('success');
+          setSuccessMsg(`📦 [AUTO-SET TO DISPATCH SCREEN] AWB "${trimmed}" identified as Forward Order & automatically packed to Screen 2 (Dispatch)!`);
+          return;
+        }
+      }
+
+      // Manual Quick-Store overrides if explicitly switched
       if (screen1TargetMode === 'AUTO_DELIVERY') {
         await handleStoreDelivery(orderData);
         return;
@@ -818,7 +882,7 @@ export default function ScanAndPackScreen({ currentUser }) {
         paymentMode: orderData.paymentMode || 'PREPAID',
         paymentStatus: orderData.paymentStatus || 'PAID',
         codAmount: orderData.codAmount || 0,
-        mode: 'LOOKUP',
+        mode: orderData.isReturn ? 'RETURN' : 'PACK',
         status: orderData.isReturn ? 'RETURN_VERIFIED' : (orderData.currentStage || orderData.orderClassification || 'LOOKUP_VERIFIED'),
         time: new Date().toLocaleTimeString('en-IN'),
         date: new Date().toLocaleDateString('en-IN')
@@ -1342,6 +1406,28 @@ export default function ScanAndPackScreen({ currentUser }) {
 
           <button 
             type="button"
+            onClick={handleClearHistory}
+            title="Clear all scan history and start a fresh session"
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#fca5a5',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <Trash2 size={13} />
+            <span>New Session</span>
+          </button>
+
+          <button 
+            type="button"
             onClick={() => {
               setActiveOrder(null);
               setErrorMsg('');
@@ -1434,14 +1520,14 @@ export default function ScanAndPackScreen({ currentUser }) {
 
           <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
             
-            {/* Screen 1: All Data (Universal Lookup) */}
+            {/* Screen 1: Data Collection Hub (Auto-Router) */}
             <button
               type="button"
               onClick={() => { setScanMode('ALL'); setActiveOrder(null); setErrorMsg(''); setSuccessMsg(''); focusInput(); }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 padding: '0.55rem 1.15rem',
                 borderRadius: '8px',
                 border: 'none',
@@ -1454,8 +1540,18 @@ export default function ScanAndPackScreen({ currentUser }) {
                 transition: 'all 0.15s ease'
               }}
             >
-              <Boxes size={15} />
-              <span>1. All Data</span>
+              <Zap size={15} />
+              <span>1. Data Collection Hub</span>
+              <span style={{
+                fontSize: '0.65rem',
+                fontWeight: 800,
+                padding: '1px 6px',
+                borderRadius: '999px',
+                background: scanMode === 'ALL' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                color: scanMode === 'ALL' ? '#ffffff' : '#475569'
+              }}>
+                Auto-Router
+              </span>
             </button>
 
             {/* Screen 2: Dispatch (Pack Outward) */}
@@ -1470,7 +1566,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 padding: '0.55rem 1.15rem',
                 borderRadius: '8px',
                 border: 'none',
@@ -1485,6 +1581,18 @@ export default function ScanAndPackScreen({ currentUser }) {
             >
               <Truck size={15} />
               <span>2. Dispatch</span>
+              {stats.dispatchedToday > 0 && (
+                <span style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 800,
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  background: scanMode === 'PACK' ? 'rgba(255,255,255,0.25)' : '#0ea5e920',
+                  color: scanMode === 'PACK' ? '#ffffff' : '#0284c7'
+                }}>
+                  {stats.dispatchedToday}
+                </span>
+              )}
             </button>
 
             {/* Screen 3: Return (Strict Return / RTO Inward) */}
@@ -1499,7 +1607,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 padding: '0.55rem 1.15rem',
                 borderRadius: '8px',
                 border: 'none',
@@ -1514,6 +1622,18 @@ export default function ScanAndPackScreen({ currentUser }) {
             >
               <RotateCcw size={15} />
               <span>3. Return</span>
+              {stats.returnedToday > 0 && (
+                <span style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 800,
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  background: scanMode === 'RETURN' ? 'rgba(255,255,255,0.25)' : '#f43f5e20',
+                  color: scanMode === 'RETURN' ? '#ffffff' : '#be123c'
+                }}>
+                  {stats.returnedToday}
+                </span>
+              )}
             </button>
 
           </div>
@@ -1587,8 +1707,102 @@ export default function ScanAndPackScreen({ currentUser }) {
         )}
 
         {/* 🎯 High-Visibility AWB Scan Input Box - ONLY on Screen 1 (All Data) */}
+        {/* 🎯 High-Visibility AWB Scan Input Box - Screen 1 (Continuous Data Collection & Auto-Router) */}
         {scanMode === 'ALL' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%' }}>
+            
+            {/* Real-time Session Auto-Route Tally Banner */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              padding: '0.85rem 1.25rem',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%)',
+              border: '1.5px solid #c7d2fe'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.3)'
+                }}>
+                  <Zap size={20} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#312e81', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Continuous Data Collection & API Auto-Router</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 7px', borderRadius: '999px', background: '#22c55e', color: '#ffffff' }}>
+                      AUTOMATIC
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#6366f1', marginTop: '2px' }}>
+                    Scan AWB codes one-by-one. The API detects if the shipment is <strong>Dispatch</strong> or <strong>Return</strong> and automatically sets both screens!
+                  </div>
+                </div>
+              </div>
+
+              {/* Session Live Counters */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  background: '#ffffff',
+                  border: '1px solid #c7d2fe',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Session Scans</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#4338ca' }}>
+                    {sessionDispatchCount + sessionReturnCount}
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => setScanMode('PACK')}
+                  title="Click to view Screen 2 (Dispatch Desk)"
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    background: '#f0f9ff',
+                    border: '1px solid #7dd3fc',
+                    textAlign: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase' }}>→ To Dispatch</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0284c7' }}>
+                    {sessionDispatchCount}
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => setScanMode('RETURN')}
+                  title="Click to view Screen 3 (Return Desk)"
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    background: '#fff1f2',
+                    border: '1px solid #fecdd3',
+                    textAlign: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase' }}>→ To Return</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#e11d48' }}>
+                    {sessionReturnCount}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Scan input form */}
             <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
               <div style={{ position: 'relative', flex: 1 }}>
@@ -1604,7 +1818,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                   type="text"
                   value={scanInput}
                   onChange={(e) => setScanInput(e.target.value)}
-                  placeholder="Scan or enter any Courier AWB / Order ID to view complete details, tracking & auto-update..."
+                  placeholder="Scan AWB code one-by-one (Barcode gun ready) — Auto-sets to Dispatch or Return instantly..."
                   disabled={loading}
                   style={{
                     width: '100%',
@@ -1642,7 +1856,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 }}
               >
                 {loading ? <RefreshCw size={18} className="spin-loader" /> : <Barcode size={18} />}
-                <span>Process Scan</span>
+                <span>Auto-Route Scan</span>
               </button>
             </form>
           </div>
@@ -1761,8 +1975,8 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
         )}
 
-        {/* 📦 Active Order Inspection Card (When AWB is scanned) */}
-        {activeOrder && (
+        {/* 📦 Active Order Inspection Card (Only for manual work desks Screen 2 & Screen 3 - hidden on Screen 1) */}
+        {activeOrder && scanMode !== 'ALL' && (
           <div style={{
             background: '#f8fafc',
             border: '1px solid #cbd5e1',
@@ -2113,11 +2327,13 @@ export default function ScanAndPackScreen({ currentUser }) {
               </div>
             </div>
 
-            {/* ⚡ Mandatory Data Management & Auto-Update Command Bar for Screen 1 */}
+            {/* ⚡ Intelligent Auto-Router Confirmation & Screen Navigation Bar for Screen 1 */}
             {scanMode === 'ALL' && (
               <div style={{
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: '1.5px solid #cbd5e1',
+                background: activeOrder.isReturn
+                  ? 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)'
+                  : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                border: `1.5px solid ${activeOrder.isReturn ? '#fecdd3' : '#bae6fd'}`,
                 borderRadius: '12px',
                 padding: '1rem 1.25rem',
                 display: 'flex',
@@ -2125,113 +2341,98 @@ export default function ScanAndPackScreen({ currentUser }) {
                 gap: '0.75rem'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <div>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CheckCheck size={18} color="#6366f1" />
-                      <span>Mandatory Storage & Auto-Update Commands:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: activeOrder.isReturn ? '#f43f5e' : '#0ea5e9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff'
+                    }}>
+                      {activeOrder.isReturn ? <RotateCcw size={15} /> : <Truck size={15} />}
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
-                      Store this AWB record into Delivery, Return, or Dispatch. Dates, payment statuses, stock adjustments, and scan logs will be automatically updated in the database.
+                    <div>
+                      <div style={{
+                        fontSize: '0.88rem',
+                        fontWeight: 900,
+                        color: activeOrder.isReturn ? '#9f1239' : '#0369a1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span>
+                          {activeOrder.isReturn ? '⚡ Auto-Set to Screen 3 (Return Desk)' : '⚡ Auto-Set to Screen 2 (Dispatch Desk)'}
+                        </span>
+                        <span style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: activeOrder.isReturn ? '#ffe4e6' : '#e0f2fe',
+                          color: activeOrder.isReturn ? '#be123c' : '#0284c7',
+                          border: `1px solid ${activeOrder.isReturn ? '#fecdd3' : '#7dd3fc'}`
+                        }}>
+                          {activeOrder.isReturn ? 'RETURN RECORDED' : 'DISPATCH PACKED'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: activeOrder.isReturn ? '#be123c' : '#0284c7', marginTop: '2px' }}>
+                        {activeOrder.isReturn
+                          ? `Identified as ${activeOrder.orderClassificationLabel}. Inwarded to inventory and visible in Screen 3 (Return).`
+                          : `Identified as Forward Order. Dispatched date stamped and visible in Screen 2 (Dispatch).`}
+                      </div>
                     </div>
                   </div>
 
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', border: '1px solid #bbf7d0' }}>
-                    Auto-Sync Active
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '10px' }}>
-                  
-                  {/* Button 1: Store in Delivery */}
-                  <button
-                    type="button"
-                    disabled={storingActionLoading}
-                    onClick={() => handleStoreDelivery(activeOrder)}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      gap: '3px',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '10px',
-                      border: '1.5px solid #10b981',
-                      background: activeOrder.isDelivered ? '#ecfdf5' : 'linear-gradient(135deg, #10b981, #059669)',
-                      color: activeOrder.isDelivered ? '#047857' : '#ffffff',
-                      cursor: storingActionLoading ? 'wait' : 'pointer',
-                      textAlign: 'left',
-                      boxShadow: activeOrder.isDelivered ? 'none' : '0 2px 8px rgba(16,185,129,0.25)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 800 }}>
-                      <CheckCircle2 size={16} />
-                      <span>{activeOrder.isDelivered ? '✓ Already Stored in Delivery' : '1. Store in Delivery (Auto-Update)'}</span>
-                    </div>
-                    <div style={{ fontSize: '0.7rem', opacity: activeOrder.isDelivered ? 0.8 : 0.9 }}>
-                      Auto-stamps Delivery Date & Time • Settles payment to PAID
-                    </div>
-                  </button>
-
-                  {/* Button 2: Store in Return */}
-                  <button
-                    type="button"
-                    disabled={storingActionLoading}
-                    onClick={() => handleStoreReturn(activeOrder, activeOrder.orderClassification === 'RETURN_RTO' ? 'RTO' : 'CUSTOMER_RETURN')}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      gap: '3px',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '10px',
-                      border: '1.5px solid #f43f5e',
-                      background: activeOrder.isReturn ? '#fff1f2' : 'linear-gradient(135deg, #f43f5e, #be123c)',
-                      color: activeOrder.isReturn ? '#9f1239' : '#ffffff',
-                      cursor: storingActionLoading ? 'wait' : 'pointer',
-                      textAlign: 'left',
-                      boxShadow: activeOrder.isReturn ? 'none' : '0 2px 8px rgba(244,63,94,0.25)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 800 }}>
-                      <RotateCcw size={16} />
-                      <span>{activeOrder.isReturn ? '✓ Already Stored in Return' : '2. Store in Return / RTO (Auto-Update)'}</span>
-                    </div>
-                    <div style={{ fontSize: '0.7rem', opacity: activeOrder.isReturn ? 0.8 : 0.9 }}>
-                      Auto-stamps Return Inward • Auto-increments warehouse stock
-                    </div>
-                  </button>
-
-                  {/* Button 3: Store in Dispatch */}
-                  <button
-                    type="button"
-                    disabled={storingActionLoading}
-                    onClick={() => handleStoreDispatch(activeOrder)}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      gap: '3px',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '10px',
-                      border: '1.5px solid #0ea5e9',
-                      background: activeOrder.dispatchDate ? '#f0f9ff' : 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                      color: activeOrder.dispatchDate ? '#0369a1' : '#ffffff',
-                      cursor: storingActionLoading ? 'wait' : 'pointer',
-                      textAlign: 'left',
-                      boxShadow: activeOrder.dispatchDate ? 'none' : '0 2px 8px rgba(14,165,233,0.25)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 800 }}>
-                      <Truck size={16} />
-                      <span>{activeOrder.dispatchDate ? '✓ Already Stored in Dispatch' : '3. Store in Dispatch (Auto-Update)'}</span>
-                    </div>
-                    <div style={{ fontSize: '0.7rem', opacity: activeOrder.dispatchDate ? 0.8 : 0.9 }}>
-                      Auto-stamps Dispatch Date • Weight verified for 3PL pickup
-                    </div>
-                  </button>
-
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {activeOrder.isReturn ? (
+                      <button
+                        type="button"
+                        onClick={() => setScanMode('RETURN')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '0.45rem 0.9rem',
+                          borderRadius: '8px',
+                          background: '#be123c',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(190,18,60,0.25)'
+                        }}
+                      >
+                        <RotateCcw size={13} />
+                        <span>View in Screen 3 (Return)</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setScanMode('PACK')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '0.45rem 0.9rem',
+                          borderRadius: '8px',
+                          background: '#0284c7',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(2,132,199,0.25)'
+                        }}
+                      >
+                        <Truck size={13} />
+                        <span>View in Screen 2 (Dispatch)</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -2587,7 +2788,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 </span>
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px' }}>
-                Persistent history saved across all terminals • Click any row to view complete order dossier • {scanHistory.length} records loaded
+                Persistent history saved across all terminals • Click any row or cell to expand/collapse complete details • {scanHistory.length} records loaded
               </div>
             </div>
           </div>
@@ -2700,6 +2901,29 @@ export default function ScanAndPackScreen({ currentUser }) {
               <FileDown size={12} />
               <span>Export CSV</span>
             </button>
+
+            {/* Clear / New Session Button */}
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              title="Clear all records and start a fresh scanning session"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                background: '#fee2e2',
+                border: '1px solid #fecaca',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: '#b91c1c',
+                cursor: 'pointer'
+              }}
+            >
+              <Trash2 size={12} />
+              <span>Clear / New Session</span>
+            </button>
           </div>
         </div>
 
@@ -2729,190 +2953,438 @@ export default function ScanAndPackScreen({ currentUser }) {
                   </td>
                 </tr>
               ) : (
-                scanHistory.map((item) => (
-                  <tr 
-                    key={item.id || item._id} 
-                    onClick={() => handleOpenRecordDetails(item)}
-                    title="Click row to view complete record dossier"
-                    style={{ 
-                      borderBottom: '1px solid #f1f5f9',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8fafc'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                  >
-                    {/* Timestamp */}
-                    <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{item.time}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{item.date}</div>
-                    </td>
+                scanHistory.map((item) => {
+                  const rowKey = String(item.awb || item.shippingPackageCode || item.orderCode || item.id || item._id || '').toUpperCase();
+                  const isExpanded = expandedRowAwb === rowKey;
+                  const isCod = item.paymentMode === 'COD' || item.isCod === true;
+                  const itemImg = item.productImage || item.image || item.rawOrder?.productImage;
 
-                    {/* AWB & Package Code */}
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 800, color: '#0ea5e9', fontFamily: 'monospace' }}>{item.awb}</div>
-                      {item.shippingPackageCode && (
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginTop: '2px', display: 'inline-block', background: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', border: '1px solid #e2e8f0' }}>
-                          Pkg: <strong style={{ color: '#0f172a' }}>{item.shippingPackageCode}</strong>
-                        </div>
-                      )}
-                    </td>
+                  return (
+                    <React.Fragment key={rowKey}>
+                      <tr 
+                        onClick={() => setExpandedRowAwb(prev => prev === rowKey ? null : rowKey)}
+                        title="Click to expand / collapse full order details"
+                        style={{ 
+                          borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          backgroundColor: isExpanded ? '#f0f9ff' : 'transparent',
+                          transition: 'background-color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                        onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      >
+                        {/* Timestamp + Expand Toggle */}
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedRowAwb(prev => prev === rowKey ? null : rowKey);
+                              }}
+                              title={isExpanded ? "Collapse row" : "Expand row details"}
+                              style={{
+                                background: isExpanded ? '#0ea5e9' : '#f1f5f9',
+                                border: `1px solid ${isExpanded ? '#0ea5e9' : '#cbd5e1'}`,
+                                color: isExpanded ? '#ffffff' : '#64748b',
+                                borderRadius: '4px',
+                                width: '22px',
+                                height: '22px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                padding: 0,
+                                flexShrink: 0
+                              }}
+                            >
+                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#334155' }}>{item.time}</div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{item.date}</div>
+                            </div>
+                          </div>
+                        </td>
 
-                    {/* Order & Channel */}
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.78rem' }}>#{item.orderCode}</div>
-                      {item.channel && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: '#fdf2f8', color: '#db2777', border: '1px solid #fbcfe8', textTransform: 'uppercase', display: 'inline-block', marginTop: '2px' }}>
-                          {item.channel}
-                        </span>
-                      )}
-                    </td>
+                        {/* AWB & Package Code */}
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ fontWeight: 800, color: '#0ea5e9', fontFamily: 'monospace' }}>{item.awb}</div>
+                          {item.shippingPackageCode && (
+                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginTop: '2px', display: 'inline-block', background: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', border: '1px solid #e2e8f0' }}>
+                              Pkg: <strong style={{ color: '#0f172a' }}>{item.shippingPackageCode}</strong>
+                            </div>
+                          )}
+                        </td>
 
-                    {/* Product / SKU Details */}
-                    <td style={{ padding: '10px 12px', maxWidth: '220px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.8rem' }}>{item.sku}</span>
-                        {item.brand && (
-                          <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '1px 5px', borderRadius: '3px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
-                            {item.brand}
+                        {/* Order & Channel */}
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.78rem' }}>#{item.orderCode}</div>
+                          {item.channel && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: '#fdf2f8', color: '#db2777', border: '1px solid #fbcfe8', textTransform: 'uppercase', display: 'inline-block', marginTop: '2px' }}>
+                              {item.channel}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Product / SKU Details */}
+                        <td style={{ padding: '10px 12px', maxWidth: '220px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.8rem' }}>{item.sku}</span>
+                            {item.brand && (
+                              <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '1px 5px', borderRadius: '3px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
+                                {item.brand}
+                              </span>
+                            )}
+                          </div>
+                          {item.itemName && (
+                            <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.itemName}>
+                              {item.itemName}
+                            </div>
+                          )}
+                          {(item.size || item.color) && (
+                            <div style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', gap: '6px', marginTop: '2px' }}>
+                              {item.size && <span>Size: <strong>{item.size}</strong></span>}
+                              {item.color && <span>Color: <strong>{item.color}</strong></span>}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Customer & City */}
+                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                          {item.customerName ? (
+                            <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.76rem' }}>
+                              👤 {item.customerName}
+                            </div>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>—</span>
+                          )}
+                          {item.city && (
+                            <div style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '2px', marginTop: '2px' }}>
+                              <MapPin size={11} color="#94a3b8" />
+                              <span>{item.city}</span>
+                            </div>
+                          )}
+                        </td>
+                        
+                        {/* Payment Column */}
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              background: isCod ? '#fef3c7' : '#ecfdf5',
+                              color: isCod ? '#b45309' : '#047857',
+                              border: `1px solid ${isCod ? '#fde68a' : '#a7f3d0'}`
+                            }}>
+                              {isCod ? '💵 COD' : '💳 PREPAID'}
+                            </span>
+                            {item.paymentStatus === 'PAID' ? (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                <span>✓</span> Paid {item.price > 0 ? `(${fmtINR(item.price)})` : ''}
+                              </span>
+                            ) : item.paymentStatus === 'PENDING' ? (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                <span>⏳</span> Pending {item.codAmount > 0 ? `(${fmtINR(item.codAmount)})` : (item.price > 0 ? `(${fmtINR(item.price)})` : '')}
+                              </span>
+                            ) : item.paymentStatus?.includes('REFUND') ? (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#7e22ce' }}>
+                                ↺ Refund Pending
+                              </span>
+                            ) : item.paymentStatus === 'NOT_COLLECTED' ? (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>
+                                ✕ Not Collected (RTO)
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                {item.paymentStatus || 'Settled'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Weight */}
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+                          {item.weightGrams ? `${item.weightGrams}g` : '—'}
+                        </td>
+
+                        {/* Courier */}
+                        <td style={{ padding: '10px 12px', color: '#475569', fontSize: '0.76rem' }}>
+                          {item.courier || 'Logistics'}
+                        </td>
+
+                        {/* Screen / Mode */}
+                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                          {item.mode === 'LOOKUP' || item.mode === 'ALL' ? (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                              🔍 Screen 1: Auto
+                            </span>
+                          ) : item.mode === 'PACK' || item.mode === 'DISPATCH' ? (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd' }}>
+                              📦 Screen 2: Dispatch
+                            </span>
+                          ) : item.mode === 'RETURN' || item.mode === 'RTO' ? (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ffe4e6', color: '#be123c', border: '1px solid #fecdd3' }}>
+                              🔄 Screen 3: Return
+                            </span>
+                          ) : item.mode === 'DELIVERY' ? (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
+                              🚚 Delivery
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#f1f5f9', color: '#475569' }}>
+                              {item.mode}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Operation Status */}
+                        <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            background: item.status?.includes('RESTOCK')
+                              ? '#ecfdf5'
+                              : item.status?.includes('PACK') || item.status?.includes('DISPATCH')
+                              ? '#eff6ff'
+                              : item.status?.includes('DELIVER')
+                              ? '#f0fdf4'
+                              : item.status?.includes('RETURN') || item.status?.includes('RTO')
+                              ? '#fff1f2'
+                              : '#f8fafc',
+                            color: item.status?.includes('RESTOCK')
+                              ? '#059669'
+                              : item.status?.includes('PACK') || item.status?.includes('DISPATCH')
+                              ? '#0284c7'
+                              : item.status?.includes('DELIVER')
+                              ? '#16a34a'
+                              : item.status?.includes('RETURN') || item.status?.includes('RTO')
+                              ? '#be123c'
+                              : '#475569',
+                            border: '1px solid rgba(0,0,0,0.06)'
+                          }}>
+                            {item.status}
                           </span>
-                        )}
-                      </div>
-                      {item.itemName && (
-                        <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.itemName}>
-                          {item.itemName}
-                        </div>
-                      )}
-                      {(item.size || item.color) && (
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', gap: '6px', marginTop: '2px' }}>
-                          {item.size && <span>Size: <strong>{item.size}</strong></span>}
-                          {item.color && <span>Color: <strong>{item.color}</strong></span>}
-                        </div>
-                      )}
-                    </td>
+                        </td>
+                      </tr>
 
-                    {/* Customer & City */}
-                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                      {item.customerName ? (
-                        <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.76rem' }}>
-                          👤 {item.customerName}
-                        </div>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>—</span>
+                      {/* 🔽 INLINE EXPANDED ACCORDION ROW */}
+                      {isExpanded && (
+                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                          <td colSpan={10} style={{ padding: '1rem 1.25rem' }}>
+                            <div style={{
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '12px',
+                              padding: '1.25rem',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '1rem'
+                            }}>
+                              {/* Top Bar of Expanded Dossier */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0ea5e9', background: '#e0f2fe', padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                                    AWB: {item.awb}
+                                  </span>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                                    Order #{item.orderCode}
+                                  </span>
+                                  {item.channel && (
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 7px', borderRadius: '4px', background: '#fdf2f8', color: '#db2777', border: '1px solid #fbcfe8' }}>
+                                      {item.channel}
+                                    </span>
+                                  )}
+                                  {item.brand && (
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 7px', borderRadius: '4px', background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}>
+                                      {item.brand}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenRecordDetails(item);
+                                    }}
+                                    style={{
+                                      background: '#f8fafc',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '6px',
+                                      padding: '4px 10px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      color: '#475569',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <FileText size={12} color="#0ea5e9" />
+                                    <span>Full Audit Modal</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedRowAwb(null);
+                                    }}
+                                    style={{
+                                      background: '#f1f5f9',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '6px',
+                                      padding: '4px 10px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      color: '#64748b',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <ChevronUp size={13} />
+                                    <span>Collapse</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Item & Product Details Strip */}
+                              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                {itemImg ? (
+                                  <div style={{ width: 68, height: 68, borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', flexShrink: 0 }}>
+                                    <img src={itemImg} alt={item.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  </div>
+                                ) : (
+                                  <div style={{ width: 68, height: 68, borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexShrink: 0, border: '1px solid #e2e8f0' }}>
+                                    <Boxes size={26} />
+                                  </div>
+                                )}
+
+                                <div style={{ flex: 1, minWidth: '220px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                                      {item.sku}
+                                    </span>
+                                    {item.size && (
+                                      <span style={{ fontSize: '0.72rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                                        Size: <strong style={{ color: '#0f172a' }}>{item.size}</strong>
+                                      </span>
+                                    )}
+                                    {item.color && (
+                                      <span style={{ fontSize: '0.72rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                                        Color: <strong style={{ color: '#0f172a' }}>{item.color}</strong>
+                                      </span>
+                                    )}
+                                    {item.shippingPackageCode && (
+                                      <span style={{ fontSize: '0.72rem', background: '#f8fafc', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                        Package: <strong style={{ fontFamily: 'monospace', color: '#0284c7' }}>{item.shippingPackageCode}</strong>
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginTop: '3px' }}>
+                                    {item.itemName || 'Garment / Apparel Item'}
+                                  </div>
+                                  <div style={{ fontSize: '0.73rem', color: '#64748b', display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                    <span>Courier: <strong>{item.courier || 'Logistics'}</strong></span>
+                                    <span>Weight: <strong>{item.weightGrams ? `${item.weightGrams}g` : 'Standard'}</strong></span>
+                                    {item.customerName && <span>Recipient: <strong>{item.customerName}</strong></span>}
+                                    {item.city && <span>Destination: <strong>{item.city}{item.state ? `, ${item.state}` : ''}</strong></span>}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 📅 4 Lifecycle Auto-Date Timestamps */}
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.65rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                                <div>
+                                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' }}>Order Date:</span>
+                                  <strong style={{ color: '#0f172a' }}>
+                                    {item.orderDate ? new Date(item.orderDate).toLocaleString('en-IN') : (item.date ? `${item.date} ${item.time}` : 'Recorded')}
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' }}>Dispatch Date:</span>
+                                  <strong style={{ color: '#0ea5e9' }}>
+                                    {item.dispatchDate ? new Date(item.dispatchDate).toLocaleString('en-IN') : (item.mode === 'PACK' || item.mode === 'DISPATCH' ? `${item.date} ${item.time}` : 'Stamped on Dispatch')}
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' }}>Delivery Date:</span>
+                                  <strong style={{ color: '#10b981' }}>
+                                    {item.deliveryDate || item.deliveryTime ? new Date(item.deliveryDate || item.deliveryTime).toLocaleString('en-IN') : (item.status?.includes('DELIVER') ? `${item.date} ${item.time}` : 'In-Transit')}
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' }}>Return Date:</span>
+                                  <strong style={{ color: '#f43f5e' }}>
+                                    {item.returnDate ? new Date(item.returnDate).toLocaleString('en-IN') : (item.mode === 'RETURN' || item.isReturn ? `${item.date} ${item.time}` : 'Not Returned')}
+                                  </strong>
+                                </div>
+                              </div>
+
+                              {/* 💰 Dedicated Payment & Financial Details Strip */}
+                              <div style={{
+                                background: isCod ? '#fffbeb' : '#f0fdf4',
+                                border: `1px solid ${isCod ? '#fde68a' : '#bbf7d0'}`,
+                                borderRadius: '8px',
+                                padding: '0.65rem 0.9rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '10px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: '6px',
+                                    background: isCod ? '#fef3c7' : '#dcfce7',
+                                    color: isCod ? '#b45309' : '#15803d',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 900,
+                                    fontSize: '0.85rem'
+                                  }}>
+                                    {isCod ? '₹' : '✓'}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: isCod ? '#b45309' : '#15803d', textTransform: 'uppercase' }}>
+                                      {isCod ? 'Cash on Delivery (COD)' : 'Prepaid Order (Online Paid)'}
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: '#475569' }}>
+                                      Status: <strong style={{ color: item.paymentStatus === 'PAID' ? '#15803d' : '#b45309' }}>
+                                        {item.paymentStatus === 'PAID' ? 'Collected / Paid' : (isCod ? 'Pending Collection on Delivery' : (item.paymentStatus || 'Settled'))}
+                                      </strong>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: '0.66rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
+                                    {isCod ? 'COD Collectable Amount' : 'Order Total Value'}
+                                  </div>
+                                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: isCod ? '#b45309' : '#15803d' }}>
+                                    {item.price > 0 ? fmtINR(item.price) : (item.codAmount > 0 ? fmtINR(item.codAmount) : '—')}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                      {item.city && (
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '2px', marginTop: '2px' }}>
-                          <MapPin size={11} color="#94a3b8" />
-                          <span>{item.city}</span>
-                        </div>
-                      )}
-                    </td>
-                    
-                    {/* Payment Column */}
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
-                        <span style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          background: item.paymentMode === 'COD' ? '#fef3c7' : '#ecfdf5',
-                          color: item.paymentMode === 'COD' ? '#b45309' : '#047857',
-                          border: `1px solid ${item.paymentMode === 'COD' ? '#fde68a' : '#a7f3d0'}`
-                        }}>
-                          {item.paymentMode === 'COD' ? '💵 COD' : '💳 PREPAID'}
-                        </span>
-                        {item.paymentStatus === 'PAID' ? (
-                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <span>✓</span> Paid {item.price > 0 ? `(${fmtINR(item.price)})` : ''}
-                          </span>
-                        ) : item.paymentStatus === 'PENDING' ? (
-                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                            <span>⏳</span> Pending {item.codAmount > 0 ? `(${fmtINR(item.codAmount)})` : (item.price > 0 ? `(${fmtINR(item.price)})` : '')}
-                          </span>
-                        ) : item.paymentStatus?.includes('REFUND') ? (
-                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#7e22ce' }}>
-                            ↺ Refund Pending
-                          </span>
-                        ) : item.paymentStatus === 'NOT_COLLECTED' ? (
-                          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>
-                            ✕ Not Collected (RTO)
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                            {item.paymentStatus || 'Settled'}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Weight */}
-                    <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
-                      {item.weightGrams ? `${item.weightGrams}g` : '—'}
-                    </td>
-
-                    {/* Courier */}
-                    <td style={{ padding: '10px 12px', color: '#475569', fontSize: '0.76rem' }}>
-                      {item.courier || 'Logistics'}
-                    </td>
-
-                    {/* Screen / Mode */}
-                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                      {item.mode === 'LOOKUP' || item.mode === 'ALL' ? (
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-                          🔍 Screen 1: Lookup
-                        </span>
-                      ) : item.mode === 'PACK' || item.mode === 'DISPATCH' ? (
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd' }}>
-                          📦 Screen 2: Dispatch
-                        </span>
-                      ) : item.mode === 'RETURN' || item.mode === 'RTO' ? (
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ffe4e6', color: '#be123c', border: '1px solid #fecdd3' }}>
-                          🔄 Screen 3: Return
-                        </span>
-                      ) : item.mode === 'DELIVERY' ? (
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
-                          🚚 Delivery
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#f1f5f9', color: '#475569' }}>
-                          {item.mode}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Operation Status */}
-                    <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        background: item.status?.includes('RESTOCK')
-                          ? '#ecfdf5'
-                          : item.status?.includes('PACK') || item.status?.includes('DISPATCH')
-                          ? '#eff6ff'
-                          : item.status?.includes('DELIVER')
-                          ? '#f0fdf4'
-                          : item.status?.includes('RETURN') || item.status?.includes('RTO')
-                          ? '#fff1f2'
-                          : '#f8fafc',
-                        color: item.status?.includes('RESTOCK')
-                          ? '#059669'
-                          : item.status?.includes('PACK') || item.status?.includes('DISPATCH')
-                          ? '#0284c7'
-                          : item.status?.includes('DELIVER')
-                          ? '#16a34a'
-                          : item.status?.includes('RETURN') || item.status?.includes('RTO')
-                          ? '#be123c'
-                          : '#475569',
-                        border: '1px solid rgba(0,0,0,0.06)'
-                      }}>
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
