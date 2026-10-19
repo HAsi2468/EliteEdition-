@@ -1672,259 +1672,188 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
         )}
 
-        {/* 🎯 High-Visibility AWB Scan Input Box - ONLY on Screen 1 (All Data) */}
-        {/* 🎯 High-Visibility AWB Scan Input Box - Screen 1 (Continuous Data Collection & Auto-Router) */}
-        {scanMode === 'ALL' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%' }}>
-            
-            {/* Real-time Session Auto-Route Tally Banner */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '12px',
-              padding: '0.85rem 1.25rem',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%)',
-              border: '1.5px solid #c7d2fe'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
-                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
-                  boxShadow: '0 2px 8px rgba(99,102,241,0.3)'
-                }}>
-                  <Zap size={20} />
+        {/* 🎯 High-Visibility AWB Scan Input Box - Active across all Operational Modes (Screen 1, Screen 2, and Screen 3) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%' }}>
+          
+          {/* Mode-specific Top Guidance & Live Counters Banner */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            padding: '0.85rem 1.25rem',
+            borderRadius: '12px',
+            background: scanMode === 'PACK' 
+              ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)'
+              : scanMode === 'RETURN'
+              ? 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)'
+              : 'linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%)',
+            border: `1.5px solid ${scanMode === 'PACK' ? '#7dd3fc' : scanMode === 'RETURN' ? '#fecdd3' : '#c7d2fe'}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: scanMode === 'PACK'
+                  ? 'linear-gradient(135deg, #0ea5e9, #0284c7)'
+                  : scanMode === 'RETURN'
+                  ? 'linear-gradient(135deg, #f43f5e, #e11d48)'
+                  : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: scanMode === 'PACK' 
+                  ? '0 2px 8px rgba(14,165,233,0.3)' 
+                  : scanMode === 'RETURN'
+                  ? '0 2px 8px rgba(244,63,94,0.3)'
+                  : '0 2px 8px rgba(99,102,241,0.3)'
+              }}>
+                {scanMode === 'PACK' ? <Truck size={20} /> : scanMode === 'RETURN' ? <RotateCcw size={20} /> : <Zap size={20} />}
+              </div>
+              <div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 900, color: scanMode === 'PACK' ? '#0369a1' : scanMode === 'RETURN' ? '#9f1239' : '#312e81', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>
+                    {scanMode === 'PACK' 
+                      ? 'Screen 2: Dispatch Desk & Forward Shipping' 
+                      : scanMode === 'RETURN' 
+                      ? 'Screen 3: Return & RTO Inward Station' 
+                      : 'Screen 1: Continuous Data Collection & Auto-Router'}
+                  </span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 7px', borderRadius: '999px', background: scanMode === 'PACK' ? '#0ea5e9' : scanMode === 'RETURN' ? '#e11d48' : '#22c55e', color: '#ffffff' }}>
+                    {scanMode === 'PACK' ? 'PACK DESK' : scanMode === 'RETURN' ? 'RETURN QC' : 'AUTOMATIC'}
+                  </span>
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#312e81', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>Continuous Data Collection & API Auto-Router</span>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 7px', borderRadius: '999px', background: '#22c55e', color: '#ffffff' }}>
-                      AUTOMATIC
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.74rem', color: '#6366f1', marginTop: '2px' }}>
-                    Scan AWB codes one-by-one. The API detects if the shipment is <strong>Dispatch</strong> or <strong>Return</strong> and automatically sets both screens!
-                  </div>
+                <div style={{ fontSize: '0.74rem', color: scanMode === 'PACK' ? '#0284c7' : scanMode === 'RETURN' ? '#be123c' : '#6366f1', marginTop: '2px' }}>
+                  {scanMode === 'PACK'
+                    ? `Scan forward AWB parcels to verify SKU, stamp weight (${parcelWeight || 350}g), and record Dispatch instantly!`
+                    : scanMode === 'RETURN'
+                    ? 'Scan return / RTO AWB parcels to inspect contents, verify condition, and restock to inventory!'
+                    : 'Scan AWB codes one-by-one. The API detects if the shipment is Dispatch or Return and automatically sets both screens!'}
+                </div>
+              </div>
+            </div>
+
+            {/* Session Live Counters */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                padding: '4px 10px',
+                borderRadius: '8px',
+                background: '#ffffff',
+                border: '1px solid #c7d2fe',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Session Scans</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#4338ca' }}>
+                  {sessionDispatchCount + sessionReturnCount}
                 </div>
               </div>
 
-              {/* Session Live Counters */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
+              <div 
+                onClick={() => { setScanMode('PACK'); focusInput(); }}
+                title="Click to view Screen 2 (Dispatch Desk)"
+                style={{
                   padding: '4px 10px',
                   borderRadius: '8px',
-                  background: '#ffffff',
-                  border: '1px solid #c7d2fe',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Session Scans</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#4338ca' }}>
-                    {sessionDispatchCount + sessionReturnCount}
-                  </div>
-                </div>
-
-                <div 
-                  onClick={() => setScanMode('PACK')}
-                  title="Click to view Screen 2 (Dispatch Desk)"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    background: '#f0f9ff',
-                    border: '1px solid #7dd3fc',
-                    textAlign: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase' }}>→ To Dispatch</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0284c7' }}>
-                    {sessionDispatchCount}
-                  </div>
-                </div>
-
-                <div 
-                  onClick={() => setScanMode('RETURN')}
-                  title="Click to view Screen 3 (Return Desk)"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    background: '#fff1f2',
-                    border: '1px solid #fecdd3',
-                    textAlign: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase' }}>→ To Return</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#e11d48' }}>
-                    {sessionReturnCount}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Scan input form */}
-            <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <Scan size={22} style={{
-                  position: 'absolute',
-                  left: '14px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#6366f1'
-                }} />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={scanInput}
-                  onChange={(e) => setScanInput(e.target.value)}
-                  placeholder="Scan AWB code one-by-one (Barcode gun ready) — Auto-sets to Dispatch or Return instantly..."
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '0.9rem 1rem 0.9rem 3rem',
-                    fontSize: '1.05rem',
-                    fontWeight: 700,
-                    borderRadius: '12px',
-                    border: '2px solid #6366f1',
-                    background: '#f8fafc',
-                    color: '#0f172a',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                    outline: 'none',
-                    letterSpacing: '0.02em'
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || !scanInput.trim()}
-                style={{
-                  background: '#6366f1',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '0 1.75rem',
-                  fontSize: '0.95rem',
-                  fontWeight: 800,
-                  cursor: loading || !scanInput.trim() ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  whiteSpace: 'nowrap'
+                  background: scanMode === 'PACK' ? '#0ea5e9' : '#f0f9ff',
+                  border: '1px solid #7dd3fc',
+                  textAlign: 'center',
+                  cursor: 'pointer'
                 }}
               >
-                {loading ? <RefreshCw size={18} className="spin-loader" /> : <Barcode size={18} />}
-                <span>Auto-Route Scan</span>
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* 📦 Screen 2: Dispatch Station Placeholder (When no forward order is selected) */}
-        {scanMode === 'PACK' && !activeOrder && (
-          <div style={{
-            padding: '1.25rem 1.5rem',
-            background: '#f0f9ff',
-            border: '1.5px dashed #7dd3fc',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: '#0ea5e920', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0ea5e9' }}>
-                <Truck size={24} />
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: scanMode === 'PACK' ? '#ffffff' : '#0369a1', textTransform: 'uppercase' }}>→ To Dispatch</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: scanMode === 'PACK' ? '#ffffff' : '#0284c7' }}>
+                  {sessionDispatchCount}
+                </div>
               </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0369a1' }}>
-                  Screen 2: Dispatch Desk
-                </h4>
-                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Scan or search orders in <strong>1. All Data</strong> to load details, or click <strong>Screen 1</strong> on any order in the register below.
-                </p>
+
+              <div 
+                onClick={() => { setScanMode('RETURN'); focusInput(); }}
+                title="Click to view Screen 3 (Return Desk)"
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  background: scanMode === 'RETURN' ? '#e11d48' : '#fff1f2',
+                  border: '1px solid #fecdd3',
+                  textAlign: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: scanMode === 'RETURN' ? '#ffffff' : '#be123c', textTransform: 'uppercase' }}>→ To Return</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: scanMode === 'RETURN' ? '#ffffff' : '#e11d48' }}>
+                  {sessionReturnCount}
+                </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => { setScanMode('ALL'); focusInput(); }}
-              style={{
-                padding: '0.55rem 1.15rem',
-                borderRadius: '8px',
-                background: '#0ea5e9',
-                color: '#ffffff',
-                border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <Search size={14} />
-              <span>Go to 1. All Data Scan Bar</span>
-            </button>
           </div>
-        )}
 
-        {/* 🔄 Screen 3: Return QC Desk Placeholder (When no return order is selected) */}
-        {scanMode === 'RETURN' && (!activeOrder || !activeOrder.isReturn) && (
-          <div style={{
-            padding: '1.25rem 1.5rem',
-            background: '#fff1f2',
-            border: '1.5px dashed #fecdd3',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: '#f43f5e20', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}>
-                <RotateCcw size={24} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#be123c' }}>
-                  Screen 3: Return & RTO Inward Desk
-                </h4>
-                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Strict Return QC Station: Only verified returns are inwarded here. Scan the AWB in <strong>1. All Data</strong> to verify return status, or click <strong>Screen 1</strong> on any return in the register below.
-                </p>
-              </div>
+          {/* Scan input form */}
+          <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Scan size={22} style={{
+                position: 'absolute',
+                left: '14px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: scanMode === 'PACK' ? '#0ea5e9' : scanMode === 'RETURN' ? '#e11d48' : '#6366f1'
+              }} />
+              <input
+                ref={inputRef}
+                type="text"
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                placeholder={
+                  scanMode === 'PACK'
+                    ? `Scan forward AWB code to pack & dispatch immediately (${parcelWeight || 350}g)...`
+                    : scanMode === 'RETURN'
+                    ? "Scan return / RTO AWB code for QC inspection & inwarding..."
+                    : "Scan AWB code one-by-one (Barcode gun ready) — Auto-sets to Dispatch or Return instantly..."
+                }
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '0.9rem 1rem 0.9rem 3rem',
+                  fontSize: '1.05rem',
+                  fontWeight: 700,
+                  borderRadius: '12px',
+                  border: `2px solid ${scanMode === 'PACK' ? '#0ea5e9' : scanMode === 'RETURN' ? '#e11d48' : '#6366f1'}`,
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  letterSpacing: '0.02em'
+                }}
+              />
             </div>
+
             <button
-              type="button"
-              onClick={() => { setScanMode('ALL'); focusInput(); }}
+              type="submit"
+              disabled={loading || !scanInput.trim()}
               style={{
-                padding: '0.55rem 1.15rem',
-                borderRadius: '8px',
-                background: '#be123c',
+                background: scanMode === 'PACK' ? '#0ea5e9' : scanMode === 'RETURN' ? '#e11d48' : '#6366f1',
                 color: '#ffffff',
                 border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
+                borderRadius: '12px',
+                padding: '0 1.75rem',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: loading || !scanInput.trim() ? 'not-allowed' : 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                whiteSpace: 'nowrap'
               }}
             >
-              <Search size={14} />
-              <span>Go to 1. All Data Scan Bar</span>
+              {loading ? <RefreshCw size={18} className="spin-loader" /> : <Barcode size={18} />}
+              <span>
+                {scanMode === 'PACK' ? 'Dispatch & Pack Scan' : scanMode === 'RETURN' ? 'Return QC Scan' : 'Auto-Route Scan'}
+              </span>
             </button>
-          </div>
-        )}
+          </form>
+        </div>
 
         {/* Notifications & Feedback */}
         {successMsg && (
