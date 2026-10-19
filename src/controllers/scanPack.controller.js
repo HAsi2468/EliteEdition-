@@ -15,6 +15,41 @@ const detectCourier = (code = '') => {
   return 'Standard Courier / Logistics';
 };
 
+// Helper: Resolve product image from catalog by SKU code or design number
+const findProductImageBySku = async (skuStr) => {
+  if (!skuStr) return '';
+  const clean = String(skuStr).trim();
+  try {
+    // 1. Try exact match on Product and InventoryProduct
+    let catalog = await db.Product.findOne({
+      $or: [{ skuCode: clean }, { sku: clean }]
+    }).lean() || await db.InventoryProduct.findOne({
+      $or: [{ skuCode: clean }, { sku: clean }]
+    }).lean();
+
+    if (catalog?.imageUrl) return catalog.imageUrl;
+    if (catalog?.images && catalog.images.length > 0) return catalog.images[0];
+
+    // 2. Try normalized candidates (strip size prefix/suffix & match base design code)
+    const baseWithoutSize = clean.replace(/[-_](XS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|[0-9]+[A-Z]+)$/i, '');
+    const digits = clean.match(/\d{2,5}/g) || [];
+    const candidates = Array.from(new Set([clean, baseWithoutSize, ...digits]));
+
+    catalog = await db.Product.findOne({
+      $or: [
+        { skuCode: { $in: candidates } },
+        { sku: { $in: candidates } }
+      ]
+    }).lean();
+
+    if (catalog?.imageUrl) return catalog.imageUrl;
+    if (catalog?.images && catalog.images.length > 0) return catalog.images[0];
+  } catch (err) {
+    // quiet fail
+  }
+  return '';
+};
+
 // Helper: Persistently record every scan operation into MongoDB ScanLog
 const logScanEvent = async ({
   awb,
@@ -36,6 +71,7 @@ const logScanEvent = async ({
   brand = '',
   size = '',
   color = '',
+  productImage = '',
   operator = 'Warehouse Operator',
   operatorId = null,
   facility = 'eliteedition',
@@ -48,6 +84,10 @@ const logScanEvent = async ({
     const cleanAwb = String(awb).trim().toUpperCase();
     if (!cleanAwb || cleanAwb === 'UNDEFINED' || cleanAwb === 'NULL' || cleanAwb === 'NAN' || cleanAwb.length < 4) {
       return null;
+    }
+
+    if (!productImage && sku) {
+      productImage = await findProductImageBySku(sku);
     }
 
     const payload = {
@@ -63,6 +103,7 @@ const logScanEvent = async ({
       brand: String(brand || '').trim(),
       size: String(size || '').trim(),
       color: String(color || '').trim(),
+      productImage: String(productImage || '').trim(),
       mode,
       status,
       weightGrams: Number(weightGrams) || 0,
@@ -196,10 +237,7 @@ const lookupAwb = async (req, res) => {
     // Get product thumbnail from catalog if available
     let productImage = salesItem?.productImage || '';
     if (!productImage && itemSKUCode) {
-      const catalog = await db.Product.findOne({ sku: itemSKUCode }).lean() ||
-        await db.InventoryProduct.findOne({ skuCode: itemSKUCode }).lean();
-      if (catalog?.imageUrl) productImage = catalog.imageUrl;
-      else if (catalog?.images && catalog.images.length > 0) productImage = catalog.images[0];
+      productImage = await findProductImageBySku(itemSKUCode);
     }
 
     // Extract current status & Intelligent Classification (Return vs New Order)
@@ -873,6 +911,7 @@ const recordScanLog = async (req, res) => {
       channel = 'Myntra',
       size = '',
       color = '',
+      productImage = '',
       customerName = '',
       city = '',
       courier,
@@ -902,6 +941,7 @@ const recordScanLog = async (req, res) => {
       channel,
       size,
       color,
+      productImage,
       customerName,
       city,
       courier,
@@ -993,34 +1033,44 @@ const getScanHistory = async (req, res) => {
     const cleanDbLogs = Array.from(uniqueLogsMap.values());
 
     // Format logs for frontend table
-    let history = cleanDbLogs.map(l => ({
-      id: l._id,
-      awb: l.awb,
-      shippingPackageCode: l.shippingPackageCode || '',
-      orderCode: l.orderCode || '',
-      sku: l.sku || '',
-      itemName: l.itemName || '',
-      brand: l.brand || '',
-      channel: l.channel || 'Myntra',
-      customerName: l.customerName || '',
-      city: l.city || '',
-      size: l.size || '',
-      color: l.color || '',
-      weightGrams: l.weightGrams || 0,
-      price: l.price || 0,
-      paymentMode: l.paymentMode || 'PREPAID',
-      paymentStatus: l.paymentStatus || 'PAID',
-      codAmount: l.codAmount || 0,
-      courier: l.courier || '',
-      mode: l.mode,
-      status: l.status,
-      time: new Date(l.updatedAt || l.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      date: new Date(l.updatedAt || l.createdAt).toLocaleDateString('en-IN'),
-      createdAt: l.updatedAt || l.createdAt,
-      operator: l.operator || 'Warehouse Operator',
-      notes: l.notes || '',
-      source: l.source || '',
-      meta: l.meta || {}
+    let history = await Promise.all(cleanDbLogs.map(async (l) => {
+      let img = l.productImage || '';
+      if (!img && l.sku) {
+        img = await findProductImageBySku(l.sku);
+        if (img) {
+          db.ScanLog.updateOne({ _id: l._id }, { $set: { productImage: img } }).catch(() => {});
+        }
+      }
+      return {
+        id: l._id,
+        awb: l.awb,
+        shippingPackageCode: l.shippingPackageCode || '',
+        orderCode: l.orderCode || '',
+        sku: l.sku || '',
+        itemName: l.itemName || '',
+        brand: l.brand || '',
+        productImage: img,
+        channel: l.channel || 'Myntra',
+        customerName: l.customerName || '',
+        city: l.city || '',
+        size: l.size || '',
+        color: l.color || '',
+        weightGrams: l.weightGrams || 0,
+        price: l.price || 0,
+        paymentMode: l.paymentMode || 'PREPAID',
+        paymentStatus: l.paymentStatus || 'PAID',
+        codAmount: l.codAmount || 0,
+        courier: l.courier || '',
+        mode: l.mode,
+        status: l.status,
+        time: new Date(l.updatedAt || l.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        date: new Date(l.updatedAt || l.createdAt).toLocaleDateString('en-IN'),
+        createdAt: l.updatedAt || l.createdAt,
+        operator: l.operator || 'Warehouse Operator',
+        notes: l.notes || '',
+        source: l.source || '',
+        meta: l.meta || {}
+      };
     }));
     res.json({
       success: true,

@@ -57,6 +57,10 @@ const scanLogSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    productImage: {
+      type: String,
+      default: '',
+    },
     mode: {
       type: String,
       enum: ['ALL', 'PACK', 'DISPATCH', 'DELIVERY', 'RETURN', 'RTO', 'LOOKUP', 'MANIFEST'],
