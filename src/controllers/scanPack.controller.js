@@ -196,8 +196,54 @@ const lookupAwb = async (req, res) => {
               trackingNumber: so.shippingPackages?.[0]?.trackingNumber || cleanCode,
               orderDate: so.displayOrderDateTime,
               invoiceCode: so.invoices?.[0]?.code || '',
-              cod: so.cod
+              cod: so.cod,
+              productImage: so.saleOrderItems?.[0]?.itemTypeImageUrl || ''
             };
+          }
+
+          // Also try Uniware Shipping Package search by trackingNumber/AWB
+          if (!order) {
+            try {
+              const axios = require('axios');
+              const pkgRes = await axios.post('https://eliteedition.unicommerce.com/services/rest/v1/oms/shippingPackage/search', {
+                trackingNumber: cleanCode
+              }, {
+                headers: { Authorization: `bearer ${token}`, 'Content-Type': 'application/json', Facility: 'Oequal', Cookie: 'unicommerce=app1' }
+              });
+
+              if (pkgRes.data && pkgRes.data.successful && pkgRes.data.elements && pkgRes.data.elements.length > 0) {
+                const pkg = pkgRes.data.elements[0];
+                const firstItemKey = Object.keys(pkg.items || {})[0];
+                const itemObj = pkg.items?.[firstItemKey] || {};
+
+                order = {
+                  displayOrderCode: pkg.channelShipmentCode || pkg.saleOrderCode || cleanCode,
+                  itemSKUCode: itemObj.itemSku || '',
+                  itemTypeName: itemObj.itemName || '',
+                  itemTypeColor: '',
+                  itemTypeSize: '',
+                  itemTypeBrand: '',
+                  channel: pkg.channel || 'Myntra',
+                  totalPrice: pkg.collectableAmount || 0,
+                  mrp: 0,
+                  shippingAddressCity: pkg.city || '',
+                  shippingAddressState: '',
+                  shippingAddressPincode: '',
+                  shippingAddressName: pkg.customer || '',
+                  shippingAddressPhone: '',
+                  shippingCourier: pkg.shippingProvider || pkg.shippingCourier || detectCourier(cleanCode),
+                  trackingNumber: pkg.trackingNumber || cleanCode,
+                  orderDate: pkg.created ? new Date(pkg.created).toISOString() : null,
+                  dispatchDate: pkg.dispatched ? new Date(pkg.dispatched).toISOString() : null,
+                  invoiceCode: pkg.invoiceCode || '',
+                  cod: pkg.shippingMethod && pkg.shippingMethod.toUpperCase().includes('COD'),
+                  productImage: itemObj.itemTypeImageUrl || '',
+                  shippingPackageStatusCode: pkg.status
+                };
+              }
+            } catch (pkgErr) {
+              // quiet fail
+            }
           }
         }
       } catch (liveErr) {
@@ -237,7 +283,7 @@ const lookupAwb = async (req, res) => {
     const returnReason = order?.reversePickupReason || order?.returnReason || returnRecord?.notes || '';
 
     // Get product thumbnail from catalog if available
-    let productImage = salesItem?.productImage || '';
+    let productImage = order?.productImage || salesItem?.productImage || '';
     if (!productImage && itemSKUCode) {
       productImage = await findProductImageBySku(itemSKUCode);
     }
