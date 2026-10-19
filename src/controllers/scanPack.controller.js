@@ -149,7 +149,8 @@ const lookupAwb = async (req, res) => {
         { shippingPackageCode: regex },
         { displayOrderCode: regex },
         { saleOrderItemCode: regex },
-        { saleOrderCode: regex }
+        { saleOrderCode: regex },
+        { reversePickupCode: regex }
       ]
     }).lean();
 
@@ -161,7 +162,8 @@ const lookupAwb = async (req, res) => {
           { trackingNumber: regex },
           { saleOrderItemCode: regex },
           { displayOrderCode: regex },
-          { saleOrderCode: regex }
+          { saleOrderCode: regex },
+          { reversePickupCode: regex }
         ]
       }).lean();
     }
@@ -241,15 +243,24 @@ const lookupAwb = async (req, res) => {
     }
 
     // Extract current status & Intelligent Classification (Return vs New Order)
+    const upperCode = cleanCode.toUpperCase();
+    const isReturnAwbPrefix = upperCode.startsWith('MYSR') ||
+      upperCode.startsWith('RPC') ||
+      upperCode.startsWith('RP') ||
+      upperCode.startsWith('RET') ||
+      upperCode.startsWith('RMA') ||
+      upperCode.startsWith('FMPR') ||
+      upperCode.startsWith('RTO');
+
     const hasReturnRecord = !!returnRecord;
-    const hasReverseCode = !!(order?.reversePickupCode || cleanCode.toUpperCase().startsWith('RPC') || cleanCode.toUpperCase().startsWith('RP'));
+    const hasReverseCode = !!(order?.reversePickupCode || isReturnAwbPrefix);
     const hasReturnDate = !!(order?.returnedDate || order?.returnDate || returnRecord?.createdAt);
     const hasReturnReason = !!(order?.reversePickupReason || order?.returnReason || returnRecord?.notes);
     const pkgStatus = String(order?.shippingPackageStatusCode || order?.saleOrderStatus || order?.shippingCourierStatus || '').toUpperCase();
-    const isRto = pkgStatus.includes('RTO') || (returnRecord?.returnType === 'RTO');
+    const isRto = pkgStatus.includes('RTO') || (returnRecord?.returnType === 'RTO') || upperCode.startsWith('RTO');
     const isCustomerReturn = hasReverseCode || pkgStatus.includes('RETURN') || (!isRto && (hasReturnDate || hasReturnReason || hasReturnRecord));
-    const isDelivered = !!(order?.deliveryTime || pkgStatus === 'DELIVERED');
-    const isDispatched = !!(order?.dispatchDate || ['DISPATCHED', 'SHIPPED'].includes(pkgStatus));
+    const isDelivered = !isCustomerReturn && !isRto && !!(order?.deliveryTime || pkgStatus === 'DELIVERED');
+    const isDispatched = !isCustomerReturn && !isRto && !!(order?.dispatchDate || ['DISPATCHED', 'SHIPPED'].includes(pkgStatus));
 
     let orderClassification = 'NEW_DISPATCH';
     let orderClassificationLabel = 'NEW FORWARD ORDER (READY TO PACK)';
@@ -386,6 +397,16 @@ const packOrder = async (req, res) => {
     }
 
     const cleanAwb = String(awb).trim();
+    const upperAwb = cleanAwb.toUpperCase();
+
+    // Guard: Prevent accidental forward dispatch packing of Customer Returns / Reverse Pickups
+    if (upperAwb.startsWith('MYSR') || upperAwb.startsWith('RPC') || upperAwb.startsWith('RP') || upperAwb.startsWith('FMPR')) {
+      return res.status(400).json({
+        success: false,
+        error: `AWB "${cleanAwb}" is a Customer Return / Reverse Pickup code, not a Forward Dispatch code! Please process it via Screen 1 (Auto-Router) or Screen 3 (Return Station).`
+      });
+    }
+
     const nowIso = new Date().toISOString();
     const cleanCourier = courier || detectCourier(cleanAwb);
     const weight = Number(weightGrams) || 0;
@@ -1001,12 +1022,17 @@ const getScanHistory = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const returnPrefixRegex = /^(MYSR|RPC|RP|RET|RMA|FMPR)/i;
     const query = {};
     if (mode && mode !== 'ALL') {
       if (mode === 'RETURN') {
-        query.mode = { $in: ['RETURN', 'RTO'] };
+        query.$or = [
+          { mode: { $in: ['RETURN', 'RTO'] } },
+          { awb: returnPrefixRegex }
+        ];
       } else if (mode === 'PACK' || mode === 'DISPATCH') {
         query.mode = { $in: ['PACK', 'DISPATCH'] };
+        query.awb = { $not: returnPrefixRegex };
       } else if (mode === 'LOOKUP') {
         query.mode = { $in: ['LOOKUP', 'ALL'] };
       } else {
