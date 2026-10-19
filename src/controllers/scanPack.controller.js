@@ -742,16 +742,24 @@ const getManifestPending = async (req, res) => {
       ]
     };
     if (channel && channel !== 'ALL') {
-      filter.channel = new RegExp(channel.trim(), 'i');
+      const channels = String(channel).split(',').map(s => s.trim()).filter(Boolean);
+      if (channels.length > 1) {
+        filter.channel = { $in: channels.map(c => new RegExp(`^${c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+      } else if (channels.length === 1) {
+        filter.channel = new RegExp(channels[0], 'i');
+      }
     }
     if (courier && courier !== 'ALL') {
-      filter.$and = filter.$and || [];
-      filter.$and.push({
-        $or: [
-          { shippingCourier: new RegExp(courier.trim(), 'i') },
-          { trackingNumber: new RegExp(courier.trim(), 'i') }
-        ]
-      });
+      const couriers = String(courier).split(',').map(s => s.trim()).filter(Boolean);
+      if (couriers.length > 0) {
+        filter.$and = filter.$and || [];
+        const courierOr = [];
+        couriers.forEach(c => {
+          courierOr.push({ shippingCourier: new RegExp(c, 'i') });
+          courierOr.push({ trackingNumber: new RegExp(c, 'i') });
+        });
+        filter.$and.push({ $or: courierOr });
+      }
     }
 
     const orders = await db.SaleOrder.find(filter).sort({ dispatchDate: -1 }).lean();
@@ -1018,13 +1026,28 @@ const getScanHistory = async (req, res) => {
       ];
     }
     if (courier && courier !== 'ALL') {
-      query.courier = new RegExp(courier.trim(), 'i');
+      const couriers = String(courier).split(',').map(s => s.trim()).filter(Boolean);
+      if (couriers.length > 1) {
+        query.courier = { $in: couriers.map(c => new RegExp(`^${c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+      } else if (couriers.length === 1) {
+        query.courier = new RegExp(couriers[0], 'i');
+      }
     }
     if (channel && channel !== 'ALL') {
-      query.channel = new RegExp(channel.trim(), 'i');
+      const channels = String(channel).split(',').map(s => s.trim()).filter(Boolean);
+      if (channels.length > 1) {
+        query.channel = { $in: channels.map(c => new RegExp(`^${c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+      } else if (channels.length === 1) {
+        query.channel = new RegExp(channels[0], 'i');
+      }
     }
     if (status && status !== 'ALL') {
-      query.status = new RegExp(status.trim(), 'i');
+      const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length > 1) {
+        query.status = { $in: statuses.map(s => new RegExp(`^${s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+      } else if (statuses.length === 1) {
+        query.status = new RegExp(statuses[0], 'i');
+      }
     }
     if (startDate || endDate) {
       query.createdAt = {};
@@ -1198,17 +1221,25 @@ const getCourierAnalytics = async (req, res) => {
     }
 
     if (channel && channel !== 'ALL') {
-      orderQuery.channel = new RegExp(channel.trim(), 'i');
+      const channels = String(channel).split(',').map(s => s.trim()).filter(Boolean);
+      if (channels.length > 1) {
+        orderQuery.channel = { $in: channels.map(c => new RegExp(`^${c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+      } else if (channels.length === 1) {
+        orderQuery.channel = new RegExp(channels[0], 'i');
+      }
     }
 
     if (courier && courier !== 'ALL') {
-      orderQuery.$and = orderQuery.$and || [];
-      orderQuery.$and.push({
-        $or: [
-          { shippingCourier: new RegExp(courier.trim(), 'i') },
-          { trackingNumber: new RegExp(courier.trim(), 'i') }
-        ]
-      });
+      const couriers = String(courier).split(',').map(s => s.trim()).filter(Boolean);
+      if (couriers.length > 0) {
+        orderQuery.$and = orderQuery.$and || [];
+        const courierOr = [];
+        couriers.forEach(c => {
+          courierOr.push({ shippingCourier: new RegExp(c, 'i') });
+          courierOr.push({ trackingNumber: new RegExp(c, 'i') });
+        });
+        orderQuery.$and.push({ $or: courierOr });
+      }
     }
 
     const orders = await db.SaleOrder.find(orderQuery).lean();
