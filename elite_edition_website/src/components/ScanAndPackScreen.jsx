@@ -79,6 +79,7 @@ export default function ScanAndPackScreen({ currentUser }) {
   
   const [scanInput, setScanInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [storingActionLoading, setStoringActionLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
