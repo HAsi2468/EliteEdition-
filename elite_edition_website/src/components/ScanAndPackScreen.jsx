@@ -771,6 +771,20 @@ export default function ScanAndPackScreen({ currentUser }) {
   // ── 📦 Mandatory Action 3: Store in Dispatch & Auto-Update ───────────────
   const handleStoreDispatch = async (order) => {
     if (!order || !order.awb) return;
+    const cleanAwb = String(order.awb).trim().toUpperCase();
+    const isReturnAwb = order.isReturn ||
+      cleanAwb.startsWith('MYSR') ||
+      cleanAwb.startsWith('RPC') ||
+      cleanAwb.startsWith('RP') ||
+      cleanAwb.startsWith('RET') ||
+      cleanAwb.startsWith('RMA') ||
+      cleanAwb.startsWith('FMPR') ||
+      cleanAwb.startsWith('RTO');
+
+    if (isReturnAwb) {
+      return await handleStoreReturn(order, order.orderClassification === 'RETURN_RTO' ? 'RTO' : 'CUSTOMER_RETURN');
+    }
+
     setStoringActionLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -877,7 +891,23 @@ export default function ScanAndPackScreen({ currentUser }) {
         throw new Error(lookupRes?.error || 'Failed to lookup AWB code');
       }
 
-      const orderData = lookupRes.data;
+      const orderData = lookupRes.data || {};
+      const upperTrimmed = trimmed.toUpperCase();
+      const isReturnPrefix = upperTrimmed.startsWith('MYSR') ||
+        upperTrimmed.startsWith('RPC') ||
+        upperTrimmed.startsWith('RP') ||
+        upperTrimmed.startsWith('RET') ||
+        upperTrimmed.startsWith('RMA') ||
+        upperTrimmed.startsWith('FMPR') ||
+        upperTrimmed.startsWith('RTO');
+
+      if (isReturnPrefix) {
+        orderData.isReturn = true;
+        if (!orderData.orderClassification || orderData.orderClassification === 'NEW_DISPATCH') {
+          orderData.orderClassification = upperTrimmed.startsWith('RTO') ? 'RETURN_RTO' : 'RETURN_CUSTOMER';
+          orderData.orderClassificationLabel = upperTrimmed.startsWith('RTO') ? 'COURIER RTO (UNDELIVERED RETURN)' : 'CUSTOMER RETURN (CIR)';
+        }
+      }
 
       // ── SCREEN 3: RETURN / RTO INWARD (STRICT RETURN CHECK) ──────────────────
       if (scanMode === 'RETURN') {
@@ -1019,14 +1049,23 @@ export default function ScanAndPackScreen({ currentUser }) {
 
       // ⚡ Smart Auto-Routing Pipeline (Default behavior)
       if (screen1TargetMode === 'AUTO_CLASSIFY') {
-        if (orderData.isReturn) {
+        const isReturnOrder = orderData.isReturn ||
+          upperTrimmed.startsWith('MYSR') ||
+          upperTrimmed.startsWith('RPC') ||
+          upperTrimmed.startsWith('RP') ||
+          upperTrimmed.startsWith('RET') ||
+          upperTrimmed.startsWith('RMA') ||
+          upperTrimmed.startsWith('FMPR') ||
+          upperTrimmed.startsWith('RTO');
+
+        if (isReturnOrder) {
           // AUTO-SET TO SCREEN 3 (RETURN QC / INWARD)
           await handleStoreReturn(orderData, orderData.orderClassification === 'RETURN_RTO' ? 'RTO' : 'CUSTOMER_RETURN');
           setSessionReturnCount(c => c + 1);
           setExpandedRowAwb(trimmed.toUpperCase());
           setActiveOrder(null);
           playAudioCue('success');
-          setSuccessMsg(`🔄 [AUTO-SET TO RETURN SCREEN] AWB "${trimmed}" identified as ${orderData.orderClassificationLabel} & automatically stored into Screen 3 (Return QC)!`);
+          setSuccessMsg(`🔄 [AUTO-SET TO RETURN SCREEN] AWB "${trimmed}" identified as ${orderData.orderClassificationLabel || 'Return Parcel'} & automatically stored into Screen 3 (Return QC)!`);
           return;
         } else {
           // AUTO-SET TO SCREEN 2 (DISPATCH / PACK)
@@ -1728,7 +1767,7 @@ export default function ScanAndPackScreen({ currentUser }) {
 
           <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
             
-            {/* Screen 1: Data Collection Hub (Auto-Router) */}
+            {/* Screen 1: Central Department Dashboard & Auto-Router */}
             <button
               type="button"
               onClick={() => { setScanMode('ALL'); setActiveOrder(null); setErrorMsg(''); setSuccessMsg(''); focusInput(); }}
@@ -1749,7 +1788,7 @@ export default function ScanAndPackScreen({ currentUser }) {
               }}
             >
               <Zap size={15} />
-              <span>1. Data Collection Hub</span>
+              <span>1. Central Dashboard</span>
               <span style={{
                 fontSize: '0.65rem',
                 fontWeight: 800,
@@ -1962,18 +2001,18 @@ export default function ScanAndPackScreen({ currentUser }) {
                       ? 'Screen 2: Dispatch Desk & Forward Shipping' 
                       : scanMode === 'RETURN' 
                       ? 'Screen 3: Return & RTO Inward Station' 
-                      : 'Screen 1: Continuous Data Collection & Auto-Router'}
+                      : 'Screen 1: Department Central Dashboard & Auto-Router'}
                   </span>
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 7px', borderRadius: '999px', background: scanMode === 'PACK' ? '#0ea5e9' : scanMode === 'RETURN' ? '#e11d48' : '#22c55e', color: '#ffffff' }}>
-                    {scanMode === 'PACK' ? 'PACK DESK' : scanMode === 'RETURN' ? 'RETURN QC' : 'AUTOMATIC'}
+                    {scanMode === 'PACK' ? 'PACK DESK' : scanMode === 'RETURN' ? 'RETURN QC' : 'CENTRAL SCANNER'}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.74rem', color: scanMode === 'PACK' ? '#0284c7' : scanMode === 'RETURN' ? '#be123c' : '#6366f1', marginTop: '2px' }}>
                   {scanMode === 'PACK'
-                    ? `Scan forward AWB parcels to verify SKU, stamp weight (${parcelWeight || 350}g), and record Dispatch instantly!`
+                    ? `Dispatch Desk: Displays forward dispatched parcels (${parcelWeight || 350}g). Tip: Scan new parcels in Screen 1 (Central Dashboard) for auto-routing!`
                     : scanMode === 'RETURN'
-                    ? 'Scan return / RTO AWB parcels to inspect contents, verify condition, and restock to inventory!'
-                    : 'Scan AWB codes one-by-one. The API detects if the shipment is Dispatch or Return and automatically sets both screens!'}
+                    ? 'Return Station: Displays returned & RTO parcels. Tip: Scan new parcels in Screen 1 (Central Dashboard) for auto-routing!'
+                    : 'Central Scan Desk: Scan any barcode here. The system automatically inspects the code, classifies Dispatch vs Return, and routes it into Screen 2 or Screen 3!'}
                 </div>
               </div>
             </div>
@@ -3178,16 +3217,43 @@ export default function ScanAndPackScreen({ currentUser }) {
               </tr>
             </thead>
             <tbody>
-              {scanHistory.length === 0 ? (
-                <tr>
-                  <td colSpan={10} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
-                    <Scan size={24} style={{ margin: '0 auto 6px', color: '#cbd5e1' }} />
-                    <div style={{ fontWeight: 600 }}>No scan operations match this filter.</div>
-                    <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Scan or type an AWB like <strong>MYSC1359190430</strong> above to record live operations across any of the 3 screens.</div>
-                  </td>
-                </tr>
-              ) : (
-                scanHistory.map((item) => {
+              {(() => {
+                const displayedHistory = scanHistory.filter((item) => {
+                  const upperAwb = String(item.awb || '').toUpperCase();
+                  const isReturnRow = item.mode === 'RETURN' ||
+                    item.mode === 'RTO' ||
+                    item.isReturn ||
+                    upperAwb.startsWith('MYSR') ||
+                    upperAwb.startsWith('RPC') ||
+                    upperAwb.startsWith('RP') ||
+                    upperAwb.startsWith('FMPR') ||
+                    upperAwb.startsWith('RET');
+
+                  if (scanMode === 'PACK') {
+                    // Screen 2 (Dispatch Desk) strictly ONLY shows forward dispatches - strictly exclude any returns!
+                    return !isReturnRow && (item.mode === 'PACK' || item.mode === 'DISPATCH' || !item.mode);
+                  }
+                  if (scanMode === 'RETURN') {
+                    // Screen 3 (Return Station) strictly ONLY shows returns!
+                    return isReturnRow;
+                  }
+                  // Screen 1 (Central Dashboard) shows ALL!
+                  return true;
+                });
+
+                if (displayedHistory.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={10} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <Scan size={24} style={{ margin: '0 auto 6px', color: '#cbd5e1' }} />
+                        <div style={{ fontWeight: 600 }}>No scan operations match this filter.</div>
+                        <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Scan or type an AWB like <strong>MYSC1359190430</strong> above to record live operations.</div>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return displayedHistory.map((item) => {
                   const rowKey = String(item.awb || item.shippingPackageCode || item.orderCode || item.id || item._id || '').toUpperCase();
                   const isExpanded = expandedRowAwb === rowKey;
                   const isCod = item.paymentMode === 'COD' || item.isCod === true;
@@ -3351,27 +3417,51 @@ export default function ScanAndPackScreen({ currentUser }) {
 
                         {/* Screen / Mode */}
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                          {item.mode === 'LOOKUP' || item.mode === 'ALL' ? (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-                              🔍 Screen 1: Auto
-                            </span>
-                          ) : item.mode === 'PACK' || item.mode === 'DISPATCH' ? (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd' }}>
-                              📦 Screen 2: Dispatch
-                            </span>
-                          ) : item.mode === 'RETURN' || item.mode === 'RTO' ? (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ffe4e6', color: '#be123c', border: '1px solid #fecdd3' }}>
-                              🔄 Screen 3: Return
-                            </span>
-                          ) : item.mode === 'DELIVERY' ? (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
-                              🚚 Delivery
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#f1f5f9', color: '#475569' }}>
-                              {item.mode}
-                            </span>
-                          )}
+                          {(() => {
+                            const upperAwb = String(item.awb || '').toUpperCase();
+                            const isReturnRow = item.mode === 'RETURN' ||
+                              item.mode === 'RTO' ||
+                              item.isReturn ||
+                              upperAwb.startsWith('MYSR') ||
+                              upperAwb.startsWith('RPC') ||
+                              upperAwb.startsWith('RP') ||
+                              upperAwb.startsWith('FMPR') ||
+                              upperAwb.startsWith('RET');
+
+                            if (isReturnRow) {
+                              return (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ffe4e6', color: '#be123c', border: '1px solid #fecdd3' }}>
+                                  🔄 Screen 3: Return
+                                </span>
+                              );
+                            }
+                            if (item.mode === 'LOOKUP' || item.mode === 'ALL') {
+                              return (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                                  🔍 Screen 1: Auto
+                                </span>
+                              );
+                            }
+                            if (item.mode === 'PACK' || item.mode === 'DISPATCH') {
+                              return (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd' }}>
+                                  📦 Screen 2: Dispatch
+                                </span>
+                              );
+                            }
+                            if (item.mode === 'DELIVERY') {
+                              return (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
+                                  🚚 Delivery
+                                </span>
+                              );
+                            }
+                            return (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#f1f5f9', color: '#475569' }}>
+                                {item.mode}
+                              </span>
+                            );
+                          })()}
                         </td>
 
                         {/* Operation Status */}
@@ -3618,8 +3708,8 @@ export default function ScanAndPackScreen({ currentUser }) {
                       )}
                     </React.Fragment>
                   );
-                })
-              )}
+                });
+              })()}
             </tbody>
           </table>
         </div>
