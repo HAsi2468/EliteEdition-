@@ -1399,10 +1399,24 @@ const downloadChallanPdf = async (req, res) => {
     const resolveImagePath = async (urlOrPath, designNameHint = '') => {
       if (!urlOrPath && !designNameHint) return null;
       let str = urlOrPath ? String(urlOrPath).trim() : '';
+
+      const ensureJpegBuffer = async (bufferOrFile) => {
+        if (!bufferOrFile) return null;
+        try {
+          const sharp = require('sharp');
+          return await sharp(bufferOrFile).jpeg({ quality: 92 }).toBuffer();
+        } catch (sharpErr) {
+          return bufferOrFile;
+        }
+      };
+
       if (str.startsWith('data:image/')) {
         try {
           const base64Data = str.split(',')[1];
-          if (base64Data) return Buffer.from(base64Data, 'base64');
+          if (base64Data) {
+            const rawBuf = Buffer.from(base64Data, 'base64');
+            return await ensureJpegBuffer(rawBuf);
+          }
         } catch (e) {}
       }
 
@@ -1423,13 +1437,13 @@ const downloadChallanPdf = async (req, res) => {
         for (const pDir of possibleDirs) {
           if (fs.existsSync(pDir)) {
             const direct = path.join(pDir, filename);
-            if (fs.existsSync(direct)) return direct;
+            if (fs.existsSync(direct)) return await ensureJpegBuffer(direct);
 
             try {
               const files = fs.readdirSync(pDir);
               const lowerFilename = filename.toLowerCase();
               const matched = files.find(f => f.toLowerCase() === lowerFilename);
-              if (matched) return path.join(pDir, matched);
+              if (matched) return await ensureJpegBuffer(path.join(pDir, matched));
             } catch (e) {}
           }
         }
@@ -1442,15 +1456,52 @@ const downloadChallanPdf = async (req, res) => {
         targetUrl = normalizeImageUrl(str, designNameHint);
       }
 
+      const candidateUrls = [];
       if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        candidateUrls.push(targetUrl);
+        const knownFolders = ['designs', 'sample_reference', 'design_samples', 'uploads'];
+        for (const f of knownFolders) {
+          if (targetUrl.includes(`/${f}/`)) {
+            for (const other of knownFolders) {
+              if (other !== f) candidateUrls.push(targetUrl.replace(`/${f}/`, `/${other}/`));
+            }
+          }
+        }
+      }
+
+      const r2Base = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+      let rawFilename = str.split('?')[0].split('#')[0].split('/').pop() || '';
+      try { rawFilename = decodeURIComponent(rawFilename); } catch (e) {}
+      if (rawFilename && rawFilename.length > 3) {
+        candidateUrls.push(`${r2Base}/sample_reference/${encodeURIComponent(rawFilename)}`);
+        candidateUrls.push(`${r2Base}/designs/${encodeURIComponent(rawFilename)}`);
+        candidateUrls.push(`${r2Base}/design_samples/${encodeURIComponent(rawFilename)}`);
+        candidateUrls.push(`${r2Base}/uploads/${encodeURIComponent(rawFilename)}`);
+      }
+
+      if (designNameHint) {
+        const cleanD = String(designNameHint).trim().replace(/^ED-/i, '');
+        ['jpg', 'jpeg', 'png', 'webp'].forEach(ext => {
+          candidateUrls.push(`${r2Base}/designs/${encodeURIComponent(designNameHint.trim())}.${ext}`);
+          candidateUrls.push(`${r2Base}/designs/${encodeURIComponent(cleanD)}.${ext}`);
+          candidateUrls.push(`${r2Base}/designs/ED-${encodeURIComponent(cleanD)}.${ext}`);
+        });
+      }
+
+      const axios = require('axios');
+      const seenUrls = new Set();
+      for (const u of candidateUrls) {
+        if (!u || seenUrls.has(u)) continue;
+        seenUrls.add(u);
         try {
-          const axios = require('axios');
-          const r = await axios.get(targetUrl, {
+          const r = await axios.get(u, {
             responseType: 'arraybuffer',
-            timeout: 8000,
+            timeout: 5000,
             headers: { 'User-Agent': 'Mozilla/5.0' }
           });
-          if (r.data) return Buffer.from(r.data);
+          if (r.data && r.data.length > 0) {
+            return await ensureJpegBuffer(Buffer.from(r.data));
+          }
         } catch (netErr) {}
       }
 
@@ -2054,10 +2105,24 @@ const downloadBulkChallansPdf = async (req, res) => {
     const resolveImagePath = async (urlOrPath, designNameHint = '') => {
       if (!urlOrPath && !designNameHint) return null;
       let str = urlOrPath ? String(urlOrPath).trim() : '';
+
+      const ensureJpegBuffer = async (bufferOrFile) => {
+        if (!bufferOrFile) return null;
+        try {
+          const sharp = require('sharp');
+          return await sharp(bufferOrFile).jpeg({ quality: 92 }).toBuffer();
+        } catch (sharpErr) {
+          return bufferOrFile;
+        }
+      };
+
       if (str.startsWith('data:image/')) {
         try {
           const base64Data = str.split(',')[1];
-          if (base64Data) return Buffer.from(base64Data, 'base64');
+          if (base64Data) {
+            const rawBuf = Buffer.from(base64Data, 'base64');
+            return await ensureJpegBuffer(rawBuf);
+          }
         } catch (e) {}
       }
 
@@ -2075,10 +2140,10 @@ const downloadBulkChallansPdf = async (req, res) => {
         for (const d of dirs) {
           if (!fs.existsSync(d)) continue;
           const direct = path.join(d, filename);
-          if (fs.existsSync(direct)) return direct;
+          if (fs.existsSync(direct)) return await ensureJpegBuffer(direct);
           try {
             const f = fs.readdirSync(d).find(x => x.toLowerCase() === filename.toLowerCase());
-            if (f) return path.join(d, f);
+            if (f) return await ensureJpegBuffer(path.join(d, f));
           } catch(e) {}
         }
       }
@@ -2089,15 +2154,52 @@ const downloadBulkChallansPdf = async (req, res) => {
         targetUrl = normalizeImageUrl(str, designNameHint);
       }
 
+      const candidateUrls = [];
       if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        candidateUrls.push(targetUrl);
+        const knownFolders = ['designs', 'sample_reference', 'design_samples', 'uploads'];
+        for (const f of knownFolders) {
+          if (targetUrl.includes(`/${f}/`)) {
+            for (const other of knownFolders) {
+              if (other !== f) candidateUrls.push(targetUrl.replace(`/${f}/`, `/${other}/`));
+            }
+          }
+        }
+      }
+
+      const r2Base = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+      let rawFilename = str.split('?')[0].split('#')[0].split('/').pop() || '';
+      try { rawFilename = decodeURIComponent(rawFilename); } catch (e) {}
+      if (rawFilename && rawFilename.length > 3) {
+        candidateUrls.push(`${r2Base}/sample_reference/${encodeURIComponent(rawFilename)}`);
+        candidateUrls.push(`${r2Base}/designs/${encodeURIComponent(rawFilename)}`);
+        candidateUrls.push(`${r2Base}/design_samples/${encodeURIComponent(rawFilename)}`);
+        candidateUrls.push(`${r2Base}/uploads/${encodeURIComponent(rawFilename)}`);
+      }
+
+      if (designNameHint) {
+        const cleanD = String(designNameHint).trim().replace(/^ED-/i, '');
+        ['jpg', 'jpeg', 'png', 'webp'].forEach(ext => {
+          candidateUrls.push(`${r2Base}/designs/${encodeURIComponent(designNameHint.trim())}.${ext}`);
+          candidateUrls.push(`${r2Base}/designs/${encodeURIComponent(cleanD)}.${ext}`);
+          candidateUrls.push(`${r2Base}/designs/ED-${encodeURIComponent(cleanD)}.${ext}`);
+        });
+      }
+
+      const axios = require('axios');
+      const seenUrls = new Set();
+      for (const u of candidateUrls) {
+        if (!u || seenUrls.has(u)) continue;
+        seenUrls.add(u);
         try {
-          const axios = require('axios');
-          const r = await axios.get(targetUrl, {
+          const r = await axios.get(u, {
             responseType: 'arraybuffer',
-            timeout: 8000,
+            timeout: 5000,
             headers: { 'User-Agent': 'Mozilla/5.0' }
           });
-          if (r.data) return Buffer.from(r.data);
+          if (r.data && r.data.length > 0) {
+            return await ensureJpegBuffer(Buffer.from(r.data));
+          }
         } catch (netErr) {}
       }
 

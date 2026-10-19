@@ -235,9 +235,14 @@ export function getImageCandidates(rawUrl, designName, options = {}) {
   // When an explicit URL is provided, it is the actual designated image and MUST be prioritized.
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     add(raw);
-    if (raw.includes('/designs/blob-') || raw.includes('/designs/image-')) {
+    if (raw.includes('/designs/')) {
       add(raw.replace('/designs/', '/sample_reference/'));
       add(raw.replace('/designs/', '/design_samples/'));
+      add(raw.replace('/designs/', '/uploads/'));
+    } else if (raw.includes('/sample_reference/')) {
+      add(raw.replace('/sample_reference/', '/designs/'));
+      add(raw.replace('/sample_reference/', '/design_samples/'));
+      add(raw.replace('/sample_reference/', '/uploads/'));
     }
   }
 
