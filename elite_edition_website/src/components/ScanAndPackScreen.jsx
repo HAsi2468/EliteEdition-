@@ -43,6 +43,7 @@ import {
   Hash,
   Info,
   Zap,
+  Filter,
   ChevronDown,
   ChevronUp,
   Trash2
@@ -52,6 +53,38 @@ import EntityBrandBadge from './common/EntityBrandBadge';
 import { useHardwareBarcodeSniffer } from '../hooks/useHardwareBarcodeSniffer';
 
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const getLocalDateString = (dateObj = new Date()) => {
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getDateRangeForPreset = (preset) => {
+  const today = new Date();
+  const todayStr = getLocalDateString(today);
+
+  if (preset === 'TODAY') {
+    return { startDate: todayStr, endDate: todayStr };
+  } else if (preset === 'YESTERDAY') {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yStr = getLocalDateString(y);
+    return { startDate: yStr, endDate: yStr };
+  } else if (preset === '7DAYS') {
+    const past = new Date();
+    past.setDate(past.getDate() - 6);
+    return { startDate: getLocalDateString(past), endDate: todayStr };
+  } else if (preset === '30DAYS') {
+    const past = new Date();
+    past.setDate(past.getDate() - 29);
+    return { startDate: getLocalDateString(past), endDate: todayStr };
+  } else if (preset === 'ALL') {
+    return { startDate: '', endDate: '' };
+  }
+  return { startDate: '', endDate: '' };
+};
 
 export default function ScanAndPackScreen({ currentUser }) {
   // Operational Screens: 'ALL' (1st: Data Collection Hub), 'PACK' (2nd: Dispatch), 'RETURN' (3rd: Return QC)
@@ -108,8 +141,12 @@ export default function ScanAndPackScreen({ currentUser }) {
 
   // ── 📋 Daily Courier Pickup Manifest Generator ──────────────────────────
   const [showManifestModal, setShowManifestModal] = useState(false);
-  const [manifestDate, setManifestDate] = useState(new Date().toISOString().slice(0, 10));
+  const [manifestDatePreset, setManifestDatePreset] = useState('TODAY');
+  const [manifestStartDate, setManifestStartDate] = useState(() => getLocalDateString());
+  const [manifestEndDate, setManifestEndDate] = useState(() => getLocalDateString());
+  const [manifestDate, setManifestDate] = useState(() => getLocalDateString());
   const [manifestCourier, setManifestCourier] = useState('ALL');
+  const [manifestChannel, setManifestChannel] = useState('ALL');
   const [manifestPendingData, setManifestPendingData] = useState(null);
   const [manifestDriverName, setManifestDriverName] = useState('');
   const [manifestDriverPhone, setManifestDriverPhone] = useState('');
@@ -128,6 +165,15 @@ export default function ScanAndPackScreen({ currentUser }) {
 
   // ── 📈 Courier Analytics Dashboard Modal ───────────────────────────────
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [analyticsDatePreset, setAnalyticsDatePreset] = useState('30DAYS');
+  const [analyticsStartDate, setAnalyticsStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return getLocalDateString(d);
+  });
+  const [analyticsEndDate, setAnalyticsEndDate] = useState(() => getLocalDateString());
+  const [analyticsCourier, setAnalyticsCourier] = useState('ALL');
+  const [analyticsChannel, setAnalyticsChannel] = useState('ALL');
   const [analyticsData, setAnalyticsData] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
@@ -181,6 +227,14 @@ export default function ScanAndPackScreen({ currentUser }) {
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // ── 🎯 Multi-Dimension & Date Range Filters for Scan Registers & Operations ──
+  const [historyDatePreset, setHistoryDatePreset] = useState('ALL'); // 'ALL' | 'TODAY' | 'YESTERDAY' | '7DAYS' | '30DAYS' | 'CUSTOM'
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
+  const [historyCourier, setHistoryCourier] = useState('ALL');
+  const [historyChannel, setHistoryChannel] = useState('ALL');
+  const [historyOperationStatus, setHistoryOperationStatus] = useState('ALL');
+
   const [hardwareDetected, setHardwareDetected] = useState(false);
   const inputRef = useRef(null);
   const autoSubmitTimerRef = useRef(null);
@@ -205,12 +259,23 @@ export default function ScanAndPackScreen({ currentUser }) {
     } catch (e) {}
   };
 
-  const fetchHistoryAndStats = async (mode = scanMode, search = historySearchQuery) => {
+  const fetchHistoryAndStats = async (mode = scanMode, search = historySearchQuery, overrideFilters = {}) => {
     setHistoryLoading(true);
     try {
+      const activeStartDate = overrideFilters.startDate !== undefined ? overrideFilters.startDate : historyStartDate;
+      const activeEndDate = overrideFilters.endDate !== undefined ? overrideFilters.endDate : historyEndDate;
+      const activeCourier = overrideFilters.courier !== undefined ? overrideFilters.courier : historyCourier;
+      const activeChannel = overrideFilters.channel !== undefined ? overrideFilters.channel : historyChannel;
+      const activeStatus = overrideFilters.status !== undefined ? overrideFilters.status : historyOperationStatus;
+
       const res = await api.getScanPackHistory({
         mode: mode !== 'ALL' ? mode : undefined,
         search: search ? search.trim() : undefined,
+        startDate: activeStartDate || undefined,
+        endDate: activeEndDate || undefined,
+        courier: activeCourier !== 'ALL' ? activeCourier : undefined,
+        channel: activeChannel !== 'ALL' ? activeChannel : undefined,
+        status: activeStatus !== 'ALL' ? activeStatus : undefined,
         limit: 100
       });
       if (res && res.success) {
@@ -241,6 +306,34 @@ export default function ScanAndPackScreen({ currentUser }) {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const handleHistoryDatePreset = (preset) => {
+    setHistoryDatePreset(preset);
+    const range = getDateRangeForPreset(preset);
+    setHistoryStartDate(range.startDate);
+    setHistoryEndDate(range.endDate);
+    fetchHistoryAndStats(scanMode, historySearchQuery, {
+      startDate: range.startDate,
+      endDate: range.endDate
+    });
+  };
+
+  const handleResetHistoryFilters = () => {
+    setHistoryDatePreset('ALL');
+    setHistoryStartDate('');
+    setHistoryEndDate('');
+    setHistoryCourier('ALL');
+    setHistoryChannel('ALL');
+    setHistoryOperationStatus('ALL');
+    setHistorySearchQuery('');
+    fetchHistoryAndStats(scanMode, '', {
+      startDate: '',
+      endDate: '',
+      courier: 'ALL',
+      channel: 'ALL',
+      status: 'ALL'
+    });
   };
 
   const fetchStats = () => fetchHistoryAndStats(scanMode, historySearchQuery);
@@ -1050,15 +1143,36 @@ export default function ScanAndPackScreen({ currentUser }) {
     fetchManifestPending();
   };
 
-  const fetchManifestPending = async () => {
+  const fetchManifestPending = async (customParams = {}) => {
     try {
-      const res = await api.getManifestPending({ date: manifestDate, courier: manifestCourier });
+      const activeStartDate = customParams.startDate !== undefined ? customParams.startDate : manifestStartDate;
+      const activeEndDate = customParams.endDate !== undefined ? customParams.endDate : manifestEndDate;
+      const activeCourier = customParams.courier !== undefined ? customParams.courier : manifestCourier;
+      const activeChannel = customParams.channel !== undefined ? customParams.channel : manifestChannel;
+
+      const res = await api.getManifestPending({
+        startDate: activeStartDate || undefined,
+        endDate: activeEndDate || undefined,
+        courier: activeCourier !== 'ALL' ? activeCourier : undefined,
+        channel: activeChannel !== 'ALL' ? activeChannel : undefined
+      });
       if (res && res.success) {
         setManifestPendingData(res);
       }
     } catch (e) {
       console.warn('Error fetching pending manifest:', e);
     }
+  };
+
+  const handleManifestDatePreset = (preset) => {
+    setManifestDatePreset(preset);
+    const range = getDateRangeForPreset(preset);
+    setManifestStartDate(range.startDate);
+    setManifestEndDate(range.endDate);
+    fetchManifestPending({
+      startDate: range.startDate,
+      endDate: range.endDate
+    });
   };
 
   const fetchPastManifests = async () => {
@@ -1185,11 +1299,21 @@ export default function ScanAndPackScreen({ currentUser }) {
   };
 
   // ── 📈 Fetch Courier Analytics ────────────────────────────────────────────
-  const openAnalytics = async () => {
+  const openAnalytics = async (customParams = {}) => {
     setShowAnalyticsModal(true);
     setAnalyticsLoading(true);
     try {
-      const res = await api.getCourierAnalytics();
+      const activeStartDate = customParams.startDate !== undefined ? customParams.startDate : analyticsStartDate;
+      const activeEndDate = customParams.endDate !== undefined ? customParams.endDate : analyticsEndDate;
+      const activeCourier = customParams.courier !== undefined ? customParams.courier : analyticsCourier;
+      const activeChannel = customParams.channel !== undefined ? customParams.channel : analyticsChannel;
+
+      const res = await api.getCourierAnalytics({
+        startDate: activeStartDate || undefined,
+        endDate: activeEndDate || undefined,
+        courier: activeCourier !== 'ALL' ? activeCourier : undefined,
+        channel: activeChannel !== 'ALL' ? activeChannel : undefined
+      });
       if (res && res.success) {
         setAnalyticsData(res);
       }
@@ -1198,6 +1322,17 @@ export default function ScanAndPackScreen({ currentUser }) {
     } finally {
       setAnalyticsLoading(false);
     }
+  };
+
+  const handleAnalyticsDatePreset = (preset) => {
+    setAnalyticsDatePreset(preset);
+    const range = getDateRangeForPreset(preset);
+    setAnalyticsStartDate(range.startDate);
+    setAnalyticsEndDate(range.endDate);
+    openAnalytics({
+      startDate: range.startDate,
+      endDate: range.endDate
+    });
   };
 
   // ── Save Claim Details Update ─────────────────────────────────────────────
@@ -1418,57 +1553,73 @@ export default function ScanAndPackScreen({ currentUser }) {
       </div>
 
       {/* 📊 3 KPI Stat Counters */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>
-        
-        {/* Metric 1: Dispatched Today */}
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #0ea5e9', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Packed & Dispatched Today
-            </span>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#0ea5e915', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Truck size={15} color="#0ea5e9" />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0ea5e9' }}>
-            {stats.dispatchedToday}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Auto-Dated & Weight Stamped</span>
-        </div>
+      {(() => {
+        const periodText = historyDatePreset === 'TODAY' 
+          ? 'Today' 
+          : historyDatePreset === 'YESTERDAY' 
+          ? 'Yesterday' 
+          : historyDatePreset === '7DAYS' 
+          ? '(Last 7D)' 
+          : historyDatePreset === '30DAYS' 
+          ? '(Last 30D)' 
+          : historyDatePreset === 'CUSTOM'
+          ? `(${historyStartDate || '...'} to ${historyEndDate || '...'})`
+          : '(All Scans)';
 
-        {/* Metric 2: Delivered Today */}
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Delivered Shipments
-            </span>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#10b98115', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckCircle2 size={15} color="#10b981" />
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>
+            
+            {/* Metric 1: Dispatched Today */}
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #0ea5e9', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Packed & Dispatched {periodText}
+                </span>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#0ea5e915', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Truck size={15} color="#0ea5e9" />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0ea5e9' }}>
+                {stats.dispatchedToday}
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Auto-Dated & Weight Stamped</span>
             </div>
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981' }}>
-            {stats.deliveredToday}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>Confirmed Deliveries</span>
-        </div>
 
-        {/* Metric 3: Returns Processed */}
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f43f5e', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Returns / RTOs Inward
-            </span>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f43f5e15', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <RotateCcw size={15} color="#f43f5e" />
+            {/* Metric 2: Delivered Today */}
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Delivered Shipments {periodText}
+                </span>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#10b98115', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle2 size={15} color="#10b981" />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981' }}>
+                {stats.deliveredToday}
+              </div>
+              <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>Confirmed Deliveries</span>
             </div>
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f43f5e' }}>
-            {stats.returnedToday}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#f43f5e', fontWeight: 600 }}>QC & Empty Box Guarded</span>
-        </div>
 
-      </div>
+            {/* Metric 3: Returns Processed */}
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f43f5e', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Returns / RTOs Inward {periodText}
+                </span>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f43f5e15', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RotateCcw size={15} color="#f43f5e" />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f43f5e' }}>
+                {stats.returnedToday}
+              </div>
+              <span style={{ fontSize: '0.72rem', color: '#f43f5e', fontWeight: 600 }}>QC & Empty Box Guarded</span>
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* 🚀 Mode Switcher & Scanner Terminal */}
       <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(15,23,42,0.04)' }}>
@@ -2843,6 +2994,206 @@ export default function ScanAndPackScreen({ currentUser }) {
           </div>
         </div>
 
+        {/* ── 🎯 Multi-Dimension & Date Range Filters Bar ── */}
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          background: '#f8fafc',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }}>
+          {/* Row 1: Quick Date Presets & Custom Date Pickers */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase' }}>
+                <Calendar size={13} color="#0ea5e9" />
+                Date Range:
+              </span>
+              {[
+                { label: 'All Scans', val: 'ALL' },
+                { label: 'Today', val: 'TODAY' },
+                { label: 'Yesterday', val: 'YESTERDAY' },
+                { label: 'Last 7 Days', val: '7DAYS' },
+                { label: 'Last 30 Days', val: '30DAYS' }
+              ].map(p => (
+                <button
+                  key={p.val}
+                  type="button"
+                  onClick={() => handleHistoryDatePreset(p.val)}
+                  style={{
+                    padding: '3px 9px',
+                    borderRadius: '6px',
+                    border: '1px solid',
+                    borderColor: historyDatePreset === p.val ? '#0ea5e9' : '#cbd5e1',
+                    background: historyDatePreset === p.val ? '#0ea5e9' : '#ffffff',
+                    color: historyDatePreset === p.val ? '#ffffff' : '#475569',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom From & To Date Pickers */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From:</span>
+              <input
+                type="date"
+                value={historyStartDate}
+                onChange={(e) => {
+                  setHistoryStartDate(e.target.value);
+                  setHistoryDatePreset('CUSTOM');
+                  fetchHistoryAndStats(scanMode, historySearchQuery, { startDate: e.target.value });
+                }}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.74rem',
+                  background: '#ffffff',
+                  color: '#1e293b'
+                }}
+              />
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To:</span>
+              <input
+                type="date"
+                value={historyEndDate}
+                onChange={(e) => {
+                  setHistoryEndDate(e.target.value);
+                  setHistoryDatePreset('CUSTOM');
+                  fetchHistoryAndStats(scanMode, historySearchQuery, { endDate: e.target.value });
+                }}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.74rem',
+                  background: '#ffffff',
+                  color: '#1e293b'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Logistics Partner, Channel, Status Dropdowns & Clear Button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase' }}>
+                <Filter size={13} color="#0ea5e9" />
+                Filters:
+              </span>
+
+              {/* Courier Dropdown */}
+              <select
+                value={historyCourier}
+                onChange={(e) => {
+                  setHistoryCourier(e.target.value);
+                  fetchHistoryAndStats(scanMode, historySearchQuery, { courier: e.target.value });
+                }}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.74rem',
+                  background: '#ffffff',
+                  color: '#1e293b',
+                  fontWeight: 600
+                }}
+              >
+                <option value="ALL">🚚 All Logistics Partners</option>
+                <option value="Flipkart Logistics / Ekart">Flipkart Logistics / Ekart</option>
+                <option value="Delhivery">Delhivery</option>
+                <option value="Shadowfax">Shadowfax</option>
+                <option value="Blue Dart">Blue Dart</option>
+                <option value="Xpressbees">Xpressbees</option>
+                <option value="Ecom Express">Ecom Express</option>
+                <option value="Amazon Shipping">Amazon Shipping</option>
+              </select>
+
+              {/* Channel Dropdown */}
+              <select
+                value={historyChannel}
+                onChange={(e) => {
+                  setHistoryChannel(e.target.value);
+                  fetchHistoryAndStats(scanMode, historySearchQuery, { channel: e.target.value });
+                }}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.74rem',
+                  background: '#ffffff',
+                  color: '#1e293b',
+                  fontWeight: 600
+                }}
+              >
+                <option value="ALL">🛍️ All Channels</option>
+                <option value="Myntra">Myntra</option>
+                <option value="Flipkart">Flipkart</option>
+                <option value="Amazon">Amazon</option>
+                <option value="Meesho">Meesho</option>
+              </select>
+
+              {/* Operation Status Dropdown */}
+              <select
+                value={historyOperationStatus}
+                onChange={(e) => {
+                  setHistoryOperationStatus(e.target.value);
+                  fetchHistoryAndStats(scanMode, historySearchQuery, { status: e.target.value });
+                }}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.74rem',
+                  background: '#ffffff',
+                  color: '#1e293b',
+                  fontWeight: 600
+                }}
+              >
+                <option value="ALL">⚡ All Operation Statuses</option>
+                <option value="SUCCESS">Success / Verified</option>
+                <option value="ALREADY_PACKED">Already Packed</option>
+                <option value="CANCELLED">Cancelled / Hold</option>
+                <option value="DUPLICATE">Duplicate Scan</option>
+                <option value="NOT_FOUND">Not Found / Error</option>
+              </select>
+            </div>
+
+            {/* Active Filters Pill & Reset Button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {(historyCourier !== 'ALL' || historyChannel !== 'ALL' || historyOperationStatus !== 'ALL' || historyDatePreset !== 'ALL' || historyStartDate || historyEndDate) && (
+                <button
+                  type="button"
+                  onClick={handleResetHistoryFilters}
+                  title="Reset all filters to default"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: '#dc2626',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <RotateCcw size={11} />
+                  <span>Clear Filters</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
             <thead>
@@ -3448,31 +3799,107 @@ export default function ScanAndPackScreen({ currentUser }) {
               </div>
 
               {manifestTab === 'PENDING' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="date"
-                    value={manifestDate}
-                    onChange={(e) => setManifestDate(e.target.value)}
-                    style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.75rem' }}
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  {/* Presets */}
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {[
+                      { label: 'Today', val: 'TODAY' },
+                      { label: 'Yesterday', val: 'YESTERDAY' },
+                      { label: '7D', val: '7DAYS' },
+                      { label: 'All', val: 'ALL' }
+                    ].map(p => (
+                      <button
+                        key={p.val}
+                        type="button"
+                        onClick={() => handleManifestDatePreset(p.val)}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '5px',
+                          border: '1px solid',
+                          borderColor: manifestDatePreset === p.val ? '#0ea5e9' : '#cbd5e1',
+                          background: manifestDatePreset === p.val ? '#0ea5e9' : '#ffffff',
+                          color: manifestDatePreset === p.val ? '#ffffff' : '#475569',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Date Pickers */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="date"
+                      value={manifestStartDate}
+                      onChange={(e) => {
+                        setManifestStartDate(e.target.value);
+                        setManifestDatePreset('CUSTOM');
+                      }}
+                      style={{ padding: '3px 6px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem' }}
+                    />
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>to</span>
+                    <input
+                      type="date"
+                      value={manifestEndDate}
+                      onChange={(e) => {
+                        setManifestEndDate(e.target.value);
+                        setManifestDatePreset('CUSTOM');
+                      }}
+                      style={{ padding: '3px 6px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem' }}
+                    />
+                  </div>
+
+                  {/* Courier Dropdown */}
                   <select
                     value={manifestCourier}
                     onChange={(e) => setManifestCourier(e.target.value)}
-                    style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.75rem' }}
+                    style={{ padding: '3px 8px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem', fontWeight: 600 }}
                   >
                     <option value="ALL">All Logistics Partners</option>
-                    <option value="Flipkart">Flipkart Logistics / Ekart</option>
+                    <option value="Flipkart Logistics / Ekart">Flipkart / Ekart</option>
                     <option value="Delhivery">Delhivery</option>
-                    <option value="Blue Dart">Blue Dart</option>
                     <option value="Shadowfax">Shadowfax</option>
+                    <option value="Blue Dart">Blue Dart</option>
                     <option value="Xpressbees">Xpressbees</option>
+                    <option value="Ecom Express">Ecom Express</option>
                   </select>
+
+                  {/* Channel Dropdown */}
+                  <select
+                    value={manifestChannel}
+                    onChange={(e) => setManifestChannel(e.target.value)}
+                    style={{ padding: '3px 8px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem', fontWeight: 600 }}
+                  >
+                    <option value="ALL">All Marketplaces</option>
+                    <option value="Myntra">Myntra</option>
+                    <option value="Flipkart">Flipkart</option>
+                    <option value="Amazon">Amazon</option>
+                    <option value="Meesho">Meesho</option>
+                  </select>
+
+                  {/* Filter Apply button */}
                   <button
                     type="button"
-                    onClick={fetchManifestPending}
-                    style={{ padding: '4px 8px', borderRadius: '6px', background: '#0ea5e9', color: '#fff', border: 'none', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                    onClick={() => fetchManifestPending()}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '5px',
+                      background: '#0ea5e9',
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
                   >
-                    Filter
+                    <Filter size={11} />
+                    <span>Apply</span>
                   </button>
                 </div>
               )}
@@ -3865,6 +4292,133 @@ export default function ScanAndPackScreen({ currentUser }) {
               <button type="button" onClick={() => setShowAnalyticsModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
+            </div>
+
+            {/* ── 🎯 Courier Analytics Multi-Filter Bar ── */}
+            <div style={{
+              padding: '0.85rem 1.5rem',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {/* Row 1: Presets & Custom Dates */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Calendar size={12} color="#a855f7" />
+                    Timeframe:
+                  </span>
+                  {[
+                    { label: 'Today', val: 'TODAY' },
+                    { label: 'Yesterday', val: 'YESTERDAY' },
+                    { label: 'Last 7 Days', val: '7DAYS' },
+                    { label: 'Last 30 Days', val: '30DAYS' },
+                    { label: 'All Time', val: 'ALL' }
+                  ].map(p => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      onClick={() => handleAnalyticsDatePreset(p.val)}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '5px',
+                        border: '1px solid',
+                        borderColor: analyticsDatePreset === p.val ? '#a855f7' : '#cbd5e1',
+                        background: analyticsDatePreset === p.val ? '#a855f7' : '#ffffff',
+                        color: analyticsDatePreset === p.val ? '#ffffff' : '#475569',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From:</span>
+                  <input
+                    type="date"
+                    value={analyticsStartDate}
+                    onChange={(e) => {
+                      setAnalyticsStartDate(e.target.value);
+                      setAnalyticsDatePreset('CUSTOM');
+                    }}
+                    style={{ padding: '3px 6px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem' }}
+                  />
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To:</span>
+                  <input
+                    type="date"
+                    value={analyticsEndDate}
+                    onChange={(e) => {
+                      setAnalyticsEndDate(e.target.value);
+                      setAnalyticsDatePreset('CUSTOM');
+                    }}
+                    style={{ padding: '3px 6px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Courier Partner, Marketplace & Refresh */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Filter size={12} color="#a855f7" />
+                    Filters:
+                  </span>
+
+                  <select
+                    value={analyticsCourier}
+                    onChange={(e) => setAnalyticsCourier(e.target.value)}
+                    style={{ padding: '3px 8px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem', fontWeight: 600 }}
+                  >
+                    <option value="ALL">🚚 All Logistics Partners</option>
+                    <option value="Flipkart Logistics / Ekart">Flipkart Logistics / Ekart</option>
+                    <option value="Delhivery">Delhivery</option>
+                    <option value="Shadowfax">Shadowfax</option>
+                    <option value="Blue Dart">Blue Dart</option>
+                    <option value="Xpressbees">Xpressbees</option>
+                    <option value="Ecom Express">Ecom Express</option>
+                  </select>
+
+                  <select
+                    value={analyticsChannel}
+                    onChange={(e) => setAnalyticsChannel(e.target.value)}
+                    style={{ padding: '3px 8px', borderRadius: '5px', border: '1px solid #cbd5e1', fontSize: '0.72rem', fontWeight: 600 }}
+                  >
+                    <option value="ALL">🛍️ All Marketplaces</option>
+                    <option value="Myntra">Myntra</option>
+                    <option value="Flipkart">Flipkart</option>
+                    <option value="Amazon">Amazon</option>
+                    <option value="Meesho">Meesho</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openAnalytics()}
+                  disabled={analyticsLoading}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <RefreshCw size={12} className={analyticsLoading ? 'spin' : ''} />
+                  <span>Update Analytics</span>
+                </button>
+              </div>
             </div>
 
             <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

@@ -2212,7 +2212,7 @@ export const api = {
     });
   },
 
-  async getScanPackHistory({ limit, page, mode, search, startDate, endDate } = {}) {
+  async getScanPackHistory({ limit, page, mode, search, startDate, endDate, courier, channel, status } = {}) {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit);
     if (page) params.append('page', page);
@@ -2220,6 +2220,9 @@ export const api = {
     if (search) params.append('search', search);
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
+    if (courier && courier !== 'ALL') params.append('courier', courier);
+    if (channel && channel !== 'ALL') params.append('channel', channel);
+    if (status && status !== 'ALL') params.append('status', status);
     const qs = params.toString();
     return request(`/scan-pack/history${qs ? `?${qs}` : ''}`);
   },
@@ -2245,10 +2248,13 @@ export const api = {
     });
   },
 
-  async getManifestPending({ date, courier } = {}) {
+  async getManifestPending({ date, startDate, endDate, courier, channel } = {}) {
     const params = new URLSearchParams();
     if (date) params.append('date', date);
-    if (courier) params.append('courier', courier);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (courier && courier !== 'ALL') params.append('courier', courier);
+    if (channel && channel !== 'ALL') params.append('channel', channel);
     return request(`/scan-pack/manifest/pending?${params.toString()}`);
   },
 
@@ -2259,8 +2265,9 @@ export const api = {
     });
   },
 
-  async getManifestList() {
-    return request('/scan-pack/manifest/list');
+  async getManifestList(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/scan-pack/manifest/list${qs ? `?${qs}` : ''}`);
   },
 
   async getManifestById(manifestId) {
@@ -2274,8 +2281,14 @@ export const api = {
     });
   },
 
-  async getCourierAnalytics() {
-    return request('/scan-pack/analytics');
+  async getCourierAnalytics({ startDate, endDate, courier, channel } = {}) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (courier && courier !== 'ALL') params.append('courier', courier);
+    if (channel && channel !== 'ALL') params.append('channel', channel);
+    const qs = params.toString();
+    return request(`/scan-pack/analytics${qs ? `?${qs}` : ''}`);
   },
 
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {

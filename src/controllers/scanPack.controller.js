@@ -713,12 +713,17 @@ const updateReturnClaim = async (req, res) => {
 };
 
 // ── GET /api/v1/scan-pack/manifest/pending ───────────────────────────────────
-// Lists today's dispatched packages grouped by courier partner
+// Lists today's or date-filtered dispatched packages grouped by courier partner
 const getManifestPending = async (req, res) => {
   try {
-    const { date, courier } = req.query;
+    const { date, startDate, endDate, courier, channel } = req.query;
     let startOfDay, endOfDay;
-    if (date) {
+    if (startDate || endDate) {
+      startOfDay = startDate ? new Date(startDate) : new Date(0);
+      startOfDay.setHours(0, 0, 0, 0);
+      endOfDay = endDate ? new Date(endDate) : new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+    } else if (date) {
       startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
       endOfDay = new Date(date);
@@ -736,8 +741,17 @@ const getManifestPending = async (req, res) => {
         { updatedAt: { $gte: startOfDay, $lte: endOfDay }, saleOrderStatus: 'DISPATCHED' }
       ]
     };
+    if (channel && channel !== 'ALL') {
+      filter.channel = new RegExp(channel.trim(), 'i');
+    }
     if (courier && courier !== 'ALL') {
-      filter.shippingCourier = new RegExp(courier, 'i');
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { shippingCourier: new RegExp(courier.trim(), 'i') },
+          { trackingNumber: new RegExp(courier.trim(), 'i') }
+        ]
+      });
     }
 
     const orders = await db.SaleOrder.find(filter).sort({ dispatchDate: -1 }).lean();
@@ -971,7 +985,7 @@ const recordScanLog = async (req, res) => {
 // Returns persistent scan history from MongoDB with search, filters & pagination
 const getScanHistory = async (req, res) => {
   try {
-    const { limit = 50, page = 1, mode, search, startDate, endDate } = req.query;
+    const { limit = 50, page = 1, mode, search, startDate, endDate, courier, channel, status } = req.query;
     const cleanLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 300);
     const cleanPage = Math.max(parseInt(page, 10) || 1, 1);
     const skip = (cleanPage - 1) * cleanLimit;
@@ -1003,6 +1017,15 @@ const getScanHistory = async (req, res) => {
         { city: sRegex }
       ];
     }
+    if (courier && courier !== 'ALL') {
+      query.courier = new RegExp(courier.trim(), 'i');
+    }
+    if (channel && channel !== 'ALL') {
+      query.channel = new RegExp(channel.trim(), 'i');
+    }
+    if (status && status !== 'ALL') {
+      query.status = new RegExp(status.trim(), 'i');
+    }
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -1013,12 +1036,48 @@ const getScanHistory = async (req, res) => {
       }
     }
 
+    // Dynamic stats date range filter
+    let statsStartIso, statsEndIso;
+    let statsStartDate, statsEndDate;
+    if (startDate || endDate) {
+      if (startDate) {
+        statsStartDate = new Date(startDate);
+        statsStartIso = statsStartDate.toISOString();
+      }
+      if (endDate) {
+        statsEndDate = new Date(endDate);
+        statsEndDate.setHours(23, 59, 59, 999);
+        statsEndIso = statsEndDate.toISOString();
+      }
+    } else {
+      statsStartDate = today;
+      statsStartIso = today.toISOString();
+    }
+
+    const dispatchFilter = { dispatchDate: { $gte: statsStartIso } };
+    if (statsEndIso) dispatchFilter.dispatchDate.$lte = statsEndIso;
+
+    const deliveryFilter = { deliveryTime: { $gte: statsStartIso } };
+    if (statsEndIso) deliveryFilter.deliveryTime.$lte = statsEndIso;
+
+    const returnFilter = { createdAt: { $gte: statsStartDate } };
+    if (statsEndDate) returnFilter.createdAt.$lte = statsEndDate;
+
+    if (channel && channel !== 'ALL') {
+      dispatchFilter.channel = new RegExp(channel.trim(), 'i');
+      deliveryFilter.channel = new RegExp(channel.trim(), 'i');
+    }
+    if (courier && courier !== 'ALL') {
+      dispatchFilter.shippingCourier = new RegExp(courier.trim(), 'i');
+      deliveryFilter.shippingCourier = new RegExp(courier.trim(), 'i');
+    }
+
     const [dbLogs, totalLogsCount, dispatchedCount, deliveredCount, returnCount] = await Promise.all([
       db.ScanLog ? db.ScanLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(cleanLimit).lean() : [],
       db.ScanLog ? db.ScanLog.countDocuments(query) : 0,
-      db.SaleOrder.countDocuments({ dispatchDate: { $gte: today.toISOString() } }),
-      db.SaleOrder.countDocuments({ deliveryTime: { $gte: today.toISOString() } }),
-      db.ReturnRecord.countDocuments({ createdAt: { $gte: today } })
+      db.SaleOrder.countDocuments(dispatchFilter),
+      db.SaleOrder.countDocuments(deliveryFilter),
+      db.ReturnRecord.countDocuments(returnFilter)
     ]);
 
     // Deduplicate dbLogs by unique AWB - each AWB code is strictly unique
@@ -1118,12 +1177,41 @@ const clearScanHistory = async (req, res) => {
 // Computes courier partner performance, SLA turnaround & RTO return rates
 const getCourierAnalytics = async (req, res) => {
   try {
-    const orders = await db.SaleOrder.find({
+    const { startDate, endDate, courier, channel } = req.query;
+
+    const orderQuery = {
       $or: [
         { dispatchDate: { $exists: true, $ne: null } },
         { trackingNumber: { $exists: true, $ne: null } }
       ]
-    }).lean();
+    };
+
+    if (startDate || endDate) {
+      const dateFilter = {};
+      if (startDate) dateFilter.$gte = new Date(startDate).toISOString();
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.$lte = end.toISOString();
+      }
+      orderQuery.dispatchDate = dateFilter;
+    }
+
+    if (channel && channel !== 'ALL') {
+      orderQuery.channel = new RegExp(channel.trim(), 'i');
+    }
+
+    if (courier && courier !== 'ALL') {
+      orderQuery.$and = orderQuery.$and || [];
+      orderQuery.$and.push({
+        $or: [
+          { shippingCourier: new RegExp(courier.trim(), 'i') },
+          { trackingNumber: new RegExp(courier.trim(), 'i') }
+        ]
+      });
+    }
+
+    const orders = await db.SaleOrder.find(orderQuery).lean();
 
     const courierStats = {};
     let totalDispatched = 0;
@@ -1169,10 +1257,21 @@ const getCourierAnalytics = async (req, res) => {
     });
 
     // Claim stats
+    const claimQuery = { claimStatus: { $ne: 'NOT_APPLICABLE' } };
+    if (startDate || endDate) {
+      claimQuery.createdAt = {};
+      if (startDate) claimQuery.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        claimQuery.createdAt.$lte = end;
+      }
+    }
+
     const [pendingClaims, approvedClaims, totalClaims] = await Promise.all([
-      db.ReturnRecord.countDocuments({ claimStatus: 'CLAIM_PENDING' }),
-      db.ReturnRecord.countDocuments({ claimStatus: 'CLAIM_APPROVED' }),
-      db.ReturnRecord.find({ claimStatus: { $ne: 'NOT_APPLICABLE' } }).lean()
+      db.ReturnRecord.countDocuments({ ...claimQuery, claimStatus: 'CLAIM_PENDING' }),
+      db.ReturnRecord.countDocuments({ ...claimQuery, claimStatus: 'CLAIM_APPROVED' }),
+      db.ReturnRecord.find(claimQuery).lean()
     ]);
 
     const totalClaimAmount = totalClaims.reduce((acc, c) => acc + (c.claimAmount || 0), 0);
