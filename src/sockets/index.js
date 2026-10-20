@@ -1,5 +1,5 @@
 const { setActivitySocketIo } = require('../utils/activityEvent');
-const { ChatMessage, User, Task, ChatRoom } = require('../db/models');
+const { ChatMessage, user: User, Task, ChatRoom } = require('../db/models');
 const eventBus = require('../services/eventBus.service');
 const { verifyToken } = require('../utils/auth');
 const { normalizeCompanyId, COMPANIES } = require('../config/company.constants');

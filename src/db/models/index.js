@@ -34,6 +34,7 @@ mongoose.plugin(realtimePlugin);
 
 const db = {
   user: require('./user.model'),
+  User: require('./user.model'),
   Product: require('./product.model'),
   InventoryProduct: require('./inventoryProduct.model'),
   SaleOrder: require('./saleOrder.model'),
