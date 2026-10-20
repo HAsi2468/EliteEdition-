@@ -76,8 +76,18 @@ import {
   Calendar,
   Tag,
   PhoneMissed,
-  PhoneCall
+  PhoneCall,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
+
+function formatFileSize(bytes) {
+  if (!bytes || isNaN(bytes)) return '';
+  const num = Number(bytes);
+  if (num < 1024) return `${num} B`;
+  if (num < 1024 * 1024) return `${(num / 1024).toFixed(1)} KB`;
+  return `${(num / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -1994,10 +2004,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return;
     }
 
+    const rawFileName = file.name || `file_${Date.now()}`;
+    const lowerName = rawFileName.toLowerCase();
+    const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
+    const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
+    const isAudio = file.type?.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(lowerName);
+    const isSpreadsheet = /\.(xls|xlsx|csv)$/i.test(lowerName);
+
     setUploadingFile(true);
     try {
       let uploadFile = file;
-      if (file.type && file.type.startsWith('image/')) {
+      if (isImage && !lowerName.endsWith('.svg')) {
         try {
           const imageCompression = (await import('browser-image-compression')).default;
           uploadFile = await imageCompression(file, { maxSizeMB: 2, maxWidthOrHeight: 2560, useWebWorker: true });
@@ -2009,11 +2026,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       const roomName = activeGroup?.name || 'General';
       const res = await api.uploadChatAttachment(uploadFile, roomName);
       if (res && res.fileUrl) {
+        const detectedType = isImage ? 'image' : isAudio ? 'audio' : isPdf ? 'pdf' : isSpreadsheet ? 'spreadsheet' : 'document';
         setAttachedFile({
-          fileName: res.fileName || file.name || `file_${Date.now()}`,
-          fileType: file.type.startsWith('image/') ? 'image' : file.type.startsWith('audio/') ? 'audio' : 'document',
+          fileName: res.fileName || rawFileName,
+          fileType: detectedType,
           fileUrl: res.fileUrl,
           fileSize: res.fileSize || file.size,
+          mimeType: file.type || (isPdf ? 'application/pdf' : 'application/octet-stream')
         });
       } else {
         alert('Failed to upload attachment.');
@@ -2032,7 +2051,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     e.target.value = '';
   };
 
-  const openFileDialog = (acceptType = 'image/*,.pdf,.doc,.docx,audio/*') => {
+  const openFileDialog = (acceptType = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*') => {
     if (fileInputRef.current) {
       fileInputRef.current.value = null;
       if (acceptType) fileInputRef.current.accept = acceptType;
@@ -2052,6 +2071,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleChatDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+    if (!isChatDragging) {
+      setIsChatDragging(true);
+    }
   };
 
   const handleChatDragLeave = (e) => {
@@ -2069,9 +2094,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     e.stopPropagation();
     chatDragCounterRef.current = 0;
     setIsChatDragging(false);
+
     if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
       await processFileUpload(file);
+    } else if (e.dataTransfer?.items) {
+      for (let i = 0; i < e.dataTransfer.items.length; i++) {
+        const item = e.dataTransfer.items[i];
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) {
+            await processFileUpload(file);
+            break;
+          }
+        }
+      }
     }
   };
 
@@ -2631,22 +2668,29 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  // Clipboard Screenshot Paste Handler (Supports Ctrl+V / Cmd+V Screenshots & Image Blobs)
+  // Clipboard Paste Handler (Supports Ctrl+V / Cmd+V for PDFs, Documents, Screenshots & Images)
   const handlePasteClipboard = async (e) => {
     let file = null;
-    if (e.clipboardData?.items) {
+
+    // 1. Check e.clipboardData.files first (Finder / File Explorer copied files, PDFs, images)
+    if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
+      file = e.clipboardData.files[0];
+    }
+
+    // 2. Fallback to e.clipboardData.items (Browser screenshots, canvas blobs)
+    if (!file && e.clipboardData?.items) {
       for (let i = 0; i < e.clipboardData.items.length; i++) {
         const item = e.clipboardData.items[i];
-        if (item.type && item.type.startsWith('image/')) {
-          file = item.getAsFile();
-          break;
+        if (item.kind === 'file') {
+          const f = item.getAsFile();
+          if (f) {
+            file = f;
+            break;
+          }
         }
       }
     }
-    if (!file && e.clipboardData?.files && e.clipboardData.files.length > 0) {
-      const f = e.clipboardData.files[0];
-      if (f && f.type.startsWith('image/')) file = f;
-    }
+
     if (file) {
       e.preventDefault();
       await processFileUpload(file);
@@ -3671,7 +3715,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
 
         {/* ════ RIGHT COLUMN: PHOENIX ACTIVE CHAT STREAM ════ */}
-        <div className={`phoenix-chat-main ${(isMobileScreen && !activeGroup) ? 'is-mobile-hidden is-hidden' : ''}`} style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex', flexDirection: 'column' }}>
+        <div
+          className={`phoenix-chat-main ${(isMobileScreen && !activeGroup) ? 'is-mobile-hidden is-hidden' : ''}`}
+          style={{ display: (isMobileScreen && !activeGroup) ? 'none' : 'flex', flexDirection: 'column', position: 'relative' }}
+          onDragEnter={handleChatDragEnter}
+          onDragOver={handleChatDragOver}
+          onDragLeave={handleChatDragLeave}
+          onDrop={handleChatDrop}
+          onPaste={handlePasteClipboard}
+        >
           
           {rosterTab === 'tasks' ? (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -4108,6 +4160,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 onDragOver={handleChatDragOver}
                 onDragLeave={handleChatDragLeave}
                 onDrop={handleChatDrop}
+                onPaste={handlePasteClipboard}
                 className="phoenix-chat-stream"
                 style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}
               >
@@ -4132,7 +4185,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <Paperclip size={24} />
                     </div>
                     <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e40af' }}>Drop file here to attach</div>
-                    <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Screenshots, documents, audio or ERP records</div>
+                    <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 600 }}>PDFs, Screenshots, Images, Excel, Word & Audio files supported</div>
                   </div>
                 )}
                 {loadingMoreMessages && (
@@ -4932,25 +4985,172 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               );
                             })()}
 
-                            {/* Image Attachment */}
+                            {/* Attachment: Image, PDF, Spreadsheet or Document */}
                             {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
-                              <div style={{ marginBottom: '0.35rem' }}>
-                                {msg.attachment.fileType === 'image' ? (
-                                  <img
-                                    src={msg.attachment.fileUrl}
-                                    alt="Attachment"
-                                    onClick={() => setZoomImg(msg.attachment.fileUrl)}
-                                    style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: '6px', cursor: 'zoom-in', objectFit: 'cover' }}
-                                  />
-                                ) : (
-                                  <a
-                                    href={msg.attachment.fileUrl}
-                                    download={msg.attachment.fileName}
-                                    style={{ color: isMe ? '#ffffff' : '#2563eb', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}
-                                  >
-                                    <FileText size={14} /> {msg.attachment.fileName}
-                                  </a>
-                                )}
+                              <div style={{ marginBottom: '0.45rem' }}>
+                                {(() => {
+                                  const lowerName = (msg.attachment.fileName || '').toLowerCase();
+                                  const isImg = msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
+                                  const isPdf = msg.attachment.fileType === 'pdf' || lowerName.endsWith('.pdf') || msg.attachment.mimeType === 'application/pdf';
+                                  const isSheet = msg.attachment.fileType === 'spreadsheet' || /\.(xls|xlsx|csv)$/i.test(lowerName);
+
+                                  if (isImg) {
+                                    return (
+                                      <div style={{ position: 'relative' }}>
+                                        <img
+                                          src={msg.attachment.fileUrl}
+                                          alt={msg.attachment.fileName || 'Attachment'}
+                                          onClick={() => setZoomImg(msg.attachment.fileUrl)}
+                                          style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '260px',
+                                            borderRadius: '8px',
+                                            cursor: 'zoom-in',
+                                            objectFit: 'cover',
+                                            display: 'block',
+                                            border: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light, #e2e8f0)'
+                                          }}
+                                        />
+                                        {msg.attachment.fileName && (
+                                          <div style={{ fontSize: '0.68rem', opacity: 0.8, marginTop: '3px', wordBreak: 'break-all' }}>
+                                            {msg.attachment.fileName} {msg.attachment.fileSize ? `(${formatFileSize(msg.attachment.fileSize)})` : ''}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
+                                  // Dedicated PDF, Spreadsheet, or Document Card
+                                  return (
+                                    <div
+                                      style={{
+                                        background: isMe ? 'rgba(255, 255, 255, 0.15)' : 'var(--bg-card, #ffffff)',
+                                        border: isMe ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid var(--border-light, #cbd5e1)',
+                                        borderRadius: '8px',
+                                        padding: '0.6rem 0.75rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.45rem',
+                                        minWidth: '220px',
+                                        maxWidth: '340px',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div
+                                          style={{
+                                            width: 36,
+                                            height: 36,
+                                            borderRadius: '6px',
+                                            background: isPdf ? '#ef4444' : isSheet ? '#10b981' : '#3b82f6',
+                                            color: '#ffffff',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 900,
+                                            fontSize: '0.62rem',
+                                            flexShrink: 0
+                                          }}
+                                        >
+                                          {isPdf ? (
+                                            <>
+                                              <FileText size={15} />
+                                              <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>PDF</span>
+                                            </>
+                                          ) : isSheet ? (
+                                            <>
+                                              <FileSpreadsheet size={15} />
+                                              <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>XLS</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Paperclip size={15} />
+                                              <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>DOC</span>
+                                            </>
+                                          )}
+                                        </div>
+
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                          <div
+                                            style={{
+                                              fontWeight: 700,
+                                              fontSize: '0.82rem',
+                                              color: 'inherit',
+                                              whiteSpace: 'nowrap',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis'
+                                            }}
+                                            title={msg.attachment.fileName}
+                                          >
+                                            {msg.attachment.fileName}
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                                            {isPdf ? 'PDF Document' : isSheet ? 'Spreadsheet' : 'Attachment'}{msg.attachment.fileSize ? ` • ${formatFileSize(msg.attachment.fileSize)}` : ''}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Action Buttons: Open & Download */}
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: '6px',
+                                          marginTop: '2px',
+                                          paddingTop: '6px',
+                                          borderTop: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light, #e2e8f0)'
+                                        }}
+                                      >
+                                        <a
+                                          href={msg.attachment.fileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          style={{
+                                            flex: 1,
+                                            padding: '4px 8px',
+                                            fontSize: '0.74rem',
+                                            fontWeight: 700,
+                                            borderRadius: '4px',
+                                            background: isMe ? 'rgba(255,255,255,0.25)' : '#2563eb',
+                                            color: '#ffffff',
+                                            textAlign: 'center',
+                                            textDecoration: 'none',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px'
+                                          }}
+                                        >
+                                          <ExternalLink size={12} /> {isPdf ? 'View PDF' : 'Open'}
+                                        </a>
+
+                                        <a
+                                          href={msg.attachment.fileUrl}
+                                          download={msg.attachment.fileName}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          style={{
+                                            padding: '4px 8px',
+                                            fontSize: '0.74rem',
+                                            fontWeight: 700,
+                                            borderRadius: '4px',
+                                            background: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)',
+                                            color: 'inherit',
+                                            textAlign: 'center',
+                                            textDecoration: 'none',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px'
+                                          }}
+                                          title="Download File"
+                                        >
+                                          <Download size={12} /> Download
+                                        </a>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             )}
 
@@ -5098,15 +5298,131 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               )}
 
-              {/* Attachment Preview Banner */}
-              {attachedFile && (
-                <div style={{ padding: '0.4rem 0.9rem', background: '#eff6ff', borderTop: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Paperclip size={14} color="#2563eb" />
-                    <span>Attached ({attachedFile.fileType}): {attachedFile.fileName}</span>
+              {/* Uploading Status Indicator */}
+              {uploadingFile && (
+                <div
+                  style={{
+                    padding: '0.55rem 1rem',
+                    background: 'linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%)',
+                    borderTop: '1px solid #93c5fd',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#1d4ed8'
+                  }}
+                >
+                  <RefreshCw size={15} className="spin-loader" />
+                  <span>Uploading attachment to secure cloud storage...</span>
+                </div>
+              )}
+
+              {/* Enhanced Attachment Preview Banner */}
+              {attachedFile && !uploadingFile && (
+                <div
+                  style={{
+                    padding: '0.55rem 1rem',
+                    background: 'var(--bg-card, #ffffff)',
+                    borderTop: '1px solid var(--border-light, #e2e8f0)',
+                    boxShadow: '0 -2px 10px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    {/* Thumbnail or Badge */}
+                    {attachedFile.fileType === 'image' && attachedFile.fileUrl ? (
+                      <img
+                        src={attachedFile.fileUrl}
+                        alt="Preview"
+                        onClick={() => setZoomImg(attachedFile.fileUrl)}
+                        style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border-light)', cursor: 'zoom-in' }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 6,
+                          background: attachedFile.fileType === 'pdf' ? '#fee2e2' : attachedFile.fileType === 'spreadsheet' ? '#d1fae5' : '#dbeafe',
+                          color: attachedFile.fileType === 'pdf' ? '#dc2626' : attachedFile.fileType === 'spreadsheet' ? '#059669' : '#2563eb',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 900,
+                          fontSize: '0.62rem',
+                          flexShrink: 0
+                        }}
+                      >
+                        {attachedFile.fileType === 'pdf' ? (
+                          <>
+                            <FileText size={16} />
+                            <span>PDF</span>
+                          </>
+                        ) : attachedFile.fileType === 'spreadsheet' ? (
+                          <>
+                            <FileSpreadsheet size={16} />
+                            <span>XLS</span>
+                          </>
+                        ) : (
+                          <>
+                            <Paperclip size={16} />
+                            <span>DOC</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.82rem',
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                        title={attachedFile.fileName}
+                      >
+                        {attachedFile.fileName}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{attachedFile.fileType === 'pdf' ? 'PDF Document' : attachedFile.fileType === 'image' ? 'Image' : attachedFile.fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}</span>
+                        {attachedFile.fileSize && <span>• {formatFileSize(attachedFile.fileSize)}</span>}
+                        <a
+                          href={attachedFile.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'underline' }}
+                        >
+                          Preview
+                        </a>
+                      </div>
+                    </div>
                   </div>
-                  <button onClick={() => setAttachedFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                    <X size={14} />
+
+                  <button
+                    type="button"
+                    onClick={() => setAttachedFile(null)}
+                    style={{
+                      padding: '4px',
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.2)',
+                      borderRadius: '50%',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Remove attachment"
+                  >
+                    <X size={15} />
                   </button>
                 </div>
               )}
@@ -5116,6 +5432,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 onSubmit={handleSendMessage}
                 className="phoenix-chat-input-bar"
                 style={{ position: 'relative' }}
+                onDragEnter={handleChatDragEnter}
+                onDragOver={handleChatDragOver}
+                onDragLeave={handleChatDragLeave}
+                onDrop={handleChatDrop}
+                onPaste={handlePasteClipboard}
               >
                 {/* Hidden File Input for Attachments and Photos */}
                 <input
@@ -5123,6 +5444,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   ref={fileInputRef}
                   style={{ display: 'none' }}
                   onChange={handleFileUpload}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*"
                 />
 
                 {/* @mention Suggestion Dropdown */}
@@ -5291,7 +5613,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 type="button"
                                 onClick={() => {
                                   setShowMobileActionMenu(false);
-                                  openFileDialog('image/*,.pdf,.doc,.docx,audio/*');
+                                  openFileDialog('.pdf,application/pdf');
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                  background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                  fontSize: '0.8rem', color: '#0f172a', cursor: 'pointer', fontWeight: 600
+                                }}
+                              >
+                                <FileText size={15} color="#dc2626" />
+                                <span>Attach PDF Document</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowMobileActionMenu(false);
+                                  openFileDialog('image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*');
                                 }}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
@@ -5300,7 +5638,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 }}
                               >
                                 <Paperclip size={15} color="#2563eb" />
-                                <span>Attach Document</span>
+                                <span>Attach Any Document</span>
                               </button>
 
                               <button
@@ -5365,8 +5703,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           <button
                             type="button"
                             className="phoenix-toolbar-icon"
-                            onClick={() => openFileDialog('image/*,.pdf,.doc,.docx,audio/*')}
-                            title="Attach File"
+                            onClick={() => openFileDialog('image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*')}
+                            title="Attach File (PDF, Image, Document)"
                             style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
                           >
                             <Paperclip size={16} />
