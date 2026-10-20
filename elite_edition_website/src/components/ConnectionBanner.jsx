@@ -85,6 +85,23 @@ export function ConnectionBanner() {
   const isOffline = !isActuallyConnected && (!isBrowserOnline || status === 'offline');
   const isReconnecting = !isActuallyConnected && !isOffline;
 
+  // Debounce reconnecting pill: Do not flash intrusive "Reconnecting..." on sub-second transient blips
+  const [showReconnectingPill, setShowReconnectingPill] = useState(false);
+
+  useEffect(() => {
+    let timer = null;
+    if (isReconnecting) {
+      timer = setTimeout(() => {
+        setShowReconnectingPill(true);
+      }, 3500);
+    } else {
+      setShowReconnectingPill(false);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isReconnecting]);
+
   // Handle recovery confirmation badge transition
   useEffect(() => {
     if (isActuallyConnected) {
@@ -156,8 +173,8 @@ export function ConnectionBanner() {
     );
   }
 
-  // 3. Reconnecting State: Gentle floating amber pill ("Reconnecting...")
-  if (isReconnecting) {
+  // 3. Reconnecting State: Gentle floating amber pill ("Reconnecting...") - only after grace period
+  if (isReconnecting && showReconnectingPill) {
     return (
       <aside
         role="status"

@@ -50,7 +50,7 @@ class SocketManager {
     this.heartbeatTimer = null;
     this.consecutiveMissedHeartbeats = 0;
     this.HEARTBEAT_INTERVAL_MS = 25000;
-    this.HEARTBEAT_TIMEOUT_MS = 4000;
+    this.HEARTBEAT_TIMEOUT_MS = 15000;
 
     // Exponential backoff & jitter for iOS / mobile recovery (initial 500ms, max 8s)
     this.reconnectAttempt = 0;
@@ -118,9 +118,9 @@ class SocketManager {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 500,
-      reconnectionDelayMax: 4000,
+      reconnectionDelayMax: 5000,
       randomizationFactor: 0.3,
-      timeout: 5000,
+      timeout: 15000,
       upgrade: true,
       rememberUpgrade: true,
     });
@@ -318,12 +318,12 @@ class SocketManager {
         if (!ackReceived) {
           this.consecutiveMissedHeartbeats++;
           console.warn(
-            `[SocketManager] Missed Cloudflare heartbeat (${this.consecutiveMissedHeartbeats}/2).`
+            `[SocketManager] Missed Cloudflare heartbeat (${this.consecutiveMissedHeartbeats}/3).`
           );
 
-          if (this.consecutiveMissedHeartbeats >= 2) {
+          if (this.consecutiveMissedHeartbeats >= 3) {
             console.error(
-              '[SocketManager] 2 consecutive heartbeats missed! Declaring connection degraded & cycling socket.'
+              '[SocketManager] 3 consecutive heartbeats missed! Declaring connection degraded & cycling socket.'
             );
             this._setStatus('reconnecting');
             this.forceCycleConnection();
@@ -341,7 +341,7 @@ class SocketManager {
       } catch (err) {
         clearTimeout(timeoutId);
         this.consecutiveMissedHeartbeats++;
-        if (this.consecutiveMissedHeartbeats >= 2) {
+        if (this.consecutiveMissedHeartbeats >= 3) {
           this.forceCycleConnection();
         }
       }
@@ -403,9 +403,13 @@ class SocketManager {
             this.reconnect(true);
           }
         } else if (state === 'OFFLINE') {
-          this._setStatus('offline');
+          if (!this.isConnected()) {
+            this._setStatus('offline');
+          }
         } else if (state === 'RECONNECTING') {
-          this._setStatus('reconnecting');
+          if (!this.isConnected()) {
+            this._setStatus('reconnecting');
+          }
         }
       });
     } catch (e) {
@@ -422,13 +426,19 @@ class SocketManager {
         });
       }
       if (isVisible) {
-        this._handleDeviceAwakening('visibilitychange');
+        if (!this.socket || !this.socket.connected) {
+          this.reconnect(true);
+        } else {
+          this.resync('visibilitychange');
+        }
       }
     });
 
-    // 2. Window focus (user clicked back into window)
+    // 2. Window focus (user clicked back into window) - verify without disrupting healthy sockets
     window.addEventListener('focus', () => {
-      this._handleDeviceAwakening('focus');
+      if (!this.socket || !this.socket.connected) {
+        this.reconnect(true);
+      }
     });
 
     // 3. W3C Page Lifecycle: 'freeze' (Aggressive background tab hibernation)
@@ -443,8 +453,7 @@ class SocketManager {
 
     // 5. iOS Safari & Android Chrome 'pageshow' (crucial for Back-Forward Cache & phone unlock)
     window.addEventListener('pageshow', (event) => {
-      // On iOS Safari, event.persisted is true when restored from bfcache or background suspension
-      if (event.persisted || document.visibilityState === 'visible') {
+      if (event.persisted || !this.socket || !this.socket.connected) {
         this._handleDeviceAwakening('pageshow-persisted');
       }
     });
@@ -461,16 +470,14 @@ class SocketManager {
       this._startOfflineTimer();
     });
 
-    // 7. Workstation user activity recovery watchdog
+    // 7. Workstation user activity recovery watchdog - passive check only
     let lastUserCheck = 0;
     const handleUserInteraction = () => {
       const now = Date.now();
-      if (now - lastUserCheck > 15000) {
+      if (now - lastUserCheck > 30000) {
         lastUserCheck = now;
         if (!this.socket || !this.socket.connected) {
           this.reconnect(true);
-        } else {
-          this._verifySocketAlive();
         }
       }
     };
@@ -480,8 +487,7 @@ class SocketManager {
 
   /**
    * Device awakening routine:
-   * iOS Safari silently closes background TCP sockets without firing close events.
-   * Send an immediate ping-burst; if stalled after 1500ms, force reconnect.
+   * Gracefully verifies or restores connection after mobile sleep or tab hibernation
    */
   _handleDeviceAwakening(triggerSource) {
     if (!this.socket || !this.socket.connected) {
@@ -491,11 +497,11 @@ class SocketManager {
 
     let acked = false;
     const pingTimeout = setTimeout(() => {
-      if (!acked) {
-        console.warn(`[SocketManager] iOS/Mobile sleep detected (${triggerSource}). Zombie socket detected -> Force reconnecting.`);
+      if (!acked && (!this.socket || !this.socket.connected)) {
+        console.warn(`[SocketManager] Sleep wake stalled (${triggerSource}) -> Reconnecting.`);
         this.forceCycleConnection();
       }
-    }, 1500);
+    }, 8000);
 
     try {
       this.socket.emit('ping-health', () => {
@@ -506,7 +512,9 @@ class SocketManager {
       });
     } catch (e) {
       clearTimeout(pingTimeout);
-      this.forceCycleConnection();
+      if (!this.socket || !this.socket.connected) {
+        this.forceCycleConnection();
+      }
     }
   }
 
@@ -522,11 +530,11 @@ class SocketManager {
     let hasAcked = false;
     const timeout = setTimeout(() => {
       this._isVerifyingAlive = false;
-      if (!hasAcked) {
+      if (!hasAcked && (!this.socket || !this.socket.connected)) {
         console.warn('[SocketManager] Proactive ping timed out. Cycling socket connection.');
         this.forceCycleConnection();
       }
-    }, 1500);
+    }, 8000);
 
     try {
       this.socket.emit('ping-health', () => {
@@ -537,7 +545,9 @@ class SocketManager {
     } catch (e) {
       clearTimeout(timeout);
       this._isVerifyingAlive = false;
-      this.forceCycleConnection();
+      if (!this.socket || !this.socket.connected) {
+        this.forceCycleConnection();
+      }
     }
   }
 

@@ -64,11 +64,11 @@ class ResilientLifecycleManager {
   constructor(customConfig: HeartbeatConfig = {}) {
     this.config = {
       pingEndpoint: customConfig.pingEndpoint || '/v1/auth/ping',
-      activeIntervalMs: customConfig.activeIntervalMs || 10000,
-      backgroundIntervalMs: customConfig.backgroundIntervalMs || 25000,
-      probeTimeoutMs: customConfig.probeTimeoutMs || 6000,
+      activeIntervalMs: customConfig.activeIntervalMs || 30000,
+      backgroundIntervalMs: customConfig.backgroundIntervalMs || 60000,
+      probeTimeoutMs: customConfig.probeTimeoutMs || 12000,
       baseReconnectDelayMs: customConfig.baseReconnectDelayMs || 500,
-      maxReconnectDelayMs: customConfig.maxReconnectDelayMs || 10000,
+      maxReconnectDelayMs: customConfig.maxReconnectDelayMs || 15000,
       jitterFactor: customConfig.jitterFactor || 0.25,
     };
   }
@@ -141,7 +141,9 @@ class ResilientLifecycleManager {
 
     // 2. Window Focus (Workstation user clicks into browser)
     window.addEventListener('focus', () => {
-      this.checkRealConnectivity('window-focus');
+      if (Date.now() - this.lastSuccessfulPingTime > 30000) {
+        this.checkRealConnectivity('window-focus');
+      }
     });
 
     // 3. W3C Page Lifecycle: 'freeze' (Browser hibernates background tab to reclaim CPU/RAM)
@@ -273,10 +275,10 @@ class ResilientLifecycleManager {
       clearTimeout(timeoutId);
       this.consecutiveFailures++;
 
-      // If disconnected for > 1 consecutive probe, declare reconnecting/offline
-      if (this.consecutiveFailures >= 2) {
+      // Require 2 consecutive failures before declaring RECONNECTING, and 4 before OFFLINE
+      if (this.consecutiveFailures >= 4) {
         this.setState('OFFLINE', { attempt: this.consecutiveFailures });
-      } else {
+      } else if (this.consecutiveFailures >= 2) {
         this.setState('RECONNECTING', { attempt: this.consecutiveFailures });
       }
 

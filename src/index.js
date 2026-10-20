@@ -14,11 +14,11 @@ const server = http.Server(app);
 
 const eventBus = require('./services/eventBus.service');
 
-// Initialize Socket.io with high-resilience mobile & desktop heartbeat, fast reconnection, and compression
+// Initialize Socket.io with production-grade stability, long-lived heartbeat, and compression
 const io = new Server(server, {
-  pingTimeout: 8000,    // Detect dropped connection in 8s instead of 20s
-  pingInterval: 12000,  // Heartbeat check every 12s instead of 25s
-  connectTimeout: 8000,
+  pingTimeout: 30000,   // 30s timeout allows background tabs and network jitter to stay alive without dropping
+  pingInterval: 25000,  // Heartbeat check every 25s
+  connectTimeout: 20000,
   transports: ['websocket', 'polling'],
   perMessageDeflate: {
     threshold: 1024     // Enable compression for payloads above 1KB
@@ -72,32 +72,6 @@ const port = process.env.PORT || 3001;
 server.listen(port, '0.0.0.0', async () => {
   logger.info(`App is listening on primary port ${port}`);
   console.log('Server bound to', server.address());
-
-  if (Number(port) !== 3000) {
-    try {
-      const server3000 = http.Server(app);
-      server3000.on('error', (err) => {
-        console.warn('Could not bind fallback port 3000 (handled):', err.message);
-      });
-      const io3000 = new Server(server3000, { cors: { origin: '*' } });
-      setupSockets(io3000);
-      server3000.listen(3000, '0.0.0.0', () => console.log('Fallback server listening on port 3000'));
-    } catch(e) {
-      console.warn('Could not bind fallback port 3000:', e.message);
-    }
-  }
-
-  try {
-    const server80 = http.Server(app);
-    server80.on('error', (err) => {
-      console.warn('Could not bind port 80 (handled):', err.message);
-    });
-    const io80 = new Server(server80, { cors: { origin: '*' } });
-    setupSockets(io80);
-    server80.listen(80, '0.0.0.0', () => console.log('HTTP server listening on port 80'));
-  } catch(e) {
-    console.warn('Could not bind port 80:', e.message);
-  }
 
   await syncCommunicationGroups();
   const { seedFacilitiesOnStartup } = require('./controllers/facility.controller');
