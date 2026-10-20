@@ -61,6 +61,7 @@ async function dispatchChatMessage({ io, roomId, populatedMessage, targetRoom, s
 
   // 2. Intelligent Push Routing: Filter recipients who need background Web Push
   const senderDisplayName =
+    populatedMessage.senderName ||
     populatedMessage.senderId?.name ||
     populatedMessage.senderId?.username ||
     'Team Member';

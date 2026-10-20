@@ -91,6 +91,11 @@ const chatMessageSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    senderName: {
+      type: String,
+      default: null,
+      trim: true
+    },
     content: {
       type: String,
       required: true,

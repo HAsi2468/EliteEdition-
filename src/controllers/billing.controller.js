@@ -1367,7 +1367,7 @@ const resolveInvoiceImagePath = async (urlOrPath, designNameHint = '', cache = n
       const axios = require('axios');
       const r = await axios.get(targetUrl, {
         responseType: 'arraybuffer',
-        timeout: 10000,
+        timeout: 2500,
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
       });
       if (r.data) {
@@ -1568,9 +1568,25 @@ const downloadInvoicePdf = async (req, res) => {
   try {
     const invoice = await BillingInvoice.findById(req.params.id).lean();
     if (!invoice) return res.status(404).send('Invoice not found');
-    await enrichInvoiceItemsWithImages(invoice);
 
     const includeDuplicate = req.query?.duplicate === 'true';
+
+    // Fast Disk Caching for Invoice PDFs to eliminate 25s hangs on preview
+    const cacheDir = path.join(__dirname, '../../uploads/cached_invoices');
+    if (!fs.existsSync(cacheDir)) {
+      try { fs.mkdirSync(cacheDir, { recursive: true }); } catch (e) {}
+    }
+    const invUpdatedAt = invoice.updatedAt ? new Date(invoice.updatedAt).getTime() : 0;
+    const cacheFileName = `inv_${invoice._id}_${invUpdatedAt}_${includeDuplicate ? 'dup' : 'orig'}.pdf`;
+    const cachedFilePath = path.join(cacheDir, cacheFileName);
+
+    if (fs.existsSync(cachedFilePath)) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo}.pdf"`);
+      return fs.createReadStream(cachedFilePath).pipe(res);
+    }
+
+    await enrichInvoiceItemsWithImages(invoice);
 
     const PrintConfig = require('../db/models/printConfig.model');
     const JobCard = require('../db/models/jobCard.model');
@@ -1595,6 +1611,16 @@ const downloadInvoicePdf = async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo}.pdf"`);
     doc.pipe(res);
+
+    const tempCachedPath = `${cachedFilePath}.tmp_${Date.now()}`;
+    const fileStream = fs.createWriteStream(tempCachedPath);
+    doc.pipe(fileStream);
+
+    fileStream.on('finish', () => {
+      try {
+        fs.renameSync(tempCachedPath, cachedFilePath);
+      } catch (e) {}
+    });
 
     const PW = 595.28, PH = 841.89;
     const PAD = 18;

@@ -35,16 +35,21 @@ async function generateResetPasswordToken(email) {
  * @param {string} params.userId
  * @param {string} [params.familyId]
  */
-async function generateAuthTokens({ userId, familyId = null }) {
+async function generateAuthTokens({ userId, familyId = null, role = null }) {
   const redis = getRedisClient();
   const activeFamilyId = familyId || uuidv4();
   const jti = uuidv4();
 
-  const accessTokenExpires = generateExpires(ACCESS_TOKEN_EXPIRATION_MINUTES / 60);
+  const isQaAutomation = role === 'qa-automation';
+  const accessTokenExpires = isQaAutomation 
+    ? generateExpires(30 * 24) 
+    : generateExpires(ACCESS_TOKEN_EXPIRATION_MINUTES / 60);
+
   const accessToken = generateToken({
     userId,
     familyId: activeFamilyId,
-    tokenType: 'access'
+    tokenType: 'access',
+    role: role || undefined
   }, accessTokenExpires);
 
   const refreshTokenExpires = generateExpires(REFRESH_TOKEN_EXPIRATION_DAYS * 24);
@@ -52,7 +57,8 @@ async function generateAuthTokens({ userId, familyId = null }) {
     userId,
     familyId: activeFamilyId,
     jti,
-    tokenType: 'refresh'
+    tokenType: 'refresh',
+    role: role || undefined
   }, refreshTokenExpires);
 
   // Store active family state in Redis with 7-day TTL
@@ -159,7 +165,7 @@ async function rotateRefreshToken(refreshToken) {
   }
 
   // Generate a brand new pair within the SAME family (Rotation)
-  const newTokens = await generateAuthTokens({ userId, familyId });
+  const newTokens = await generateAuthTokens({ userId, familyId, role: user?.role });
 
   return {
     ...newTokens,

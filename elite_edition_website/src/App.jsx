@@ -123,21 +123,84 @@ import { GuidedTourController } from './components/common/GuidedTourController';
 
 
 
+export const ROUTE_ALIASES = {
+  'dashboard': { tab: 'dashboard', dept: null },
+  'tasks': { tab: 'task_management', dept: null },
+  'task': { tab: 'task_management', dept: null },
+  'task-manager': { tab: 'task_management', dept: null },
+  'task_management': { tab: 'task_management', dept: null },
+  'invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'invoice': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'ee_invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'jobcards': { tab: 'jobcards', dept: 'digital_print' },
+  'jobcard': { tab: 'jobcards', dept: 'digital_print' },
+  'fusing': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
+  'jobcards_fusing_log': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
+  'challans': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'challan': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'dispatch': { tab: 'inventory', dept: 'elite_online' },
+  'inventory': { tab: 'inventory', dept: 'elite_online' },
+  'stock-ledger': { tab: 'stock_ledger', dept: 'elite_online' },
+  'stock_ledger': { tab: 'stock_ledger', dept: 'elite_online' },
+  'ee_complaints': { tab: 'ee_complaints', dept: 'elite_edition' },
+  'reports': { tab: 'reports', dept: 'elite_online' },
+  'communication': { tab: 'communication', dept: null },
+  'workspace': { tab: 'workspace', dept: null }
+};
+
+export function parseHashRoute(hashStr = '') {
+  const clean = (hashStr || '').replace(/^#\/?/, '').trim();
+  if (!clean) return { path: '', query: {}, queryString: '' };
+  const [pathPart, queryPart] = clean.split('?');
+  const path = (pathPart || '').trim().toLowerCase();
+  const query = {};
+  if (queryPart) {
+    const params = new URLSearchParams(queryPart);
+    for (const [k, v] of params.entries()) {
+      query[k] = v;
+    }
+  }
+  return { path, query, queryString: queryPart ? `?${queryPart}` : '' };
+}
+
+export function resolveActiveRoute(hashStr = '') {
+  const { path, query, queryString } = parseHashRoute(hashStr);
+  const alias = ROUTE_ALIASES[path];
+  if (alias) {
+    return { tab: alias.tab, dept: alias.dept, query, queryString, path };
+  }
+  return { tab: path || null, dept: null, query, queryString, path };
+}
+
+export function getCanonicalHashForTab(tab, queryString = '') {
+  let alias = tab;
+  if (tab === 'task_management') alias = 'tasks';
+  else if (tab === 'ee_invoices') alias = 'invoices';
+  else if (tab === 'jobcards_fusing_log') alias = 'fusing';
+  else if (tab === 'jobcards_fabric') alias = 'challans';
+  else if (tab === 'stock_ledger') alias = 'stock-ledger';
+  return `#${alias}${queryString}`;
+}
+
 export default function App() {
   const getSavedNavState = () => {
     let savedTab = '';
     let savedDept = '';
     try {
       if (typeof window !== 'undefined' && window.location.hash) {
-        savedTab = window.location.hash.replace('#', '').trim();
+        const route = resolveActiveRoute(window.location.hash);
+        if (route.tab) {
+          savedTab = route.tab;
+          if (route.dept) savedDept = route.dept;
+        }
+        window.__ELITE_ROUTER_QUERY = route.query;
       }
       if (!savedTab && typeof localStorage !== 'undefined') {
-        savedTab = localStorage.getItem('elite_active_tab') || '';
+        const storedTab = localStorage.getItem('elite_active_tab') || '';
+        const route = resolveActiveRoute(storedTab);
+        savedTab = route.tab || storedTab;
       }
-      if (savedTab === 'tasks' || savedTab === 'task' || savedTab === 'task-manager') {
-        savedTab = 'task_management';
-      }
-      if (typeof localStorage !== 'undefined') {
+      if (typeof localStorage !== 'undefined' && !savedDept) {
         savedDept = localStorage.getItem('elite_active_dept') || localStorage.getItem('elite_active_department') || '';
       }
     } catch (e) {}
@@ -588,8 +651,10 @@ export default function App() {
   useEffect(() => {
     if (activeTab) {
       localStorage.setItem('elite_active_tab', activeTab);
-      const targetHash = activeTab === 'task_management' ? '#tasks' : `#${activeTab}`;
-      if (window.location.hash !== targetHash && !(activeTab === 'task_management' && (window.location.hash === '#tasks' || window.location.hash === '#task_management'))) {
+      const { queryString } = parseHashRoute(window.location.hash);
+      const targetHash = getCanonicalHashForTab(activeTab, queryString);
+      const currentRoute = resolveActiveRoute(window.location.hash);
+      if (currentRoute.tab !== activeTab) {
         window.history.replaceState(null, '', targetHash);
       }
     }
@@ -604,17 +669,19 @@ export default function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      let hash = window.location.hash.replace('#', '').trim();
-      if (hash === 'tasks' || hash === 'task' || hash === 'task-manager') {
-        hash = 'task_management';
-      }
-      if (hash && hash !== activeTab) {
-        setActiveTab(hash);
+      const route = resolveActiveRoute(window.location.hash);
+      window.__ELITE_ROUTER_QUERY = route.query;
+      window.dispatchEvent(new CustomEvent('elite-route-change', { detail: route }));
+      if (route.tab && route.tab !== activeTab) {
+        setActiveTab(route.tab);
+        if (route.dept && route.dept !== activeDepartment) {
+          setActiveDepartment(route.dept);
+        }
       }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [activeTab]);
+  }, [activeTab, activeDepartment]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);

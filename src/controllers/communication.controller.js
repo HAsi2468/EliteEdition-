@@ -384,11 +384,13 @@ const postGroupMessage = async (req, res) => {
   try {
     const { groupId } = req.params;
     let rawSenderId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.senderId || req.body.userId || req.query.userId);
+    let resolvedSenderName = req.user?.name || req.body.senderName || null;
 
     if (!rawSenderId) {
       const fallbackUser = await User.findOne({ role: 'admin' }) || await User.findOne();
       if (fallbackUser) {
         rawSenderId = fallbackUser._id;
+        if (!resolvedSenderName) resolvedSenderName = fallbackUser.name;
       } else {
         return res.status(400).json({ success: false, message: 'Sender ID is required' });
       }
@@ -480,6 +482,7 @@ const postGroupMessage = async (req, res) => {
     const newMessage = await ChatMessage.create({
       roomId: groupId,
       senderId: senderObjId,
+      senderName: resolvedSenderName,
       content: sanitizedContent || (pollMeta ? pollMeta.question : attachment ? `Attached ${attachment.fileName || 'file'}` : 'Message'),
       replyTo: replyTo || null,
       type: msgType,

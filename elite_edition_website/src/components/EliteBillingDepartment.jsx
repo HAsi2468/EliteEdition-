@@ -2628,14 +2628,13 @@ export default function EliteBillingDepartment({
 
     periodInvoices.forEach(inv => {
       const amountExclGst = getAmountWithoutGst(inv);
+      const grandTotal = Number(inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount != null ? inv.totalAmount : amountExclGst));
       const paid = Number(inv.paidAmount || 0);
-      const balance = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, amountExclGst - paid);
+      const balance = inv.balanceDue != null ? Number(inv.balanceDue) : Math.max(0, grandTotal - paid);
 
-      totalInvoiced += amountExclGst;
+      totalInvoiced += grandTotal;
       totalPaid += paid;
       totalBalanceDue += balance;
-
-      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
       const effectiveTds = inv.enableTds ? Number(inv.tdsAmount || 0) : 0;
       if (inv.paymentStatus === 'PAID' || (grandTotal - effectiveTds - paid) <= 0) {
         paidCount++;
@@ -2713,6 +2712,24 @@ export default function EliteBillingDepartment({
       setPdfDuplicateModal(null);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (previewImageModal) setPreviewImageModal(null);
+        else if (pdfDuplicateModal) setPdfDuplicateModal(null);
+        else if (viewInvoiceModal) setViewInvoiceModal(null);
+        else if (viewPurchaseModal) setViewPurchaseModal(null);
+        else if (paymentModalInvoice) setPaymentModalInvoice(null);
+        else if (isCreateOpen) setIsCreateOpen(false);
+        else if (isPurchaseModalOpen) setIsPurchaseModalOpen(false);
+        else if (isChallanModalOpen) setIsChallanModalOpen(false);
+        else if (bulkPayModalOpen) setBulkPayModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewImageModal, pdfDuplicateModal, viewInvoiceModal, viewPurchaseModal, paymentModalInvoice, isCreateOpen, isPurchaseModalOpen, isChallanModalOpen, bulkPayModalOpen]);
 
   // Filtered Customers & Items
   const filteredCustomers = useMemo(() => {
@@ -4096,7 +4113,7 @@ export default function EliteBillingDepartment({
                               {formatDateDDMMYYYY(inv.invoiceDate)}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(getAmountWithoutGst(inv))}
+                              {fmtINR(inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount != null ? inv.totalAmount : getAmountWithoutGst(inv)))}
                               {inv.enableTds && Number(inv.tdsAmount) > 0 && (
                                 <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600, marginTop: 2 }}>
                                   TDS: -₹ {Math.round(Number(inv.tdsAmount || 0)).toLocaleString('en-IN')} ({inv.tdsSection || '194C'})
@@ -4106,8 +4123,8 @@ export default function EliteBillingDepartment({
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {fmtINR(inv.paidAmount)}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: (inv.balanceDue != null ? inv.balanceDue : Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0))) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(inv.balanceDue != null ? inv.balanceDue : Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)))}
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: (inv.balanceDue != null ? inv.balanceDue : Math.max(0, (inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount || getAmountWithoutGst(inv))) - (inv.paidAmount || 0))) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(inv.balanceDue != null ? inv.balanceDue : Math.max(0, (inv.grandTotal != null ? inv.grandTotal : (inv.totalAmount || getAmountWithoutGst(inv))) - (inv.paidAmount || 0)))}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
                               <span style={{
@@ -6975,7 +6992,10 @@ export default function EliteBillingDepartment({
 
       {/* ── VIEW PURCHASE ENTRY DETAILS MODAL ────────────────────────── */}
       {viewPurchaseModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setViewPurchaseModal(null); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
+        >
           <div style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
             <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -7229,7 +7249,11 @@ export default function EliteBillingDepartment({
 
       {/* ── TAX INVOICE PREVIEW / VIEW MODAL ────────────────────────────────── */}
       {viewInvoiceModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => { if (e.target === e.currentTarget) setViewInvoiceModal(null); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
+        >
           <div style={{ width: '100%', maxWidth: '780px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
 
             {/* Modal Header */}
@@ -7398,23 +7422,31 @@ export default function EliteBillingDepartment({
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Subtotal:</span>
                   <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.subtotal)}</span>
                 </div>
-                {viewInvoiceModal.igstAmount > 0 ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b', fontWeight: 600 }}>IGST Tax (18%):</span>
-                    <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.igstAmount)}</span>
-                  </div>
-                ) : (
-                  <>
+                {(() => {
+                  const taxable = Number(viewInvoiceModal.subtotal || viewInvoiceModal.taxableAmount || 0);
+                  const totalTax = Number(viewInvoiceModal.totalTax || (viewInvoiceModal.cgstAmount || 0) + (viewInvoiceModal.sgstAmount || 0) + (viewInvoiceModal.igstAmount || 0));
+                  const declaredGstRate = viewInvoiceModal.items?.find(it => Number(it.gstRate) > 0)?.gstRate || (taxable > 0 && totalTax > 0 ? Number(((totalTax / taxable) * 100).toFixed(2)) : 5);
+                  const splitRate = (declaredGstRate / 2).toFixed(2).replace(/\.00$/, '').replace(/(\.[1-9])0$/, '$1');
+                  const fullRate = Number(declaredGstRate).toFixed(2).replace(/\.00$/, '').replace(/(\.[1-9])0$/, '$1');
+
+                  return viewInvoiceModal.igstAmount > 0 ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>CGST Tax (9%):</span>
-                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.cgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>IGST Tax ({fullRate}%):</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.igstAmount)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>SGST Tax (9%):</span>
-                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.sgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
-                    </div>
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>CGST Tax ({splitRate}%):</span>
+                        <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.cgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>SGST Tax ({splitRate}%):</span>
+                        <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.sgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Round Off Details Row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#7c3aed', fontWeight: 600 }}>

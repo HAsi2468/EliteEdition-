@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
+import { useFileUpload } from '../hooks/useFileUpload';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
 import { openPrintOptionsDialog } from '../utils/printService';
 import '../styles/taskManager.css';
@@ -189,11 +190,29 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [recurrenceFreq, setRecurrenceFreq] = useState('daily'); // 'daily' | 'weekly' | 'monthly'
 
   // Task Attachments (stored in Cloudflare R2)
+  const { uploadFile: uploadFileToR2 } = useFileUpload({ folder: 'tasks/attachments' });
   const [newAttachments, setNewAttachments] = useState([]); // [{ fileName, fileUrl, fileSize, fileType }]
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [drawerUploadingAttachment, setDrawerUploadingAttachment] = useState(false);
   const fileInputRef = useRef(null);
   const drawerFileInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showCreateModal) setShowCreateModal(false);
+        else if (showEditModal) setShowEditModal(false);
+        else if (showLogWorkModal) setShowLogWorkModal(false);
+        else if (showExportModal) setShowExportModal(false);
+        else if (selectedTask) setSelectedTask(null);
+        else if (showMobileViewMenu) setShowMobileViewMenu(false);
+        else if (showMobileScopeMenu) setShowMobileScopeMenu(false);
+        else if (showMobileFilterMenu) setShowMobileFilterMenu(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCreateModal, showEditModal, showLogWorkModal, showExportModal, selectedTask, showMobileViewMenu, showMobileScopeMenu, showMobileFilterMenu]);
 
   const formatFileSize = (bytes) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -548,15 +567,16 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setUploadingAttachment(true);
     try {
       for (const file of files) {
-        const uploadRes = await api.uploadTaskAttachment(file);
-        if (uploadRes && (uploadRes.url || uploadRes.fileUrl)) {
-          const fileUrl = uploadRes.url || uploadRes.fileUrl;
-          const fileName = file.name;
-          const fileSize = file.size;
-          const fileType = file.type || 'document';
+        const fileInfo = await uploadFileToR2(file, { folder: 'tasks/attachments' });
+        if (fileInfo && fileInfo.fileUrl) {
           setNewAttachments((prev) => [
             ...prev,
-            { fileName, fileUrl, fileSize, fileType }
+            {
+              fileName: fileInfo.fileName,
+              fileUrl: fileInfo.fileUrl,
+              fileSize: fileInfo.fileSize,
+              fileType: fileInfo.fileType
+            }
           ]);
         }
       }
@@ -581,18 +601,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setDrawerUploadingAttachment(true);
     try {
       for (const file of files) {
-        const uploadRes = await api.uploadTaskAttachment(file);
-        if (uploadRes && (uploadRes.url || uploadRes.fileUrl)) {
-          const fileUrl = uploadRes.url || uploadRes.fileUrl;
-          const fileName = file.name;
-          const fileSize = file.size;
-          const fileType = file.type || 'document';
-
+        const fileInfo = await uploadFileToR2(file, { folder: 'tasks/attachments' });
+        if (fileInfo && fileInfo.fileUrl) {
           const res = await api.addTaskAttachment(selectedTask._id, {
-            fileName,
-            fileUrl,
-            fileSize,
-            fileType,
+            fileName: fileInfo.fileName,
+            fileUrl: fileInfo.fileUrl,
+            fileSize: fileInfo.fileSize,
+            fileType: fileInfo.fileType,
             userId: myId,
             userName: myName
           });
@@ -604,7 +619,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         }
       }
     } catch (err) {
-      console.error('Failed to upload attachment to R2:', err);
+      console.error('Failed to upload drawer attachment:', err);
       alert('Failed to upload attachment to Cloudflare R2: ' + err.message);
     } finally {
       setDrawerUploadingAttachment(false);

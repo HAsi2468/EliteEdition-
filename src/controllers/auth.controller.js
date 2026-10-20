@@ -68,6 +68,7 @@ const register = catchAsync(async (req, res) => {
   const user = await userService.createUser(req);
   const tokens = await tokenService.generateAuthTokens({
     userId: user.id,
+    role: user.role
   });
   setAuthCookies(res, tokens);
   delete user.password;
@@ -78,6 +79,7 @@ const login = catchAsync(async (req, res) => {
   const user = await authService.loginUserWithEmailAndPassword(req);
   const tokens = await tokenService.generateAuthTokens({
     userId: user.id,
+    role: user.role
   });
   setAuthCookies(res, tokens);
   res.send({ user, tokens });

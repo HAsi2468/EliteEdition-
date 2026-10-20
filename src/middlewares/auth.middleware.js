@@ -45,33 +45,40 @@ const requireAuth = async (req, res, next) => {
       });
     }
 
-    let user = await User.findById(userId).select('_id companyId role isActive status name username email isMainAdmin isAdmin').lean();
+    const mongoose = require('mongoose');
+    let user = null;
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId).select('_id companyId role isActive status name username email isMainAdmin isAdmin').lean();
+    }
     let isClient = false;
 
     if (!user) {
       try {
         const clientModel = require('../db/models/client.model');
-        const client = await clientModel.findById(userId).lean();
-        if (client) {
-          user = {
-            ...client,
-            _id: client._id,
-            id: String(client._id),
-            role: 'Client',
-            isClient: true,
-            companyId: client.companyId || client.companyCode || null,
-            isActive: client.status !== 'Inactive'
-          };
-          isClient = true;
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          const client = await clientModel.findById(userId).lean();
+          if (client) {
+            user = {
+              ...client,
+              _id: client._id,
+              id: String(client._id),
+              role: 'Client',
+              isClient: true,
+              companyId: client.companyId || client.companyCode || null,
+              isActive: client.status !== 'Inactive'
+            };
+            isClient = true;
+          }
         }
       } catch (cErr) {}
     }
 
     if (!user && (decoded.role === 'qa-automation' || decoded.isBot === true)) {
       user = {
-        _id: userId,
+        _id: mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : new mongoose.Types.ObjectId('666666666666666666666666'),
         id: String(userId),
-        name: 'QA Automation Service',
+        name: decoded.name || 'QA Automation Service',
+        username: 'qa-bot',
         email: decoded.email || 'qa-bot@eliteedition.in',
         role: 'admin',
         isMainAdmin: true,

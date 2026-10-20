@@ -5,6 +5,7 @@ import { useSocket } from '../contexts/SocketContext';
 import TaskManagerPanel from './TaskManagerPanel';
 import JobCardPdfModal from './JobCardPdfModal';
 import ErrorBoundary from './common/ErrorBoundary';
+import { useFileUpload } from '../hooks/useFileUpload';
 import '../styles/communication.css';
 import {
   MessageSquare,
@@ -425,6 +426,38 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       })
       .catch(err => console.warn('Could not load staff users for chat task creation:', err));
   }, []);
+
+  // Universal File Upload Hook for R2
+  const { uploadFile: uploadChatFileToR2 } = useFileUpload();
+
+  // Escape Key Modal Dismissal
+  useEffect(() => {
+    const handleEscapeDismiss = (e) => {
+      if (e.key === 'Escape') {
+        if (showMobileActionMenu) setShowMobileActionMenu(false);
+        else if (showMobileHeaderMenu) setShowMobileHeaderMenu(false);
+        else if (showDesktopHeaderMenu) setShowDesktopHeaderMenu(false);
+        else if (showNewDmModal) setShowNewDmModal(false);
+        else if (showCreateGroupModal) setShowCreateGroupModal(false);
+        else if (showMembersModal) setShowMembersModal(false);
+        else if (showShareModal) setShowShareModal(false);
+        else if (showGalleryModal) setShowGalleryModal(false);
+        else if (showPollModal) setShowPollModal(false);
+        else if (showForwardModal) setShowForwardModal(false);
+        else if (showClearAllModal) setShowClearAllModal(false);
+        else if (showChatTaskModal) setShowChatTaskModal(false);
+        else if (showDialpad) setShowDialpad(false);
+        else if (selectedMedia) setSelectedMedia(null);
+      }
+    };
+    window.addEventListener('keydown', handleEscapeDismiss);
+    return () => window.removeEventListener('keydown', handleEscapeDismiss);
+  }, [
+    showMobileActionMenu, showMobileHeaderMenu, showDesktopHeaderMenu,
+    showNewDmModal, showCreateGroupModal, showMembersModal, showShareModal,
+    showGalleryModal, showPollModal, showForwardModal, showClearAllModal,
+    showChatTaskModal, showDialpad, selectedMedia
+  ]);
 
   // ─── Real-Time Voice & Video Calling Handlers (WebRTC) ───
   useEffect(() => {
@@ -2013,26 +2046,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     setUploadingFile(true);
     try {
-      let uploadFile = file;
-      if (isImage && !lowerName.endsWith('.svg')) {
-        try {
-          const imageCompression = (await import('browser-image-compression')).default;
-          uploadFile = await imageCompression(file, { maxSizeMB: 2, maxWidthOrHeight: 2560, useWebWorker: true });
-        } catch (err) {
-          uploadFile = file;
-        }
-      }
-
       const roomName = activeGroup?.name || 'General';
-      const res = await api.uploadChatAttachment(uploadFile, roomName);
-      if (res && res.fileUrl) {
-        const detectedType = isImage ? 'image' : isAudio ? 'audio' : isPdf ? 'pdf' : isSpreadsheet ? 'spreadsheet' : 'document';
+      const cleanRoom = String(roomName || 'General').trim().replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
+      const fileInfo = await uploadChatFileToR2(file, {
+        folder: `Chat/${cleanRoom}`,
+        useChatEndpoint: true
+      });
+
+      if (fileInfo && fileInfo.fileUrl) {
         setAttachedFile({
-          fileName: res.fileName || rawFileName,
-          fileType: detectedType,
-          fileUrl: res.fileUrl,
-          fileSize: res.fileSize || file.size,
-          mimeType: file.type || (isPdf ? 'application/pdf' : 'application/octet-stream')
+          fileName: fileInfo.fileName || rawFileName,
+          fileType: fileInfo.fileType,
+          fileUrl: fileInfo.fileUrl,
+          fileSize: fileInfo.fileSize || file.size,
+          mimeType: fileInfo.mimeType || (isPdf ? 'application/pdf' : 'application/octet-stream')
         });
       } else {
         alert('Failed to upload attachment.');
