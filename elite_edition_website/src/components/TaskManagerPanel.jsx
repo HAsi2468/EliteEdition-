@@ -197,22 +197,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const fileInputRef = useRef(null);
   const drawerFileInputRef = useRef(null);
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (showCreateModal) setShowCreateModal(false);
-        else if (showEditModal) setShowEditModal(false);
-        else if (showLogWorkModal) setShowLogWorkModal(false);
-        else if (showExportModal) setShowExportModal(false);
-        else if (selectedTask) setSelectedTask(null);
-        else if (showMobileViewMenu) setShowMobileViewMenu(false);
-        else if (showMobileScopeMenu) setShowMobileScopeMenu(false);
-        else if (showMobileFilterMenu) setShowMobileFilterMenu(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showCreateModal, showEditModal, showLogWorkModal, showExportModal, selectedTask, showMobileViewMenu, showMobileScopeMenu, showMobileFilterMenu]);
 
   const formatFileSize = (bytes) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -284,6 +268,24 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   // Active Timer Live Counter
   const [timerTick, setTimerTick] = useState(0);
+
+  // Keyboard shortcut listener for modal dismissals
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showCreateModal) setShowCreateModal(false);
+        else if (showEditModal) setShowEditModal(false);
+        else if (showLogWorkModal) setShowLogWorkModal(false);
+        else if (showExportModal) setShowExportModal(false);
+        else if (selectedTask) setSelectedTask(null);
+        else if (showMobileViewMenu) setShowMobileViewMenu(false);
+        else if (showMobileScopeMenu) setShowMobileScopeMenu(false);
+        else if (showMobileFilterMenu) setShowMobileFilterMenu(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCreateModal, showEditModal, showLogWorkModal, showExportModal, selectedTask, showMobileViewMenu, showMobileScopeMenu, showMobileFilterMenu]);
 
   const KANBAN_COLUMNS = [
     { id: 'Backlog', label: 'Backlog', color: '#64748b', bg: '#f1f5f9' },
