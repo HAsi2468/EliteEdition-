@@ -359,12 +359,69 @@ class WebPushService {
   }
 
   /**
-   * Sends push notification payload to multiple users in parallel
+   * Dispatches web push notification for task assignments and updates
+   * @param {Array<string>|object} recipientIdsOrTask
+   * @param {object} options
    */
-  async sendPushToUsers(userIds, payload, options = {}) {
-    if (!Array.isArray(userIds) || userIds.length === 0) return [];
-    const uniqueUserIds = Array.from(new Set(userIds.map(String).filter(Boolean)));
-    return Promise.allSettled(uniqueUserIds.map((uId) => this.sendPushToUser(uId, payload, options)));
+  async dispatchTaskNotification(recipientIdsOrTask, options = {}) {
+    try {
+      let recipientIds = [];
+      let taskData = options || {};
+      const actorId = options.actorId ? String(options.actorId) : '';
+
+      if (recipientIdsOrTask && typeof recipientIdsOrTask === 'object' && !Array.isArray(recipientIdsOrTask)) {
+        // Called as dispatchTaskNotification(task, { actorId })
+        const task = recipientIdsOrTask;
+        taskData = {
+          taskId: String(task._id || task.id || ''),
+          title: task.title,
+          priority: task.priority,
+          department: task.department,
+          dueDate: task.dueDate,
+          createdByName: options.createdByName || task.createdBy?.name || 'Admin',
+          projectRef: task.projectRef,
+          ...options
+        };
+        const assignees = task.assignees || [];
+        recipientIds = assignees
+          .map(a => String(typeof a === 'object' ? (a._id || a.id) : a))
+          .filter(id => id && id !== actorId);
+      } else {
+        // Called as dispatchTaskNotification(recipientIds, { taskId, title, ... })
+        const rawIds = Array.isArray(recipientIdsOrTask) ? recipientIdsOrTask : [recipientIdsOrTask];
+        recipientIds = rawIds
+          .map(a => String(typeof a === 'object' ? (a._id || a.id) : a))
+          .filter(id => id && id !== actorId);
+      }
+
+      if (recipientIds.length === 0) return [];
+
+      const notificationTitle = taskData.notificationTitle || `📋 Task Assigned: ${taskData.title || 'New Task'}`;
+      const notificationBody = taskData.message || `You were assigned "${taskData.title || 'a task'}" by ${taskData.createdByName || 'Admin'}${taskData.department ? ` (${taskData.department})` : ''}`;
+
+      const pushPayload = {
+        title: notificationTitle,
+        body: notificationBody,
+        icon: '/Logo.png',
+        badge: '/Logo.png',
+        tag: `task-${taskData.taskId || Date.now()}`,
+        renotify: true,
+        data: {
+          url: '/tasks',
+          taskId: String(taskData.taskId || ''),
+          type: 'task',
+        },
+        actions: [
+          { action: 'open', title: 'Open Tasks' },
+          { action: 'dismiss', title: 'Dismiss' }
+        ]
+      };
+
+      return await this.sendPushToUsers(recipientIds, pushPayload, { urgency: 'high' });
+    } catch (err) {
+      logger.warn(`[WebPush] dispatchTaskNotification error: ${err.message}`);
+      return [];
+    }
   }
 }
 

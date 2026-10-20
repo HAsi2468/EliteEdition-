@@ -318,7 +318,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     (effectiveUser?.role || '').toLowerCase() === 'master' ||
     (effectiveUser?.username || '').toLowerCase() === 'admin' ||
     (effectiveUser?.username || '').toLowerCase() === 'master' ||
-    (effectiveUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com'
+    effectiveUser?.isAdmin === true
   );
   const isUserAdmin = isAdmin || isMasterAdmin;
   const userAssignedName = (currentUser?.designerName || currentUser?.name || currentUser?.username || '').trim();

@@ -227,14 +227,17 @@ const getGroupMessages = async (req, res) => {
           path: 'replyTo',
           populate: { path: 'senderId', select: 'name username email' }
         })
-        .sort({ createdAt: -1 })
+        .sort({ roomSeq: -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean()
     ]);
 
-    // Return in chronological order
-    messages.reverse();
+    // Return in monotonic chronological order (roomSeq ascending, fallback createdAt)
+    messages.sort((a, b) => {
+      if (a.roomSeq && b.roomSeq) return a.roomSeq - b.roomSeq;
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    });
 
     res.json({
       success: true,
@@ -466,6 +469,14 @@ const postGroupMessage = async (req, res) => {
 
     const msgType = type || (attachment && attachment.fileType === 'audio' ? 'audio-voice' : 'text');
 
+    // Monotonic room sequence increment
+    const updatedRoom = await ChatRoom.findByIdAndUpdate(
+      groupId,
+      { $inc: { lastSeq: 1 }, updatedAt: new Date() },
+      { new: true }
+    );
+    const roomSeq = updatedRoom?.lastSeq || 1;
+
     const newMessage = await ChatMessage.create({
       roomId: groupId,
       senderId: senderObjId,
@@ -478,10 +489,11 @@ const postGroupMessage = async (req, res) => {
       pollMeta: pollMeta || undefined,
       activityMeta: activityMeta || undefined,
       recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
-      readBy: [senderObjId]
+      mentions: mentions.length > 0 ? mentions : undefined,
+      readBy: [senderObjId],
+      createdAt: new Date(),
+      roomSeq
     });
-
-    await ChatRoom.findByIdAndUpdate(groupId, { updatedAt: new Date() });
 
     const populatedMessage = await ChatMessage.findById(newMessage._id)
       .populate('senderId', 'name username email role')
@@ -506,6 +518,40 @@ const postGroupMessage = async (req, res) => {
       rawContent: content,
       priority: priority === 'urgent' ? 'urgent' : 'normal',
     });
+
+    // Targeted notification for mentioned users
+    if (mentions.length > 0 && io) {
+      const recipientMentionIds = mentions
+        .map(String)
+        .filter(uId => uId !== strSender);
+
+      recipientMentionIds.forEach(uId => {
+        io.to(`user_${uId}`).emit('notification:mention', {
+          messageId: newMessage._id,
+          roomId: groupId,
+          roomName: targetRoom?.name || 'Group Chat',
+          sender: populatedMessage.senderId,
+          content: sanitizedContent,
+          timestamp: newMessage.createdAt
+        });
+      });
+
+      if (recipientMentionIds.length > 0 && webPushService && typeof webPushService.sendPushToUsers === 'function') {
+        const senderName = populatedMessage.senderId?.name || populatedMessage.senderId?.username || 'Team Member';
+        webPushService.sendPushToUsers(recipientMentionIds, {
+          title: `💬 @mentioned by ${senderName} in ${targetRoom?.name || 'Chat'}`,
+          body: sanitizedContent ? (sanitizedContent.length > 80 ? sanitizedContent.slice(0, 80) + '...' : sanitizedContent) : 'You were mentioned in a message',
+          icon: '/Logo.png',
+          badge: '/Logo.png',
+          tag: `mention-${newMessage._id}`,
+          data: {
+            url: '/communication',
+            roomId: String(groupId),
+            type: 'mention'
+          }
+        }, { urgency: 'high' }).catch(err => console.warn('[postGroupMessage mention push] warning:', err.message));
+      }
+    }
 
     res.json({ success: true, data: populatedMessage });
   } catch (error) {
@@ -973,6 +1019,91 @@ const broadcastVersionUpdate = async (req, res) => {
   }
 };
 
+/**
+ * DELETE /v1/communication/messages/:messageId
+ * Soft delete a single chat message and purge attached storage assets
+ */
+const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user ? (req.user._id || req.user.id) : null;
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin =
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      Boolean(req.user?.isAdmin) ||
+      req.headers['x-is-admin'] === 'true';
+
+    const message = await ChatMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    const isSender = String(message.senderId) === String(userId);
+    const messageAgeHours = (Date.now() - new Date(message.createdAt).getTime()) / (1000 * 60 * 60);
+
+    if (!isMasterAdmin && (!isSender || messageAgeHours > 24)) {
+      return res.status(403).json({
+        success: false,
+        message: isSender
+          ? 'You can only delete messages within 24 hours of sending.'
+          : 'You do not have permission to delete this message.'
+      });
+    }
+
+    // Purge attached media asset from Cloudflare R2 if present
+    if (message.attachment && message.attachment.fileUrl) {
+      try {
+        const { deleteR2Object } = require('../utils/r2Storage');
+        const url = new URL(message.attachment.fileUrl);
+        const key = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+        if (key) {
+          await deleteR2Object(key);
+        }
+      } catch (r2Err) {
+        console.warn('[Communication] Error purging R2 media for deleted message:', r2Err.message);
+      }
+    }
+
+    // Soft delete the message in MongoDB
+    message.isDeleted = true;
+    message.deletedBy = userId;
+    message.deletedAt = new Date();
+    message.content = 'This message was deleted';
+    message.attachment = null;
+    await message.save();
+
+    // If this was the room's latest message, update room.lastMessage to previous non-deleted message
+    const room = await ChatRoom.findById(message.roomId);
+    if (room && room.lastMessage && String(room.lastMessage._id || room.lastMessage) === String(message._id)) {
+      const prevMsg = await ChatMessage.findOne({ roomId: message.roomId, isDeleted: { $ne: true } })
+        .sort({ roomSeq: -1, createdAt: -1 })
+        .populate('senderId', 'name username');
+      room.lastMessage = prevMsg || null;
+      await room.save();
+    }
+
+    // Real-time broadcast to room participants
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    if (io) {
+      io.to(String(message.roomId)).emit('message-deleted', {
+        messageId: message._id,
+        roomId: message.roomId
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Message deleted successfully',
+      data: { messageId: message._id, roomId: message.roomId }
+    });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete message', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -988,6 +1119,7 @@ module.exports = {
   createOrGetDirectRoom,
   createGroup,
   deleteGroup,
+  deleteMessage,
   forceReloadAllUsers,
   clearAllData,
   broadcastVersionUpdate,

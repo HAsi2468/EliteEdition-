@@ -13,6 +13,7 @@ const getTasks = async (req, res) => {
       priority,
       department,
       assignee,
+      createdBy,
       projectRef,
       lotNo,
       search,
@@ -39,8 +40,11 @@ const getTasks = async (req, res) => {
     if (lotNo) {
       query.lotNo = { $regex: lotNo, $options: 'i' };
     }
-    if (assignee && mongoose.Types.ObjectId.isValid(assignee)) {
-      query.assignees = new mongoose.Types.ObjectId(assignee);
+    if (assignee && assignee !== 'all') {
+      query.assignees = mongoose.Types.ObjectId.isValid(assignee) ? new mongoose.Types.ObjectId(assignee) : assignee;
+    }
+    if (createdBy && createdBy !== 'all') {
+      query.createdBy = mongoose.Types.ObjectId.isValid(createdBy) ? new mongoose.Types.ObjectId(createdBy) : createdBy;
     }
 
     const andConditions = [];
@@ -67,8 +71,7 @@ const getTasks = async (req, res) => {
       Boolean(req.user?.isMainAdmin) ||
       Boolean(req.user?.isAdmin) ||
       req.headers['x-is-admin'] === 'true' ||
-      (req.user?.username || req.headers['x-user-name'] || '').toLowerCase() === 'admin' ||
-      (req.user?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com';
+      (req.user?.username || req.headers['x-user-name'] || '').toLowerCase() === 'admin';
 
     const currentUserId = req.user?._id || req.headers['x-user-id'] || req.query.userId;
 
@@ -99,8 +102,8 @@ const getTasks = async (req, res) => {
 
     const total = await Task.countDocuments(query);
     const tasks = await Task.find(query)
-      .populate('assignees', 'name email role department')
-      .populate('createdBy', 'name email role')
+      .populate('assignees', 'name email role department avatar')
+      .populate('createdBy', 'name email role avatar')
       .populate('dependencies', 'title status priority')
       .sort(sort)
       .skip(skip)
@@ -246,18 +249,21 @@ const createTask = async (req, res) => {
       uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
     })).filter(att => !!att.fileUrl) : [];
 
-    // Prevent rapid double-click duplicate task creation (within 10 seconds)
-    const recentDuplicate = await Task.findOne({
+    // Prevent rapid double-click duplicate task creation (within 60 seconds)
+    const duplicateQuery = {
       title: title.trim(),
       department,
-      projectRef: projectRef.trim(),
-      clientName: clientName.trim(),
-      createdAt: { $gte: new Date(Date.now() - 10000) }
-    }).populate('assignees', 'name email role department')
-      .populate('createdBy', 'name email role')
+      createdAt: { $gte: new Date(Date.now() - 60000) }
+    };
+    if (creatorId) duplicateQuery.createdBy = creatorId;
+
+    const recentDuplicate = await Task.findOne(duplicateQuery)
+      .populate('assignees', 'name email role department avatar')
+      .populate('createdBy', 'name email role avatar')
       .populate('attachments.uploadedBy', 'name email');
 
     if (recentDuplicate) {
+      console.warn(`[TaskController] Duplicate task suppressed within 60s debounce: "${title.trim()}"`);
       return res.status(200).json({ success: true, data: recentDuplicate, isDuplicate: true });
     }
 
@@ -283,50 +289,58 @@ const createTask = async (req, res) => {
     });
 
     const populated = await Task.findById(task._id)
-      .populate('assignees', 'name email role department')
-      .populate('createdBy', 'name email role')
+      .populate('assignees', 'name email role department avatar')
+      .populate('createdBy', 'name email role avatar')
       .populate('attachments.uploadedBy', 'name email');
 
-    // 1. Dispatch Web Push notification to all assigned users (excluding creator)
-    const creatorIdStr = creatorId ? String(creatorId) : '';
-    const recipientAssigneeIds = (finalAssignees || [])
-      .map(a => String(typeof a === 'object' ? (a._id || a.id) : a))
-      .filter(id => id && id !== creatorIdStr);
-
-    if (recipientAssigneeIds.length > 0) {
-      webPushService.dispatchTaskNotification(recipientAssigneeIds, {
-        taskId: String(task._id),
-        title: task.title,
-        priority: task.priority,
-        department: task.department,
-        dueDate: task.dueDate,
-        createdByName: createdByName || (req.user ? (req.user.name || req.user.username) : 'Admin'),
-        projectRef: task.projectRef
-      }).catch(err => console.error('[TaskController] Push notification dispatch failed on createTask:', err));
-    }
-
-    // 2. Real-time Socket.IO Alert & Board Sync
-    const io = req.app.get('socketio');
-    if (io) {
-      recipientAssigneeIds.forEach(uId => {
-        io.to(`user_${uId}`).emit('task-assigned', {
-          taskId: String(task._id),
-          task: populated,
-          title: task.title,
-          priority: task.priority,
-          department: task.department,
-          dueDate: task.dueDate,
-          createdByName: createdByName || (req.user ? (req.user.name || req.user.username) : 'Admin'),
-          projectRef: task.projectRef,
-          message: `📋 New Task Assigned: "${task.title}"`
-        });
-      });
-
-      // Broadcast to all active users so Kanban/List boards update instantly
-      io.emit('task-created', populated);
-    }
-
+    // Respond IMMEDIATELY with HTTP 201 Created to completely prevent frontend 500 timeouts
     res.status(201).json({ success: true, data: populated });
+
+    // Asynchronously dispatch Web Push & Socket.io in background without blocking response
+    setImmediate(async () => {
+      try {
+        const creatorIdStr = creatorId ? String(creatorId) : '';
+        const recipientAssigneeIds = (finalAssignees || [])
+          .map(a => String(typeof a === 'object' ? (a._id || a.id) : a))
+          .filter(id => id && id !== creatorIdStr);
+
+        // 1. Dispatch Web Push notification
+        if (recipientAssigneeIds.length > 0 && webPushService && typeof webPushService.dispatchTaskNotification === 'function') {
+          webPushService.dispatchTaskNotification(recipientAssigneeIds, {
+            taskId: String(task._id),
+            title: task.title,
+            priority: task.priority,
+            department: task.department,
+            dueDate: task.dueDate,
+            createdByName: createdByName || (req.user ? (req.user.name || req.user.username) : 'Admin'),
+            projectRef: task.projectRef
+          }).catch(err => console.warn('[TaskController] Push notification dispatch notice:', err.message));
+        }
+
+        // 2. Real-time Socket.IO Alert & Board Sync
+        const io = req.app.get('socketio');
+        if (io) {
+          recipientAssigneeIds.forEach(uId => {
+            io.to(`user_${uId}`).emit('task-assigned', {
+              taskId: String(task._id),
+              task: populated,
+              title: task.title,
+              priority: task.priority,
+              department: task.department,
+              dueDate: task.dueDate,
+              createdByName: createdByName || (req.user ? (req.user.name || req.user.username) : 'Admin'),
+              projectRef: task.projectRef,
+              message: `📋 New Task Assigned: "${task.title}"`
+            });
+          });
+
+          // Broadcast to all active users so Kanban/List boards update instantly
+          io.emit('task-created', populated);
+        }
+      } catch (bgErr) {
+        console.warn('[TaskController] Background task notification error (handled):', bgErr.message);
+      }
+    });
   } catch (error) {
     console.error('Error creating task:', error);
     res.status(500).json({ success: false, message: 'Failed to create task', error: error.message });
@@ -432,8 +446,8 @@ const updateTask = async (req, res) => {
     await task.save();
 
     const updatedTask = await Task.findById(id)
-      .populate('assignees', 'name email role department')
-      .populate('createdBy', 'name email role')
+      .populate('assignees', 'name email role department avatar')
+      .populate('createdBy', 'name email role avatar')
       .populate('dependencies', 'title status priority')
       .populate('attachments.uploadedBy', 'name email');
 
@@ -442,7 +456,7 @@ const updateTask = async (req, res) => {
     const userIdStr = userId ? String(userId) : '';
     const newlyAddedAssignees = newAssigneeIds.filter(aId => aId && !oldAssigneeIds.includes(aId) && aId !== userIdStr);
 
-    if (newlyAddedAssignees.length > 0) {
+    if (newlyAddedAssignees.length > 0 && webPushService && typeof webPushService.dispatchTaskNotification === 'function') {
       webPushService.dispatchTaskNotification(newlyAddedAssignees, {
         taskId: String(id),
         title: updatedTask.title,
@@ -451,7 +465,7 @@ const updateTask = async (req, res) => {
         dueDate: updatedTask.dueDate,
         createdByName: userName,
         projectRef: updatedTask.projectRef
-      }).catch(err => console.error('[TaskController] Push notification dispatch failed on updateTask:', err));
+      }).catch(err => console.warn('[TaskController] Push notification dispatch notice on updateTask:', err.message));
     }
 
     // Real-time socket broadcast

@@ -145,7 +145,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
       email: u.email || '',
       password: '',
       role: u.role || 'user',
-      isMainAdmin: Boolean(u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com'),
+      isMainAdmin: Boolean(u.isMainAdmin || u.isAdmin || u.role === 'admin'),
       permissions: u.permissions || []
     });
     setShowUserModal(true);
@@ -493,11 +493,11 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                             borderRadius: '999px',
                             fontSize: '0.7rem',
                             fontWeight: 800,
-                            background: u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '#ef444420' : u.role === 'admin' ? '#3b82f620' : '#10b98120',
-                            color: u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '#f87171' : u.role === 'admin' ? '#60a5fa' : '#34d399',
-                            border: `1px solid ${u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '#ef444450' : u.role === 'admin' ? '#3b82f650' : '#10b98150'}`
+                            background: u.isMainAdmin || u.isAdmin ? '#ef444420' : u.role === 'admin' ? '#3b82f620' : '#10b98120',
+                            color: u.isMainAdmin || u.isAdmin ? '#f87171' : u.role === 'admin' ? '#60a5fa' : '#34d399',
+                            border: `1px solid ${u.isMainAdmin || u.isAdmin ? '#ef444450' : u.role === 'admin' ? '#3b82f650' : '#10b98150'}`
                           }}>
-                            {u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '👑 MAIN ADMIN' : u.role === 'admin' ? '🛡️ COMPANY ADMIN' : '👤 STANDARD STAFF'}
+                            {u.isMainAdmin || u.isAdmin ? '👑 MAIN ADMIN' : u.role === 'admin' ? '🛡️ COMPANY ADMIN' : '👤 STANDARD STAFF'}
                           </span>
                         </td>
                         <td style={{ padding: '0.75rem 0.65rem' }}>

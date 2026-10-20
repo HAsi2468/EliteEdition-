@@ -24,6 +24,7 @@ router.post('/activity', communicationController.postActivityEvent);
 router.post('/messages/:messageId/acknowledge', communicationController.acknowledgeMessage);
 router.post('/messages/:messageId/poll-vote', communicationController.votePollMessage);
 router.post('/messages/:messageId/forward', communicationController.forwardMessage);
+router.delete('/messages/:messageId', communicationController.deleteMessage);
 router.get('/users', communicationController.getUsersForDM);
 router.post('/direct', communicationController.createOrGetDirectRoom);
 

@@ -649,10 +649,11 @@ export default function App() {
 
   const isSuperOrAdmin = Boolean(
     currentUser?.role === 'admin' || 
+    currentUser?.role === 'super_admin' || 
     currentUser?.role === 'main_admin' || 
     currentUser?.isMainAdmin || 
-    currentUser?.isAdmin === true || 
-    currentUser?.email === 'harshitsidapara2468@gmail.com'
+    currentUser?.isAdmin === true ||
+    (currentUser?.username || '').toLowerCase() === 'admin'
   );
 
   const isCompanyAllowed = (companyNameOrId) => {
@@ -2299,11 +2300,11 @@ export default function App() {
                       alignItems: 'center',
                       gap: '3px'
                     }}>
-                      {(currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') && <span>👑</span>}
+                      {(currentUser.isMainAdmin || currentUser.role === 'admin' || currentUser.isAdmin) && <span>👑</span>}
                       {currentUser.name}
                     </span>
                     <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                      {(currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') ? 'Main Admin' : (currentUser.role || 'user')}
+                      {(currentUser.isMainAdmin || currentUser.role === 'admin' || currentUser.isAdmin) ? 'Main Admin' : (currentUser.role || 'user')}
                     </span>
                   </div>
                   <button

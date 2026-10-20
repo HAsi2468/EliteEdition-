@@ -571,12 +571,30 @@ export const api = {
     });
   },
 
-  // Products Catalog
-  async getProductsCatalog() {
-    return request('/products/list?limit=10000');
+  // Products Catalog Cache
+  _productsCatalogCache: null,
+  _productsCatalogCacheTime: 0,
+
+  async getProductsCatalog(params = {}) {
+    const { limit = 1000, search, forceRefresh = false } = (typeof params === 'object' && params !== null) ? params : {};
+    const now = Date.now();
+    if (!forceRefresh && !search && this._productsCatalogCache && (now - this._productsCatalogCacheTime < 60000)) {
+      return this._productsCatalogCache;
+    }
+    const query = new URLSearchParams();
+    query.set('limit', limit);
+    if (search) query.set('search', search);
+
+    const result = await request(`/products/list?${query.toString()}`);
+    if (!search && result) {
+      this._productsCatalogCache = result;
+      this._productsCatalogCacheTime = now;
+    }
+    return result;
   },
 
   async createProductCatalog(data) {
+    this._productsCatalogCache = null;
     return request('/products', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -584,6 +602,7 @@ export const api = {
   },
 
   async updateProductCatalog(id, data) {
+    this._productsCatalogCache = null;
     return request(`/products/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -591,6 +610,7 @@ export const api = {
   },
 
   async deleteProductCatalog(id) {
+    this._productsCatalogCache = null;
     return request(`/products/${id}`, {
       method: 'DELETE',
     });
@@ -2580,6 +2600,12 @@ export const api = {
     return request(`/communication/messages/${messageId}/forward`, {
       method: 'POST',
       body: JSON.stringify({ targetRoomId }),
+    });
+  },
+
+  async deleteCommunicationMessage(messageId) {
+    return request(`/communication/messages/${messageId}`, {
+      method: 'DELETE',
     });
   },
 

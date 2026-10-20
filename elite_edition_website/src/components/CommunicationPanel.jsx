@@ -4,6 +4,7 @@ import { api, getBaseUrl } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import TaskManagerPanel from './TaskManagerPanel';
 import JobCardPdfModal from './JobCardPdfModal';
+import ErrorBoundary from './common/ErrorBoundary';
 import '../styles/communication.css';
 import {
   MessageSquare,
@@ -390,6 +391,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   });
   const [staffUsers, setStaffUsers] = useState([]);
   const [isCreatingChatTask, setIsCreatingChatTask] = useState(false);
+
+  // Group Chat @mention State
+  const [mentionQuery, setMentionQuery] = useState(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionedUserIds, setMentionedUserIds] = useState([]);
+  const chatTextareaRef = useRef(null);
+
+  const getTomorrowLocalDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
     api.getUsers({ limit: 100 })
@@ -1018,9 +1034,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   }, [activeCall?.type, activeCall?.isVideoOff, activeCall?.isScreenSharing]);
 
   const handleOpenTaskModalFromChat = () => {
-    const today = new Date();
-    today.setDate(today.getDate() + 1);
-    const tomorrowStr = today.toISOString().split('T')[0];
+    const tomorrowStr = getTomorrowLocalDate();
 
     let defaultAssignees = [];
     if (activeGroup?.type === 'direct' && Array.isArray(activeGroup.members)) {
@@ -1047,9 +1061,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   const handleOpenTaskModalFromMsg = (msg) => {
-    const today = new Date();
-    today.setDate(today.getDate() + 1);
-    const tomorrowStr = today.toISOString().split('T')[0];
+    const tomorrowStr = getTomorrowLocalDate();
 
     const senderName = typeof msg.senderId === 'object' ? (msg.senderId?.name || msg.senderId?.username) : (msg.senderName || 'Staff Member');
     const text = msg.content || msg.text || '';
@@ -1141,6 +1153,29 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       alert('Failed to create task: ' + err.message);
     } finally {
       setIsCreatingChatTask(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm('Are you sure you want to delete this message? This action cannot be undone.')) return;
+    try {
+      const res = await api.deleteCommunicationMessage(messageId);
+      if (res.success) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m._id) === String(messageId)
+              ? { ...m, content: 'This message was deleted', isDeleted: true, attachment: null }
+              : m
+          )
+        );
+        if (socket) {
+          socket.emit('delete-message', { messageId, roomId: activeGroup?._id });
+        }
+      } else {
+        alert(res.message || 'Failed to delete message');
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to delete message');
     }
   };
 
@@ -1574,6 +1609,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     };
     window.addEventListener('elite-answer-call', handleGlobalAnswer);
     return () => window.removeEventListener('elite-answer-call', handleGlobalAnswer);
+  }, []);
+
+  // Listen for background sync messages on reconnection
+  useEffect(() => {
+    const handleSyncMessage = (e) => {
+      if (e.detail) {
+        const msg = e.detail;
+        const currentActiveId = activeGroupIdRef.current;
+        if (currentActiveId && String(msg.roomId) === String(currentActiveId)) {
+          setMessages((prev) => {
+            const exists = prev.some((m) => String(m._id) === String(msg._id));
+            const updated = exists
+              ? prev.map((m) => (String(m._id) === String(msg._id) ? { ...m, ...msg } : m))
+              : [...prev, msg];
+            return updated.sort((a, b) => {
+              if (a.roomSeq != null && b.roomSeq != null && a.roomSeq !== b.roomSeq) {
+                return a.roomSeq - b.roomSeq;
+              }
+              return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+            });
+          });
+        }
+        setGroups((prevGroups) =>
+          prevGroups.map((g) => {
+            if (String(g._id) === String(msg.roomId)) {
+              return {
+                ...g,
+                lastMessage: msg,
+                updatedAt: msg.createdAt || g.updatedAt
+              };
+            }
+            return g;
+          })
+        );
+      }
+    };
+    window.addEventListener('elite-chat-sync-message', handleSyncMessage);
+    return () => window.removeEventListener('elite-chat-sync-message', handleSyncMessage);
   }, []);
 
   // Join socket room when active group changes & fetch messages with in-memory caching
@@ -2541,11 +2614,71 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
+  const mentionCandidates = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const myId = String(currentUser?._id || currentUser?.id || '');
+
+    let usersToSearch = allUsers || [];
+    if (activeGroup?.type === 'group' && Array.isArray(activeGroup.members) && activeGroup.members.length > 0) {
+      const memberIdSet = new Set(
+        activeGroup.members.map((m) => String(typeof m === 'object' ? (m._id || m.id) : m))
+      );
+      const groupUsers = allUsers.filter((u) => memberIdSet.has(String(u._id || u.id)));
+      if (groupUsers.length > 0) usersToSearch = groupUsers;
+    }
+
+    return usersToSearch
+      .filter((u) => String(u._id || u.id) !== myId)
+      .filter((u) => {
+        const name = (u.name || '').toLowerCase();
+        const username = (u.username || '').toLowerCase();
+        return name.includes(mentionQuery) || username.includes(mentionQuery);
+      })
+      .slice(0, 6);
+  }, [mentionQuery, allUsers, activeGroup, currentUser]);
+
+  const handleSelectMention = (user) => {
+    const uName = user.name || user.username || 'User';
+    const uId = String(user._id || user.id);
+    const textarea = chatTextareaRef.current;
+    const cursorPos = textarea?.selectionStart ?? inputMessage.length;
+
+    const textBeforeCursor = inputMessage.slice(0, cursorPos);
+    const textAfterCursor = inputMessage.slice(cursorPos);
+    const replacedBefore = textBeforeCursor.replace(/(?:^|\s)@([a-zA-Z0-9._-]*)$/, (match) => {
+      const leadingSpace = match.startsWith(' ') ? ' ' : '';
+      return `${leadingSpace}@${uName} `;
+    });
+
+    const newMsg = replacedBefore + textAfterCursor;
+    setInputMessage(newMsg);
+    setMentionedUserIds((prev) => Array.from(new Set([...prev, uId])));
+    setMentionQuery(null);
+
+    setTimeout(() => {
+      if (textarea) {
+        textarea.focus();
+        const newPos = replacedBefore.length;
+        textarea.setSelectionRange(newPos, newPos);
+      }
+    }, 50);
+  };
+
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInputMessage(val);
     if (activeGroup?._id) {
       setRoomDrafts((prev) => ({ ...prev, [activeGroup._id]: val }));
+    }
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const atMatch = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9._-]*)$/);
+    if (atMatch) {
+      setMentionQuery(atMatch[1].toLowerCase());
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
     }
 
     if (activeGroup?._id && socket) {
@@ -2723,6 +2856,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const messageText = inputMessage.trim() || (attachedFile ? `Attached ${attachedFile.fileName}` : '');
 
+    const finalMentionedUserIds = Array.from(
+      new Set([
+        ...mentionedUserIds,
+        ...(allUsers || [])
+          .filter((u) => {
+            const name = u.name || u.username;
+            return name && messageText.includes(`@${name}`);
+          })
+          .map((u) => String(u._id || u.id)),
+      ])
+    );
+
     const messagePayload = {
       roomId: activeGroup._id,
       senderId,
@@ -2730,6 +2875,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       priority: isUrgent ? 'urgent' : 'normal',
       replyTo: replyToMessage ? replyToMessage._id : undefined,
       attachment: attachedFile || undefined,
+      mentionedUserIds: finalMentionedUserIds.length > 0 ? finalMentionedUserIds : undefined,
     };
 
     const tempId = 'temp_' + Date.now();
@@ -2760,6 +2906,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setAttachedFile(null);
     setReplyToMessage(null);
     setIsUrgent(false);
+    setMentionQuery(null);
+    setMentionedUserIds([]);
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     if (isTypingRef.current && socket && activeGroup?._id) {
@@ -3052,6 +3200,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
+  const formatMessageTime = formatTime;
+
   const formatDateLabel = (dtStr) => {
     if (!dtStr) return '';
     try {
@@ -3129,14 +3279,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const renderContentWithMentions = (text) => {
     if (!text) return null;
-    const recordRegex = /@(JC|DES|INV)-([a-zA-Z0-9_-]+)/gi;
-    const parts = text.split(recordRegex);
-    if (parts.length === 1) return text;
-
+    const combinedRegex = /(@(?:JC|DES|INV)-[a-zA-Z0-9_-]+)|(@[a-zA-Z0-9._-]+)/gi;
     const elements = [];
-    const matches = [...text.matchAll(recordRegex)];
-
     let lastIndex = 0;
+    const matches = [...text.matchAll(combinedRegex)];
+
+    if (matches.length === 0) return text;
+
     matches.forEach((m, idx) => {
       const matchText = m[0];
       const matchIndex = m.index;
@@ -3144,36 +3293,57 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         elements.push(text.substring(lastIndex, matchIndex));
       }
 
-      const prefix = m[1].toUpperCase();
-
-      elements.push(
-        <button
-          key={idx}
-          onClick={() =>
-            handleRecordClick({
-              module: prefix === 'JC' ? 'Job Card' : prefix === 'DES' ? 'Design' : 'Invoice',
-              permissionScope: prefix === 'JC' ? 'jobcards' : prefix === 'DES' ? 'catalogue' : 'billing',
-            })
-          }
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '3px',
-            background: 'rgba(37,99,235,0.14)',
-            color: '#1d4ed8',
-            border: '1px solid #bfdbfe',
-            borderRadius: '4px',
-            padding: '1px 6px',
-            fontSize: '0.78rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            margin: '0 2px',
-          }}
-        >
-          <ExternalLink size={11} />
-          <span>{matchText}</span>
-        </button>
-      );
+      if (m[1]) {
+        // Record mention (@JC-..., @DES-..., @INV-...)
+        const prefix = matchText.substring(1, matchText.indexOf('-')).toUpperCase();
+        elements.push(
+          <button
+            key={`rec_${idx}`}
+            onClick={() =>
+              handleRecordClick({
+                module: prefix === 'JC' ? 'Job Card' : prefix === 'DES' ? 'Design' : 'Invoice',
+                permissionScope: prefix === 'JC' ? 'jobcards' : prefix === 'DES' ? 'catalogue' : 'billing',
+              })
+            }
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              background: 'rgba(37,99,235,0.14)',
+              color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              borderRadius: '4px',
+              padding: '1px 6px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              margin: '0 2px',
+            }}
+          >
+            <ExternalLink size={11} />
+            <span>{matchText}</span>
+          </button>
+        );
+      } else {
+        // User mention (@Name)
+        elements.push(
+          <span
+            key={`usr_${idx}`}
+            style={{
+              display: 'inline-block',
+              background: 'rgba(59, 130, 246, 0.16)',
+              color: '#1d4ed8',
+              fontWeight: 700,
+              borderRadius: '4px',
+              padding: '0 5px',
+              margin: '0 1px',
+              fontSize: '0.86rem',
+            }}
+          >
+            {matchText}
+          </span>
+        );
+      }
 
       lastIndex = matchIndex + matchText.length;
     });
@@ -3933,6 +4103,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 )}
 
+                <ErrorBoundary fallback={<div style={{ padding: '1rem', color: '#dc2626', textAlign: 'center' }}>Unable to display messages. Please refresh.</div>}>
                 {(() => {
                   let filteredList = showPinnedOnly ? messages.filter((m) => m.isPinned) : messages;
                   if (msgFilter === 'human') filteredList = filteredList.filter((m) => m.msgType !== 'system_activity');
@@ -4062,6 +4233,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     const isPollMsg = msg.type === 'poll' || Boolean(msg.pollMeta && msg.pollMeta.question);
                     const isCallLog = msg.type === 'call-log' || Boolean(msg.activityMeta && msg.activityMeta.callType);
 
+                    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.isAdmin;
+                    const senderIdStr = String(typeof msg.senderId === 'object' ? (msg.senderId?._id || msg.senderId?.id) : (msg.senderId || ''));
+                    const myIdStr = String(currentUser?._id || currentUser?.id || '');
+                    const isSender = senderIdStr === myIdStr;
+                    const isWithin24h = (Date.now() - new Date(msg.createdAt || Date.now()).getTime()) < 24 * 60 * 60 * 1000;
+                    const canDelete = !msg.isDeleted && (isAdmin || (isSender && isWithin24h));
+
                     return (
                       <React.Fragment key={msg._id}>
                         {showDateHeader && (
@@ -4165,37 +4343,39 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               }}
                             >
                             {/* WhatsApp Down-Chevron Trigger */}
-                            <button
-                              type="button"
-                              className="wa-bubble-trigger"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMsgMenuId(activeMsgMenuId === msg._id ? null : msg._id);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                top: '3px',
-                                right: '3px',
-                                background: isMe ? 'rgba(255, 255, 255, 0.25)' : 'rgba(241, 245, 249, 0.95)',
-                                border: 'none',
-                                borderRadius: '50%',
-                                width: '18px',
-                                height: '18px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                color: isMe ? '#ffffff' : '#64748b',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
-                                zIndex: 4
-                              }}
-                              title="Message options"
-                            >
-                              <ChevronDown size={12} />
-                            </button>
+                            {!msg.isDeleted && (
+                              <button
+                                type="button"
+                                className="wa-bubble-trigger"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMsgMenuId(activeMsgMenuId === msg._id ? null : msg._id);
+                                }}
+                                style={{
+                                  position: 'absolute',
+                                  top: '3px',
+                                  right: '3px',
+                                  background: isMe ? 'rgba(255, 255, 255, 0.25)' : 'rgba(241, 245, 249, 0.95)',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  width: '18px',
+                                  height: '18px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  color: isMe ? '#ffffff' : '#64748b',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                                  zIndex: 4
+                                }}
+                                title="Message options"
+                              >
+                                <ChevronDown size={12} />
+                              </button>
+                            )}
 
                             {/* 3-Second Hold / Options Popup Menu */}
-                            {activeMsgMenuId === msg._id && (
+                            {!msg.isDeleted && activeMsgMenuId === msg._id && (
                               <>
                                 <div
                                   style={{ position: 'fixed', inset: 0, zIndex: 49 }}
@@ -4290,16 +4470,49 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       <span>Copy Text</span>
                                     </button>
                                   )}
+
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMsgMenuId(null);
+                                        handleDeleteMessage(msg._id);
+                                      }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', borderTop: '1px solid #fee2e2', fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
+                                    >
+                                      <Trash2 size={14} color="#dc2626" />
+                                      <span>Delete Message</span>
+                                    </button>
+                                  )}
                                 </div>
                               </>
                             )}
 
-                            {/* Sender Name (only shown for others in group chats) */}
-                            {!isMe && activeGroup?.type !== 'direct' && (
-                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', marginBottom: '2px', lineHeight: 1.2 }}>
-                                {msg.senderId?.name || msg.senderName || 'Staff Member'}
+                            {/* Bubble Content */}
+                            {msg.isDeleted ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  fontStyle: 'italic',
+                                  color: isMe ? 'rgba(255,255,255,0.8)' : '#64748b',
+                                  fontSize: '0.84rem',
+                                  padding: '2px 0',
+                                  userSelect: 'none'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.9rem' }}>🚫</span>
+                                <span>This message was deleted</span>
                               </div>
-                            )}
+                            ) : (
+                              <>
+                                {/* Sender Name (only shown for others in group chats) */}
+                                {!isMe && activeGroup?.type !== 'direct' && (
+                                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', marginBottom: '2px', lineHeight: 1.2 }}>
+                                    {msg.senderId?.name || msg.senderName || 'Staff Member'}
+                                  </div>
+                                )}
 
                             {/* Urgent SOS Alert Badge */}
                             {msg.priority === 'urgent' && (
@@ -4452,7 +4665,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       {msg.content || `Missed ${msg.activityMeta?.callType || 'voice'} call`}
                                     </div>
                                     <div style={{ fontSize: '0.68rem', color: isMe ? 'rgba(255,255,255,0.85)' : '#be123c' }}>
-                                      {formatMessageTime(msg.createdAt)}
+                                      {formatTime(msg.createdAt)}
                                     </div>
                                   </div>
                                 </div>
@@ -4706,6 +4919,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <div style={{ fontSize: '0.88rem', lineHeight: '1.42', color: 'inherit' }}>
                               {!isPollMsg && renderContentWithMentions(msg.content)}
                             </div>
+                              </>
+                            )}
                           </div>
 
                           {/* Phoenix Timestamp & Status below bubble */}
@@ -4756,7 +4971,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           </div>
 
                           {/* Existing Reaction Badges (WhatsApp Style Overlapping Pill) */}
-                          {msg.reactions && (
+                          {!msg.isDeleted && msg.reactions && (
                             <div style={{
                               display: 'flex',
                               flexWrap: 'wrap',
@@ -4802,6 +5017,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     );
                   });
                 })()}
+                </ErrorBoundary>
                 <div ref={chatBottomRef} />
               </div>
 
@@ -4860,7 +5076,86 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               <form
                 onSubmit={handleSendMessage}
                 className="phoenix-chat-input-bar"
+                style={{ position: 'relative' }}
               >
+                {/* Hidden File Input for Attachments and Photos */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileUpload}
+                />
+
+                {/* @mention Suggestion Dropdown */}
+                {mentionQuery !== null && mentionCandidates.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 8px)',
+                      left: '12px',
+                      right: '12px',
+                      background: '#ffffff',
+                      border: '1.5px solid #bfdbfe',
+                      borderRadius: '12px',
+                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+                      overflow: 'hidden',
+                      zIndex: 60,
+                      maxHeight: '210px',
+                      overflowY: 'auto'
+                    }}
+                  >
+                    <div style={{ padding: '6px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Mention team member (Use ↑↓ and Enter)
+                    </div>
+                    {mentionCandidates.map((u, idx) => {
+                      const isSelected = idx === mentionIndex;
+                      const uName = u.name || u.username || 'Staff';
+                      const uRole = u.department || u.role || 'Member';
+                      return (
+                        <div
+                          key={u._id || u.id}
+                          onClick={() => handleSelectMention(u)}
+                          onMouseEnter={() => setMentionIndex(idx)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            background: isSelected ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                            cursor: 'pointer',
+                            transition: 'background 0.1s ease',
+                            borderBottom: idx < mentionCandidates.length - 1 ? '1px solid #f1f5f9' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              background: '#2563eb',
+                              color: '#ffffff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.75rem'
+                            }}>
+                              {uName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>{uName}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>@{u.username || uName.toLowerCase().replace(/\s+/g, '')}</div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.68rem', padding: '2px 6px', background: '#e2e8f0', borderRadius: '4px', color: '#475569', fontWeight: 600 }}>
+                            {uRole}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {isRecordingAudio ? (
                   <div style={{
                     width: '100%',
@@ -5070,11 +5365,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         </span>
                       )}
                       <textarea
+                        ref={chatTextareaRef}
                         rows={1}
                         placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Type a message..."}
                         value={inputMessage}
                         onPaste={handlePasteClipboard}
                         onKeyDown={(e) => {
+                          if (mentionQuery !== null && mentionCandidates.length > 0) {
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+                              return;
+                            }
+                            if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                              return;
+                            }
+                            if (e.key === 'Enter' || e.key === 'Tab') {
+                              e.preventDefault();
+                              if (mentionCandidates[mentionIndex]) {
+                                handleSelectMention(mentionCandidates[mentionIndex]);
+                              }
+                              return;
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setMentionQuery(null);
+                              return;
+                            }
+                          }
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             handleSendMessage(e);
@@ -5910,6 +6230,179 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CREATE TASK FROM CHAT MODAL ── */}
+      {showChatTaskModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 540, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', background: 'var(--bg-card, #ffffff)', maxHeight: '90vh' }}>
+            <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid var(--border-light, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-th, #f8fafc)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckSquare size={18} color="#10b981" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary, #0f172a)' }}>
+                  Create Task from Chat
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowChatTaskModal(false)}
+                className="btn-secondary"
+                style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitChatTask} style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', overflowY: 'auto' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '4px' }}>
+                  Task Title *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Inspect fabric defect before dispatch"
+                  value={chatTaskForm.title}
+                  onChange={(e) => setChatTaskForm((prev) => ({ ...prev, title: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.84rem', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', background: 'var(--bg-input, #ffffff)', color: 'var(--text-primary, #0f172a)', boxSizing: 'border-box' }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '4px' }}>
+                  Description / Context
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Additional instructions or chat reference details..."
+                  value={chatTaskForm.description}
+                  onChange={(e) => setChatTaskForm((prev) => ({ ...prev, description: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', background: 'var(--bg-input, #ffffff)', color: 'var(--text-primary, #0f172a)', boxSizing: 'border-box', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '4px' }}>
+                    Priority
+                  </label>
+                  <select
+                    value={chatTaskForm.priority}
+                    onChange={(e) => setChatTaskForm((prev) => ({ ...prev, priority: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.84rem', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', background: 'var(--bg-input, #ffffff)', color: 'var(--text-primary, #0f172a)', boxSizing: 'border-box' }}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent (SOS)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '4px' }}>
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={chatTaskForm.dueDate}
+                    onChange={(e) => setChatTaskForm((prev) => ({ ...prev, dueDate: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.84rem', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', background: 'var(--bg-input, #ffffff)', color: 'var(--text-primary, #0f172a)', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '4px' }}>
+                    Job / Project Ref
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Job #2841"
+                    value={chatTaskForm.projectRef}
+                    onChange={(e) => setChatTaskForm((prev) => ({ ...prev, projectRef: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.84rem', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', background: 'var(--bg-input, #ffffff)', color: 'var(--text-primary, #0f172a)', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '4px' }}>
+                    Client Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Optional client name"
+                    value={chatTaskForm.clientName}
+                    onChange={(e) => setChatTaskForm((prev) => ({ ...prev, clientName: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.84rem', borderRadius: '8px', border: '1px solid var(--border-light, #cbd5e1)', background: 'var(--bg-input, #ffffff)', color: 'var(--text-primary, #0f172a)', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '6px' }}>
+                  Assignees
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '110px', overflowY: 'auto', padding: '6px', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '8px', background: '#fafafa' }}>
+                  {(staffUsers && staffUsers.length > 0 ? staffUsers : allUsers).map((u) => {
+                    const uId = String(u._id || u.id);
+                    const isSelected = Array.isArray(chatTaskForm.assignees) && chatTaskForm.assignees.some((a) => String(a) === uId);
+                    return (
+                      <button
+                        key={uId}
+                        type="button"
+                        onClick={() => {
+                          setChatTaskForm((prev) => {
+                            const cur = prev.assignees || [];
+                            const exists = cur.some((a) => String(a) === uId);
+                            return {
+                              ...prev,
+                              assignees: exists ? cur.filter((a) => String(a) !== uId) : [...cur, uId]
+                            };
+                          });
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 8px',
+                          borderRadius: '16px',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: isSelected ? '1px solid #10b981' : '1px solid #cbd5e1',
+                          background: isSelected ? '#ecfdf5' : '#ffffff',
+                          color: isSelected ? '#065f46' : '#475569'
+                        }}
+                      >
+                        {isSelected && <CheckCircle size={12} color="#10b981" />}
+                        <span>{u.name || u.username || 'Staff'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowChatTaskModal(false)}
+                  style={{ padding: '0.55rem 1rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingChatTask}
+                  style={{ padding: '0.55rem 1.2rem', fontSize: '0.82rem', borderRadius: '8px', border: 'none', background: '#10b981', color: '#ffffff', cursor: isCreatingChatTask ? 'not-allowed' : 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', opacity: isCreatingChatTask ? 0.7 : 1 }}
+                >
+                  {isCreatingChatTask && <RefreshCw size={13} className="spin" />}
+                  <span>{isCreatingChatTask ? 'Creating...' : 'Create Task'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

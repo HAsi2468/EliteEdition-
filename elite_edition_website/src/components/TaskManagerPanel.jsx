@@ -63,13 +63,35 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const myId = String(currentUser?._id || currentUser?.id || '');
   const myName = currentUser?.name || currentUser?.username || 'Staff';
 
+  const getNormalizedId = (u) => String(u?._id ?? u?.id ?? u ?? '');
+
+  const formatLocalDate = (d) => {
+    if (!d) return '';
+    const dateObj = typeof d === 'string' ? new Date(d) : d;
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const isTaskOverdue = (task) => {
+    if (!task?.dueDate || task.status === 'Done') return false;
+    const dueDateStr = typeof task.dueDate === 'string' ? task.dueDate.split('T')[0] : '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dueDateStr)) {
+      const endOfDay = new Date(`${dueDateStr}T23:59:59.999+05:30`);
+      return new Date() > endOfDay;
+    }
+    const due = new Date(task.dueDate);
+    due.setHours(23, 59, 59, 999);
+    return new Date() > due;
+  };
+
   const isMasterAdmin = Boolean(
     (currentUser?.role || '').toLowerCase() === 'admin' ||
     (currentUser?.role || '').toLowerCase() === 'super_admin' ||
     currentUser?.isAdmin ||
     currentUser?.isMainAdmin ||
-    (currentUser?.username || '').toLowerCase() === 'admin' ||
-    (currentUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com'
+    (currentUser?.username || '').toLowerCase() === 'admin'
   );
   const isAdmin = isMasterAdmin;
 
@@ -91,6 +113,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const defaultAssigneeFilter = isMasterAdmin ? 'all' : 'me';
   const [searchQuery, setSearchQuery] = useState('');
   const [assigneeFilter, setAssigneeFilterRaw] = useState(() => (isMasterAdmin ? 'all' : 'me'));
+  const [createdByFilter, setCreatedByFilter] = useState('all');
+  const [memberFilterMode, setMemberFilterMode] = useState('assigned'); // 'assigned' | 'created_by' | 'either'
+
   const setAssigneeFilter = useCallback((val) => {
     if (!isMasterAdmin) {
       setAssigneeFilterRaw('me');
@@ -364,7 +389,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setLoading(true);
     try {
       const [tasksRes, usersRes] = await Promise.all([
-        api.getTasks({ limit: 1000 }),
+        api.getTasks({ limit: 200 }),
         api.getUsers({ limit: 100 }).catch(() => api.getCommunicationUsers(myId))
       ]);
 
@@ -839,53 +864,63 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     const cId = String(typeof t.createdBy === 'object' ? (t.createdBy?._id || t.createdBy?.id) : (t.createdBy || ''));
     if (cId !== String(myId)) return false;
     return (t.assignees || []).some(
-      (a) => String(typeof a === 'object' ? (a._id || a.id) : a) !== String(myId)
+      (a) => getNormalizedId(a) !== String(myId)
     );
   }).length;
   const todayCount = visibleTasks.filter((t) => {
     if (!t.dueDate || t.status === 'Done') return false;
     return new Date(t.dueDate).toDateString() === new Date().toDateString();
   }).length;
-  const overdueCount = visibleTasks.filter((t) => {
-    return t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
-  }).length;
+  const overdueCount = visibleTasks.filter((t) => isTaskOverdue(t)).length;
   const completedCount = visibleTasks.filter((t) => t.status === 'Done').length;
 
   // Filter tasks logic based on TaskOPad Scope, Priority, Status, Assignee, Search
   const filteredTasks = visibleTasks.filter((t) => {
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+
+    // Filter by Member / Assignee
     if (assigneeFilter === 'me') {
       if (!isTaskAssignedToMe(t) && !isTaskCreatedByMe(t)) return false;
     } else if (assigneeFilter !== 'all') {
-      const hasAssignee = (t.assignees || []).some((a) => {
-        const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
-        if (aId === String(assigneeFilter)) return true;
-        if (String(assigneeFilter) === myId && isTaskAssignedToMe(t)) return true;
+      const targetId = String(assigneeFilter);
+      const isAssigned = (t.assignees || []).some((a) => {
+        if (getNormalizedId(a) === targetId) return true;
         if (typeof a === 'object' && a.name) {
-          const matched = allUsers.find((u) => String(u._id || u.id) === String(assigneeFilter));
+          const matched = allUsers.find((u) => getNormalizedId(u) === targetId);
           if (matched && (matched.name || '').toLowerCase() === (a.name || '').toLowerCase()) return true;
         }
         return false;
       });
-      if (!hasAssignee) return false;
+
+      const isCreator = getNormalizedId(t.createdBy) === targetId;
+
+      if (memberFilterMode === 'assigned' && !isAssigned) return false;
+      if (memberFilterMode === 'created_by' && !isCreator) return false;
+      if (memberFilterMode === 'either' && !isAssigned && !isCreator) return false;
+    }
+
+    // Filter by explicit Created By filter if specified
+    if (createdByFilter !== 'all') {
+      const targetCreatorId = String(createdByFilter);
+      const isCreator = getNormalizedId(t.createdBy) === targetCreatorId;
+      if (!isCreator) return false;
     }
 
     if (taskScope === 'my_tasks') {
       if (!isTaskAssignedToMe(t)) return false;
     } else if (taskScope === 'delegated') {
-      const cId = String(typeof t.createdBy === 'object' ? (t.createdBy?._id || t.createdBy?.id) : (t.createdBy || ''));
+      const cId = getNormalizedId(t.createdBy);
       if (cId !== String(myId)) return false;
       const isDelegated = (t.assignees || []).some(
-        (a) => String(typeof a === 'object' ? (a._id || a.id) : a) !== String(myId)
+        (a) => getNormalizedId(a) !== String(myId)
       );
       if (!isDelegated) return false;
     } else if (taskScope === 'today') {
       if (!t.dueDate) return false;
       if (new Date(t.dueDate).toDateString() !== new Date().toDateString()) return false;
     } else if (taskScope === 'overdue') {
-      const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
-      if (!isOverdue) return false;
+      if (!isTaskOverdue(t)) return false;
     } else if (taskScope === 'completed') {
       if (t.status !== 'Done') return false;
     }
@@ -1954,30 +1989,101 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             )}
           </div>
 
-          {/* Filters: Assignee & Priority */}
-          <div className="task-filter-dropdowns">
+          {/* Filters: Assignee, Created By & Priority */}
+          <div className="task-filter-dropdowns" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             {isMasterAdmin ? (
-              <select
-                value={assigneeFilter}
-                onChange={(e) => setAssigneeFilter(e.target.value)}
-                className="task-select"
-              >
-                <option value="all">👥 All Staff</option>
-                <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
-                  👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
-                </option>
-                <optgroup label="Team Members">
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <select
+                    value={assigneeFilter}
+                    onChange={(e) => setAssigneeFilter(e.target.value)}
+                    className="task-select"
+                    title="Filter by member"
+                  >
+                    <option value="all">👥 Member: All</option>
+                    <option value="me" style={{ fontWeight: 700, color: '#2563eb' }}>
+                      👤 My Tasks Only ({currentUser?.name || currentUser?.username || 'Myself'})
+                    </option>
+                    <optgroup label="Team Members">
+                      {allUsers.map((u) => {
+                        const uId = getNormalizedId(u);
+                        const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
+                        return (
+                          <option key={uId} value={uId}>
+                            {u.name || u.username} {isMe ? '(Me)' : ''}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  </select>
+
+                  {assigneeFilter !== 'all' && assigneeFilter !== 'me' && (
+                    <div style={{ display: 'inline-flex', borderRadius: '6px', border: '1px solid #cbd5e1', overflow: 'hidden', fontSize: '0.68rem', fontWeight: 700 }}>
+                      <button
+                        type="button"
+                        onClick={() => setMemberFilterMode('assigned')}
+                        style={{
+                          padding: '3px 7px',
+                          border: 'none',
+                          background: memberFilterMode === 'assigned' ? '#2563eb' : '#f8fafc',
+                          color: memberFilterMode === 'assigned' ? '#ffffff' : '#64748b',
+                          cursor: 'pointer'
+                        }}
+                        title="Show tasks assigned to this member"
+                      >
+                        Assigned
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberFilterMode('created_by')}
+                        style={{
+                          padding: '3px 7px',
+                          border: 'none',
+                          borderLeft: '1px solid #cbd5e1',
+                          borderRight: '1px solid #cbd5e1',
+                          background: memberFilterMode === 'created_by' ? '#2563eb' : '#f8fafc',
+                          color: memberFilterMode === 'created_by' ? '#ffffff' : '#64748b',
+                          cursor: 'pointer'
+                        }}
+                        title="Show tasks created by this member"
+                      >
+                        Created By
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberFilterMode('either')}
+                        style={{
+                          padding: '3px 7px',
+                          border: 'none',
+                          background: memberFilterMode === 'either' ? '#2563eb' : '#f8fafc',
+                          color: memberFilterMode === 'either' ? '#ffffff' : '#64748b',
+                          cursor: 'pointer'
+                        }}
+                        title="Show tasks assigned to OR created by this member"
+                      >
+                        Either
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <select
+                  value={createdByFilter}
+                  onChange={(e) => setCreatedByFilter(e.target.value)}
+                  className="task-select"
+                  title="Filter explicitly by Creator"
+                >
+                  <option value="all">✍️ Created by: All</option>
                   {allUsers.map((u) => {
-                    const uId = String(u._id || u.id);
-                    const isMe = (myId && uId === myId) || (currentUser?.name && (u.name || '').toLowerCase() === currentUser.name.toLowerCase());
+                    const uId = getNormalizedId(u);
                     return (
-                      <option key={uId} value={uId}>
-                        {u.name || u.username} {isMe ? '(Me)' : ''}
+                      <option key={`creator_${uId}`} value={uId}>
+                        ✍️ {u.name || u.username}
                       </option>
                     );
                   })}
-                </optgroup>
-              </select>
+                </select>
+              </>
             ) : (
               <select
                 value="me"
@@ -2556,7 +2662,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                           const completedCheck = (t.checklist || []).filter((c) => c.completed).length;
                           const totalCheck = (t.checklist || []).length;
                           const assignerName = getAssignerName(t);
-                          const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
+                          const isOverdue = isTaskOverdue(t);
                           const firstAssignee = (t.assignees || [])[0];
                           const assigneeFullName = typeof firstAssignee === 'object' ? (firstAssignee.name || firstAssignee.username || 'Staff') : (firstAssignee || 'Staff');
                           const avStyle = getAvatarStyle(assigneeFullName);
@@ -2924,7 +3030,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   filteredTasks.map((t) => {
                     const pri = getPriorityBadge(t.priority);
                     const assignerName = getAssignerName(t);
-                    const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
+                    const isOverdue = isTaskOverdue(t);
                     const checkTotal = (t.checklist || []).length;
                     const checkDone = (t.checklist || []).filter(c => c.completed).length;
                     const checkPct = checkTotal > 0 ? Math.round((checkDone / checkTotal) * 100) : 0;

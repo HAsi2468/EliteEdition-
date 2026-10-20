@@ -165,13 +165,20 @@ const setupSockets = (io) => {
           const userRooms = await ChatRoom.find({ members: socket.userId }).select('_id').lean();
           const rIds = userRooms.map(r => r._id);
           if (rIds.length > 0) {
+            // Guard against client future clock skew skipping legitimate messages
+            let syncTimestamp = new Date(lastReceivedMessageTimestamp);
+            const now = new Date(Date.now() + 1000);
+            if (syncTimestamp > now) {
+              syncTimestamp = new Date(Date.now() - 30000); // fallback to 30s ago
+            }
+
             missedMessages = await ChatMessage.find({
               roomId: { $in: rIds },
-              createdAt: { $gt: new Date(lastReceivedMessageTimestamp) }
+              createdAt: { $gt: syncTimestamp }
             })
             .populate('senderId', 'name username email role')
-            .sort({ createdAt: 1 })
-            .limit(50)
+            .sort({ roomSeq: 1, createdAt: 1 })
+            .limit(100)
             .lean();
           }
         }
@@ -347,7 +354,15 @@ const setupSockets = (io) => {
 
         const msgType = type || (attachment && attachment.fileType === 'audio' ? 'audio-voice' : 'text');
 
-        // Save message to MongoDB
+        // Monotonic room sequence increment
+        const updatedRoom = await ChatRoom.findByIdAndUpdate(
+          roomId,
+          { $inc: { lastSeq: 1 }, updatedAt: new Date() },
+          { new: true }
+        );
+        const roomSeq = updatedRoom?.lastSeq || 1;
+
+        // Save message to MongoDB strictly setting server-enforced createdAt and monotonic roomSeq
         const newMessage = await ChatMessage.create({
           roomId,
           senderId: actualSenderId,
@@ -359,11 +374,11 @@ const setupSockets = (io) => {
           attachment: attachment || undefined,
           activityMeta: activityMeta || undefined,
           recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
-          readBy: [senderId]
+          mentions: mentions.length > 0 ? mentions : undefined,
+          readBy: [senderId],
+          createdAt: new Date(),
+          roomSeq
         });
-
-        // Update room updatedAt timestamp
-        await ChatRoom.findByIdAndUpdate(roomId, { updatedAt: new Date() });
 
         const populatedMessage = await ChatMessage.findById(newMessage._id)
           .populate('senderId', 'name username email')
@@ -395,16 +410,42 @@ const setupSockets = (io) => {
 
         // Emit direct notification to each mentioned user
         if (mentions.length > 0) {
-          mentions.forEach(uId => {
-            if (String(uId) !== String(senderId)) {
-              io.to(`user_${uId}`).emit('mention-notification', {
-                roomId,
-                senderName: populatedMessage.senderId.name || populatedMessage.senderId.username,
-                content: content,
-                messageId: newMessage._id
-              });
-            }
+          const recipientMentionIds = mentions
+            .map(String)
+            .filter(uId => uId !== String(senderId));
+
+          recipientMentionIds.forEach(uId => {
+            io.to(`user_${uId}`).emit('mention-notification', {
+              roomId,
+              senderName: populatedMessage.senderId.name || populatedMessage.senderId.username,
+              content: content,
+              messageId: newMessage._id
+            });
+            io.to(`user_${uId}`).emit('notification:mention', {
+              messageId: newMessage._id,
+              roomId,
+              roomName: targetRoom?.name || 'Group Chat',
+              sender: populatedMessage.senderId,
+              content: sanitizedContent,
+              timestamp: newMessage.createdAt
+            });
           });
+
+          if (recipientMentionIds.length > 0 && webPushService && typeof webPushService.sendPushToUsers === 'function') {
+            const senderName = populatedMessage.senderId?.name || populatedMessage.senderId?.username || 'Team Member';
+            webPushService.sendPushToUsers(recipientMentionIds, {
+              title: `💬 @mentioned by ${senderName} in ${targetRoom?.name || 'Chat'}`,
+              body: sanitizedContent ? (sanitizedContent.length > 80 ? sanitizedContent.slice(0, 80) + '...' : sanitizedContent) : 'You were mentioned in a message',
+              icon: '/Logo.png',
+              badge: '/Logo.png',
+              tag: `mention-${newMessage._id}`,
+              data: {
+                url: '/communication',
+                roomId: String(roomId),
+                type: 'mention'
+              }
+            }, { urgency: 'high' }).catch(err => console.warn('[Socket send-message mention push] warning:', err.message));
+          }
         }
 
         // ── @EliteAI Bot Handler ──
@@ -717,12 +758,39 @@ const setupSockets = (io) => {
     socket.on('delete-message', async (data) => {
       try {
         const { messageId, roomId } = data;
-        await ChatMessage.findByIdAndUpdate(messageId, {
-          content: 'This message was deleted',
-          isDeleted: true,
-          attachment: null
-        });
-        io.to(roomId).emit('message-deleted', { messageId });
+        const userId = socket.userId;
+        const msg = await ChatMessage.findById(messageId);
+        if (!msg) return;
+
+        // Purge R2 asset if attached
+        if (msg.attachment && msg.attachment.fileUrl) {
+          try {
+            const { deleteR2Object } = require('../utils/r2Storage');
+            const url = new URL(msg.attachment.fileUrl);
+            const key = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+            if (key) await deleteR2Object(key);
+          } catch (r2Err) {
+            console.warn('[Socket delete-message] R2 asset purge warning:', r2Err.message);
+          }
+        }
+
+        msg.content = 'This message was deleted';
+        msg.isDeleted = true;
+        msg.deletedBy = userId;
+        msg.deletedAt = new Date();
+        msg.attachment = null;
+        await msg.save();
+
+        const room = await ChatRoom.findById(roomId || msg.roomId);
+        if (room && room.lastMessage && String(room.lastMessage._id || room.lastMessage) === String(messageId)) {
+          const prevMsg = await ChatMessage.findOne({ roomId: room._id, isDeleted: { $ne: true } })
+            .sort({ roomSeq: -1, createdAt: -1 })
+            .populate('senderId', 'name username');
+          room.lastMessage = prevMsg || null;
+          await room.save();
+        }
+
+        io.to(String(roomId || msg.roomId)).emit('message-deleted', { messageId, roomId: roomId || msg.roomId });
       } catch (error) {
         console.error('Error deleting message:', error);
       }

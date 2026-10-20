@@ -64,6 +64,10 @@ const chatRoomSchema = new mongoose.Schema(
         trim: true,
       }
     ],
+    lastSeq: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -76,6 +80,11 @@ const chatMessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ChatRoom',
       required: true,
+    },
+    roomSeq: {
+      type: Number,
+      default: 0,
+      index: true,
     },
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -135,6 +144,15 @@ const chatMessageSchema = new mongoose.Schema(
     isDeleted: {
       type: Boolean,
       default: false
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    deletedAt: {
+      type: Date,
+      default: null
     },
     isPinned: {
       type: Boolean,

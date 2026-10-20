@@ -59,10 +59,11 @@ export default function SystemMaintenanceLockScreen({ lockData, onAdminAuthSucce
       const user = res?.user || api.getCurrentUser();
       const isAdmin =
         user?.role === 'admin' ||
+        user?.role === 'super_admin' ||
         user?.role === 'main_admin' ||
         user?.isMainAdmin ||
         user?.isAdmin === true ||
-        user?.email === 'harshitsidapara2468@gmail.com';
+        (user?.username || '').toLowerCase() === 'admin';
 
       if (!isAdmin) {
         setAuthError('Access Denied: This account does not have Administrator privileges.');

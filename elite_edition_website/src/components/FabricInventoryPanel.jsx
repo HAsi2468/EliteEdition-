@@ -166,7 +166,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     return false;
   };
 
-  const isAdmin = String(currentUser?.role || '').toLowerCase() === 'admin' || !!currentUser?.isMainAdmin || currentUser?.email === 'harshitsidapara2468@gmail.com';
+  const isAdmin = String(currentUser?.role || '').toLowerCase() === 'admin' || String(currentUser?.role || '').toLowerCase() === 'super_admin' || !!currentUser?.isMainAdmin || !!currentUser?.isAdmin;
   const [stock, setStock] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [fabricsList, setFabricsList] = useState([]);

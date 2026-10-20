@@ -328,6 +328,19 @@ class PushNotificationService {
 
     return results;
   }
+
+  /**
+   * Dispatches web push notification for task assignments and updates
+   */
+  async dispatchTaskNotification(recipientIdsOrTask, options = {}) {
+    try {
+      const webPushService = require('./webPush.service');
+      return await webPushService.dispatchTaskNotification(recipientIdsOrTask, options);
+    } catch (e) {
+      console.warn('[PushNotificationService] dispatchTaskNotification fallback warning:', e.message);
+      return [];
+    }
+  }
 }
 
 const pushNotificationService = new PushNotificationService();

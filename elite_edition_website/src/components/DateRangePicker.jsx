@@ -543,3 +543,5 @@ export default function DateRangePicker({
     </div>
   );
 }
+
+export { default as DateRangePickerWithCompare } from './filters/DateRangePickerWithCompare';

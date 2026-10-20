@@ -830,7 +830,7 @@ export default function AdminPanel() {
       email: user.email || '',
       password: '',
       role: user.role || (user.permissions?.length === AVAILABLE_SCREENS.length ? 'admin' : 'user'),
-      isMainAdmin: Boolean(user.isMainAdmin || user.email === 'harshitsidapara2468@gmail.com'),
+      isMainAdmin: Boolean(user.isMainAdmin || user.isAdmin || user.role === 'admin'),
       department: user.department || 'General',
       designerName: user.designerName || '',
       status: user.status || 'Active',
@@ -1793,7 +1793,7 @@ export default function AdminPanel() {
                   <tbody>
                     {filteredUsers
                       .map((u) => {
-                        const isMain = Boolean(u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com');
+                        const isMain = Boolean(u.isMainAdmin || u.isAdmin || u.role === 'admin');
                         const checkAdmin = u.role === 'admin' || isMain;
                         const isCurrentlyEditing = editingUser && (editingUser.id === u.id || editingUser._id === u.id);
                         const userCompanies = Array.isArray(u.allowedCompanies) && u.allowedCompanies.length > 0
