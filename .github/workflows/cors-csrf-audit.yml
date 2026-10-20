@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Semgrep Static Security Audit
-        uses: returntocorp/semgrep-action@v1
+        uses: semgrep/semgrep-action@v1
         with:
           config: .semgrep/cors-csrf-guard.yml
           generateSarif: "1"
