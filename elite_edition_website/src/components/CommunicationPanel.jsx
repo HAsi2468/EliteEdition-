@@ -1805,6 +1805,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     return () => window.removeEventListener('popstate', handlePopState);
   }, [isMobileScreen]);
 
+  // Auto-scroll to bottom on thread open
+  useEffect(() => {
+    if (activeGroup?._id) {
+      isNearBottomRef.current = true;
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+      const t = setTimeout(() => {
+        if (chatScrollRef.current) {
+          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+      }, 60);
+      return () => clearTimeout(t);
+    }
+  }, [activeGroup?._id]);
+
   // Auto-scroll to chat bottom safely strictly within message container
   useEffect(() => {
     if (isNearBottomRef.current && chatScrollRef.current) {
@@ -5016,7 +5032,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
                               <div style={{ marginBottom: '0.45rem' }}>
                                 {(() => {
-                                  const lowerName = (msg.attachment.fileName || '').toLowerCase();
+                                  const rawName = msg.attachment.fileName || (typeof msg.attachment.fileUrl === 'string' ? msg.attachment.fileUrl.split('/').pop().split('?')[0] : 'Attachment');
+                                  const fileNameDisplay = rawName.startsWith('blob:') ? 'Uploaded Document' : rawName;
+                                  const lowerName = fileNameDisplay.toLowerCase();
                                   const isImg = msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
                                   const isPdf = msg.attachment.fileType === 'pdf' || lowerName.endsWith('.pdf') || msg.attachment.mimeType === 'application/pdf';
                                   const isSheet = msg.attachment.fileType === 'spreadsheet' || /\.(xls|xlsx|csv)$/i.test(lowerName);
@@ -5026,7 +5044,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       <div style={{ position: 'relative' }}>
                                         <img
                                           src={msg.attachment.fileUrl}
-                                          alt={msg.attachment.fileName || 'Attachment'}
+                                          alt={fileNameDisplay}
                                           onClick={() => setZoomImg(msg.attachment.fileUrl)}
                                           style={{
                                             maxWidth: '100%',
@@ -5038,11 +5056,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                             border: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light, #e2e8f0)'
                                           }}
                                         />
-                                        {msg.attachment.fileName && (
-                                          <div style={{ fontSize: '0.68rem', opacity: 0.8, marginTop: '3px', wordBreak: 'break-all' }}>
-                                            {msg.attachment.fileName} {msg.attachment.fileSize ? `(${formatFileSize(msg.attachment.fileSize)})` : ''}
-                                          </div>
-                                        )}
+                                        <div style={{ fontSize: '0.68rem', opacity: 0.8, marginTop: '3px', wordBreak: 'break-all' }}>
+                                          {fileNameDisplay} {msg.attachment.fileSize ? `(${formatFileSize(msg.attachment.fileSize)})` : ''}
+                                        </div>
                                       </div>
                                     );
                                   }

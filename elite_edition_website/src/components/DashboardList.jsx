@@ -109,7 +109,7 @@ export function DashboardList({
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                High-density layout optimized to prevent horizontal eye strain
+                Real-time stock alerts and replenishment warnings
               </p>
             </div>
           </div>

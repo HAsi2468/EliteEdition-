@@ -433,6 +433,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         loadedUsers = usersRes;
       }
 
+      // Filter out system non-human accounts from assignees
+      const SYSTEM_EXCLUDED_ACCOUNTS = ['general', 'eliteac', 'system', 'bot', 'admin auto'];
+      loadedUsers = loadedUsers.filter((u) => {
+        const username = (u.username || '').toLowerCase().trim();
+        const name = (u.name || '').toLowerCase().trim();
+        return !SYSTEM_EXCLUDED_ACCOUNTS.includes(username) && !SYSTEM_EXCLUDED_ACCOUNTS.includes(name);
+      });
+
       // Ensure currentUser is always included in allUsers so their data can be filtered
       if (currentUser && (currentUser._id || currentUser.id || currentUser.name)) {
         const myUserId = String(currentUser._id || currentUser.id || '');
@@ -2727,7 +2735,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                       flexShrink: 0
                                     }}>
                                       <AlertCircle size={11} color="#dc2626" />
-                                      <span>Overdue</span>
+                                      <span>Overdue{t.dueDate ? ` (${new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })})` : ''}</span>
                                     </span>
                                   )}
 

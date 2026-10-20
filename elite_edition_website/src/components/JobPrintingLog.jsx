@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { api } from '../services/api';
 import {
   Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
@@ -93,6 +93,21 @@ export default function JobPrintingLog() {
   const [activeView, setActiveView] = useState('log'); // 'log' | 'queue'
   const [queueFabricFilter, setQueueFabricFilter] = useState('All');
   const [queueSearch, setQueueSearch] = useState('');
+
+  // Form Collapse & Consolidated Reports Dropdown State
+  const [isFormCollapsed, setIsFormCollapsed] = useState(false);
+  const [showReportsDropdown, setShowReportsDropdown] = useState(false);
+  const reportsDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleReportsOutsideClick = (e) => {
+      if (reportsDropdownRef.current && !reportsDropdownRef.current.contains(e.target)) {
+        setShowReportsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleReportsOutsideClick);
+    return () => document.removeEventListener('mousedown', handleReportsOutsideClick);
+  }, []);
 
   const user = api.getCurrentUser();
   const accountFullName = user ? (user.name || user.fullName || user.username || '') : '';
@@ -2186,83 +2201,159 @@ export default function JobPrintingLog() {
 
             {/* Right-aligned Buttons in Form Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {/* Button 1: GENERATE REPORT */}
-              <button
-                type="button"
-                onClick={() => setShowRawMaterialModal(true)}
-                className="btn-primary"
-                style={{
-                  padding: '0.4rem 0.85rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
-                  cursor: 'pointer'
-                }}
-              >
-                <Sparkles size={14} /> GENERATE REPORT
-              </button>
+              {/* Consolidated Reports & Actions Dropdown */}
+              <div ref={reportsDropdownRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowReportsDropdown(prev => !prev)}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.4rem 0.85rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
+                    cursor: 'pointer'
+                  }}
+                  title="Reports & Actions"
+                >
+                  <FileText size={14} />
+                  <span>Reports & Actions</span>
+                  <ChevronDown size={13} style={{ transform: showReportsDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
 
-              {/* Button 2: Previous Reports */}
+                {showReportsDropdown && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 'calc(100% + 4px)',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                      zIndex: 100,
+                      minWidth: '220px',
+                      padding: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowReportsDropdown(false);
+                        setShowRawMaterialModal(true);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdf4'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <Sparkles size={14} /> Generate Consumption Report
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowReportsDropdown(false);
+                        setActiveView('reports');
+                        fetchArchiveLogs(archiveDateStart, archiveDateEnd);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#7c3aed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f5f3ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <History size={14} /> Previous Reports & Archives
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowReportsDropdown(false);
+                        setReportStartDate(dateStart);
+                        setReportEndDate(dateEnd);
+                        setShowReportModal(true);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <Download size={14} /> Download Operator Report
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Form Collapse / Expand Toggle */}
               <button
                 type="button"
-                onClick={() => {
-                  setActiveView('reports');
-                  fetchArchiveLogs(archiveDateStart, archiveDateEnd);
-                }}
+                onClick={() => setIsFormCollapsed(prev => !prev)}
                 className="btn-secondary"
                 style={{
-                  padding: '0.4rem 0.85rem',
+                  padding: '0.4rem 0.65rem',
                   fontSize: '0.78rem',
-                  fontWeight: 700,
+                  fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
-                  background: 'rgba(168,85,247,0.12)',
-                  color: '#c084fc',
-                  border: '1px solid rgba(168,85,247,0.35)',
+                  gap: '4px',
                   borderRadius: '6px',
                   cursor: 'pointer'
                 }}
+                title={isFormCollapsed ? 'Expand Form' : 'Collapse Form'}
               >
-                <History size={14} /> Previous Reports
-              </button>
-
-              {/* Button 3: Download Report */}
-              <button
-                type="button"
-                onClick={() => {
-                  setReportStartDate(dateStart);
-                  setReportEndDate(dateEnd);
-                  setShowReportModal(true);
-                }}
-                className="btn-primary"
-                style={{
-                  padding: '0.4rem 0.85rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-                  cursor: 'pointer'
-                }}
-              >
-                <Download size={14} /> Download Report
+                {isFormCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                <span>{isFormCollapsed ? 'Expand Entry Form' : 'Collapse'}</span>
               </button>
             </div>
           </div>
 
+          {!isFormCollapsed && (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
 
             {/* ── LINE 1: DATE, SHIFT, JOB TYPE ── */}
@@ -2507,6 +2598,13 @@ export default function JobPrintingLog() {
             </div>
 
           </form>
+          )}
+
+          {isFormCollapsed && (
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', padding: '0.5rem 0' }}>
+              Form collapsed. Click <strong style={{ color: 'var(--text-primary)' }}>Expand Entry Form</strong> above to record a new print run.
+            </div>
+          )}
         </div>
 
         {/* Selected Job Card Status Card (Completion & Pending Indicator) */}

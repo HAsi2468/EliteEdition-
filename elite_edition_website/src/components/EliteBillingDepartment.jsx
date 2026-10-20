@@ -4049,7 +4049,23 @@ export default function EliteBillingDepartment({
                     </tr>
                   </thead>
                   <tbody>
-                    {displayedInvoices.length === 0 ? (
+                    {loading && invoices.length === 0 ? (
+                      [...Array(5)].map((_, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', animation: 'pulse 1.5s infinite' }}>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}><div style={{ width: '16px', height: '16px', background: '#e2e8f0', borderRadius: '4px', margin: 'auto' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '80px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '140px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '60px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '70px', height: '20px', background: '#e2e8f0', borderRadius: '12px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '80px', height: '14px', background: '#f1f5f9', borderRadius: '4px' }} /></td>
+                          <td style={{ padding: '1rem' }}><div style={{ width: '90px', height: '24px', background: '#e2e8f0', borderRadius: '6px', margin: 'auto' }} /></td>
+                        </tr>
+                      ))
+                    ) : displayedInvoices.length === 0 ? (
                       <tr>
                         <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                           No invoices found for the selected date range ({activeRange.labelText}).

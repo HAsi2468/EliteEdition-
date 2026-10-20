@@ -34,7 +34,8 @@ export function EnterpriseHUDThemeController({
   hasCommunicationAccess = true,
   hasTaskAccess = true,
   chatUnreadCount = 0,
-  isAuthenticated = true
+  isAuthenticated = true,
+  isDocked = false
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [scale, setScale] = useState(1);
@@ -291,19 +292,21 @@ export function EnterpriseHUDThemeController({
   const isCommActive = activeTab === 'communication' || activeTab === 'workspace';
   const isTaskActive = activeTab === 'task_management';
 
+  const effectiveCollapsed = isDocked ? false : isCollapsed;
+
   return (
     <div
       ref={dockRef}
-      className={`floating-enterprise-dock ${isDragging ? 'is-dragging' : ''} ${isCollapsed ? 'is-collapsed' : ''} ${isIndustrial ? 'is-industrial' : ''}`}
-      style={{
+      className={`floating-enterprise-dock ${isDocked ? 'is-docked' : ''} ${isDragging ? 'is-dragging' : ''} ${effectiveCollapsed ? 'is-collapsed' : ''} ${isIndustrial ? 'is-industrial' : ''}`}
+      style={isDocked ? {} : {
         left: `${position.x}px`,
         top: `${position.y}px`
       }}
-      onPointerDown={onPointerDown}
-      title="Click & Drag freely to position anywhere on your screen. Double-click grip to reset."
+      onPointerDown={isDocked ? undefined : onPointerDown}
+      title={isDocked ? "UI Scale, Chat & Tasks" : "Click & Drag freely to position anywhere on your screen. Double-click grip to reset."}
     >
       {/* ── COLLAPSED MODE: Clean Minimal Circular FAB Button ── */}
-      {isCollapsed ? (
+      {effectiveCollapsed ? (
         <button
           type="button"
           className="dock-circle-fab-btn"
@@ -322,13 +325,15 @@ export function EnterpriseHUDThemeController({
         /* ── EXPANDED MODE: Full 3-Action Dock ── */
         <>
           {/* Drag Grip Handle */}
-          <div 
-            className="dock-grip-handle" 
-            onDoubleClick={handleDoubleClickGrip}
-            title="Drag anywhere (Double click to reset position)"
-          >
-            <GripVertical size={14} />
-          </div>
+          {!isDocked && (
+            <div 
+              className="dock-grip-handle" 
+              onDoubleClick={handleDoubleClickGrip}
+              title="Drag anywhere (Double click to reset position)"
+            >
+              <GripVertical size={14} />
+            </div>
+          )}
 
           {/* Button 1: Scale & Industrial HUD Display */}
           <button
@@ -394,15 +399,17 @@ export function EnterpriseHUDThemeController({
           )}
 
           {/* Collapse to Single Circular Button Toggle */}
-          <button
-            type="button"
-            className="dock-toggle-btn"
-            onClick={handleItemClick(toggleCollapsed)}
-            title="Minimize to circular button"
-            aria-label="Minimize Dock"
-          >
-            <ChevronRight size={12} />
-          </button>
+          {!isDocked && (
+            <button
+              type="button"
+              className="dock-toggle-btn"
+              onClick={handleItemClick(toggleCollapsed)}
+              title="Minimize to circular button"
+              aria-label="Minimize Dock"
+            >
+              <ChevronRight size={12} />
+            </button>
+          )}
         </>
       )}
 

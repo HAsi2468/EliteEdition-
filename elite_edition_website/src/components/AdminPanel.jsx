@@ -46,8 +46,10 @@ import {
   HardDrive,
   Send,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  MoreVertical
 } from 'lucide-react';
+import { triggerEliteConfirm } from './EliteModalDialog';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import AdminSignedDocumentsApproval from './AdminSignedDocumentsApproval';
 import AdminClientDetails from './AdminClientDetails';
@@ -146,6 +148,17 @@ export default function AdminPanel() {
   const [error, setError] = useState('');
   const [modalError, setModalError] = useState('');
   const [success, setSuccess] = useState('');
+  const [activeActionMenuUserId, setActiveActionMenuUserId] = useState(null);
+
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (!e.target.closest('.user-action-menu-container')) {
+        setActiveActionMenuUserId(null);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
 
   // Mobile & iOS Viewport Detection
   const [isMobile, setIsMobile] = useState(
@@ -1086,13 +1099,18 @@ export default function AdminPanel() {
   };
 
   const handleDeleteUser = async (user) => {
+    setActiveActionMenuUserId(null);
     const currentUser = api.getCurrentUser();
     if (currentUser && currentUser.id === user.id) {
       setError("You cannot delete your own logged-in account.");
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete user "${user.name}"?`)) return;
+    const confirmed = await triggerEliteConfirm(
+      `Are you sure you want to permanently delete user "${user.name}" (${user.username || user.email})? This action cannot be undone.`,
+      { title: 'Confirm Delete User', confirmText: 'Yes, Delete User', cancelText: 'Cancel', isDestructive: true }
+    );
+    if (!confirmed) return;
 
     setError('');
     setSuccess('');
@@ -1366,8 +1384,12 @@ export default function AdminPanel() {
         gap: '0.5rem',
         overflowX: 'auto',
         WebkitOverflowScrolling: 'touch',
-        paddingBottom: '4px',
-        maxWidth: '100%'
+        paddingBottom: '8px',
+        maxWidth: '100%',
+        scrollbarWidth: 'thin',
+        flexWrap: 'nowrap',
+        minHeight: '48px',
+        alignItems: 'center'
       }}>
         <button
           onClick={() => { setActiveSubTab('users'); setError(''); setSuccess(''); }}
@@ -1925,7 +1947,7 @@ export default function AdminPanel() {
                               </div>
                             </td>
                             <td>
-                              <div style={styles.actionsCell}>
+                              <div className="user-action-menu-container" style={{ ...styles.actionsCell, position: 'relative', overflow: 'visible' }}>
                                 <button
                                   onClick={() => handleEditClick(u)}
                                   style={{
@@ -1943,27 +1965,80 @@ export default function AdminPanel() {
                                   }}
                                   title="Edit Credentials & Permissions"
                                 >
-                                  <Edit2 size={14} /> Edit
+                                  <Edit2 size={13} /> Edit
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteUser(u)}
-                                  style={{
-                                    padding: '0.4rem 0.75rem',
-                                    background: '#fef2f2',
-                                    border: '1px solid #fecaca',
-                                    color: '#dc2626',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px'
-                                  }}
-                                  title="Delete User"
-                                >
-                                  <Trash2 size={14} /> Delete
-                                </button>
+
+                                <div style={{ position: 'relative', display: 'inline-block' }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveActionMenuUserId(activeActionMenuUserId === u.id ? null : u.id);
+                                    }}
+                                    style={{
+                                      padding: '0.4rem 0.5rem',
+                                      background: activeActionMenuUserId === u.id ? '#f1f5f9' : '#ffffff',
+                                      border: '1px solid #e2e8f0',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#64748b'
+                                    }}
+                                    title="More Actions"
+                                    aria-label="More user actions"
+                                  >
+                                    <MoreVertical size={14} />
+                                  </button>
+
+                                  {activeActionMenuUserId === u.id && (
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        right: 0,
+                                        top: '100%',
+                                        marginTop: '4px',
+                                        background: '#ffffff',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '8px',
+                                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                                        zIndex: 100,
+                                        minWidth: '150px',
+                                        padding: '4px',
+                                        overflow: 'hidden'
+                                      }}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteUser(u);
+                                        }}
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 10px',
+                                          background: 'transparent',
+                                          border: 'none',
+                                          borderRadius: '6px',
+                                          color: '#dc2626',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '8px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          textAlign: 'left'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <Trash2 size={13} color="#dc2626" />
+                                        <span>Delete User</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </td>
                           </tr>

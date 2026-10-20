@@ -180,7 +180,7 @@ const getDailyOperationsSummary = async (req, res) => {
           $match: {
             department: 'digital_print',
             printStatus: 'Printing Done',
-            fusingStatus: 'Fusing Pending'
+            fusingStatus: { $ne: 'Fusing Done' }
           }
         },
         {

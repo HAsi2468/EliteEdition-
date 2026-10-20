@@ -1908,8 +1908,6 @@ export default function FusingDepartment() {
               >
                 <option value="Morning">Morning</option>
                 <option value="Night">Night</option>
-                <option value="Shift 1">Shift 1</option>
-                <option value="Shift 2">Shift 2</option>
               </select>
             </div>
 

@@ -80,3 +80,20 @@ export function formatConsistentDate(dateInput, includeTime = false) {
     return '—';
   }
 }
+
+/**
+ * Universal Currency Formatter (INR)
+ */
+export const formatINR = (val) => {
+  if (val === null || val === undefined || isNaN(val)) return '₹0.00';
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(val || 0);
+};
+
+/**
+ * Universal Meterage Formatter
+ */
+export const formatMeters = (val) => {
+  if (val === null || val === undefined || isNaN(val)) return '0 mtr';
+  return `${new Intl.NumberFormat("en-IN").format(val || 0)} mtr`;
+};
+

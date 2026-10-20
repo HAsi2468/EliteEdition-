@@ -129,15 +129,26 @@ export const ROUTE_ALIASES = {
   'task': { tab: 'task_management', dept: null },
   'task-manager': { tab: 'task_management', dept: null },
   'task_management': { tab: 'task_management', dept: null },
+  'printing': { tab: 'jobcards_printing_log', dept: 'digital_print' },
+  'jobcards_printing_log': { tab: 'jobcards_printing_log', dept: 'digital_print' },
+  'fusing': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
+  'jobcards_fusing_log': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
+  'fabric': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'challans': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'challan': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'jobcards_fabric': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'finance': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'billing': { tab: 'ee_invoices', dept: 'elite_edition' },
   'invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
   'invoice': { tab: 'ee_invoices', dept: 'elite_edition' },
   'ee_invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
   'jobcards': { tab: 'jobcards', dept: 'digital_print' },
   'jobcard': { tab: 'jobcards', dept: 'digital_print' },
-  'fusing': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
-  'jobcards_fusing_log': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
-  'challans': { tab: 'jobcards_fabric', dept: 'digital_print' },
-  'challan': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
+  'design': { tab: 'jobcards_catalogue', dept: 'digital_print' },
+  'designs': { tab: 'jobcards_catalogue', dept: 'digital_print' },
+  'catalogue': { tab: 'jobcards_catalogue', dept: 'digital_print' },
+  'jobcards_catalogue': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'dispatch': { tab: 'inventory', dept: 'elite_online' },
   'inventory': { tab: 'inventory', dept: 'elite_online' },
   'stock-ledger': { tab: 'stock_ledger', dept: 'elite_online' },
@@ -145,7 +156,9 @@ export const ROUTE_ALIASES = {
   'ee_complaints': { tab: 'ee_complaints', dept: 'elite_edition' },
   'reports': { tab: 'reports', dept: 'elite_online' },
   'communication': { tab: 'communication', dept: null },
-  'workspace': { tab: 'workspace', dept: null }
+  'chat': { tab: 'communication', dept: null },
+  'workspace': { tab: 'workspace', dept: null },
+  'admin': { tab: 'admin', dept: null }
 };
 
 export function parseHashRoute(hashStr = '') {
@@ -175,9 +188,11 @@ export function resolveActiveRoute(hashStr = '') {
 export function getCanonicalHashForTab(tab, queryString = '') {
   let alias = tab;
   if (tab === 'task_management') alias = 'tasks';
-  else if (tab === 'ee_invoices') alias = 'invoices';
+  else if (tab === 'ee_invoices') alias = 'finance';
+  else if (tab === 'jobcards_printing_log') alias = 'printing';
   else if (tab === 'jobcards_fusing_log') alias = 'fusing';
-  else if (tab === 'jobcards_fabric') alias = 'challans';
+  else if (tab === 'jobcards_fabric') alias = 'fabric';
+  else if (tab === 'jobcards_catalogue') alias = 'design';
   else if (tab === 'stock_ledger') alias = 'stock-ledger';
   return `#${alias}${queryString}`;
 }
@@ -1983,12 +1998,21 @@ export default function App() {
                 >
                   {visibleCompanies.map(company => {
                     const isActive = activeDepartment === company.id && !isCommActive;
+                    const COMPANY_TOOLTIPS = {
+                      EDP: 'EDP (Elite Digital Prints)',
+                      ES: 'ES (Elite Saree)',
+                      EE: 'EE (Elite Edition)',
+                      EF: 'EF (Elite Fabtex)',
+                      EON: 'EON (Elite Online)',
+                      SO: 'SO (Saree Outlet)'
+                    };
+                    const tooltipText = COMPANY_TOOLTIPS[company.code] || `${company.name} (${company.code})`;
                     return (
                       <button
                         key={company.id}
                         onClick={() => handleSwitchDepartment(company.id)}
                         className={`company-segment-pill ${isActive ? 'active' : ''}`}
-                        title={`${company.name} (${company.code})`}
+                        title={tooltipText}
                         type="button"
                         style={{
                           display: 'inline-flex',
@@ -2331,6 +2355,20 @@ export default function App() {
                   </span>
                 )}
               </button>
+
+              {/* Permanently Docked Enterprise Shortcut Pill: UI Scale, Chat & Tasks */}
+              <EnterpriseHUDThemeController 
+                isDocked={true}
+                activeTab={activeTab}
+                onNavigateTab={(tab) => {
+                  setActiveTab(tab);
+                  setMobileMenuOpen(false);
+                }}
+                hasCommunicationAccess={hasCommunicationAccess}
+                hasTaskAccess={hasTaskAccess}
+                chatUnreadCount={chatUnreadCount}
+                isAuthenticated={isAuthenticated}
+              />
 
               <button
                 onClick={() => {
@@ -3843,21 +3881,8 @@ export default function App() {
       {/* Scroll-Triggered Sticky Drop-Shadows Tracker */}
       <StickyScrollShadowTracker />
 
-      {/* Enterprise Floating Action Dock: UI Scale, Communication & Tasks */}
-      <EnterpriseHUDThemeController 
-        activeTab={activeTab}
-        onNavigateTab={(tab) => {
-          setActiveTab(tab);
-          setMobileMenuOpen(false);
-        }}
-        hasCommunicationAccess={hasCommunicationAccess}
-        hasTaskAccess={hasTaskAccess}
-        chatUnreadCount={chatUnreadCount}
-        isAuthenticated={isAuthenticated}
-      />
-
-      {/* Rotating Smart Tips Banner */}
-      <QuickTipPill />
+      {/* Rotating Smart Tips Banner (dismissible, hidden in chat/tasks) */}
+      <QuickTipPill activeTab={activeTab} />
 
       {/* Guided Feature Tour Controller */}
       <GuidedTourController />

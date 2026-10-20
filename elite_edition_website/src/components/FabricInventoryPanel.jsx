@@ -3025,7 +3025,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             })()}
 
             {/* Fabric Quality Cards with Panna breakdown */}
-            {displayStock.length === 0 && !loading && <p>No stock data found.</p>}
+            {loading && displayStock.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} style={{ padding: '1.25rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', animation: 'pulse 1.5s infinite' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ width: '160px', height: '16px', background: '#e2e8f0', borderRadius: '4px' }} />
+                      <div style={{ width: '220px', height: '12px', background: '#f1f5f9', borderRadius: '4px' }} />
+                    </div>
+                    <div style={{ width: '80px', height: '28px', background: '#e2e8f0', borderRadius: '6px' }} />
+                  </div>
+                ))}
+              </div>
+            ) : displayStock.length === 0 && !loading ? (
+              <p style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No stock data found.</p>
+            ) : null}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {[...displayStock].sort((a, b) => {
                 const stockA = Number(a.currentStock || 0);
@@ -3071,7 +3085,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             <span>Shortage: <strong style={{ color: '#d97706' }}>+{Number(item.totalShortage).toFixed(2)} mtr</strong></span>
                           )}
                           <span>Net Out: <strong style={{ color: '#b91c1c' }}>{Number(item.totalOutward || 0).toFixed(2)} mtr</strong></span>
-                          <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', color: '#475569' }}>{pannaRows.length} panna variant{pannaRows.length !== 1 ? 's' : ''}</span>
+                          {pannaRows.length > 0 && (
+                            <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', color: '#475569' }}>
+                              {pannaRows.length} width{pannaRows.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>

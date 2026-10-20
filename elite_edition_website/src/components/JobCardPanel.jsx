@@ -4059,7 +4059,17 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
                   {department === 'stitching' ? 'Stitching Job Cards' : 'Job Cards & Production'}
                 </h2>
                 <p className="ent-header-meta">
-                  <strong style={{ color: 'var(--primary)' }}>{total}</strong> Total Cards • <strong style={{ color: '#059669' }}>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr
+                  {loading && total === 0 ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ display: 'inline-block', width: '60px', height: '12px', background: '#cbd5e1', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                      <span>•</span>
+                      <span style={{ display: 'inline-block', width: '80px', height: '12px', background: '#cbd5e1', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                    </span>
+                  ) : (
+                    <>
+                      <strong style={{ color: 'var(--primary)' }}>{total}</strong> Total Cards • <strong style={{ color: '#059669' }}>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr
+                    </>
+                  )}
                 </p>
               </div>
             </div>

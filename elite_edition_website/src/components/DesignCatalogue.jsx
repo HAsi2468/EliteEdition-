@@ -1275,7 +1275,11 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                   : (department === 'stitching' ? 'Stitching Design Room' : 'Design Catalog')}
               </h2>
               <span className="ent-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                {total} Designs
+                {loading && total === 0 ? (
+                  <span style={{ display: 'inline-block', width: '48px', height: '10px', background: '#bfdbfe', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                ) : (
+                  `${total} Designs`
+                )}
               </span>
             </div>
           </div>

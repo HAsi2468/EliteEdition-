@@ -208,11 +208,13 @@
 .task-header-row-bottom {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
+  justify-content: flex-start !important;
   gap: 8px !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
   padding-top: 4px !important;
   border-top: 1px solid #f1f5f9 !important;
+  scrollbar-width: thin !important;
 }
 
 /* Search Box */

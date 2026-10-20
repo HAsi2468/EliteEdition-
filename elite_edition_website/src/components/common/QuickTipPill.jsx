@@ -17,16 +17,15 @@ const TIPS = [
  * Compact, rotating smart tip bar docked at the bottom corner of the layout.
  * Cycles through helpful shortcuts, with next/prev controls and session dismiss.
  */
-export function QuickTipPill() {
+export function QuickTipPill({ activeTab = '' }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isDismissed, setIsDismissed] = useState(false);
-
-  useEffect(() => {
-    const dismissed = sessionStorage.getItem('quick_tips_dismissed');
-    if (dismissed === 'true') {
-      setIsDismissed(true);
+  const [isDismissed, setIsDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('seen_tips') === 'true' || sessionStorage.getItem('quick_tips_dismissed') === 'true';
+    } catch (e) {
+      return false;
     }
-  }, []);
+  });
 
   // Auto-advance tip every 12 seconds
   useEffect(() => {
@@ -51,10 +50,15 @@ export function QuickTipPill() {
   const handleDismiss = (e) => {
     e.stopPropagation();
     setIsDismissed(true);
-    sessionStorage.setItem('quick_tips_dismissed', 'true');
+    try {
+      localStorage.setItem('seen_tips', 'true');
+      sessionStorage.setItem('quick_tips_dismissed', 'true');
+    } catch (err) {}
   };
 
-  if (isDismissed) return null;
+  // Never obstruct chat or tasks
+  if (isDismissed || activeTab === 'communication' || activeTab === 'task_management' || activeTab === 'workspace') return null;
+
 
   return (
     <div className="quick-tip-pill-dock" role="status" aria-live="polite">

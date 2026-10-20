@@ -107,27 +107,34 @@ function DashboardStats({ items, sales }) {
     categoryGroups[cat] = (categoryGroups[cat] || 0) + (item.currentlyAvailableStock || 0);
   });
   
-  const categoryData = Object.entries(categoryGroups)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
+  const sortedCategories = Object.entries(categoryGroups)
+    .sort((a, b) => b[1] - a[1]);
+    
+  const topCategories = sortedCategories.slice(0, 4);
+  const otherTotal = sortedCategories.slice(4).reduce((sum, [_, val]) => sum + val, 0);
+  
+  const categoryData = [...topCategories];
+  if (otherTotal > 0) {
+    categoryData.push(['Other', otherTotal]);
+  }
     
   const totalCatItems = Object.values(categoryGroups).reduce((sum, val) => sum + val, 0);
   
   const donutRadius = 50;
   const donutCircumference = 2 * Math.PI * donutRadius;
   let cumulativeOffset = 0;
-  const categoryColors = ['#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+  const categoryColors = ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#64748b'];
 
   const donutSlices = categoryData.map(([name, val], idx) => {
-    const percentage = totalCatItems > 0 ? (val / totalCatItems) : 0;
-    const strokeLength = percentage * donutCircumference;
+    const rawPct = totalCatItems > 0 ? (val / totalCatItems) * 100 : 0;
+    const strokeLength = (rawPct / 100) * donutCircumference;
     const strokeOffset = donutCircumference - strokeLength + cumulativeOffset;
     cumulativeOffset -= strokeLength;
     return {
       name, val,
-      percentage: Math.round(percentage * 100),
+      percentage: rawPct > 0 && rawPct < 1 ? Number(rawPct.toFixed(1)) : Math.round(rawPct),
       strokeLength, strokeOffset,
-      color: categoryColors[idx] || '#6b7280'
+      color: categoryColors[idx % categoryColors.length]
     };
   });
 
@@ -372,7 +379,7 @@ function DashboardStats({ items, sales }) {
                   ))}
                   {/* Center Text */}
                   <text x="80" y="75" textAnchor="middle" fill="var(--text-muted)" fontSize="8" fontWeight="600" letterSpacing="0.05em">TOTAL</text>
-                  <text x="80" y="93" textAnchor="middle" fill="#0f172a" fontSize="14" fontWeight="bold">{totalStock}</text>
+                  <text x="80" y="93" textAnchor="middle" fill="#0f172a" fontSize="13" fontWeight="bold">{new Intl.NumberFormat('en-IN').format(totalCatItems)}</text>
                 </svg>
                 
                 {/* Donut Legend */}
