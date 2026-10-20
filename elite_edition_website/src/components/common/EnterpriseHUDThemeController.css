@@ -505,3 +505,30 @@
   border: 2px solid #2563eb;
   box-shadow: 0 0 20px rgba(37, 99, 235, 0.35);
 }
+
+/* Mobile Viewport Optimization (< 768px): Minimal Circular FAB mode (D-P3 Fix) */
+@media (max-width: 768px) {
+  .floating-enterprise-dock {
+    bottom: 1rem !important;
+    right: 1rem !important;
+    left: auto !important;
+    top: auto !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    justify-content: center;
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35) !important;
+  }
+
+  .floating-enterprise-dock .dock-brand,
+  .floating-enterprise-dock .dock-divider,
+  .floating-enterprise-dock .dock-slider-row,
+  .floating-enterprise-dock .dock-presets-row,
+  .floating-enterprise-dock .dock-quick-links,
+  .floating-enterprise-dock .dock-drag-handle {
+    display: none !important;
+  }
+}

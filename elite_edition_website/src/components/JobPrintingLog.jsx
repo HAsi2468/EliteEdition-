@@ -5,7 +5,7 @@ import {
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, ArrowUpFromLine, ArrowDownToLine,
   Zap, Droplets, TrendingUp, BarChart3, ListFilter, PlayCircle,
-  ChevronDown, ChevronUp, History, Filter, FileSpreadsheet
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ArrowUpDown, History, Filter, FileSpreadsheet
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD, formatForInputDate } from '../utils/dateUtils';
@@ -70,6 +70,22 @@ export default function JobPrintingLog() {
   const [dateEnd, setDateEnd] = useState(() => toLocalYMD());
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
+
+  // Server-side Pagination & Sorting State (D-P1 & D-P2 Fix)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortField, setSortField] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [serverKpis, setServerKpis] = useState({ totalMeters: 0, morningMeters: 0, nightMeters: 0, uniqueJobsCount: 0, totalLogs: 0 });
+  const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileScreen(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Edit Mode state
   const [editingLogId, setEditingLogId] = useState(null);
@@ -756,7 +772,7 @@ export default function JobPrintingLog() {
     }
   };
 
-  // Load Print Logs List
+  // Load Print Logs List (D-P1 & D-P2 Fix: Server-side pagination, sorting, and aggregate KPIs)
   const fetchLogs = async (overrideDateStart, overrideDateEnd) => {
     setLoading(true);
     setError('');
@@ -765,12 +781,16 @@ export default function JobPrintingLog() {
     try {
       const res = await api.getJobPrintLogs({
         jobNo: searchJob,
+        search: searchJob,
         machineName: printFilters.machine && printFilters.machine.length > 0 ? printFilters.machine.join(',') : undefined,
         operatorName: printFilters.operator && printFilters.operator.length > 0 ? printFilters.operator.join(',') : undefined,
         shift: printFilters.shift && printFilters.shift.length > 0 ? printFilters.shift.join(',') : undefined,
         dateStart: ds,
         dateEnd: de,
-        limit: 500
+        page: currentPage,
+        limit: pageSize,
+        sortField,
+        sortOrder
       });
       if (res && res.data) {
         let fetchedLogs = res.data;
@@ -778,6 +798,17 @@ export default function JobPrintingLog() {
           fetchedLogs = fetchedLogs.filter(l => printFilters.pass.includes(l.pass));
         }
         setLogs(fetchedLogs);
+        if (res.kpis) {
+          setServerKpis(res.kpis);
+        } else if (res.totalMeters !== undefined) {
+          setServerKpis(prev => ({
+            ...prev,
+            totalMeters: res.totalMeters || 0,
+            totalLogs: res.total || res.data.length
+          }));
+        }
+        if (res.pages !== undefined) setTotalPages(res.pages);
+        if (res.total !== undefined) setTotalCount(res.total);
       }
       await fetchRawMaterialSummary(ds, de);
     } catch (err) {
@@ -785,6 +816,43 @@ export default function JobPrintingLog() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder(field === 'meters' ? 'desc' : 'asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const renderSortHeader = (label, field, align = 'left') => {
+    const isSorted = sortField === field;
+    return (
+      <th
+        onClick={() => handleSort(field)}
+        style={{
+          ...thStyle,
+          textAlign: align,
+          cursor: 'pointer',
+          userSelect: 'none',
+          color: isSorted ? '#38bdf8' : 'var(--text-muted)',
+          transition: 'color 0.2s ease'
+        }}
+        title={`Sort by ${label} (${isSorted && sortOrder === 'asc' ? 'Descending' : 'Ascending'})`}
+      >
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
+          <span>{label}</span>
+          {isSorted ? (
+            sortOrder === 'asc' ? <ChevronUp size={13} color="#38bdf8" /> : <ChevronDown size={13} color="#38bdf8" />
+          ) : (
+            <ArrowUpDown size={11} style={{ opacity: 0.35 }} />
+          )}
+        </div>
+      </th>
+    );
   };
 
   useEffect(() => {
@@ -801,9 +869,14 @@ export default function JobPrintingLog() {
     return () => window.removeEventListener('elite-data-refresh', handleDataRefresh);
   }, []);
 
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchJob, printFilters, dateStart, dateEnd]);
+
   useEffect(() => {
     fetchLogs();
-  }, [searchJob, printFilters, dateStart, dateEnd]);
+  }, [searchJob, printFilters, dateStart, dateEnd, currentPage, pageSize, sortField, sortOrder]);
 
   // ── ARCHIVE LOGS FETCHER ──
   const fetchArchiveLogs = async (overrideStart, overrideEnd) => {
@@ -1401,23 +1474,33 @@ export default function JobPrintingLog() {
     });
 
     // Sublimation Ink consumption: industry standard 16 ml / meter
-    const estimatedInkLiters = (totalMtr * 0.016).toFixed(1);
+    const effectiveTotalMtr = (serverKpis && serverKpis.totalMeters !== undefined && serverKpis.totalMeters > 0)
+      ? serverKpis.totalMeters
+      : totalMtr;
+    const effectiveMorningMtr = (serverKpis && serverKpis.morningMeters !== undefined && serverKpis.morningMeters > 0)
+      ? serverKpis.morningMeters
+      : morningMtr;
+    const effectiveNightMtr = (serverKpis && serverKpis.nightMeters !== undefined && serverKpis.nightMeters > 0)
+      ? serverKpis.nightMeters
+      : nightMtr;
+
+    const estimatedInkLiters = (effectiveTotalMtr * 0.016).toFixed(1);
     // Sublimation Paper: approx 1.45 sq. meters per running meter (58" width)
-    const estimatedPaperSqM = (totalMtr * 1.45).toFixed(1);
+    const estimatedPaperSqM = (effectiveTotalMtr * 1.45).toFixed(1);
 
     const topOperator = Object.entries(operatorMap).sort((a, b) => b[1] - a[1])[0] || ['—', 0];
     const topMachine = Object.entries(machineMap).sort((a, b) => b[1] - a[1])[0] || ['—', 0];
 
     return {
-      totalMtr,
-      morningMtr,
-      nightMtr,
+      totalMtr: effectiveTotalMtr,
+      morningMtr: effectiveMorningMtr,
+      nightMtr: effectiveNightMtr,
       estimatedInkLiters,
       estimatedPaperSqM,
       topOperator: { name: topOperator[0], mtr: topOperator[1] },
       topMachine: { name: topMachine[0], mtr: topMachine[1] }
     };
-  }, [logs]);
+  }, [logs, serverKpis]);
 
   // ── Live Machine Fleet Output & Status ──
   const machineFleetStats = useMemo(() => {
@@ -2520,99 +2603,330 @@ export default function JobPrintingLog() {
           />
         </div>
 
-        {/* Logs Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.83rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                <th style={thStyle}>Date & Time</th>
-                <th style={thStyle}>Job No</th>
-                <th style={thStyle}>Machine Name</th>
-                <th style={thStyle}>Pass</th>
-                <th style={thStyle}>Meters Printed</th>
-                <th style={thStyle}>Operator</th>
-                <th style={thStyle}>Shift</th>
-                <th style={thStyle}>Remarks</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.length === 0 ? (
-                <tr>
-                  <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    No machine print logs found for the selected date range.
-                  </td>
-                </tr>
-              ) : (
-                logs
-                  .filter(log => matchSearchQuery(log, searchJob, ['jobNo', 'machineName', 'pass', 'operatorName', 'notes', 'shift']))
-                  .map(log => (
-                    <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={tdStyle}>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</td>
-                      <td style={{ ...tdStyle, fontWeight: 800, color: 'var(--text-primary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        {/* Logs Table (Desktop) or Card List (Mobile) */}
+        {isMobileScreen ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {logs.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No machine print logs found for the selected date range.
+              </div>
+            ) : (
+              logs
+                .filter(log => matchSearchQuery(log, searchJob, ['jobNo', 'machineName', 'pass', 'operatorName', 'notes', 'shift']))
+                .map(log => {
+                  const jc = jobCards.find(c => String(c.jobNo) === String(log.jobNo));
+                  const isReadyFusing = jc && (jc.printStatus === 'Printing Done' || jc.fusingStatus === 'Fusing Pending');
+                  return (
+                    <div
+                      key={log._id}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid var(--border-light)',
+                        borderRadius: '8px',
+                        padding: '0.85rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      {/* Card Header: Job No, Ready badge, Action buttons */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <button
                             onClick={() => loadJobCardHistory(log.jobNo)}
-                            style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
+                            style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
                           >
                             #{log.jobNo}
                           </button>
-                          {(() => {
-                            const jc = jobCards.find(c => String(c.jobNo) === String(log.jobNo));
-                            if (jc && (jc.printStatus === 'Printing Done' || jc.fusingStatus === 'Fusing Pending')) {
-                              return (
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }} title="Completed printing - ready for heat press">
-                                  🔥 Ready for Fusing
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
+                          {isReadyFusing && (
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
+                              🔥 Ready for Fusing
+                            </span>
+                          )}
                         </div>
-                      </td>
-                      <td style={{ ...tdStyle, fontWeight: 700 }}>{log.machineName}</td>
-                      <td style={tdStyle}>{log.pass}</td>
-                      <td style={{ ...tdStyle, fontWeight: 900, color: '#34d399' }}>{Number(log.meters).toFixed(2)} mtr</td>
-                      <td style={tdStyle}>{log.operatorName || '—'}</td>
-                      <td style={tdStyle}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: log.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', color: log.shift === 'Morning' ? '#38bdf8' : '#a78bfa' }}>
-                          {log.shift || 'Morning'}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{log.notes || '—'}</td>
-                      <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
                           {!isOlderThan36Hours(log.created_date_time || log.createdAt || log.date) && (
                             <button
                               onClick={() => handleOpenEditModal(log)}
                               style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
-                              title="Edit Print Log Entry"
+                              title="Edit"
                             >
-                              <Edit2 size={14} />
+                              <Edit2 size={13} />
                             </button>
                           )}
                           <button
                             onClick={() => loadJobCardHistory(log.jobNo)}
-                            className="btn-icon"
-                            title="View Job Card Run History"
-                            style={{ padding: '0.3rem' }}
+                            style={{ padding: '0.3rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', borderRadius: 4, cursor: 'pointer' }}
+                            title="History"
                           >
-                            <Eye size={14} />
+                            <Eye size={13} />
                           </button>
                           <button
                             onClick={() => handleDeleteLog(log._id, log.jobNo)}
                             style={{ padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 4, cursor: 'pointer' }}
-                            title="Delete Log Entry"
+                            title="Delete"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
+                      </div>
+
+                      {/* Card Meta: Date & Shift */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: log.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', color: log.shift === 'Morning' ? '#38bdf8' : '#a78bfa' }}>
+                          {log.shift || 'Morning'}
+                        </span>
+                      </div>
+
+                      {/* Card Details: Machine, Pass, Meters, Operator */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.1)', padding: '0.5rem', borderRadius: '6px', fontSize: '0.8rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Machine / Pass</div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{log.machineName} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({log.pass})</span></div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Meters Printed</div>
+                          <div style={{ fontWeight: 900, color: '#34d399', fontSize: '0.92rem' }}>{Number(log.meters).toFixed(2)} mtr</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Operator</div>
+                          <div style={{ color: 'var(--text-primary)' }}>{log.operatorName || '—'}</div>
+                        </div>
+                        {log.notes && (
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Remarks</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.notes}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.83rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
+                  {renderSortHeader('Date & Time', 'date')}
+                  {renderSortHeader('Job No', 'jobNo')}
+                  {renderSortHeader('Machine Name', 'machineName')}
+                  <th style={thStyle}>Pass</th>
+                  {renderSortHeader('Meters Printed', 'meters')}
+                  {renderSortHeader('Operator', 'operatorName')}
+                  {renderSortHeader('Shift', 'shift')}
+                  <th style={thStyle}>Remarks</th>
+                  <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No machine print logs found for the selected date range.
+                    </td>
+                  </tr>
+                ) : (
+                  logs
+                    .filter(log => matchSearchQuery(log, searchJob, ['jobNo', 'machineName', 'pass', 'operatorName', 'notes', 'shift']))
+                    .map(log => (
+                      <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={tdStyle}>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</td>
+                        <td style={{ ...tdStyle, fontWeight: 800, color: 'var(--text-primary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => loadJobCardHistory(log.jobNo)}
+                              style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              #{log.jobNo}
+                            </button>
+                            {(() => {
+                              const jc = jobCards.find(c => String(c.jobNo) === String(log.jobNo));
+                              if (jc && (jc.printStatus === 'Printing Done' || jc.fusingStatus === 'Fusing Pending')) {
+                                return (
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }} title="Completed printing - ready for heat press">
+                                    🔥 Ready for Fusing
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </td>
+                        <td style={{ ...tdStyle, fontWeight: 700 }}>{log.machineName}</td>
+                        <td style={tdStyle}>{log.pass}</td>
+                        <td style={{ ...tdStyle, fontWeight: 900, color: '#34d399' }}>{Number(log.meters).toFixed(2)} mtr</td>
+                        <td style={tdStyle}>{log.operatorName || '—'}</td>
+                        <td style={tdStyle}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: log.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', color: log.shift === 'Morning' ? '#38bdf8' : '#a78bfa' }}>
+                            {log.shift || 'Morning'}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{log.notes || '—'}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                            {!isOlderThan36Hours(log.created_date_time || log.createdAt || log.date) && (
+                              <button
+                                onClick={() => handleOpenEditModal(log)}
+                                style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
+                                title="Edit Print Log Entry"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => loadJobCardHistory(log.jobNo)}
+                              className="btn-icon"
+                              title="View Job Card Run History"
+                              style={{ padding: '0.3rem' }}
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLog(log._id, log.jobNo)}
+                              style={{ padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 4, cursor: 'pointer' }}
+                              title="Delete Log Entry"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination Controls (D-P1 Fix) */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          paddingTop: '0.75rem',
+          borderTop: '1px solid var(--border-light)',
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span>
+              Showing {totalCount > 0 ? (currentPage - 1) * pageSize + 1 : (logs.length > 0 ? 1 : 0)} - {Math.min(currentPage * pageSize, totalCount || logs.length)} of {totalCount || logs.length} logs
+            </span>
+            {serverKpis && serverKpis.totalMeters > 0 && (
+              <span style={{ fontWeight: 800, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: 4 }}>
+                Total: {serverKpis.totalMeters.toFixed(2)} mtr
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <label style={{ fontSize: '0.75rem' }}>Per Page:</label>
+              <select
+                value={pageSize}
+                onChange={e => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.75rem',
+                  background: 'var(--bg-input, #1e293b)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: 4,
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage <= 1 || loading}
+                style={{
+                  padding: '0.3rem 0.55rem',
+                  fontSize: '0.75rem',
+                  borderRadius: 4,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-light)',
+                  color: currentPage <= 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                  cursor: currentPage <= 1 ? 'not-allowed' : 'pointer'
+                }}
+                title="First Page"
+              >
+                «
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage <= 1 || loading}
+                style={{
+                  padding: '0.3rem 0.6rem',
+                  fontSize: '0.75rem',
+                  borderRadius: 4,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-light)',
+                  color: currentPage <= 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                  cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px'
+                }}
+                title="Previous Page"
+              >
+                <ChevronLeft size={13} /> Prev
+              </button>
+
+              <span style={{ padding: '0 0.5rem', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.78rem' }}>
+                Page {currentPage} of {Math.max(1, totalPages)}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages || loading}
+                style={{
+                  padding: '0.3rem 0.6rem',
+                  fontSize: '0.75rem',
+                  borderRadius: 4,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-light)',
+                  color: currentPage >= totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
+                  cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px'
+                }}
+                title="Next Page"
+              >
+                Next <ChevronRight size={13} />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage >= totalPages || loading}
+                style={{
+                  padding: '0.3rem 0.55rem',
+                  fontSize: '0.75rem',
+                  borderRadius: 4,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-light)',
+                  color: currentPage >= totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
+                  cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
+                }}
+                title="Last Page"
+              >
+                »
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>

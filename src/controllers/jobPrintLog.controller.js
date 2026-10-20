@@ -99,33 +99,54 @@ const createPrintLog = async (req, res) => {
     if (!jobNo && !jobCardId) {
       return res.status(400).json({ success: false, error: 'Job Card Number or ID is required.' });
     }
-    if (!machineName) {
+    if (!machineName || !String(machineName).trim()) {
       return res.status(400).json({ success: false, error: 'Machine Name is required.' });
     }
-    if (meters === undefined || meters === null || Number(meters) <= 0) {
-      return res.status(400).json({ success: false, error: 'Printed Meters must be greater than 0.' });
+
+    const numMeters = Number(meters);
+    if (meters === undefined || meters === null || isNaN(numMeters) || numMeters < 0.01 || numMeters > 50000) {
+      return res.status(400).json({ success: false, error: 'Printed Meters must be a valid number between 0.01 and 50,000.' });
     }
 
-    // Resolve Job Card
+    // Reject future dates (allow 2 minutes clock skew)
+    let logDate = new Date();
+    if (date) {
+      const parsed = parseFlexibleDate(date);
+      if (!parsed || isNaN(parsed.getTime())) {
+        return res.status(400).json({ success: false, error: 'Invalid print log date format.' });
+      }
+      if (parsed.getTime() > Date.now() + 2 * 60 * 1000) {
+        return res.status(400).json({ success: false, error: 'Print log date cannot be in the future.' });
+      }
+      logDate = parsed;
+    }
+
+    // Resolve Job Card and verify it exists and is active
     let targetJob = null;
     if (jobCardId) {
       targetJob = await JobCard.findById(jobCardId);
     }
     if (!targetJob && jobNo) {
-      targetJob = await JobCard.findOne({ jobNo: jobNo.trim() });
+      targetJob = await JobCard.findOne({ jobNo: String(jobNo).trim() });
     }
 
     if (!targetJob) {
       return res.status(404).json({ success: false, error: `Job Card #${jobNo || jobCardId} not found.` });
     }
+    if (targetJob.status === 'Cancelled' || targetJob.status === 'Archived') {
+      return res.status(400).json({
+        success: false,
+        error: `Job Card #${targetJob.jobNo} is ${targetJob.status}. Cannot log printing on inactive job card.`
+      });
+    }
 
     const printLog = new JobPrintLog({
       jobCardId: targetJob._id,
       jobNo: targetJob.jobNo,
-      machineName: machineName.trim(),
+      machineName: String(machineName).trim(),
       pass: pass || targetJob.pass || '4 Pass',
-      meters: Number(meters),
-      date: date ? (parseFlexibleDate(date) || new Date()) : new Date(),
+      meters: numMeters,
+      date: logDate,
       operatorName: operatorName || req.user?.name || '',
       shift: shift || 'General',
       notes: notes || ''
@@ -138,7 +159,7 @@ const createPrintLog = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: `Logged ${meters} mtr print run for Job #${targetJob.jobNo} on ${machineName}`,
+      message: `Logged ${numMeters} mtr print run for Job #${targetJob.jobNo} on ${machineName}`,
       data: printLog,
       summary
     });
@@ -166,23 +187,54 @@ function parseFlexibleDate(dateInput, isEnd = false) {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
-// 2. Get all Print Logs with pagination & filters
+// 2. Get all Print Logs with server-side pagination & MongoDB $facet aggregate KPIs (D-P1 Fix)
 const getPrintLogs = async (req, res) => {
   try {
-    const { jobNo, machineName, operatorName, shift, dateStart, dateEnd, page = 1, limit = 500 } = req.query;
+    const {
+      jobNo,
+      search,
+      machine,
+      machineName,
+      operatorName,
+      shift,
+      startDate,
+      endDate,
+      dateStart,
+      dateEnd,
+      page = 1,
+      limit = 50,
+      sortField = 'date',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const parsedLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const parsedPage = Math.max(Number(page) || 1, 1);
+    const skip = (parsedPage - 1) * parsedLimit;
 
     const filter = {};
-    if (jobNo) {
-      filter.jobNo = { $regex: jobNo.trim(), $options: 'i' };
+
+    // Search query across Job No, Machine Name, Operator, Notes
+    const searchQuery = search || jobNo;
+    if (searchQuery && String(searchQuery).trim()) {
+      const q = String(searchQuery).trim();
+      filter.$or = [
+        { jobNo: { $regex: q, $options: 'i' } },
+        { machineName: { $regex: q, $options: 'i' } },
+        { operatorName: { $regex: q, $options: 'i' } },
+        { notes: { $regex: q, $options: 'i' } }
+      ];
     }
-    if (machineName) {
-      const machines = String(machineName).split(',').map(m => m.trim()).filter(Boolean);
+
+    const machInput = machineName || machine;
+    if (machInput) {
+      const machines = String(machInput).split(',').map(m => m.trim()).filter(Boolean);
       if (machines.length > 1) {
         filter.machineName = { $in: machines.map(m => new RegExp(`^${m.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')) };
       } else if (machines.length === 1) {
         filter.machineName = { $regex: machines[0], $options: 'i' };
       }
     }
+
     if (operatorName) {
       const operators = String(operatorName).split(',').map(o => o.trim()).filter(Boolean);
       if (operators.length > 1) {
@@ -191,6 +243,7 @@ const getPrintLogs = async (req, res) => {
         filter.operatorName = { $regex: operators[0], $options: 'i' };
       }
     }
+
     if (shift) {
       const shifts = String(shift).split(',').map(s => s.trim()).filter(Boolean);
       if (shifts.length > 1) {
@@ -200,9 +253,11 @@ const getPrintLogs = async (req, res) => {
       }
     }
 
-    if (dateStart || dateEnd) {
-      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
-      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+    const startVal = dateStart || startDate;
+    const endVal = dateEnd || endDate;
+    if (startVal || endVal) {
+      const dsStr = startVal ? String(startVal).split('T')[0] : '';
+      const deStr = endVal ? String(endVal).split('T')[0] : '';
 
       let minTime = null;
       let maxTime = null;
@@ -223,30 +278,98 @@ const getPrintLogs = async (req, res) => {
       if (minTime !== null) dateQuery.$gte = new Date(minTime);
       if (maxTime !== null) dateQuery.$lte = new Date(maxTime);
 
-      filter.$or = [
+      const dateFilterCondition = [
         { date: dateQuery },
         { createdAt: dateQuery }
       ];
+
+      if (filter.$or) {
+        filter.$and = [
+          { $or: filter.$or },
+          { $or: dateFilterCondition }
+        ];
+        delete filter.$or;
+      } else {
+        filter.$or = dateFilterCondition;
+      }
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const total = await JobPrintLog.countDocuments(filter);
-    const logs = await JobPrintLog.find(filter)
-      .sort({ date: -1, created_date_time: -1 })
-      .skip(skip)
-      .limit(Number(limit))
-      .lean();
+    // Dynamic Sorting (D-P2 Fix)
+    const allowedSortFields = {
+      date: 'date',
+      meters: 'meters',
+      jobNo: 'jobNo',
+      machine: 'machineName',
+      machineName: 'machineName',
+      operator: 'operatorName',
+      operatorName: 'operatorName',
+      shift: 'shift',
+      created_date_time: 'created_date_time'
+    };
+    const sField = allowedSortFields[sortField] || 'date';
+    const sDirection = String(sortOrder).toLowerCase() === 'asc' ? 1 : -1;
+    const sortStage = { [sField]: sDirection };
+    if (sField !== 'created_date_time' && sField !== 'date') {
+      sortStage.date = -1;
+    }
 
-    // Summary statistics for query
-    const totalMeters = logs.reduce((s, l) => s + (l.meters || 0), 0);
+    // Execute aggregation with $facet for pagination + uncorrupted KPIs across full filtered set
+    const results = await JobPrintLog.aggregate([
+      { $match: filter },
+      {
+        $facet: {
+          logs: [
+            { $sort: sortStage },
+            { $skip: skip },
+            { $limit: parsedLimit }
+          ],
+          totalCount: [{ $count: 'count' }],
+          aggregates: [
+            {
+              $group: {
+                _id: null,
+                totalMeters: { $sum: '$meters' },
+                totalJobs: { $addToSet: '$jobNo' },
+                morningMeters: {
+                  $sum: {
+                    $cond: [{ $eq: ['$shift', 'Morning'] }, '$meters', 0]
+                  }
+                },
+                nightMeters: {
+                  $sum: {
+                    $cond: [{ $eq: ['$shift', 'Night'] }, '$meters', 0]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]);
+
+    const facetData = results[0] || {};
+    const logs = facetData.logs || [];
+    const total = facetData.totalCount && facetData.totalCount[0] ? facetData.totalCount[0].count : 0;
+    const agg = facetData.aggregates && facetData.aggregates[0] ? facetData.aggregates[0] : {};
+    const totalMeters = agg.totalMeters || 0;
+    const morningMeters = agg.morningMeters || 0;
+    const nightMeters = agg.nightMeters || 0;
+    const totalUniqueJobs = agg.totalJobs ? agg.totalJobs.length : 0;
 
     res.status(200).json({
       success: true,
       total,
-      page: Number(page),
-      limit: Number(limit),
-      pages: Math.ceil(total / Number(limit)),
-      totalMeters,
+      page: parsedPage,
+      limit: parsedLimit,
+      pages: Math.ceil(total / parsedLimit) || 1,
+      totalMeters: Number(totalMeters.toFixed(2)),
+      kpis: {
+        totalMeters: Number(totalMeters.toFixed(2)),
+        morningMeters: Number(morningMeters.toFixed(2)),
+        nightMeters: Number(nightMeters.toFixed(2)),
+        uniqueJobsCount: totalUniqueJobs,
+        totalLogs: total
+      },
       data: logs
     });
   } catch (error) {
@@ -323,12 +446,22 @@ const updatePrintLog = async (req, res) => {
 
     if (machineName !== undefined) log.machineName = String(machineName).trim();
     if (pass !== undefined) log.pass = pass;
-    if (meters !== undefined) log.meters = Number(meters);
+    if (meters !== undefined) {
+      const numMeters = Number(meters);
+      if (isNaN(numMeters) || numMeters < 0.01 || numMeters > 50000) {
+        return res.status(400).json({ success: false, error: 'Printed Meters must be a valid number between 0.01 and 50,000.' });
+      }
+      log.meters = numMeters;
+    }
     if (date !== undefined) {
       const parsed = parseFlexibleDate(date);
-      if (parsed && !isNaN(parsed.getTime())) {
-        log.date = parsed;
+      if (!parsed || isNaN(parsed.getTime())) {
+        return res.status(400).json({ success: false, error: 'Invalid print log date format.' });
       }
+      if (parsed.getTime() > Date.now() + 2 * 60 * 1000) {
+        return res.status(400).json({ success: false, error: 'Print log date cannot be in the future.' });
+      }
+      log.date = parsed;
     }
     if (operatorName !== undefined) log.operatorName = operatorName;
     if (shift !== undefined) {

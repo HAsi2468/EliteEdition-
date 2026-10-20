@@ -266,6 +266,34 @@ export class SilentAuthInterceptor {
   public isRefreshInProgress(): boolean {
     return this.isRefreshing;
   }
+
+  /**
+   * Idle Activity Extender: Resets client session timers on user interactions
+   * (mousemove, keydown, touchstart, scroll) and ensures tokens don't expire for active users.
+   */
+  public initIdleActivityExtender(): void {
+    if (typeof window === 'undefined') return;
+
+    let lastInteraction = Date.now();
+    const THROTTLE_MS = 30000; // Throttle to once every 30 seconds
+
+    const handleInteraction = () => {
+      const now = Date.now();
+      if (now - lastInteraction >= THROTTLE_MS) {
+        lastInteraction = now;
+        try {
+          localStorage.setItem('elite_last_active', String(now));
+        } catch (_) {}
+      }
+    };
+
+    ['mousemove', 'keydown', 'touchstart', 'scroll'].forEach((evt) => {
+      window.addEventListener(evt, handleInteraction, { passive: true });
+    });
+  }
 }
 
 export const silentAuth = new SilentAuthInterceptor();
+if (typeof window !== 'undefined') {
+  silentAuth.initIdleActivityExtender();
+}
