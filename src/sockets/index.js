@@ -48,11 +48,28 @@ const setupSockets = (io) => {
         return next(new Error('unauthorized'));
       }
 
-      const user = await User.findById(uid)
-        .select('_id companyId company_id role isActive allowedCompanies isMainAdmin email name')
+      let user = await User.findById(uid)
+        .select('_id companyId company_id role isActive status allowedCompanies isMainAdmin email name')
         .lean();
 
-      if (!user || user.isActive === false) {
+      if (!user) {
+        try {
+          const clientModel = require('../db/models/client.model');
+          const client = await clientModel.findById(uid).lean();
+          if (client) {
+            user = {
+              ...client,
+              _id: client._id,
+              role: 'Client',
+              isActive: client.status !== 'Inactive',
+              companyId: client.companyId || client.companyCode || 'digital_print',
+              name: client.username || client.companyName
+            };
+          }
+        } catch (cErr) {}
+      }
+
+      if (!user || user.isActive === false || user.status === 'Inactive') {
         return next(new Error('unauthorized'));
       }
 
@@ -272,9 +289,14 @@ const setupSockets = (io) => {
     // Register user to personal channel
     socket.on('register-user', (userId) => {
       socket.join(`user_${userId}`);
+      socket.join(`user:${userId}`);
       activeUsers.set(socket.id, userId);
       socket.userId = userId;
-      io.emit('presence-sync', getOnlineUserIds());
+      if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
+        socket.authorizedCompanies.forEach((cid) => {
+          io.to(`company:${cid}`).emit('presence-sync', getOnlineUserIds());
+        });
+      }
     });
 
     // Handle sending a standard text message (supports quoted replies, attachments, mentions, priority, voice notes, record cards)
@@ -667,14 +689,15 @@ const setupSockets = (io) => {
           io.to(roomId).emit('receive-message', populatedMessage);
         }
         
-        // Emit a separate event for the global Kanban board to update live
+        // Emit a separate event for the Kanban board to update live within company room
         const fullyPopulatedTask = await Task.findById(newTask._id)
           .populate('assignees', 'name email')
           .populate('comments.sender', 'name username email')
           .populate('timeLogs.user', 'name username email')
           .populate('activityLogs.user', 'name username email')
           .populate('subTasks.assignee', 'name email');
-        io.emit('task-updated', fullyPopulatedTask);
+        const taskCompany = fullyPopulatedTask?.companyId ? normalizeCompanyId(fullyPopulatedTask.companyId) : (socket.activeCompanyId || 'digital_print');
+        io.to(`company:${taskCompany}`).emit('task-updated', fullyPopulatedTask);
       } catch (error) {
         console.error('Error creating task from chat:', error);
       }
@@ -707,8 +730,9 @@ const setupSockets = (io) => {
         .populate('activityLogs.user', 'name username email')
         .populate('subTasks.assignee', 'name email');
 
-        // Broadcast to everyone so their UI flips the status color
-        io.emit('task-updated', updatedTask);
+        // Broadcast to relevant company room so their UI flips the status color
+        const taskCompany = updatedTask?.companyId ? normalizeCompanyId(updatedTask.companyId) : (socket.activeCompanyId || 'digital_print');
+        io.to(`company:${taskCompany}`).emit('task-updated', updatedTask);
       } catch (error) {
         console.error('Error updating task status:', error);
       }
@@ -738,8 +762,9 @@ const setupSockets = (io) => {
         .populate('activityLogs.user', 'name username email')
         .populate('subTasks.assignee', 'name email');
 
-        // Broadcast updated task details to all connected clients
-        io.emit('task-updated', updatedTask);
+        // Broadcast updated task details to company room
+        const taskCompany = updatedTask?.companyId ? normalizeCompanyId(updatedTask.companyId) : (socket.activeCompanyId || 'digital_print');
+        io.to(`company:${taskCompany}`).emit('task-updated', updatedTask);
       } catch (error) {
         console.error('Error updating task details:', error);
       }
@@ -751,8 +776,9 @@ const setupSockets = (io) => {
         const { taskId } = data;
         await Task.findByIdAndDelete(taskId);
 
-        // Broadcast deletion event to all connected clients
-        io.emit('task-deleted', taskId);
+        // Broadcast deletion event to company room
+        const taskCompany = socket.activeCompanyId || 'digital_print';
+        io.to(`company:${taskCompany}`).emit('task-deleted', taskId);
       } catch (error) {
         console.error('Error deleting task:', error);
       }
@@ -844,8 +870,14 @@ const setupSockets = (io) => {
         // Broadcast to everyone in the room
         io.to(roomId).emit('room-settings-updated', populatedRoom);
         
-        // Also notify all users globally to update sidebar
-        io.emit('global-room-updated', populatedRoom);
+        // Notify members in their personal channels
+        if (populatedRoom.members && Array.isArray(populatedRoom.members)) {
+          populatedRoom.members.forEach((m) => {
+            const mid = String(m._id || m);
+            io.to(`user:${mid}`).emit('global-room-updated', populatedRoom);
+            io.to(`user_${mid}`).emit('global-room-updated', populatedRoom);
+          });
+        }
       } catch (error) {
         console.error('Error updating room settings:', error);
       }
@@ -946,7 +978,8 @@ const setupSockets = (io) => {
           .populate('senderId', 'name username email');
 
         io.to(String(roomId)).emit('receive-message', populatedBotMsg);
-        io.emit('job-stage-updated', { jobCardId, jobNo: card.jobNo, newStage, prevStage });
+        const jobCompany = card.companyId ? normalizeCompanyId(card.companyId) : (socket.activeCompanyId || 'digital_print');
+        io.to(`company:${jobCompany}`).emit('job-stage-updated', { jobCardId, jobNo: card.jobNo, newStage, prevStage });
 
         // Dispatch Web Push to relevant room members
         try {
@@ -1018,7 +1051,8 @@ const setupSockets = (io) => {
         });
 
         io.to(String(roomId)).emit('receive-message', botMsg);
-        io.emit('proof-status-updated', { jobCardId, jobNo: card.jobNo, status, clientFeedback });
+        const jobCompany = card.companyId ? normalizeCompanyId(card.companyId) : (socket.activeCompanyId || 'digital_print');
+        io.to(`company:${jobCompany}`).emit('proof-status-updated', { jobCardId, jobNo: card.jobNo, status, clientFeedback });
       } catch (err) {
         console.error('Error updating proof approval socket:', err);
       }

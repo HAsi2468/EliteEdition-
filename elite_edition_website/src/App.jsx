@@ -134,6 +134,9 @@ export default function App() {
       if (!savedTab && typeof localStorage !== 'undefined') {
         savedTab = localStorage.getItem('elite_active_tab') || '';
       }
+      if (savedTab === 'tasks' || savedTab === 'task' || savedTab === 'task-manager') {
+        savedTab = 'task_management';
+      }
       if (typeof localStorage !== 'undefined') {
         savedDept = localStorage.getItem('elite_active_dept') || localStorage.getItem('elite_active_department') || '';
       }
@@ -585,8 +588,9 @@ export default function App() {
   useEffect(() => {
     if (activeTab) {
       localStorage.setItem('elite_active_tab', activeTab);
-      if (window.location.hash !== `#${activeTab}`) {
-        window.history.replaceState(null, '', `#${activeTab}`);
+      const targetHash = activeTab === 'task_management' ? '#tasks' : `#${activeTab}`;
+      if (window.location.hash !== targetHash && !(activeTab === 'task_management' && (window.location.hash === '#tasks' || window.location.hash === '#task_management'))) {
+        window.history.replaceState(null, '', targetHash);
       }
     }
   }, [activeTab]);
@@ -600,7 +604,10 @@ export default function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '').trim();
+      let hash = window.location.hash.replace('#', '').trim();
+      if (hash === 'tasks' || hash === 'task' || hash === 'task-manager') {
+        hash = 'task_management';
+      }
       if (hash && hash !== activeTab) {
         setActiveTab(hash);
       }
@@ -901,7 +908,7 @@ export default function App() {
     if (api.isClientUser() || currentUser.isClient || currentUser.role === 'Client') return;
 
     const ALL_SYSTEM_TABS = [
-      'dashboard', 'workspace', 'communication', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
+      'dashboard', 'workspace', 'communication', 'task_management', 'tasks', 'task', 'task-manager', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
       'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
       'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
       'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses',

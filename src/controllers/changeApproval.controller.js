@@ -308,53 +308,57 @@ const broadcastApprovalResolution = (req, approval, status, executionResult = nu
 
       // If approved, trigger instant data refresh across the whole system
       if (status === 'APPROVED') {
-        // Universal data-changed event
-        io.emit('data-changed', {
-          eventId: Date.now(),
-          type: `${modLower}:${action}`,
-          entity: modLower,
-          action,
-          id: targetId,
-          targetIdentifier,
-          payload,
-          timestamp: Date.now(),
-        });
+        const targetRooms = approval.companyId
+          ? [`company:${approval.companyId}`]
+          : ['company:digital_print', 'company:elite_edition', 'company:elite_fabtex', 'company:stitching', 'company:elite_online'];
 
-        // Module-specific event routing so every screen's listeners immediately update
-        if (modLower.includes('jobcard') || modLower.includes('job')) {
-          io.emit('job-updated', payload);
-          io.emit('jobCardUpdated', payload);
-          io.emit('job-stage-updated', payload);
-        }
-        if (modLower.includes('fabric')) {
-          io.emit('fabric-updated', { type: 'transaction-updated', data: payload });
-          io.emit('fabric-challan-updated', payload);
-        }
-        if (modLower.includes('billing') || modLower.includes('invoice')) {
-          io.emit('invoice-updated', payload);
-          io.emit('billing-updated', payload);
-        }
-        if (modLower.includes('inventory') || modLower.includes('rawmaterial')) {
-          io.emit('inventory-updated', payload);
-        }
-        if (modLower.includes('design')) {
-          io.emit('design-updated', payload);
-          io.emit('catalog-updated', payload);
-        }
-        if (modLower.includes('expense') || modLower.includes('costing')) {
-          io.emit('expense-updated', payload);
-          io.emit('costing-updated', payload);
-        }
-        if (modLower.includes('stitching')) {
-          io.emit('stitching-updated', payload);
-          io.emit('stitching-challan-updated', payload);
-        }
-        if (modLower.includes('complaint')) {
-          io.emit('complaint-updated', payload);
-        }
-        if (modLower.includes('product')) {
-          io.emit('product-updated', payload);
-        }
+        targetRooms.forEach((r) => {
+          io.to(r).emit('data-changed', {
+            eventId: Date.now(),
+            type: `${modLower}:${action}`,
+            entity: modLower,
+            action,
+            id: targetId,
+            targetIdentifier,
+            payload,
+            timestamp: Date.now(),
+          });
+
+          if (modLower.includes('jobcard') || modLower.includes('job')) {
+            io.to(r).emit('job-updated', payload);
+            io.to(r).emit('jobCardUpdated', payload);
+            io.to(r).emit('job-stage-updated', payload);
+          }
+          if (modLower.includes('fabric')) {
+            io.to(r).emit('fabric-updated', { type: 'transaction-updated', data: payload });
+            io.to(r).emit('fabric-challan-updated', payload);
+          }
+          if (modLower.includes('billing') || modLower.includes('invoice')) {
+            io.to(r).emit('invoice-updated', payload);
+            io.to(r).emit('billing-updated', payload);
+          }
+          if (modLower.includes('inventory') || modLower.includes('rawmaterial')) {
+            io.to(r).emit('inventory-updated', payload);
+          }
+          if (modLower.includes('design')) {
+            io.to(r).emit('design-updated', payload);
+            io.to(r).emit('catalog-updated', payload);
+          }
+          if (modLower.includes('expense') || modLower.includes('costing')) {
+            io.to(r).emit('expense-updated', payload);
+            io.to(r).emit('costing-updated', payload);
+          }
+          if (modLower.includes('stitching')) {
+            io.to(r).emit('stitching-updated', payload);
+            io.to(r).emit('stitching-challan-updated', payload);
+          }
+          if (modLower.includes('complaint')) {
+            io.to(r).emit('complaint-updated', payload);
+          }
+          if (modLower.includes('product')) {
+            io.to(r).emit('product-updated', payload);
+          }
+        });
       }
     }
 

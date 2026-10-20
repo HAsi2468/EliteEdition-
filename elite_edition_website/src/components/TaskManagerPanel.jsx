@@ -4464,9 +4464,27 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 type="submit"
                 disabled={creating}
                 className="btn-primary"
-                style={{ marginTop: '0.5rem', padding: '0.6rem', fontSize: '0.85rem', borderRadius: '8px' }}
+                style={{
+                  marginTop: '0.5rem',
+                  padding: '0.65rem',
+                  fontSize: '0.85rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: creating ? 'not-allowed' : 'pointer',
+                  opacity: creating ? 0.75 : 1
+                }}
               >
-                {creating ? 'Creating Task...' : 'Create & Assign Task'}
+                {creating ? (
+                  <>
+                    <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#ffffff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                    <span>Creating & Assigning Task...</span>
+                  </>
+                ) : (
+                  'Create & Assign Task'
+                )}
               </button>
             </form>
           </div>
@@ -4796,9 +4814,28 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   type="submit"
                   disabled={editingUpdating}
                   className="btn-primary"
-                  style={{ flex: 2, padding: '0.6rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: '8px' }}
+                  style={{
+                    flex: 2,
+                    padding: '0.6rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: editingUpdating ? 'not-allowed' : 'pointer',
+                    opacity: editingUpdating ? 0.75 : 1
+                  }}
                 >
-                  {editingUpdating ? 'Saving Changes...' : 'Save Task Changes'}
+                  {editingUpdating ? (
+                    <>
+                      <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#ffffff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    'Save Task Changes'
+                  )}
                 </button>
               </div>
 

@@ -204,14 +204,11 @@ const createTask = async (req, res) => {
       : null;
 
     if (!creatorId) {
-      try {
-        const adminUser = await User.findOne({
-          $or: [{ role: 'admin' }, { role: 'super_admin' }, { username: 'admin' }]
-        }).select('_id');
-        if (adminUser) creatorId = adminUser._id;
-      } catch (uErr) {
-        console.warn('[TaskController] Could not find fallback admin user:', uErr.message);
-      }
+      return res.status(401).json({
+        success: false,
+        code: 'AUTH_REQUIRED',
+        message: 'Authentication required to create a task'
+      });
     }
 
     // Sanitize assignees: only keep valid ObjectIds

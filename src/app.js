@@ -113,113 +113,8 @@ const jwtUtils = require('./utils/auth');
 const clientModel = require('./db/models/client.model');
 const { fieldLevelSanitizer } = require('./middlewares/fieldLevelSanitizer');
 
-// Automatic User Context Middleware
-app.use(async (req, res, next) => {
-  try {
-    let userId = req.headers['x-user-id'] || req.query?.userId || req.body?.userId;
-    let userName = req.headers['x-user-name'] || req.body?.userName;
-    let authHeader = req.headers['authorization'];
-    const isExplicitClientRole =
-      req.headers['x-user-role'] === 'Client' ||
-      req.headers['x-user-role'] === 'client';
+// Note: Strict JWT Bearer authentication is enforced globally on /v1 and /api/v1 via restAuthGate below.
 
-    if (!userId && authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      try {
-        const decoded = await jwtUtils.verifyToken(token);
-        if (decoded && (decoded.userId || decoded.id || decoded.sub)) {
-          userId = decoded.userId || decoded.id || decoded.sub;
-        }
-      } catch (e) {}
-    }
-
-    if (userId) {
-      let u = await userModel.findById(userId).lean();
-      if (u) {
-        req.user = u;
-      } else {
-        // Check if userId belongs to Client collection
-        try {
-          const client = await clientModel.findById(userId).lean();
-          if (client) {
-            req.user = {
-              ...client,
-              _id: client._id,
-              id: client._id,
-              role: 'Client',
-              isClient: true,
-              name: client.username || client.companyName,
-              username: client.username,
-              companyName: client.companyName,
-              companyCode: client.companyCode,
-            };
-            req.isClient = true;
-          }
-        } catch (cErr) {}
-      }
-
-      if (!req.user) {
-        req.user = {
-          _id: userId,
-          name: userName || 'HASI',
-          username: userName || 'HASI',
-        };
-      }
-    } else if (userName) {
-      if (isExplicitClientRole) {
-        try {
-          const client = await clientModel.findOne({
-            $or: [{ username: userName }, { companyName: userName }],
-          }).lean();
-          if (client) {
-            req.user = {
-              ...client,
-              _id: client._id,
-              id: client._id,
-              role: 'Client',
-              isClient: true,
-              name: client.username || client.companyName,
-              username: client.username,
-              companyName: client.companyName,
-              companyCode: client.companyCode,
-            };
-            req.isClient = true;
-          }
-        } catch (cErr) {}
-      }
-      if (!req.user) {
-        req.user = {
-          name: userName,
-          username: userName,
-          role: req.headers['x-user-role'] || 'admin',
-          isAdmin: true,
-          isMainAdmin: true,
-        };
-      }
-    } else {
-      if (config.env === 'production') {
-        req.user = null;
-      } else {
-        req.user = {
-          name: 'HASI',
-          username: 'HASI',
-          role: req.headers['x-user-role'] || 'admin',
-          isAdmin: true,
-          isMainAdmin: true,
-        };
-      }
-    }
-
-    if (isExplicitClientRole && req.user) {
-      req.user.role = 'Client';
-      req.user.isClient = true;
-      req.isClient = true;
-    }
-  } catch (err) {
-    console.warn('[authMiddleware] Error resolving user:', err.message);
-  }
-  next();
-});
 
 // Apply Field-Level Access Control (FLAC) Projection Sanitizer across all API responses
 app.use(fieldLevelSanitizer);
@@ -625,6 +520,36 @@ app.use(['/v1', '/api/v1'], redisIdempotencyMiddleware({ required: false }));
 // Universal Admin Change Review & Approval Interceptor
 const { approvalInterceptor } = require('./middlewares/approvalInterceptor.middleware');
 app.use(['/v1', '/api/v1'], approvalInterceptor);
+
+const { requireAuth } = require('./middlewares/auth.middleware');
+
+const isPublicRoute = (path) => {
+  const p = (path || '').toLowerCase();
+  return (
+    p.startsWith('/v1/auth') ||
+    p.startsWith('/api/v1/auth') ||
+    p === '/v1/clients/login' ||
+    p === '/api/v1/clients/login' ||
+    p.startsWith('/v1/verify') ||
+    p.startsWith('/api/v1/verify') ||
+    p.startsWith('/verify') ||
+    p.startsWith('/v1/telemetry') ||
+    p.startsWith('/api/v1/telemetry') ||
+    p === '/v1/designs/download-zip' ||
+    p === '/api/v1/designs/download-zip'
+  );
+};
+
+const restAuthGate = (req, res, next) => {
+  const targetPath = req.originalUrl ? req.originalUrl.split('?')[0] : req.path;
+  if (isPublicRoute(targetPath)) {
+    return next();
+  }
+  return requireAuth(req, res, next);
+};
+
+// Global REST Authentication Gate: enforces valid Bearer token verification across all /v1 endpoints
+app.use(['/v1', '/api/v1'], restAuthGate);
 
 // v1 and api/v1 api routes
 app.use('/v1', routes);

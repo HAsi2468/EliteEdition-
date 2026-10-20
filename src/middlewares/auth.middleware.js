@@ -7,71 +7,86 @@ const { user: User, ChatRoom } = require('../db/models');
  */
 const requireAuth = async (req, res, next) => {
   try {
-    let token = null;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-      token = req.headers.authorization.replace(/^Bearer\s+/i, '');
-    } else if (req.cookies && req.cookies.accessToken) {
-      token = req.cookies.accessToken;
-    } else if (req.query && req.query.token) {
-      token = req.query.token;
-    }
-
-    // If req.user is already validated with a real ObjectId in preceding app middleware
-    if (req.user && req.user._id && String(req.user._id).length === 24 && req.user.role) {
-      req.userId = String(req.user._id);
-      return next();
-    }
-
-    // Allow internal approval execution replay triggered by Admin
-    if (
-      (req.headers['x-approval-execution'] === 'true' || req.headers['x-internal-service'] === 'approval-executor') &&
-      req.headers['x-is-admin'] === 'true'
-    ) {
-      req.user = {
-        _id: req.headers['x-user-id'] || 'admin',
-        id: req.headers['x-user-id'] || 'admin',
-        role: 'admin',
-        name: req.headers['x-user-name'] || 'Admin',
-        isAdmin: true
-      };
-      req.userId = String(req.user._id);
-      return next();
-    }
-
-    if (!token) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: 'Authentication required. Please provide a valid Bearer token.'
+        code: 'AUTH_REQUIRED',
+        message: 'Valid Bearer token required'
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token || !token.trim()) {
+      return res.status(401).json({
+        success: false,
+        code: 'AUTH_REQUIRED',
+        message: 'Valid Bearer token required'
       });
     }
 
     let decoded;
     try {
-      decoded = jwt.verify(token, config.jwt.secret);
+      decoded = jwt.verify(token, config.jwt.secret || process.env.JWT_SECRET);
     } catch (err) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid or expired authentication token.'
+        code: 'INVALID_TOKEN',
+        message: 'Token verification failed'
       });
     }
 
-    const userId = decoded.userId || decoded.id || decoded.sub;
+    const userId = decoded.id || decoded.userId || decoded.sub;
     if (!userId) {
       return res.status(401).json({
         success: false,
+        code: 'INVALID_TOKEN',
         message: 'Malformed authentication token payload.'
       });
     }
 
-    const user = await User.findById(userId).lean();
+    let user = await User.findById(userId).lean();
+    let isClient = false;
+
     if (!user) {
+      try {
+        const clientModel = require('../db/models/client.model');
+        const client = await clientModel.findById(userId).lean();
+        if (client) {
+          user = {
+            ...client,
+            _id: client._id,
+            id: String(client._id),
+            role: 'Client',
+            isClient: true,
+            companyId: client.companyId || client.companyCode || null,
+            isActive: client.status !== 'Inactive'
+          };
+          isClient = true;
+        }
+      } catch (cErr) {}
+    }
+
+    if (!user || user.isActive === false || user.status === 'Inactive') {
       return res.status(401).json({
         success: false,
-        message: 'User account not found or has been deactivated.'
+        code: 'UNAUTHORIZED',
+        message: 'User inactive or session invalid'
       });
     }
 
-    req.user = user;
+    req.user = {
+      ...user,
+      _id: user._id,
+      id: String(user._id),
+      companyId: user.companyId ? String(user.companyId) : undefined,
+      role: user.role || 'user',
+      isClient,
+      name: user.name || user.username,
+      username: user.username,
+      email: user.email,
+      isAdmin: user.role === 'admin' || user.role === 'super_admin' || user.isAdmin === true || user.isMainAdmin === true
+    };
     req.userId = String(user._id);
     next();
   } catch (error) {

@@ -164,10 +164,13 @@ class EventBusService {
       io.to(room).emit(`${data.entity}-updated`, eventObject);
       this.metrics.delivered++;
     } else {
-      // If companyId is truly universal or unassigned (e.g. system facilities)
-      io.emit('data-changed', eventObject);
-      io.emit('data-change', eventObject);
-      io.emit(`${data.entity}-${data.action}`, eventObject);
+      // Broadcast only to authenticated company rooms (never unauthenticated sockets)
+      const companyRooms = ['digital_print', 'elite_edition', 'elite_fabtex', 'stitching', 'elite_online'];
+      companyRooms.forEach((cid) => {
+        io.to(`company:${cid}`).emit('data-changed', eventObject);
+        io.to(`company:${cid}`).emit('data-change', eventObject);
+        io.to(`company:${cid}`).emit(`${data.entity}-${data.action}`, eventObject);
+      });
       this.metrics.delivered++;
     }
 

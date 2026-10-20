@@ -2032,6 +2032,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     e.target.value = '';
   };
 
+  const openFileDialog = (acceptType = 'image/*,.pdf,.doc,.docx,audio/*') => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null;
+      if (acceptType) fileInputRef.current.accept = acceptType;
+      fileInputRef.current.click();
+    }
+  };
+
   const handleChatDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -5267,10 +5275,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 type="button"
                                 onClick={() => {
                                   setShowMobileActionMenu(false);
-                                  if (fileInputRef.current) {
-                                    fileInputRef.current.accept = 'image/*';
-                                    fileInputRef.current.click();
-                                  }
+                                  openFileDialog('image/*');
                                 }}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
@@ -5286,10 +5291,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 type="button"
                                 onClick={() => {
                                   setShowMobileActionMenu(false);
-                                  if (fileInputRef.current) {
-                                    fileInputRef.current.accept = 'image/*,.pdf,.doc,.docx,audio/*';
-                                    fileInputRef.current.click();
-                                  }
+                                  openFileDialog('image/*,.pdf,.doc,.docx,audio/*');
                                 }}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
@@ -5363,12 +5365,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           <button
                             type="button"
                             className="phoenix-toolbar-icon"
-                            onClick={() => {
-                              if (fileInputRef.current) {
-                                fileInputRef.current.accept = 'image/*,.pdf,.doc,.docx,audio/*';
-                                fileInputRef.current.click();
-                              }
-                            }}
+                            onClick={() => openFileDialog('image/*,.pdf,.doc,.docx,audio/*')}
                             title="Attach File"
                             style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
                           >
