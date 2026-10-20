@@ -11,8 +11,8 @@ const requireAuth = async (req, res, next) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        code: 'AUTH_REQUIRED',
-        message: 'Valid Bearer token required'
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required. Please provide a valid Bearer token.'
       });
     }
 
@@ -20,8 +20,8 @@ const requireAuth = async (req, res, next) => {
     if (!token || !token.trim()) {
       return res.status(401).json({
         success: false,
-        code: 'AUTH_REQUIRED',
-        message: 'Valid Bearer token required'
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required. Please provide a valid Bearer token.'
       });
     }
 
@@ -32,20 +32,20 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         code: 'INVALID_TOKEN',
-        message: 'Token verification failed'
+        message: 'Token is invalid or expired.'
       });
     }
 
-    const userId = decoded.id || decoded.userId || decoded.sub;
+    const userId = decoded.id || decoded.userId || decoded._id || decoded.sub;
     if (!userId) {
       return res.status(401).json({
         success: false,
         code: 'INVALID_TOKEN',
-        message: 'Malformed authentication token payload.'
+        message: 'Token is invalid or expired.'
       });
     }
 
-    let user = await User.findById(userId).lean();
+    let user = await User.findById(userId).select('_id companyId role isActive status name username email isMainAdmin isAdmin').lean();
     let isClient = false;
 
     if (!user) {
@@ -71,7 +71,7 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         code: 'UNAUTHORIZED',
-        message: 'User inactive or session invalid'
+        message: 'User account is inactive or not found.'
       });
     }
 
@@ -79,7 +79,7 @@ const requireAuth = async (req, res, next) => {
       ...user,
       _id: user._id,
       id: String(user._id),
-      companyId: user.companyId ? String(user.companyId) : undefined,
+      companyId: user.companyId ? String(user.companyId) : null,
       role: user.role || 'user',
       isClient,
       name: user.name || user.username,
@@ -90,10 +90,11 @@ const requireAuth = async (req, res, next) => {
     req.userId = String(user._id);
     next();
   } catch (error) {
+    console.error('Auth Middleware Error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Authentication verification error',
-      error: error.message
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Authentication processing failed.'
     });
   }
 };

@@ -16,10 +16,6 @@ const getUser = catchAsync(async (req, res) => {
 	let user = await userService.getUserById(userId);
 
 	if (!user) {
-		user = await userService.getUserByEmail('harshitsidapara2468@gmail.com') || (await userService.getUsers({ query: {} })).rows[0];
-	}
-
-	if (!user) {
 		throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
 	}
 

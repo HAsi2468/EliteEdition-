@@ -12,6 +12,22 @@ router
 	.post(grantAccess('createAny', resources.USERINFO), validate(userValidation.createUser), userController.createUser)
 	.get(validate(userValidation.getUsers), userController.getUsers);
 
+router.get('/me', async (req, res) => {
+	try {
+		if (!req.user || !req.user.id) {
+			return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Unauthorized' });
+		}
+		const User = require('../../db/models').user || require('../../db/models/user.model');
+		const user = await User.findById(req.user.id).select('-password').lean();
+		if (!user) {
+			return res.status(404).json({ success: false, message: 'User not found' });
+		}
+		return res.status(200).json({ success: true, user });
+	} catch (error) {
+		return res.status(500).json({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
+	}
+});
+
 router
 	.route('/:id')
 	.get(

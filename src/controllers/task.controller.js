@@ -198,18 +198,16 @@ const createTask = async (req, res) => {
     }
 
     // Robustly determine and validate creatorId
-    let rawCreatorId = req.user ? req.user._id : (customCreatedBy || null);
-    let creatorId = (rawCreatorId && mongoose.Types.ObjectId.isValid(rawCreatorId))
-      ? new mongoose.Types.ObjectId(rawCreatorId)
-      : null;
-
-    if (!creatorId) {
+    if (!req.user || !req.user._id) {
       return res.status(401).json({
         success: false,
-        code: 'AUTH_REQUIRED',
-        message: 'Authentication required to create a task'
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required. Please provide a valid Bearer token.'
       });
     }
+
+    const creatorId = new mongoose.Types.ObjectId(req.user._id);
+    const creatorName = req.user.name || req.user.username || 'Staff User';
 
     // Sanitize assignees: only keep valid ObjectIds
     let finalAssignees = Array.isArray(assignees)
@@ -229,8 +227,8 @@ const createTask = async (req, res) => {
       : [];
 
     const initialAudit = [{
-      user: creatorId || undefined,
-      userName: createdByName || 'Admin',
+      user: creatorId,
+      userName: creatorName,
       fieldChanged: 'Task Created',
       oldValue: '',
       newValue: `Created "${title.trim()}" in ${department}`,
@@ -498,6 +496,14 @@ const updateTask = async (req, res) => {
  */
 const deleteTask = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required. Please provide a valid Bearer token.'
+      });
+    }
+
     const { id } = req.params;
     const task = await Task.findByIdAndDelete(id);
     if (!task) {

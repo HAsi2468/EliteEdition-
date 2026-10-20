@@ -1040,6 +1040,32 @@ const getChallans = async (req, res) => {
   }
 };
 
+// ── GET /fabric-challan/:id ────────────────────────────────────────────────
+const getChallanById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let challan = null;
+    const mongoose = require('mongoose');
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      challan = await FabricChallan.findById(id);
+    }
+    if (!challan) {
+      challan = await FabricChallan.findOne({
+        $or: [
+          { challanNo: !isNaN(Number(id)) ? Number(id) : -1 },
+          { id: id }
+        ]
+      });
+    }
+    if (!challan) {
+      return res.status(404).json({ success: false, message: 'Fabric Challan not found' });
+    }
+    res.json({ success: true, data: challan, challan });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // ── PUT /fabric-challan/:id ────────────────────────────────────────────────
 const updateChallan = async (req, res) => {
   try {
@@ -2714,6 +2740,7 @@ const reconcileChallanOutwards = async (req, res) => {
 module.exports = {
   createChallan,
   getChallans,
+  getChallanById,
   updateChallan,
   deleteChallan,
   resetAllChallans,

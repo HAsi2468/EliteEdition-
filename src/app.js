@@ -510,17 +510,6 @@ app.post(
   csrfManager.handshakeHandler
 );
 
-// Anti-CSRF Verification Middleware: protects all state-changing endpoints (POST/PUT/PATCH/DELETE)
-app.use(['/v1', '/api/v1'], verifyCsrfToken);
-
-// Distributed Redis Idempotency Engine: prevents duplicate submission & network replay races
-const redisIdempotencyMiddleware = require('./middlewares/redisIdempotency.middleware');
-app.use(['/v1', '/api/v1'], redisIdempotencyMiddleware({ required: false }));
-
-// Universal Admin Change Review & Approval Interceptor
-const { approvalInterceptor } = require('./middlewares/approvalInterceptor.middleware');
-app.use(['/v1', '/api/v1'], approvalInterceptor);
-
 const { requireAuth } = require('./middlewares/auth.middleware');
 
 const isPublicRoute = (path) => {
@@ -548,8 +537,19 @@ const restAuthGate = (req, res, next) => {
   return requireAuth(req, res, next);
 };
 
-// Global REST Authentication Gate: enforces valid Bearer token verification across all /v1 endpoints
+// 1. Centralized REST Authentication Gate: enforces valid Bearer token verification across all /v1 endpoints
 app.use(['/v1', '/api/v1'], restAuthGate);
+
+// 2. Anti-CSRF Verification Middleware: protects all state-changing endpoints (POST/PUT/PATCH/DELETE)
+app.use(['/v1', '/api/v1'], verifyCsrfToken);
+
+// 3. Distributed Redis Idempotency Engine: prevents duplicate submission & network replay races
+const redisIdempotencyMiddleware = require('./middlewares/redisIdempotency.middleware');
+app.use(['/v1', '/api/v1'], redisIdempotencyMiddleware({ required: false }));
+
+// 4. Universal Admin Change Review & Approval Interceptor
+const { approvalInterceptor } = require('./middlewares/approvalInterceptor.middleware');
+app.use(['/v1', '/api/v1'], approvalInterceptor);
 
 // v1 and api/v1 api routes
 app.use('/v1', routes);

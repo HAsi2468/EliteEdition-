@@ -220,6 +220,10 @@ const createChallan = async (req, res) => {
     const computed = calculateChallanTotals(body);
     Object.assign(body, computed);
 
+    if (!body.status) {
+      body.status = 'PENDING';
+    }
+
     const doc = new DeliveryChallan(body);
     await doc.save();
 

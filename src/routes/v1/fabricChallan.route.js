@@ -18,6 +18,9 @@ router.get('/', c.getChallans);
 // Create a new challan
 router.post('/', c.createChallan);
 
+// Get single challan by ID
+router.get('/:id', verifyRecordOwnership('FabricChallan', 'partyName'), c.getChallanById);
+
 // Update a challan
 router.put('/:id', verifyRecordOwnership('FabricChallan', 'partyName'), c.updateChallan);
 

@@ -26,7 +26,7 @@ const deliveryChallanSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ['PENDING', 'DELIVERED', 'INVOICED', 'CANCELLED'],
-      default: 'DELIVERED',
+      default: 'PENDING',
       index: true
     },
 
