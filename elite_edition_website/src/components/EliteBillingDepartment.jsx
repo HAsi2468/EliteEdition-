@@ -2713,23 +2713,6 @@ export default function EliteBillingDepartment({
     }
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (previewImageModal) setPreviewImageModal(null);
-        else if (pdfDuplicateModal) setPdfDuplicateModal(null);
-        else if (viewInvoiceModal) setViewInvoiceModal(null);
-        else if (viewPurchaseModal) setViewPurchaseModal(null);
-        else if (paymentModalInvoice) setPaymentModalInvoice(null);
-        else if (isCreateOpen) setIsCreateOpen(false);
-        else if (isPurchaseModalOpen) setIsPurchaseModalOpen(false);
-        else if (isChallanModalOpen) setIsChallanModalOpen(false);
-        else if (bulkPayModalOpen) setBulkPayModalOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewImageModal, pdfDuplicateModal, viewInvoiceModal, viewPurchaseModal, paymentModalInvoice, isCreateOpen, isPurchaseModalOpen, isChallanModalOpen, bulkPayModalOpen]);
 
   // Filtered Customers & Items
   const filteredCustomers = useMemo(() => {
@@ -2853,6 +2836,26 @@ export default function EliteBillingDepartment({
   const [itemForm, setItemForm] = useState({
     itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 5, category: 'Printing Services'
   });
+
+  // Modal dismiss listener on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (previewImageModal) setPreviewImageModal(null);
+        else if (pdfDuplicateModal) setPdfDuplicateModal(null);
+        else if (viewInvoiceModal) setViewInvoiceModal(null);
+        else if (viewPurchaseModal) setViewPurchaseModal(null);
+        else if (showPurchaseModal) setShowPurchaseModal(false);
+        else if (paymentModalInvoice) setPaymentModalInvoice(null);
+        else if (showLedgerModal) setShowLedgerModal(false);
+        else if (showCustomerModal) setShowCustomerModal(false);
+        else if (showVendorModal) setShowVendorModal(false);
+        else if (showItemModal) setShowItemModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewImageModal, pdfDuplicateModal, viewInvoiceModal, viewPurchaseModal, showPurchaseModal, paymentModalInvoice, showLedgerModal, showCustomerModal, showVendorModal, showItemModal]);
 
   // ── INVOICE EDITOR STATE (myBillBook style) ──────────────────────────────
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
