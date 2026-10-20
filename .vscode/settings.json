@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "**/.github/workflows/*.yml": "yaml",
+    "**/.github/workflows/*.yaml": "yaml"
+  },
+  "yaml.validate": false,
+  "yaml.schemas": {},
+  "github-actions.workflows.pinnedVersionWarnings": false,
+  "github-actions.validation.enabled": false
+}

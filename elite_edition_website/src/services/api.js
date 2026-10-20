@@ -279,9 +279,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    if (data.tokens && data.tokens.access) {
-      localStorage.setItem('elite_auth_token', data.tokens.access.token);
-      localStorage.setItem('elite_user', JSON.stringify(data.user));
+    if (data.tokens) {
+      if (data.tokens.access && data.tokens.access.token) {
+        localStorage.setItem('elite_auth_token', data.tokens.access.token);
+        localStorage.setItem('token', data.tokens.access.token);
+      }
+      if (data.tokens.refresh && data.tokens.refresh.token) {
+        localStorage.setItem('elite_refresh_token', data.tokens.refresh.token);
+      }
+      if (data.user) {
+        localStorage.setItem('elite_user', JSON.stringify(data.user));
+      }
     }
     return data;
   },
@@ -295,6 +303,8 @@ export const api = {
 
   logout() {
     localStorage.removeItem('elite_auth_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('elite_refresh_token');
     localStorage.removeItem('elite_user');
     localStorage.removeItem('elite_is_client');
     localStorage.removeItem('elite_client_data');

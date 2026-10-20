@@ -8,8 +8,8 @@ const { generateToken, generateExpires, verifyToken } = require('../utils/auth')
 const { getRedisClient } = require('../db/redisClient');
 const logger = require('../config/logger');
 
-const ACCESS_TOKEN_EXPIRATION_MINUTES = 15; // 15 minutes as per enterprise standard
-const REFRESH_TOKEN_EXPIRATION_DAYS = 7;    // 7 days as per enterprise standard
+const ACCESS_TOKEN_EXPIRATION_MINUTES = config.jwt.accessExpirationMinutes || 7 * 24 * 60; // 7 days default (10080 minutes)
+const REFRESH_TOKEN_EXPIRATION_DAYS = config.jwt.refreshExpirationDays || 30;    // 30 days default
 const REFRESH_TOKEN_TTL_SECONDS = REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 60 * 60;
 
 async function generateResetPasswordToken(email) {

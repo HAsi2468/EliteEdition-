@@ -151,6 +151,7 @@ export class SilentAuthInterceptor {
     // Persist new access token in storage
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('elite_auth_token', newAccessToken);
+      localStorage.setItem('token', newAccessToken);
       if (data.tokens?.refresh?.token) {
         localStorage.setItem('elite_refresh_token', data.tokens.refresh.token);
       }
@@ -196,6 +197,7 @@ export class SilentAuthInterceptor {
   public handleSessionTermination(): void {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('elite_auth_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('elite_refresh_token');
       localStorage.removeItem('elite_user');
       localStorage.removeItem('elite_is_client');
