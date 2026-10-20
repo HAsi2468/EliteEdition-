@@ -1614,36 +1614,67 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   // Listen for background sync messages on reconnection
   useEffect(() => {
     const handleSyncMessage = (e) => {
-      if (e.detail) {
-        const msg = e.detail;
-        const currentActiveId = activeGroupIdRef.current;
-        if (currentActiveId && String(msg.roomId) === String(currentActiveId)) {
-          setMessages((prev) => {
-            const exists = prev.some((m) => String(m._id) === String(msg._id));
-            const updated = exists
-              ? prev.map((m) => (String(m._id) === String(msg._id) ? { ...m, ...msg } : m))
-              : [...prev, msg];
-            return updated.sort((a, b) => {
-              if (a.roomSeq != null && b.roomSeq != null && a.roomSeq !== b.roomSeq) {
-                return a.roomSeq - b.roomSeq;
-              }
-              return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-            });
-          });
-        }
-        setGroups((prevGroups) =>
-          prevGroups.map((g) => {
-            if (String(g._id) === String(msg.roomId)) {
-              return {
-                ...g,
-                lastMessage: msg,
-                updatedAt: msg.createdAt || g.updatedAt
-              };
+      if (!e.detail) return;
+      const raw = e.detail;
+      const incomingList = Array.isArray(raw.messages)
+        ? raw.messages
+        : Array.isArray(raw)
+        ? raw
+        : raw._id
+        ? [raw]
+        : [];
+      if (incomingList.length === 0) return;
+
+      const currentActiveId = activeGroupIdRef.current;
+      const activeRoomMsgs = incomingList.filter(
+        (m) => currentActiveId && String(m.roomId) === String(currentActiveId)
+      );
+
+      if (activeRoomMsgs.length > 0) {
+        setMessages((prev) => {
+          const map = new Map();
+          for (const m of prev) {
+            map.set(String(m._id), m);
+          }
+          for (const m of activeRoomMsgs) {
+            const existing = map.get(String(m._id));
+            map.set(String(m._id), existing ? { ...existing, ...m } : m);
+          }
+          return Array.from(map.values()).sort((a, b) => {
+            if (a.roomSeq != null && b.roomSeq != null && a.roomSeq !== b.roomSeq) {
+              return a.roomSeq - b.roomSeq;
             }
-            return g;
-          })
-        );
+            return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+          });
+        });
       }
+
+      // Also update groups' lastMessage & updatedAt
+      setGroups((prevGroups) => {
+        const lastMsgByRoom = new Map();
+        for (const m of incomingList) {
+          if (m.roomId) {
+            const rid = String(m.roomId);
+            const prevCandidate = lastMsgByRoom.get(rid);
+            if (!prevCandidate || new Date(m.createdAt || 0) > new Date(prevCandidate.createdAt || 0)) {
+              lastMsgByRoom.set(rid, m);
+            }
+          }
+        }
+        if (lastMsgByRoom.size === 0) return prevGroups;
+
+        return prevGroups.map((g) => {
+          const latestForGroup = lastMsgByRoom.get(String(g._id));
+          if (latestForGroup) {
+            return {
+              ...g,
+              lastMessage: latestForGroup,
+              updatedAt: latestForGroup.createdAt || g.updatedAt
+            };
+          }
+          return g;
+        });
+      });
     };
     window.addEventListener('elite-chat-sync-message', handleSyncMessage);
     return () => window.removeEventListener('elite-chat-sync-message', handleSyncMessage);

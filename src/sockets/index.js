@@ -28,43 +28,52 @@ const setupSockets = (io) => {
   // Authenticate socket connections & enforce strict company isolation
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token ||
+      const raw = socket.handshake.auth?.token ||
                     socket.handshake.query?.token ||
                     (socket.handshake.headers.authorization && socket.handshake.headers.authorization.replace(/^Bearer\s+/i, ''));
 
-      if (!token) {
-        socket.user = null;
-        socket.authorizedCompanies = [];
-        return next();
+      if (!raw) {
+        return next(new Error('unauthorized'));
       }
 
-      const decoded = await verifyToken(token);
-      if (!decoded) {
-        socket.user = null;
-        socket.authorizedCompanies = [];
-        return next();
+      let payload;
+      try {
+        payload = await verifyToken(raw);
+      } catch (err) {
+        return next(new Error('unauthorized'));
       }
 
-      const user = await User.findById(decoded.id || decoded._id).lean();
-      if (!user) {
-        socket.user = null;
-        socket.authorizedCompanies = [];
-        return next();
+      const uid = payload.userId || payload.id || payload.sub || payload._id;
+      if (!uid) {
+        return next(new Error('unauthorized'));
       }
 
+      const user = await User.findById(uid)
+        .select('_id companyId company_id role isActive allowedCompanies isMainAdmin email name')
+        .lean();
+
+      if (!user || user.isActive === false) {
+        return next(new Error('unauthorized'));
+      }
+
+      const canonicalCompany = normalizeCompanyId(user.company_id || user.companyId) || 'digital_print';
+
+      socket.data = socket.data || {};
+      socket.data.user = {
+        id: String(user._id),
+        companyId: canonicalCompany,
+        role: user.role
+      };
       socket.user = user;
       socket.userId = String(user._id);
 
       // Determine authorized companies server-side (never trust client)
-      const isSuper = user.isMainAdmin || user.role === 'super_admin' || user.email === 'harshitsidapara2468@gmail.com';
+      const isSuper = user.isMainAdmin || user.role === 'super_admin';
       if (isSuper) {
         socket.authorizedCompanies = COMPANIES.map((c) => c.id);
       } else {
         const allowed = new Set();
-        if (user.company_id) {
-          const cid = normalizeCompanyId(user.company_id);
-          if (cid) allowed.add(cid);
-        }
+        if (canonicalCompany) allowed.add(canonicalCompany);
         if (Array.isArray(user.allowedCompanies)) {
           user.allowedCompanies.forEach((c) => {
             const cid = normalizeCompanyId(c);
@@ -77,28 +86,32 @@ const setupSockets = (io) => {
 
       next();
     } catch (err) {
-      console.warn('[Socket Auth] Token verification notice:', err.message);
-      socket.user = null;
-      socket.authorizedCompanies = [];
-      next();
+      console.warn('[Socket Auth] Connection rejected:', err.message);
+      next(new Error('unauthorized'));
     }
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected to socket: ${socket.id} (user: ${socket.userId || 'anon'})`);
+    const { id, companyId } = socket.data?.user || { id: socket.userId, companyId: 'digital_print' };
+    console.log(`User connected to socket: ${socket.id} (user: ${id})`);
 
-    // 1. Join user to their authorized company rooms
+    // 1. Join user to scoped company rooms and user personal room
+    socket.join(`company:${companyId}`);
+    socket.join(`user:${id}`);
+    socket.join(`user_${id}`);
+
     if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
       socket.authorizedCompanies.forEach((cid) => {
         socket.join(`company:${cid}`);
       });
     }
 
-    // 2. Join personal room for targeted alerts & direct messages
-    if (socket.userId) {
-      socket.join(`user_${socket.userId}`);
-      activeUsers.set(socket.id, socket.userId);
-      io.emit('presence-sync', getOnlineUserIds());
+    // 2. Track active user and emit scoped presence update
+    activeUsers.set(socket.id, id);
+    if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
+      socket.authorizedCompanies.forEach((cid) => {
+        socket.to(`company:${cid}`).emit('presence_update', { userId: id, status: 'online' });
+      });
     }
 
     // 2b. Sync current system lock state to newly connected client
@@ -154,34 +167,39 @@ const setupSockets = (io) => {
     });
 
     // 4. Client reconnection resync handler (requests missed events & messages)
-    socket.on('sync-events', async ({ sinceEventId, companyId, sinceTimestamp, lastReceivedMessageTimestamp }, callback) => {
+    socket.on('sync-events', async ({ afterMessageId, sinceEventId, companyId, sinceTimestamp, lastReceivedMessageTimestamp }, callback) => {
       try {
         eventBus.metrics.clientReconnects++;
-        const targetCompany = normalizeCompanyId(companyId) || socket.activeCompanyId;
+        const targetCompany = normalizeCompanyId(companyId) || socket.data?.user?.companyId || socket.activeCompanyId;
         const missed = eventBus.getMissedEvents(sinceEventId || 0, targetCompany);
 
         let missedMessages = [];
-        if (lastReceivedMessageTimestamp && socket.userId) {
+        if (socket.userId) {
           const userRooms = await ChatRoom.find({ members: socket.userId }).select('_id').lean();
           const rIds = userRooms.map(r => r._id);
           if (rIds.length > 0) {
-            // Guard against client future clock skew skipping legitimate messages
-            let syncTimestamp = new Date(lastReceivedMessageTimestamp);
-            const now = new Date(Date.now() + 1000);
-            if (syncTimestamp > now) {
-              syncTimestamp = new Date(Date.now() - 30000); // fallback to 30s ago
+            const query = { roomId: { $in: rIds } };
+
+            if (afterMessageId) {
+              query._id = { $gt: afterMessageId };
+            } else if (lastReceivedMessageTimestamp) {
+              let syncTimestamp = new Date(lastReceivedMessageTimestamp);
+              const now = new Date(Date.now() + 1000);
+              if (syncTimestamp > now) {
+                syncTimestamp = new Date(Date.now() - 30000);
+              }
+              query.createdAt = { $gt: syncTimestamp };
             }
 
-            missedMessages = await ChatMessage.find({
-              roomId: { $in: rIds },
-              createdAt: { $gt: syncTimestamp }
-            })
-            .populate('senderId', 'name username email role')
-            .sort({ roomSeq: 1, createdAt: 1 })
-            .limit(100)
-            .lean();
+            missedMessages = await ChatMessage.find(query)
+              .populate('senderId', 'name username email role')
+              .sort({ _id: 1 })
+              .limit(500)
+              .lean();
           }
         }
+
+        socket.emit('elite-chat-sync-message', { messages: missedMessages });
 
         if (typeof callback === 'function') {
           callback({
@@ -1168,7 +1186,11 @@ const setupSockets = (io) => {
     socket.on('disconnect', () => {
       console.log(`User disconnected from socket: ${socket.id}`);
       activeUsers.delete(socket.id);
-      io.emit('presence-sync', getOnlineUserIds());
+      if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
+        socket.authorizedCompanies.forEach((cid) => {
+          socket.to(`company:${cid}`).emit('presence_update', { userId: socket.userId, status: 'offline' });
+        });
+      }
     });
   });
 };

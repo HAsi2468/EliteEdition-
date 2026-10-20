@@ -109,18 +109,20 @@ class SocketManager {
 
     this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'], // WebSocket preferred, polling fallback
-      auth: {
-        token,
-        companyId: this.currentCompanyId,
-        companyCode: this.currentCompanyCode,
-        userId: this.currentUserId,
+      auth: (cb) => {
+        cb({
+          token: this._getAuthToken(),
+          companyId: this.currentCompanyId,
+          companyCode: this.currentCompanyCode,
+          userId: this.currentUserId,
+        });
       },
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 500,
-      reconnectionDelayMax: 5000,
-      randomizationFactor: 0.3,
-      timeout: 15000,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 30000,
+      randomizationFactor: 0.5,
+      timeout: 40000,
       upgrade: true,
       rememberUpgrade: true,
     });
@@ -137,7 +139,7 @@ class SocketManager {
         this.socket.emit('register-user', this.currentUserId);
       }
 
-      // Request missed events since last received eventId and message timestamp
+      // Request missed events since last received eventId and message timestamp / ID
       this.resync('reconnect');
 
       // Flush optimistic offline queue
@@ -150,25 +152,45 @@ class SocketManager {
       this._startOfflineTimer();
     });
 
-    this.socket.on('connect_error', () => {
+    this.socket.on('connect_error', (err) => {
       this._stopCloudflareHeartbeat();
+      if (err?.message === 'unauthorized' || err?.message?.toLowerCase().includes('unauthorized')) {
+        console.warn('[SocketManager] Handshake rejected with unauthorized. Disconnecting to prevent loop.');
+        this.disconnect();
+        try {
+          window.dispatchEvent(new CustomEvent('elite-auth-expired', { detail: { reason: 'socket_unauthorized' } }));
+        } catch (e) {}
+        return;
+      }
       this._setStatus('reconnecting');
       this._startOfflineTimer();
+    });
+
+    // Chat missed messages sync listener
+    this.socket.on('elite-chat-sync-message', (data) => {
+      try {
+        window.dispatchEvent(new CustomEvent('elite-chat-sync-message', { detail: data }));
+      } catch (e) {}
+    });
+
+    // Chat message listener for timestamp and ID tracking
+    this.socket.on('receive-message', (message) => {
+      if (message) {
+        if (message._id) {
+          this.lastReceivedMessageId = message._id;
+        }
+        if (message.createdAt) {
+          const msgTime = new Date(message.createdAt).getTime();
+          if (msgTime > this.lastReceivedMessageTimestamp) {
+            this.lastReceivedMessageTimestamp = msgTime;
+          }
+        }
+      }
     });
 
     // Standardized real-time event router
     this.socket.on('data-changed', (event) => {
       this._handleIncomingDataEvent(event);
-    });
-
-    // Chat message listener for timestamp tracking
-    this.socket.on('receive-message', (message) => {
-      if (message && message.createdAt) {
-        const msgTime = new Date(message.createdAt).getTime();
-        if (msgTime > this.lastReceivedMessageTimestamp) {
-          this.lastReceivedMessageTimestamp = msgTime;
-        }
-      }
     });
 
     // Backward-compatible individual event aliases
@@ -684,6 +706,7 @@ class SocketManager {
       this.socket.emit(
         'sync-events',
         {
+          afterMessageId: this.lastReceivedMessageId || null,
           companyId: this.currentCompanyId,
           sinceEventId: this.lastEventId,
           sinceTimestamp: this.lastEventTimestamp,
@@ -693,14 +716,12 @@ class SocketManager {
           if (response && response.success && Array.isArray(response.events)) {
             response.events.forEach((evt) => this._handleIncomingDataEvent(evt));
           }
-          if (response && Array.isArray(response.messages)) {
-            response.messages.forEach((msg) => {
-              try {
-                window.dispatchEvent(
-                  new CustomEvent('elite-chat-sync-message', { detail: msg })
-                );
-              } catch (e) {}
-            });
+          if (response && Array.isArray(response.messages) && response.messages.length > 0) {
+            try {
+              window.dispatchEvent(
+                new CustomEvent('elite-chat-sync-message', { detail: { messages: response.messages } })
+              );
+            } catch (e) {}
           }
         }
       );
@@ -875,6 +896,17 @@ class SocketManager {
           this.resync('already-connected');
           return;
         }
+
+        // In-flight connection check to prevent duplicate parallel handshakes
+        if (this.socket.active && this.socket.io && this.socket.io.readyState === 'opening') {
+          return;
+        }
+
+        const now = Date.now();
+        if (this._lastManualReconnectTime && (now - this._lastManualReconnectTime < 10000)) {
+          return; // Enforce minimum 10-second manual debounce window
+        }
+        this._lastManualReconnectTime = now;
 
         if (forceImmediate && this.socket.io) {
           this.socket.io.skipReconnect = false;

@@ -142,6 +142,18 @@ export class WebPushClientManager {
       } catch (e) {}
 
       const deviceType = this.isIOS() ? 'ios' : (/Android/i.test(navigator.userAgent) ? 'android' : 'desktop');
+      const subJson = subscription.toJSON();
+      const currentEndpoint = subJson.endpoint;
+
+      // Push Subscription Guard: Avoid redundant network requests if already registered
+      try {
+        const storedEndpoint = localStorage.getItem('elite_push_endpoint');
+        const storedUserId = localStorage.getItem('elite_push_user_id');
+        if (storedEndpoint && currentEndpoint && storedEndpoint === currentEndpoint && String(storedUserId || '') === String(effectiveUserId || '')) {
+          this.initSmartFocusListeners(effectiveUserId);
+          return { success: true, subscription };
+        }
+      } catch (e) {}
 
       const saveResponse = await fetch('/v1/notifications/subscribe', {
         method: 'POST',
@@ -153,7 +165,7 @@ export class WebPushClientManager {
         },
         body: JSON.stringify({
           userId: effectiveUserId,
-          subscription: subscription.toJSON(),
+          subscription: subJson,
           deviceFingerprint: `${navigator.platform}_${navigator.vendor}`,
           deviceType,
           userAgent: navigator.userAgent,
@@ -163,6 +175,11 @@ export class WebPushClientManager {
       if (!saveResponse.ok) {
         throw new Error('Failed to register subscription on ERP server');
       }
+
+      try {
+        if (currentEndpoint) localStorage.setItem('elite_push_endpoint', currentEndpoint);
+        if (effectiveUserId) localStorage.setItem('elite_push_user_id', String(effectiveUserId));
+      } catch (e) {}
 
       this.initSmartFocusListeners(effectiveUserId);
       return { success: true, subscription };
@@ -186,6 +203,11 @@ export class WebPushClientManager {
       if (subscription) {
         const endpoint = subscription.endpoint;
         await subscription.unsubscribe();
+
+        try {
+          localStorage.removeItem('elite_push_endpoint');
+          localStorage.removeItem('elite_push_user_id');
+        } catch (e) {}
 
         // Notify backend to drop subscription record
         await fetch('/v1/notifications/unsubscribe', {
