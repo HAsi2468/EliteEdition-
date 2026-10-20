@@ -447,7 +447,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         else if (showClearAllModal) setShowClearAllModal(false);
         else if (showChatTaskModal) setShowChatTaskModal(false);
         else if (showDialpad) setShowDialpad(false);
-        else if (selectedMedia) setSelectedMedia(null);
+        else if (zoomImg) setZoomImg(null);
       }
     };
     window.addEventListener('keydown', handleEscapeDismiss);
@@ -456,7 +456,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     showMobileActionMenu, showMobileHeaderMenu, showDesktopHeaderMenu,
     showNewDmModal, showCreateGroupModal, showMembersModal, showShareModal,
     showGalleryModal, showPollModal, showForwardModal, showClearAllModal,
-    showChatTaskModal, showDialpad, selectedMedia
+    showChatTaskModal, showDialpad, zoomImg
   ]);
 
   // ─── Real-Time Voice & Video Calling Handlers (WebRTC) ───
