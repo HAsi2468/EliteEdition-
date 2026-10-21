@@ -1008,7 +1008,7 @@ class SocketManager {
         if (!this._reconnectingDebounceTimer) {
           this._reconnectingDebounceTimer = setTimeout(() => {
             this._reconnectingDebounceTimer = null;
-            if (this.status !== 'connected') {
+            if (!this.socket || !this.socket.connected) {
               this.status = 'reconnecting';
               this._notifyStatus('reconnecting');
             }
@@ -1037,7 +1037,7 @@ class SocketManager {
   }
 
   isConnected() {
-    return this.status === 'connected';
+    return Boolean(this.socket && this.socket.connected && this.status === 'connected');
   }
 
   _getAuthToken() {

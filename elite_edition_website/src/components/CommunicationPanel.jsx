@@ -2249,8 +2249,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       });
 
       if (fileInfo && fileInfo.fileUrl) {
+        let safeName = fileInfo.fileName || rawFileName || '';
+        if (!safeName || safeName.toLowerCase() === 'blob' || safeName.toLowerCase() === 'blob.blob' || safeName.startsWith('blob:')) {
+          safeName = rawFileName || `image-${Date.now()}.${ext}`;
+        }
         setAttachedFile({
-          fileName: fileInfo.fileName || rawFileName,
+          fileName: safeName,
           fileType: fileInfo.fileType,
           fileUrl: fileInfo.fileUrl,
           fileSize: fileInfo.fileSize || file.size,
@@ -3194,7 +3198,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return;
     }
 
-    const messageText = inputMessage.trim() || (attachedFile ? `Attached ${attachedFile.fileName}` : '');
+    let attachLabel = attachedFile?.fileName || '';
+    if (!attachLabel || attachLabel.toLowerCase() === 'blob' || attachLabel.toLowerCase() === 'blob.blob' || attachLabel.startsWith('blob:')) {
+      attachLabel = 'attachment';
+    }
+    const messageText = inputMessage.trim() || (attachedFile ? `Attached ${attachLabel}` : '');
 
     const finalMentionedUserIds = Array.from(
       new Set([
@@ -4827,7 +4835,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             {!msg.isDeleted && activeMsgMenuId === msg._id && (() => {
                               const isUpward = msgMenuUpward[msg._id] !== undefined
                                 ? msgMenuUpward[msg._id]
-                                : (msgIndex >= Math.max(0, filteredList.length - 4));
+                                : (msgIndex >= Math.max(0, filteredList.length - 6));
                               return (
                                 <>
                                   <div
@@ -4850,7 +4858,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       boxShadow: '0 12px 35px rgba(0,0,0,0.25)',
                                       zIndex: 99999,
                                       minWidth: '190px',
-                                      maxHeight: 'min(280px, 65vh)',
+                                      maxHeight: 'min(380px, 85vh)',
                                       overflowY: 'auto',
                                       padding: '6px 0',
                                       border: '1.5px solid #bfdbfe',
@@ -4858,6 +4866,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
+
                                   {/* Quick Reactions Bar */}
                                   <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>
                                     {['👍', '❤️', '😂', '😮', '😢', '🙏', '👏', '🔥'].map((emo) => (
@@ -5393,7 +5402,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               <div style={{ marginBottom: '0.45rem' }}>
                                 {(() => {
                                   const rawName = msg.attachment.fileName || (typeof msg.attachment.fileUrl === 'string' ? msg.attachment.fileUrl.split('/').pop().split('?')[0] : 'Attachment');
-                                  const fileNameDisplay = rawName.startsWith('blob:') ? 'Uploaded Document' : rawName;
+                                  let fileNameDisplay = rawName;
+                                  if (!fileNameDisplay || fileNameDisplay.toLowerCase() === 'blob' || fileNameDisplay.toLowerCase() === 'blob.blob' || fileNameDisplay.startsWith('blob:')) {
+                                    fileNameDisplay = 'Attached Image';
+                                  }
                                   const lowerName = fileNameDisplay.toLowerCase();
                                   const isImg = msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
                                   const isPdf = msg.attachment.fileType === 'pdf' || lowerName.endsWith('.pdf') || msg.attachment.mimeType === 'application/pdf';
@@ -5405,7 +5417,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                         <img
                                           src={msg.attachment.fileUrl}
                                           alt={fileNameDisplay}
-                                          onClick={() => setZoomImg(msg.attachment.fileUrl)}
+                                          onClick={() => setZoomImg({ url: msg.attachment.fileUrl, fileName: fileNameDisplay })}
                                           style={{
                                             maxWidth: '100%',
                                             maxHeight: '260px',
@@ -5416,8 +5428,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                             border: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light, #e2e8f0)'
                                           }}
                                         />
-                                        <div style={{ fontSize: '0.68rem', opacity: 0.8, marginTop: '3px', wordBreak: 'break-all' }}>
-                                          {fileNameDisplay} {msg.attachment.fileSize ? `(${formatFileSize(msg.attachment.fileSize)})` : ''}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem', opacity: 0.85, marginTop: '4px' }}>
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }} title={fileNameDisplay}>
+                                            {fileNameDisplay} {msg.attachment.fileSize ? `(${formatFileSize(msg.attachment.fileSize)})` : ''}
+                                          </span>
+                                          <a
+                                            href={msg.attachment.fileUrl}
+                                            download={fileNameDisplay}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ color: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', padding: '1px 6px', borderRadius: '4px', background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)' }}
+                                            title="Download attachment"
+                                          >
+                                            <Download size={11} />
+                                            <span>Save</span>
+                                          </a>
                                         </div>
                                       </div>
                                     );
@@ -5782,7 +5808,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <img
                         src={attachedFile.fileUrl}
                         alt="Preview"
-                        onClick={() => setZoomImg(attachedFile.fileUrl)}
+                        onClick={() => setZoomImg({ url: attachedFile.fileUrl, fileName: attachedFile.fileName || 'Preview' })}
                         style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border-light)', cursor: 'zoom-in' }}
                       />
                     ) : (
@@ -6790,16 +6816,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       )}
 
       {/* ── IMAGE LIGHTBOX MODAL ── */}
-      {zoomImg && (
-        <div onClick={() => setZoomImg(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', cursor: 'zoom-out' }}>
-          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
-            <img src={zoomImg} alt="Enlarged preview" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: '8px', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }} />
-            <button onClick={() => setZoomImg(null)} style={{ position: 'absolute', top: -12, right: -12, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <X size={16} />
-            </button>
+      {zoomImg && (() => {
+        const imgUrl = typeof zoomImg === 'object' ? zoomImg.url : zoomImg;
+        let imgName = (typeof zoomImg === 'object' ? zoomImg.fileName : '') || (typeof imgUrl === 'string' ? imgUrl.split('/').pop().split('?')[0] : '') || 'image.png';
+        if (!imgName || imgName.toLowerCase() === 'blob' || imgName.startsWith('blob:')) {
+          imgName = 'image.png';
+        }
+        return (
+          <div onClick={() => setZoomImg(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '90vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', color: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Eye size={16} />
+                <span title={imgName} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60vw' }}>{imgName}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <a
+                  href={imgUrl}
+                  download={imgName}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn"
+                  style={{ background: 'var(--brand-primary, #6366f1)', color: '#fff', padding: '6px 14px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+                >
+                  <Download size={14} /> Download
+                </a>
+                <button
+                  onClick={() => setZoomImg(null)}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '82vh' }}>
+              <img src={imgUrl} alt={imgName} style={{ maxWidth: '100%', maxHeight: '82vh', borderRadius: '8px', boxShadow: '0 8px 30px rgba(0,0,0,0.6)', objectFit: 'contain' }} />
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── JOB CARD PDF VIEW MODAL ── */}
       {pdfPreviewCard && (
@@ -7101,7 +7155,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <img
                               src={att.fileUrl}
                               alt={att.fileName}
-                              onClick={() => setZoomImg(att.fileUrl)}
+                              onClick={() => setZoomImg({ url: att.fileUrl, fileName: att.fileName || 'Attachment' })}
                               style={{ width: '100%', height: '110px', objectFit: 'cover', cursor: 'zoom-in' }}
                             />
                           ) : (

@@ -81,7 +81,7 @@ export function ConnectionBanner() {
   }, []);
 
   // If the WebSocket is connected, we are connected! Never display false offline if socket is healthy.
-  const isActuallyConnected = status === 'connected' || (isBrowserOnline && socketManager.isConnected());
+  const isActuallyConnected = status === 'connected' && socketManager.isConnected();
   const isOffline = !isActuallyConnected && (!isBrowserOnline || status === 'offline');
   const isReconnecting = !isActuallyConnected && !isOffline;
 
@@ -93,7 +93,7 @@ export function ConnectionBanner() {
     if (isReconnecting) {
       timer = setTimeout(() => {
         setShowReconnectingPill(true);
-      }, 3500);
+      }, 1500);
     } else {
       setShowReconnectingPill(false);
     }

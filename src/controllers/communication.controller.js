@@ -187,7 +187,7 @@ const getGroupMessages = async (req, res) => {
       const isMember = room.members && room.members.some((m) => {
         if (!m) return false;
         const memberIdStr = getMemberIdString(m);
-        return memberIdStr === reqUserIdStr;
+        return memberIdStr === reqUserIdStr || String(m) === reqUserIdStr;
       });
 
       const isSuperOrAdmin = req.user && (
@@ -198,16 +198,16 @@ const getGroupMessages = async (req, res) => {
       );
 
       if (!isMember) {
-        if (room.type === 'direct') {
+        if (room.type === 'direct' && !isSuperOrAdmin) {
           // Do NOT allow non-members to view private 1-on-1 direct rooms
           return res.status(403).json({ success: false, message: 'Access denied to direct message conversation' });
         }
         if (room.isPrivate && !isSuperOrAdmin) {
           return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this private group' });
         }
-        // Do NOT auto-join users to groups
       }
     }
+
 
     const roomObjId = mongoose.Types.ObjectId.isValid(groupId) ? new mongoose.Types.ObjectId(groupId) : groupId;
     const query = { roomId: roomObjId };
@@ -783,7 +783,10 @@ const searchMessages = async (req, res) => {
     }
 
     const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.query.userId);
-    const currentUser = rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : null;
+    const userObjId = rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : null;
+    const userStrId = rawUserId ? String(rawUserId) : null;
+    const userMembers = [userObjId, userStrId].filter(Boolean);
+
     const isSuperOrAdmin = req.user && (
       req.user.role === 'admin' ||
       req.user.role === 'super_admin' ||
@@ -792,16 +795,21 @@ const searchMessages = async (req, res) => {
       req.headers['x-is-admin'] === 'true'
     );
 
-    let roomQuery;
-    if (isSuperOrAdmin) {
-      roomQuery = { isArchived: { $ne: true } };
-    } else if (currentUser) {
-      roomQuery = {
-        isArchived: { $ne: true },
-        members: currentUser
-      };
-    } else {
-      return res.status(200).json({ success: true, results: [] });
+    let roomQuery = { isArchived: { $ne: true } };
+    if (!isSuperOrAdmin) {
+      if (userMembers.length > 0) {
+        roomQuery.$or = [
+          { members: { $in: userMembers } },
+          { createdBy: { $in: userMembers } },
+          { isSystemGroup: true },
+          { type: 'group' }
+        ];
+      } else {
+        roomQuery.$or = [
+          { isSystemGroup: true },
+          { type: 'group' }
+        ];
+      }
     }
 
     const accessibleRooms = await ChatRoom.find(roomQuery).select('_id name title type').lean();
@@ -829,12 +837,13 @@ const searchMessages = async (req, res) => {
       .limit(limitNum)
       .lean();
 
-    return res.status(200).json({ success: true, results });
+    return res.status(200).json({ success: true, results: results || [] });
   } catch (error) {
     console.error('Error searching messages:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(200).json({ success: true, results: [], error: error.message });
   }
 };
+
 
 /**
  * Admin option to create custom communication activity group

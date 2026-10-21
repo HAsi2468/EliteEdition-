@@ -1058,8 +1058,14 @@ export const api = {
       .replace(/\s+/g, '_');
     const folder = `Chat/${cleanRoom}`;
 
+    let originalName = file?.name || '';
+    if (!originalName || originalName.toLowerCase() === 'blob' || originalName.toLowerCase() === 'blob.blob') {
+      const ext = file?.type ? file.type.split('/')[1] || 'png' : 'png';
+      originalName = `upload-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
+    }
+
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', file, originalName);
     formData.append('folder', folder);
 
     return request('/workspace/upload', {
