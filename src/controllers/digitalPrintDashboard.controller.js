@@ -152,7 +152,8 @@ const getDailyOperationsSummary = async (req, res) => {
       JobCard.aggregate([
         {
           $match: {
-            department: 'digital_print',
+            department: { $ne: 'stitching' },
+            category: { $ne: 'Stitching' },
             fusingStatus: 'Fusing Done',
             fusingDate: { $gte: cleanStart, $lte: cleanEnd }
           }
@@ -178,7 +179,8 @@ const getDailyOperationsSummary = async (req, res) => {
       JobCard.aggregate([
         {
           $match: {
-            department: 'digital_print',
+            department: { $ne: 'stitching' },
+            category: { $ne: 'Stitching' },
             $or: [
               { printStatus: { $in: ['Printing Done', 'PRINTED', 'Printed'] } },
               { status: { $in: ['PRINTED', 'Printed'] } }
@@ -208,7 +210,7 @@ const getDailyOperationsSummary = async (req, res) => {
     // ──────────────────────────────────────────────────────────────────────────
     const [pipelineAgg, todayCreatedJobCards] = await Promise.all([
       JobCard.aggregate([
-        { $match: { department: 'digital_print' } },
+        { $match: { department: { $ne: 'stitching' }, category: { $ne: 'Stitching' } } },
         {
           $group: {
             _id: {
@@ -228,7 +230,8 @@ const getDailyOperationsSummary = async (req, res) => {
       JobCard.aggregate([
         {
           $match: {
-            department: 'digital_print',
+            department: { $ne: 'stitching' },
+            category: { $ne: 'Stitching' },
             date: { $gte: cleanStart, $lte: cleanEnd }
           }
         },
@@ -571,7 +574,8 @@ const getDailyOperationsSummary = async (req, res) => {
       JobCard.aggregate([
         {
           $match: {
-            department: 'digital_print',
+            department: { $ne: 'stitching' },
+            category: { $ne: 'Stitching' },
             fusingStatus: 'Fusing Done',
             fusingDate: { $gte: trendStartStr, $lte: trendEndStr }
           }

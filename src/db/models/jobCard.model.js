@@ -152,6 +152,13 @@ jobCardSchema.index({ party: 1 });
 jobCardSchema.index({ fabric: 1 });
 // Default sort order for job card listing
 jobCardSchema.index({ created_date_time: -1 });
+// High-concurrency dashboard & fusing queue lookup
+jobCardSchema.index({ fusingStatus: 1, fusingDate: -1 });
+jobCardSchema.index({ printStatus: 1, fusingStatus: 1, department: 1 });
+jobCardSchema.index({ date: -1, department: 1, category: 1 });
+jobCardSchema.index({ jobNo: 1 });
+jobCardSchema.index({ company_id: 1, status: 1 });
+jobCardSchema.index({ companyId: 1, status: 1 });
 
 const JobCard = mongoose.model('JobCard', jobCardSchema);
 module.exports = JobCard;

@@ -20,9 +20,10 @@ mongoose.connection.on('disconnected', () => {
 
 mongoose.connect(config.mongoose.url, {
   serverSelectionTimeoutMS: 5000, // Fail fast if Atlas is unreachable
-  maxPoolSize: 100,               // High-concurrency connection pool matching 50+ user scale
-  minPoolSize: 20,                // Pre-warmed standby connections
-  socketTimeoutMS: 45000,         // Prevent socket hangs during network partitions
+  maxPoolSize: 75,                // 75 per worker x 2 PM2 workers = 150 pooled connections
+  minPoolSize: 15,                // Pre-warmed standby connections per worker
+  maxIdleTimeMS: 30000,           // Close connections idle for >30s to prevent Atlas connection exhaustion
+  socketTimeoutMS: 45000,         // Prevent socket hangs during long queries
   connectTimeoutMS: 10000,
 })
   .catch((error) => {

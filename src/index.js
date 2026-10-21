@@ -38,8 +38,13 @@ if (process.env.REDIS_URL || process.env.REDIS_HOST) {
   try {
     const { createAdapter } = require('@socket.io/redis-adapter');
     const { createClient } = require('redis');
-    const pubClient = createClient({ url: process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || 'localhost'}:6379` });
+    const redisUrl = process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || '127.0.0.1'}:${process.env.REDIS_PORT || 6379}`;
+    const pubClient = createClient({ url: redisUrl });
     const subClient = pubClient.duplicate();
+
+    pubClient.on('error', (err) => logger.warn(`[Redis Adapter] PubClient error: ${err.message}`));
+    subClient.on('error', (err) => logger.warn(`[Redis Adapter] SubClient error: ${err.message}`));
+
     Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
       io.adapter(createAdapter(pubClient, subClient));
       logger.info('Attached Redis adapter to Socket.IO for multi-instance cluster synchronization');

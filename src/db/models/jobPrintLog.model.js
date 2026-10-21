@@ -61,6 +61,9 @@ const jobPrintLogSchema = new mongoose.Schema(
 jobPrintLogSchema.index({ machineName: 1, date: 1 });
 // Join/lookup by job card reference
 jobPrintLogSchema.index({ jobCardId: 1 });
+// Date range filter for daily production summaries & timeline velocity
+jobPrintLogSchema.index({ date: 1, shift: 1 });
+jobPrintLogSchema.index({ date: -1 });
 
 const JobPrintLog = mongoose.model('JobPrintLog', jobPrintLogSchema);
 module.exports = JobPrintLog;
