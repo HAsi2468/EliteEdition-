@@ -479,7 +479,17 @@
   display: flex !important;
   flex-direction: column !important;
   min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
   flex: 1 1 0% !important;
+}
+
+.phoenix-bubble-sent,
+.phoenix-bubble-received {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
 }
 
 .wa-msg-row:hover .wa-bubble-trigger,

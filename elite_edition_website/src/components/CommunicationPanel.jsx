@@ -4619,6 +4619,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             gap: '8px',
                             alignSelf: isMe ? 'flex-end' : 'flex-start',
                             maxWidth: isMobileScreen ? '88%' : '75%',
+                            minWidth: 0,
+                            boxSizing: 'border-box',
                             marginBottom: '6px',
                             position: 'relative'
                           }}
@@ -4650,6 +4652,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               flexDirection: 'column',
                               alignItems: isMe ? 'flex-end' : 'flex-start',
                               minWidth: 0,
+                              maxWidth: '100%',
+                              boxSizing: 'border-box',
                               flex: 1
                             }}
                           >
@@ -4686,6 +4690,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 overflowWrap: 'anywhere',
                                 whiteSpace: 'pre-wrap',
                                 maxWidth: '100%',
+                                boxSizing: 'border-box',
                                 position: 'relative',
                                 minWidth: '75px'
                               }}
@@ -4924,17 +4929,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   background: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(37,99,235,0.06)',
                                   borderRadius: '5px',
                                   borderLeft: isMe ? '3.5px solid #ffffff' : '3.5px solid #2563eb',
-                                  padding: '3px 8px',
-                                  marginBottom: '4px',
-                                  fontSize: '0.74rem'
+                                  padding: '4px 8px',
+                                  marginBottom: '6px',
+                                  fontSize: '0.74rem',
+                                  maxWidth: '100%',
+                                  width: '100%',
+                                  minWidth: 0,
+                                  boxSizing: 'border-box',
+                                  overflow: 'hidden'
                                 }}
                                 title="Click to jump to replied message"
                               >
-                                <div style={{ fontWeight: 700, color: isMe ? '#ffffff' : '#2563eb', fontSize: '0.7rem', marginBottom: '1px' }}>
+                                <div style={{ fontWeight: 700, color: isMe ? '#ffffff' : '#2563eb', fontSize: '0.7rem', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                                   {typeof msg.replyTo.senderId === 'object' ? (msg.replyTo.senderId.name || msg.replyTo.senderId.username) : 'Staff Member'}
                                 </div>
-                                <div style={{ color: isMe ? 'rgba(255,255,255,0.9)' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.72rem' }}>
-                                  {msg.replyTo.content}
+                                <div style={{
+                                  color: isMe ? 'rgba(255,255,255,0.92)' : '#475569',
+                                  fontSize: '0.72rem',
+                                  lineHeight: '1.35',
+                                  maxWidth: '100%',
+                                  minWidth: 0,
+                                  wordBreak: 'break-word',
+                                  overflowWrap: 'anywhere',
+                                  whiteSpace: 'pre-wrap',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {typeof msg.replyTo === 'object' ? (msg.replyTo.content || (msg.replyTo.attachment ? '📎 Attachment' : '')) : ''}
                                 </div>
                               </div>
                             )}
@@ -5444,7 +5468,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               wordBreak: 'break-word',
                               overflowWrap: 'anywhere',
                               maxWidth: '100%',
-                              minWidth: 0
+                              minWidth: 0,
+                              boxSizing: 'border-box'
                             }}>
                               {!isPollMsg && renderContentWithMentions(msg.content)}
                               {msg.isEdited && (
@@ -5606,11 +5631,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               {/* Quoted Inline Reply Banner */}
               {replyToMessage && (
                 <div style={{ padding: '0.45rem 0.9rem', background: 'rgba(37,99,235,0.08)', borderTop: '1px solid #bfdbfe', borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: '#1d4ed8', fontWeight: 600 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-                    <Reply size={14} color="#2563eb" />
-                    <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden', minWidth: 0, flex: 1 }}>
+                    <Reply size={14} color="#2563eb" style={{ flexShrink: 0 }} />
+                    <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <span style={{ fontWeight: 800 }}>Replying to {typeof replyToMessage.senderId === 'object' ? (replyToMessage.senderId.name || replyToMessage.senderId.username) : 'Staff'}: </span>
-                      <span style={{ opacity: 0.9, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{replyToMessage.content?.substring(0, 80)}</span>
+                      <span style={{ opacity: 0.9 }}>{replyToMessage.content?.substring(0, 80)}</span>
                     </div>
                   </div>
                   <button onClick={() => setReplyToMessage(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
