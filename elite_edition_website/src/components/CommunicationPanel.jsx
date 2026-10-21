@@ -117,6 +117,120 @@ const ICE_SERVERS = [
   }
 ];
 
+function CsvDataViewer({ fileUrl, fileName }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState({ headers: [], rows: [], totalRows: 0 });
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetch(fileUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load file');
+        return res.text();
+      })
+      .then((text) => {
+        if (!active) return;
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (lines.length === 0) {
+          setData({ headers: ['(Empty File)'], rows: [], totalRows: 0 });
+          setLoading(false);
+          return;
+        }
+
+        const firstLine = lines[0];
+        let delimiter = ',';
+        if (firstLine.includes('\t')) delimiter = '\t';
+        else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
+
+        const parseLine = (line) => {
+          const result = [];
+          let cur = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"' || ch === "'") {
+              inQuotes = !inQuotes;
+            } else if (ch === delimiter && !inQuotes) {
+              result.push(cur.trim());
+              cur = '';
+            } else {
+              cur += ch;
+            }
+          }
+          result.push(cur.trim());
+          return result;
+        };
+
+        const headers = parseLine(lines[0]);
+        const rows = lines.slice(1, 51).map((l) => parseLine(l));
+        setData({ headers, rows, totalRows: lines.length - 1 });
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err.message || 'Unable to load preview');
+        setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [fileUrl]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', gap: '10px' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#3874ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <span style={{ fontSize: '0.85rem' }}>Reading spreadsheet data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#f87171' }}>
+        <p style={{ margin: 0, fontWeight: 700 }}>Could not preview spreadsheet.</p>
+        <p style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '4px' }}>Please use the Download button above to open this file.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ padding: '8px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+        <span>Showing first {Math.min(50, data.rows.length)} rows {data.totalRows > 50 ? `(of ${data.totalRows} total)` : ''}</span>
+        <span style={{ color: '#059669', fontWeight: 700 }}>● Live Table Preview</span>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+          <thead>
+            <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0, zIndex: 2 }}>
+              <th style={{ padding: '7px 10px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #e2e8f0', width: '40px', color: '#64748b', fontSize: '0.7rem' }}>#</th>
+              {data.headers.map((h, i) => (
+                <th key={i} style={{ padding: '7px 12px', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #e2e8f0', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                  {h || `Col ${i + 1}`}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.rows.map((row, rIdx) => (
+              <tr key={rIdx} style={{ background: rIdx % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '6px 10px', borderRight: '1px solid #e2e8f0', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600 }}>{rIdx + 1}</td>
+                {data.headers.map((_, cIdx) => (
+                  <td key={cIdx} style={{ padding: '6px 12px', borderRight: '1px solid #f1f5f9', color: '#334155', whiteSpace: 'nowrap' }}>
+                    {row[cIdx] !== undefined ? row[cIdx] : ''}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat', activeTab = 'communication', onUnreadChange }) {
   const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
 
@@ -176,6 +290,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('chat-unread-count-change', { detail: { count: totalChatUnreadCount } }));
+      const baseTitle = 'Elite Edition ERP';
+      if (totalChatUnreadCount > 0) {
+        document.title = `(${totalChatUnreadCount}) ${baseTitle}`;
+      } else {
+        document.title = baseTitle;
+      }
     }
   }, [totalChatUnreadCount, onUnreadChange]);
 
@@ -2929,6 +3049,33 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     setTimeout(() => {
       URL.revokeObjectURL(url);
     }, 2000);
+  };
+
+  // Universal Download Helper: Saves with exact original filename without opening new tabs
+  const handleDownloadAttachment = async (url, name) => {
+    if (!url) return;
+    const cleanName = name || 'download';
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Direct fetch failed');
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = cleanName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+    } catch (e) {
+      const proxyUrl = `/api/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}`;
+      const link = document.createElement('a');
+      link.href = proxyUrl;
+      link.download = cleanName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
 
@@ -5728,12 +5875,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                         </div>
                                       </div>
 
-                                      <a
-                                        href={msg.attachment.fileUrl}
-                                        download={fileNameDisplay}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDownloadAttachment(msg.attachment.fileUrl, fileNameDisplay);
+                                        }}
                                         style={{
                                           width: 32,
                                           height: 32,
@@ -5748,10 +5895,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                           border: 'none',
                                           cursor: 'pointer'
                                         }}
-                                        title="Download file"
+                                        title={`Download ${fileNameDisplay}`}
                                       >
                                         <Download size={15} />
-                                      </a>
+                                      </button>
                                     </div>
                                   );
                                 })()}
@@ -7074,8 +7221,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         const lowerName = fileName.toLowerCase();
         const isImg = attachmentViewer.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
         const isPdf = attachmentViewer.fileType === 'pdf' || lowerName.endsWith('.pdf');
+        const isCsv = /\.(csv|tsv|txt)$/i.test(lowerName) || attachmentViewer.fileType === 'csv';
         const isSpreadsheet = attachmentViewer.fileType === 'spreadsheet' || /\.(xls|xlsx|csv)$/i.test(lowerName);
-        const isDoc = /\.(doc|docx|txt|rtf)$/i.test(lowerName);
+        const isDoc = /\.(doc|docx|rtf)$/i.test(lowerName);
 
         const vBtnStyle = {
           background: 'rgba(255, 255, 255, 0.12)',
@@ -7224,11 +7372,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   <ExternalLink size={16} />
                 </a>
 
-                <a
-                  href={fileUrl}
-                  download={fileName}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => handleDownloadAttachment(fileUrl, fileName)}
                   style={{
                     background: '#2563eb',
                     color: '#ffffff',
@@ -7240,14 +7386,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    textDecoration: 'none',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    transition: 'background 0.15s ease'
                   }}
                   title="Download file"
                 >
                   <Download size={15} />
                   <span>Download</span>
-                </a>
+                </button>
 
                 <button
                   type="button"
@@ -7308,6 +7454,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     title={fileName}
                     style={{ width: '100%', height: '100%', border: 'none' }}
                   />
+                </div>
+              ) : isCsv ? (
+                <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                  <CsvDataViewer fileUrl={fileUrl} fileName={fileName} />
                 </div>
               ) : (
                 <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>

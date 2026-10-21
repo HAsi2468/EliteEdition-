@@ -327,6 +327,48 @@ router.post('/', (req, res, next) => {
 });
 
 /**
+ * GET /v1/upload/download
+ * Serves files with Content-Disposition: attachment; filename="<originalName>"
+ * so browser saves the file with original name rather than opening in new tab
+ */
+router.get('/download', async (req, res) => {
+  const fileUrl = req.query.url;
+  const originalName = req.query.filename || req.query.fileName || 'download';
+  if (!fileUrl) {
+    return res.status(400).send('Missing url parameter');
+  }
+
+  const safeName = originalName.replace(/["\r\n]/g, '_');
+
+  // If local file path
+  if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('/designs/')) {
+    const localRel = fileUrl.replace(/^\/(uploads|designs)\//, '');
+    const localPath = path.join(uploadDir, localRel);
+    if (fs.existsSync(localPath)) {
+      return res.download(localPath, safeName);
+    }
+  }
+
+  // Stream remote R2/Cloudflare URL
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: fileUrl,
+      responseType: 'stream',
+      timeout: 30000
+    });
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName)}"`);
+    if (response.headers['content-type']) {
+      res.setHeader('Content-Type', response.headers['content-type']);
+    }
+    response.data.pipe(res);
+  } catch (err) {
+    console.warn('[upload/download] Remote stream failed, redirecting:', err.message);
+    res.redirect(fileUrl);
+  }
+});
+
+/**
  * POST /v1/upload/presign
  * Generates a pre-signed direct upload URL to bypass app server
  */
