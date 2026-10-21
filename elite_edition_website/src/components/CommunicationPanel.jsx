@@ -2982,7 +2982,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const mentionCandidates = useMemo(() => {
     if (mentionQuery === null) return [];
-    const myId = String(currentUser?._id || currentUser?.id || '');
+
+    let storedUser = null;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('user');
+        if (raw) storedUser = JSON.parse(raw);
+      }
+    } catch (e) {}
+
+    const myIds = new Set([
+      String(currentUser?._id || ''),
+      String(currentUser?.id || ''),
+      String(storedUser?._id || ''),
+      String(storedUser?.id || '')
+    ].filter(Boolean));
+
+    const myEmails = new Set([
+      String(currentUser?.email || '').trim().toLowerCase(),
+      String(storedUser?.email || '').trim().toLowerCase()
+    ].filter(Boolean));
+
+    const myUsernames = new Set([
+      String(currentUser?.username || '').trim().toLowerCase(),
+      String(storedUser?.username || '').trim().toLowerCase()
+    ].filter(Boolean));
+
+    const myNames = new Set([
+      String(currentUser?.name || '').trim().toLowerCase(),
+      String(storedUser?.name || '').trim().toLowerCase()
+    ].filter(Boolean));
 
     let usersToSearch = allUsers || [];
     if (activeGroup?.type === 'group' && Array.isArray(activeGroup.members) && activeGroup.members.length > 0) {
@@ -2993,34 +3022,72 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (groupUsers.length > 0) usersToSearch = groupUsers;
     }
 
-    const q = mentionQuery.trim();
-    return usersToSearch
-      .filter((u) => String(u._id || u.id) !== myId)
+    const q = mentionQuery.trim().toLowerCase();
+
+    // Exclude logged in user ("me")
+    const filteredUsers = usersToSearch
+      .filter((u) => {
+        const uid = String(u._id || u.id || '');
+        if (uid && myIds.has(uid)) return false;
+        const uEmail = String(u.email || '').trim().toLowerCase();
+        if (uEmail && myEmails.has(uEmail)) return false;
+        const uUsername = String(u.username || '').trim().toLowerCase();
+        if (uUsername && myUsernames.has(uUsername)) return false;
+        const uName = String(u.name || '').trim().toLowerCase();
+        if (uName && myNames.has(uName)) return false;
+        return true;
+      })
       .filter((u) => {
         if (!q) return true;
         const name = (u.name || '').toLowerCase();
         const username = (u.username || '').toLowerCase();
         return name.includes(q) || username.includes(q);
-      })
-      .slice(0, 6);
+      });
+
+    const candidates = [];
+
+    // Prepend @all / Everyone option for group or channel chats
+    const canMentionAll = !activeGroup || activeGroup.type === 'group' || (activeGroup.members && activeGroup.members.length > 1);
+    if (canMentionAll && (!q || 'all'.startsWith(q) || 'everyone'.startsWith(q))) {
+      candidates.push({
+        _id: 'ALL_MEMBERS',
+        id: 'ALL_MEMBERS',
+        name: 'all',
+        displayName: 'all',
+        title: 'All Members',
+        role: 'Notify all members in this conversation',
+        isSpecialAll: true
+      });
+    }
+
+    candidates.push(...filteredUsers.slice(0, 6));
+    return candidates;
   }, [mentionQuery, allUsers, activeGroup, currentUser]);
 
   const handleSelectMention = (user) => {
-    const uName = user.name || user.username || 'User';
-    const uId = String(user._id || user.id);
+    const isAll = user.isSpecialAll || user._id === 'ALL_MEMBERS' || user.name === 'all';
     const textarea = chatTextareaRef.current;
     const cursorPos = textarea?.selectionStart ?? inputMessage.length;
 
     const textBeforeCursor = inputMessage.slice(0, cursorPos);
     const textAfterCursor = inputMessage.slice(cursorPos);
-    const replacedBefore = textBeforeCursor.replace(/(?:^|\s)@([a-zA-Z0-9._-]+(?:\s[a-zA-Z0-9._-]+)?)$/, (match) => {
+    const replacedBefore = textBeforeCursor.replace(/(?:^|\s)@([a-zA-Z0-9._-]*(?:\s[a-zA-Z0-9._-]+)?)$/, (match) => {
       const leadingSpace = match.startsWith(' ') ? ' ' : '';
-      return `${leadingSpace}@${uName} `;
+      return `${leadingSpace}${isAll ? '@all ' : `@${user.name || user.username || 'User'} `}`;
     });
 
     const newMsg = replacedBefore + textAfterCursor;
     setInputMessage(newMsg);
-    setMentionedUserIds((prev) => Array.from(new Set([...prev, uId])));
+
+    if (isAll) {
+      const allMemberIds = (activeGroup?.members || []).map((m) =>
+        String(typeof m === 'object' ? (m._id || m.id) : m)
+      ).filter(Boolean);
+      setMentionedUserIds((prev) => Array.from(new Set([...prev, 'ALL_MEMBERS', ...allMemberIds])));
+    } else {
+      const uId = String(user._id || user.id);
+      setMentionedUserIds((prev) => Array.from(new Set([...prev, uId])));
+    }
     setMentionQuery(null);
 
     setTimeout(() => {
@@ -3041,7 +3108,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const cursorPos = e.target.selectionStart;
     const textBeforeCursor = val.slice(0, cursorPos);
-    const atMatch = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9._-]+(?:\s[a-zA-Z0-9._-]+)?)$/);
+    const atMatch = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9._-]*(?:\s[a-zA-Z0-9._-]+)?)$/);
     if (atMatch) {
       setMentionQuery(atMatch[1].toLowerCase());
       setMentionIndex(0);
@@ -3779,19 +3846,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           </button>
         );
       } else {
-        // User mention (@Full Name or @Username)
+        // User mention (@Full Name, @Username, or @all / @everyone)
+        const isAllTag = matchText.toLowerCase() === '@all' || matchText.toLowerCase() === '@everyone';
         elements.push(
           <span
             key={`usr_${idx}`}
             style={{
               display: 'inline-block',
-              background: 'rgba(59, 130, 246, 0.16)',
-              color: '#1d4ed8',
-              fontWeight: 700,
+              background: isAllTag ? 'rgba(245, 158, 11, 0.18)' : 'rgba(59, 130, 246, 0.16)',
+              color: isAllTag ? '#b45309' : '#1d4ed8',
+              fontWeight: 800,
               borderRadius: '4px',
               padding: '0 6px',
               margin: '0 2px',
               fontSize: '0.86rem',
+              border: isAllTag ? '1px solid rgba(245, 158, 11, 0.35)' : 'none'
             }}
           >
             {matchText}
@@ -6132,8 +6201,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     </div>
                     {mentionCandidates.map((u, idx) => {
                       const isSelected = idx === mentionIndex;
-                      const uName = u.name || u.username || 'Staff';
-                      const uRole = u.department || u.role || 'Member';
+                      const isAll = u.isSpecialAll || u._id === 'ALL_MEMBERS' || u.name === 'all';
+                      const uName = isAll ? 'all' : (u.name || u.username || 'Staff');
+                      const uRole = isAll ? 'EVERYONE' : (u.department || u.role || 'Member');
                       return (
                         <div
                           key={u._id || u.id}
@@ -6144,7 +6214,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             padding: '8px 12px',
-                            background: isSelected ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                            background: isSelected ? (isAll ? 'rgba(245, 158, 11, 0.14)' : 'rgba(37, 99, 235, 0.1)') : 'transparent',
                             cursor: 'pointer',
                             transition: 'background 0.1s ease',
                             borderBottom: idx < mentionCandidates.length - 1 ? '1px solid #f1f5f9' : 'none'
@@ -6155,7 +6225,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               width: 26,
                               height: 26,
                               borderRadius: '50%',
-                              background: '#2563eb',
+                              background: isAll ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#2563eb',
                               color: '#ffffff',
                               display: 'flex',
                               alignItems: 'center',
@@ -6163,14 +6233,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               fontWeight: 800,
                               fontSize: '0.75rem'
                             }}>
-                              {uName.charAt(0).toUpperCase()}
+                              {isAll ? <Users size={13} color="#ffffff" /> : uName.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>{uName}</div>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>@{u.username || uName.toLowerCase().replace(/\s+/g, '')}</div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isAll ? '#b45309' : '#0f172a' }}>
+                                {isAll ? '@all (All Members)' : uName}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                {isAll ? 'Notify everyone in this conversation' : `@${u.username || uName.toLowerCase().replace(/\s+/g, '')}`}
+                              </div>
                             </div>
                           </div>
-                          <span style={{ fontSize: '0.68rem', padding: '2px 6px', background: '#e2e8f0', borderRadius: '4px', color: '#475569', fontWeight: 600 }}>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            padding: '2px 6px',
+                            background: isAll ? '#fef3c7' : '#e2e8f0',
+                            borderRadius: '4px',
+                            color: isAll ? '#92400e' : '#475569',
+                            fontWeight: 700
+                          }}>
                             {uRole}
                           </span>
                         </div>

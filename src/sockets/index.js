@@ -369,8 +369,19 @@ const setupSockets = (io) => {
         // Sanitize content against stored XSS
         const sanitizedContent = sanitizeChatMessage(content || '');
         
-        // Parse user mentions (supports explicit mentionedUserIds, full names e.g. @QA Automation Bot, and @usernames)
+        // Parse user mentions (supports explicit mentionedUserIds, full names e.g. @QA Automation Bot, @usernames, and @all / @everyone)
         let mentions = Array.isArray(inMentionedUserIds) ? [...inMentionedUserIds] : [];
+        const isMentionAll = /\b@(all|everyone)\b/i.test(sanitizedContent) || mentions.includes('ALL_MEMBERS');
+        if (isMentionAll && targetRoom && Array.isArray(targetRoom.members)) {
+          targetRoom.members.forEach((m) => {
+            const mIdStr = String(typeof m === 'object' ? (m._id || m.id) : m);
+            if (mIdStr && mIdStr !== senderIdStr && !mentions.includes(mIdStr)) {
+              mentions.push(mIdStr);
+            }
+          });
+          mentions = mentions.filter((id) => id !== 'ALL_MEMBERS');
+        }
+
         if (sanitizedContent) {
           try {
             const usersInDb = await User.find({}).select('_id name username').lean();
@@ -385,7 +396,7 @@ const setupSockets = (io) => {
           } catch (err) {
             console.warn('[socket send-message mention resolution error]:', err.message);
           }
-          mentions = Array.from(new Set(mentions));
+          mentions = Array.from(new Set(mentions)).filter((id) => id !== 'ALL_MEMBERS' && id !== senderIdStr);
         }
 
         // Parse record mentions e.g. @JC-1004, @DES-55, @INV-201
