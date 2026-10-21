@@ -399,7 +399,7 @@ const postGroupMessage = async (req, res) => {
       }
     }
 
-    const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions } = req.body;
+    const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds } = req.body;
 
     if (!content && !attachment && type !== 'poll') {
       return res.status(400).json({ success: false, message: 'Message content, attachment, or poll is required' });
@@ -449,14 +449,23 @@ const postGroupMessage = async (req, res) => {
     // Sanitize content against Stored XSS and malicious script injection
     const sanitizedContent = sanitizeChatMessage(content || '');
 
-    // Parse user mentions
-    const mentionRegex = /@(\w+)/g;
-    const matches = [...(sanitizedContent || '').matchAll(mentionRegex)];
-    const usernames = matches.map(m => m[1]);
-    const mentions = [];
-    if (usernames.length > 0) {
-      const matchedUsers = await User.find({ username: { $in: usernames } });
-      matchedUsers.forEach(u => mentions.push(u._id));
+    // Parse user mentions (supports explicit mentionedUserIds, full names e.g. @QA Automation Bot, and @usernames)
+    let mentions = Array.isArray(inMentionedUserIds) ? [...inMentionedUserIds] : [];
+    if (sanitizedContent) {
+      try {
+        const usersInDb = await User.find({}).select('_id name username').lean();
+        usersInDb.forEach((u) => {
+          const uIdStr = String(u._id);
+          if (u.name && sanitizedContent.toLowerCase().includes(`@${u.name.toLowerCase()}`)) {
+            if (!mentions.includes(uIdStr)) mentions.push(uIdStr);
+          } else if (u.username && sanitizedContent.toLowerCase().includes(`@${u.username.toLowerCase()}`)) {
+            if (!mentions.includes(uIdStr)) mentions.push(uIdStr);
+          }
+        });
+      } catch (err) {
+        console.warn('[postGroupMessage mention resolution error]:', err.message);
+      }
+      mentions = Array.from(new Set(mentions));
     }
 
     // Parse record mentions

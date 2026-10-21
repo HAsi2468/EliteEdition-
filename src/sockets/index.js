@@ -302,7 +302,7 @@ const setupSockets = (io) => {
     // Handle sending a standard text message (supports quoted replies, attachments, mentions, priority, voice notes, record cards)
     socket.on('send-message', async (data, callback) => {
       try {
-        const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = data;
+        const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds } = data;
         
         // Anti-Spoofing: Bind sender strictly to authenticated socket user when available
         const actualSenderId = socket.userId || (socket.user ? String(socket.user._id) : senderId);
@@ -369,14 +369,23 @@ const setupSockets = (io) => {
         // Sanitize content against stored XSS
         const sanitizedContent = sanitizeChatMessage(content || '');
         
-        // Parse user mentions
-        const mentionRegex = /@(\w+)/g;
-        const matches = [...(sanitizedContent || '').matchAll(mentionRegex)];
-        const usernames = matches.map(m => m[1]);
-        const mentions = [];
-        if (usernames.length > 0) {
-          const matchedUsers = await User.find({ username: { $in: usernames } });
-          matchedUsers.forEach(u => mentions.push(u._id));
+        // Parse user mentions (supports explicit mentionedUserIds, full names e.g. @QA Automation Bot, and @usernames)
+        let mentions = Array.isArray(inMentionedUserIds) ? [...inMentionedUserIds] : [];
+        if (sanitizedContent) {
+          try {
+            const usersInDb = await User.find({}).select('_id name username').lean();
+            usersInDb.forEach((u) => {
+              const uIdStr = String(u._id);
+              if (u.name && sanitizedContent.toLowerCase().includes(`@${u.name.toLowerCase()}`)) {
+                if (!mentions.includes(uIdStr)) mentions.push(uIdStr);
+              } else if (u.username && sanitizedContent.toLowerCase().includes(`@${u.username.toLowerCase()}`)) {
+                if (!mentions.includes(uIdStr)) mentions.push(uIdStr);
+              }
+            });
+          } catch (err) {
+            console.warn('[socket send-message mention resolution error]:', err.message);
+          }
+          mentions = Array.from(new Set(mentions));
         }
 
         // Parse record mentions e.g. @JC-1004, @DES-55, @INV-201

@@ -2959,12 +2959,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (groupUsers.length > 0) usersToSearch = groupUsers;
     }
 
+    const q = mentionQuery.trim();
     return usersToSearch
       .filter((u) => String(u._id || u.id) !== myId)
       .filter((u) => {
+        if (!q) return true;
         const name = (u.name || '').toLowerCase();
         const username = (u.username || '').toLowerCase();
-        return name.includes(mentionQuery) || username.includes(mentionQuery);
+        return name.includes(q) || username.includes(q);
       })
       .slice(0, 6);
   }, [mentionQuery, allUsers, activeGroup, currentUser]);
@@ -2977,7 +2979,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const textBeforeCursor = inputMessage.slice(0, cursorPos);
     const textAfterCursor = inputMessage.slice(cursorPos);
-    const replacedBefore = textBeforeCursor.replace(/(?:^|\s)@([a-zA-Z0-9._-]*)$/, (match) => {
+    const replacedBefore = textBeforeCursor.replace(/(?:^|\s)@([a-zA-Z0-9._-]+(?:\s[a-zA-Z0-9._-]+)?)$/, (match) => {
       const leadingSpace = match.startsWith(' ') ? ' ' : '';
       return `${leadingSpace}@${uName} `;
     });
@@ -3005,7 +3007,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const cursorPos = e.target.selectionStart;
     const textBeforeCursor = val.slice(0, cursorPos);
-    const atMatch = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9._-]*)$/);
+    const atMatch = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9._-]+(?:\s[a-zA-Z0-9._-]+)?)$/);
     if (atMatch) {
       setMentionQuery(atMatch[1].toLowerCase());
       setMentionIndex(0);
@@ -3650,9 +3652,54 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     });
   };
 
-  const renderContentWithMentions = (text) => {
+  const renderContentWithMentions = (text, msg = null) => {
     if (!text) return null;
-    const combinedRegex = /(@(?:JC|DES|INV)-[a-zA-Z0-9_-]+)|(@[a-zA-Z0-9._-]+)/gi;
+
+    // Collect all candidate user mention names from msg.mentions, allUsers, activeGroup.members, and broadcast tags
+    const candidateNames = new Set(['all', 'everyone', 'channel']);
+
+    if (msg && Array.isArray(msg.mentions)) {
+      msg.mentions.forEach((u) => {
+        if (typeof u === 'object' && u) {
+          if (u.name && u.name.trim()) candidateNames.add(u.name.trim());
+          if (u.username && u.username.trim()) candidateNames.add(u.username.trim());
+        }
+      });
+    }
+
+    if (Array.isArray(allUsers)) {
+      allUsers.forEach((u) => {
+        if (u.name && u.name.trim()) candidateNames.add(u.name.trim());
+        if (u.username && u.username.trim()) candidateNames.add(u.username.trim());
+      });
+    }
+
+    if (activeGroup && Array.isArray(activeGroup.members)) {
+      activeGroup.members.forEach((m) => {
+        if (typeof m === 'object' && m) {
+          if (m.name && m.name.trim()) candidateNames.add(m.name.trim());
+          if (m.username && m.username.trim()) candidateNames.add(m.username.trim());
+        }
+      });
+    }
+
+    // Sort by length DESCENDING so longer multi-word names (e.g. "QA Automation Bot") match before subnames ("QA")
+    const sortedNames = Array.from(candidateNames)
+      .filter((n) => n && n.length > 0)
+      .sort((a, b) => b.length - a.length);
+
+    const escapedNames = sortedNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+    let combinedRegex;
+    if (escapedNames.length > 0) {
+      combinedRegex = new RegExp(
+        `(@(?:JC|DES|INV)-[a-zA-Z0-9_-]+)|(@(?:${escapedNames.join('|')}))(?=[\\s,.:;!?)]|$)|(@[a-zA-Z0-9._-]+)`,
+        'gi'
+      );
+    } else {
+      combinedRegex = /(@(?:JC|DES|INV)-[a-zA-Z0-9_-]+)|(@[a-zA-Z0-9._-]+)/gi;
+    }
+
     const elements = [];
     let lastIndex = 0;
     const matches = [...text.matchAll(combinedRegex)];
@@ -3698,7 +3745,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           </button>
         );
       } else {
-        // User mention (@Name)
+        // User mention (@Full Name or @Username)
         elements.push(
           <span
             key={`usr_${idx}`}
@@ -3708,8 +3755,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               color: '#1d4ed8',
               fontWeight: 700,
               borderRadius: '4px',
-              padding: '0 5px',
-              margin: '0 1px',
+              padding: '0 6px',
+              margin: '0 2px',
               fontSize: '0.86rem',
             }}
           >
@@ -5616,7 +5663,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 padding: isImageAttachment ? '4px 6px 2px 6px' : 0,
                                 boxSizing: 'border-box'
                               }}>
-                                {!isPollMsg && renderContentWithMentions(msg.content)}
+                                {!isPollMsg && renderContentWithMentions(msg.content, msg)}
                                 {msg.isEdited && (
                                   <span style={{ fontSize: '0.68rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
                                     (edited)
