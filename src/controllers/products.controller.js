@@ -104,6 +104,18 @@ const getOrders = async (
   }
 };
 
+const productsListCache = new Map();
+const PRODUCTS_CACHE_TTL = 30 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of productsListCache.entries()) {
+    if (now - val.time > PRODUCTS_CACHE_TTL) {
+      productsListCache.delete(key);
+    }
+  }
+}, 60000);
+
 const getAllProductsList = async (req, res) => {
   const { page: defaultPage, limit: defaultLimit } = config.pagination;
   const {
@@ -116,6 +128,17 @@ const getAllProductsList = async (req, res) => {
     search,
   } = req.query;
 
+  const isDefaultQuery = !search && !dateStart && !dateEnd && (!page || Number(page) === 1);
+  const cappedLimit = Math.min(parseInt(limit, 10) || 50, 100);
+  const cacheKey = `default_prod_${cappedLimit}_${sortField || ''}_${sortOrder || ''}`;
+
+  if (isDefaultQuery && productsListCache.has(cacheKey)) {
+    const cached = productsListCache.get(cacheKey);
+    if (Date.now() - cached.time < PRODUCTS_CACHE_TTL) {
+      return res.send(cached.data);
+    }
+  }
+
   try {
     const filters = {};
     if (search) {
@@ -123,7 +146,7 @@ const getAllProductsList = async (req, res) => {
     }
     const allData = await getOrders(
       page,
-      limit,
+      cappedLimit,
       sortField,
       sortOrder,
       {
@@ -134,11 +157,17 @@ const getAllProductsList = async (req, res) => {
       filters,
       true // useInventoryTable
     );
+
+    if (isDefaultQuery) {
+      productsListCache.set(cacheKey, { data: allData, time: Date.now() });
+    }
+
     res.send(allData);
   } catch (error) {
     res.status(500).send({ message: 'somtheng went wrong' });
   }
 };
+
 
 const readFile = async (url, accesstoken) => {
   const bgStartTime = Date.now();

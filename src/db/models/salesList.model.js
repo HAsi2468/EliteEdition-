@@ -84,6 +84,10 @@ const salesListSchema = new mongoose.Schema(
 
 salesListSchema.index({ itemSKUCode: 1 });
 salesListSchema.index({ orderDate: -1 });
+salesListSchema.index({ orderDate: -1, itemSKUCode: 1 });
+salesListSchema.index({ facility: 1, orderDate: -1 });
+salesListSchema.index({ itemSKUCode: 1, saleCount: -1 });
 
 const SalesList = mongoose.model('SalesList', salesListSchema);
 module.exports = SalesList;
+

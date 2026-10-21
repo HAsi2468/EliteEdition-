@@ -79,9 +79,20 @@ const buildWhereClause = (query) => {
   return whereClause;
 };
 
+const salesListCache = new Map();
+const SALES_LIST_CACHE_TTL = 30 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of salesListCache.entries()) {
+    if (now - val.time > SALES_LIST_CACHE_TTL) {
+      salesListCache.delete(key);
+    }
+  }
+}, 60000);
+
 const getSalseList = async (req, res) => {
   try {
-    logger.info('Fetching sales order list...');
     const { page: defaultPage, limit: defaultLimit } = config.pagination;
     const {
       page = defaultPage,
@@ -89,20 +100,32 @@ const getSalseList = async (req, res) => {
       sortField,
       sortOrder,
     } = req.query;
+
+    const cappedLimit = Math.min(parseInt(limit, 10) || 50, 100);
+    const cacheKey = JSON.stringify({ ...req.query, limit: cappedLimit, page });
+    const cached = salesListCache.get(cacheKey);
+    if (cached && (Date.now() - cached.time < SALES_LIST_CACHE_TTL)) {
+      return res.send(cached.data);
+    }
+
+    logger.info('Fetching sales order list...');
     const whereClause = buildWhereClause(req.query);
     const data = await getSalseListFromDB(
       page,
-      limit,
+      cappedLimit,
       sortField,
       sortOrder,
       whereClause
     );
+
+    salesListCache.set(cacheKey, { data, time: Date.now() });
     res.send(data);
   } catch (error) {
     logger.debug('getSalseList ~ error: %o', error);
     res.send(error);
   }
 };
+
 
 const saveCsvData = async (req, res) => {
   try {

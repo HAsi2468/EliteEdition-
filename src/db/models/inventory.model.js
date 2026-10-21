@@ -77,5 +77,11 @@ const inventorySchema = new mongoose.Schema(
   }
 );
 
+inventorySchema.index({ created_date_time: -1 });
+inventorySchema.index({ party: 1 });
+inventorySchema.index({ skuCode: 1, facility: 1 });
+inventorySchema.index({ facility: 1 });
+
 const Inventory = mongoose.model('Inventory', inventorySchema);
 module.exports = Inventory;
+

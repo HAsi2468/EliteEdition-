@@ -5,16 +5,32 @@ const getProducts = async (skuCodes) => {
   return await db.Product.find({ skuCode: { $in: skuCodes } }).lean();
 };
 
+const imageCache = new Map();
+const IMAGE_CACHE_MAX = 5000;
+
 const fetchProductImages = async (skuCodes) => {
   if (!Array.isArray(skuCodes) || skuCodes.length === 0) return {};
 
   const cleanSkus = skuCodes.filter(Boolean);
-  const baseSkus = [...new Set(cleanSkus.map(s => extractBaseSku(s)))];
+  const acc = {};
+  const unCachedSkus = [];
+
+  for (const sku of cleanSkus) {
+    if (imageCache.has(sku)) {
+      acc[sku] = imageCache.get(sku);
+    } else {
+      unCachedSkus.push(sku);
+    }
+  }
+
+  if (unCachedSkus.length === 0) {
+    return acc;
+  }
+
+  const baseSkus = [...new Set(unCachedSkus.map(s => extractBaseSku(s)))];
   
   // Build regexes to match base SKUs with any variation suffix or exact match
   const regexes = baseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
-  
-  const acc = {};
   
   // Helper to store image for base SKU and any variation SKUs
   const registerImage = (skuCode, imageUrl) => {
@@ -25,11 +41,13 @@ const fetchProductImages = async (skuCodes) => {
     }
     if (!acc[skuCode]) {
       acc[skuCode] = imageUrl;
+      if (imageCache.size < IMAGE_CACHE_MAX) imageCache.set(skuCode, imageUrl);
     }
     // Also match any input SKU that shares this base SKU
     cleanSkus.forEach(inputSku => {
       if (extractBaseSku(inputSku) === base && !acc[inputSku]) {
         acc[inputSku] = imageUrl;
+        if (imageCache.size < IMAGE_CACHE_MAX) imageCache.set(inputSku, imageUrl);
       }
     });
   };
@@ -57,6 +75,14 @@ const fetchProductImages = async (skuCodes) => {
       registerImage(product.skuCode, product.imageUrl);
     });
   }
+
+  // Cache nulls for SKUs not found to prevent re-querying
+  for (const sku of unCachedSkus) {
+    if (!acc[sku] && imageCache.size < IMAGE_CACHE_MAX) {
+      imageCache.set(sku, null);
+    }
+  }
+
 
   return acc;
 };

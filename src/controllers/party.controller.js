@@ -1,6 +1,15 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
 
+let partiesCache = null;
+let partiesCacheTime = 0;
+const PARTIES_CACHE_TTL = 60 * 1000;
+
+const invalidatePartiesCache = () => {
+  partiesCache = null;
+  partiesCacheTime = 0;
+};
+
 const createParty = async (req, res) => {
   try {
     const { name, phone, address } = req.body;
@@ -20,6 +29,7 @@ const createParty = async (req, res) => {
       address: address || '',
     });
 
+    invalidatePartiesCache();
     res.status(201).json(newParty);
   } catch (error) {
     logger.error('Error creating party: %o', error);
@@ -29,23 +39,45 @@ const createParty = async (req, res) => {
 
 const getPartys = async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, limit, page } = req.query;
+    
+    // Serve from cache if no search filter and cache is valid
+    if (!search && partiesCache && (Date.now() - partiesCacheTime < PARTIES_CACHE_TTL)) {
+      return res.json(partiesCache);
+    }
+
     const whereClause = {};
 
     if (search) {
-      whereClause.name = new RegExp(search, 'i');
+      whereClause.name = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
 
-    const partys = await db.Party.find(whereClause)
+    const limitNum = limit ? Math.min(parseInt(limit, 10) || 100, 500) : 0;
+    const pageNum = parseInt(page, 10) || 1;
+    const skipNum = limitNum > 0 ? (pageNum - 1) * limitNum : 0;
+
+    let query = db.Party.find(whereClause)
       .sort({ name: 1 })
       .lean();
 
-    res.json(partys.map(p => ({ ...p, id: p._id.toString() })));
+    if (skipNum > 0) query = query.skip(skipNum);
+    if (limitNum > 0) query = query.limit(limitNum);
+
+    const partys = await query;
+    const result = partys.map(p => ({ ...p, id: p._id.toString() }));
+
+    if (!search && (!limit || limitNum >= 100)) {
+      partiesCache = result;
+      partiesCacheTime = Date.now();
+    }
+
+    res.json(result);
   } catch (error) {
     logger.error('Error fetching partys: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
+
 
 const updateParty = async (req, res) => {
   try {
@@ -70,6 +102,7 @@ const updateParty = async (req, res) => {
       return res.status(404).json({ error: 'Party not found' });
     }
 
+    invalidatePartiesCache();
     res.json(updatedParty);
   } catch (error) {
     logger.error('Error updating party: %o', error);
@@ -87,7 +120,9 @@ const deleteParty = async (req, res) => {
       return res.status(404).json({ error: 'Party not found' });
     }
 
+    invalidatePartiesCache();
     res.json({ message: 'Party deleted successfully', id });
+
   } catch (error) {
     logger.error('Error deleting party: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });

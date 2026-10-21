@@ -30,9 +30,20 @@ async function resolveMasterSkuForBackend(inputSku, inputSize) {
   return cleanSku;
 }
 
+let inventoryDefaultCache = null;
+let inventoryCacheTime = 0;
+const INVENTORY_CACHE_TTL = 30 * 1000;
+
+
+function invalidateInventoryCache() {
+  inventoryDefaultCache = null;
+  inventoryCacheTime = 0;
+}
+
 const createInventory = async (req, res) => {
   try {
     if (Array.isArray(req.body)) {
+
       logger.info(`[INVENTORY] Bulk create request — ${req.body.length} items`);
       
       const processedItems = [];
@@ -118,6 +129,7 @@ const createInventory = async (req, res) => {
       date: date || new Date(),
     });
 
+    invalidateInventoryCache();
     logger.info(`[INVENTORY] ✅ Created — ID: ${newItem._id} | SKU: "${newItem.skuCode}" | Facility: "${newItem.facility}" | Party: "${newItem.party}" | Size: ${newItem.size} | Qty: ${newItem.qty}`);
     emitSocketEvent(req, 'inventory-created', newItem);
     res.status(201).json(newItem);
@@ -127,9 +139,16 @@ const createInventory = async (req, res) => {
   }
 };
 
+
 const getInventory = async (req, res) => {
   try {
-    const { search, excludeUniware, facility } = req.query;
+    const { search, excludeUniware, facility, limit, page } = req.query;
+    
+    const isDefaultQuery = !search && (!facility || facility === 'All') && excludeUniware !== 'false' && !page && !limit;
+    if (isDefaultQuery && inventoryDefaultCache && (Date.now() - inventoryCacheTime < INVENTORY_CACHE_TTL)) {
+      return res.json(inventoryDefaultCache);
+    }
+
     const whereClause = {};
 
     if (excludeUniware !== 'false') {
@@ -141,7 +160,7 @@ const getInventory = async (req, res) => {
     }
 
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
+      const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       whereClause.$or = [
         { party: searchRegex },
         { itemName: searchRegex },
@@ -153,20 +172,35 @@ const getInventory = async (req, res) => {
       ];
       logger.info(`[INVENTORY] GET — Search: "${search}"`);
     } else {
-      logger.info(`[INVENTORY] GET — Fetching all inventory items`);
+      logger.info(`[INVENTORY] GET — Fetching inventory items`);
     }
 
-    const items = await db.Inventory.find(whereClause)
+    let query = db.Inventory.find(whereClause)
       .sort({ created_date_time: -1 })
       .lean();
 
-    logger.info(`[INVENTORY] ✅ Returned ${items.length} item(s)`);
-    res.json(items.map(item => ({ ...item, id: item._id.toString() })));
+    if (limit) {
+      const limitNum = Math.min(parseInt(limit, 10) || 50, 500);
+      const pageNum = parseInt(page, 10) || 1;
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const items = await query;
+    const mapped = items.map(item => ({ ...item, id: item._id.toString() }));
+
+    if (isDefaultQuery) {
+      inventoryDefaultCache = mapped;
+      inventoryCacheTime = Date.now();
+    }
+
+    logger.info(`[INVENTORY] ✅ Returned ${mapped.length} item(s)`);
+    res.json(mapped);
   } catch (error) {
     logger.error('[INVENTORY] Error fetching inventory items: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
+
 
 const updateInventory = async (req, res) => {
   try {
@@ -185,6 +219,7 @@ const updateInventory = async (req, res) => {
       return res.status(404).json({ error: 'Inventory item not found' });
     }
 
+    invalidateInventoryCache();
     logger.info(`[INVENTORY] ✅ Updated — ID: ${updatedItem._id} | Party: "${updatedItem.party}" | Item: "${updatedItem.itemName}" | Size: ${updatedItem.size}`);
     emitSocketEvent(req, 'inventory-updated', updatedItem);
     res.json(updatedItem);
@@ -206,8 +241,10 @@ const deleteInventory = async (req, res) => {
       return res.status(404).json({ error: 'Inventory item not found' });
     }
 
+    invalidateInventoryCache();
     logger.info(`[INVENTORY] ✅ Deleted — ID: ${id} | Party: "${deletedItem.party}" | Item: "${deletedItem.itemName}" | Size: ${deletedItem.size}`);
     emitSocketEvent(req, 'inventory-deleted', { id });
+
     res.json({ message: 'Inventory item deleted successfully', id });
   } catch (error) {
     logger.error('[INVENTORY] Error deleting inventory item: %o', error);
