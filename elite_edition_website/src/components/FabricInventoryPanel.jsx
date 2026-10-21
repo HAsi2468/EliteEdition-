@@ -917,7 +917,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       // NOTE: fetchChallans is intentionally excluded here.
       // It has its own useEffect that fires on challanSearch/date changes.
       fetchStockAdjustments();
-    }, 25000); // 25s auto-sync interval (prevents rapid continuous refresh/flicker)
+    }, 120000); // 120s auto-sync interval (relies primarily on real-time event bus)
 
     const handleDataRefresh = () => {
       fetchData(true);

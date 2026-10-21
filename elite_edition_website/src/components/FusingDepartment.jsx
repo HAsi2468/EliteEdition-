@@ -555,7 +555,10 @@ export default function FusingDepartment() {
   useEffect(() => {
     fetchData();
     api.getPrintConfig().then(res => setPrintConfig(res)).catch(() => {});
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchData();
+    }, 120000);
     const handleGlobalRefresh = () => fetchData();
     window.addEventListener('elite-data-refresh', handleGlobalRefresh);
     return () => {

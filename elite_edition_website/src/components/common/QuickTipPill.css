@@ -15,7 +15,7 @@
   transition: all 180ms ease;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1439px) {
   .quick-tip-pill-dock {
     display: none !important;
   }

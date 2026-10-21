@@ -126,6 +126,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [inputMessage, setInputMessage] = useState('');
   const [roomDrafts, setRoomDrafts] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [messageSearchResults, setMessageSearchResults] = useState([]);
+  const [isSearchingMessages, setIsSearchingMessages] = useState(false);
 
   // Mobile View Guarantee: When user navigates to Communication, ALWAYS display the Chats list screen on mobile!
   useEffect(() => {
@@ -195,6 +197,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [onlineUserIds, setOnlineUserIds] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState([]);
   const [isChatDragging, setIsChatDragging] = useState(false);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setMessageSearchResults([]);
+      setIsSearchingMessages(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setIsSearchingMessages(true);
+        const res = await api.searchCommunicationMessages(q, 20);
+        if (res && res.success && Array.isArray(res.results)) {
+          setMessageSearchResults(res.results);
+        } else if (res && res.success && Array.isArray(res.data)) {
+          setMessageSearchResults(res.data);
+        } else {
+          setMessageSearchResults([]);
+        }
+      } catch (err) {
+        console.warn('Message search error:', err);
+        setMessageSearchResults([]);
+      } finally {
+        setIsSearchingMessages(false);
+      }
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const audioElementRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -1849,22 +1879,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         });
 
         const savedRoomId = typeof localStorage !== 'undefined' ? localStorage.getItem('elite_active_chat_room_id') : null;
+        const persistentId = activeGroupIdRef.current || (activeGroupRef.current ? activeGroupRef.current._id : null) || savedRoomId;
 
         setActiveGroup((prev) => {
-          if (!prev) {
-            // CRITICAL: On mobile screens, NEVER auto-select or open any room! Always show the Chats list inbox screen!
-            const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobileScreen);
-            if (isMobile) {
-              return null;
-            }
-            if (savedRoomId) {
-              const matched = res.data.find((g) => String(g._id) === String(savedRoomId));
-              if (matched) return matched;
-            }
-            return res.data.length > 0 ? res.data[0] : null;
+          const currentId = prev?._id || persistentId;
+          if (currentId) {
+            const matched = res.data.find((g) => String(g._id) === String(currentId));
+            if (matched) return matched;
+            if (prev) return prev;
           }
-          const updated = res.data.find((g) => String(g._id) === String(prev._id));
-          return updated || prev;
+
+          // CRITICAL: On mobile screens, NEVER auto-select or open any room! Always show the Chats list inbox screen!
+          const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobileScreen);
+          if (isMobile) {
+            return null;
+          }
+          if (savedRoomId) {
+            const matched = res.data.find((g) => String(g._id) === String(savedRoomId));
+            if (matched) return matched;
+          }
+          return res.data.length > 0 ? res.data[0] : null;
         });
       }
     } catch (err) {
@@ -2053,7 +2087,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return;
     }
 
-    const rawFileName = file.name || `file_${Date.now()}`;
+    let rawFileName = file.name || '';
+    if (!rawFileName || rawFileName.toLowerCase() === 'blob' || rawFileName === 'blob.blob') {
+      const ext = file.type ? file.type.split('/')[1] || 'png' : 'png';
+      rawFileName = `upload-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
+    }
     const lowerName = rawFileName.toLowerCase();
     const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
     const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
@@ -2095,10 +2133,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   const openFileDialog = (acceptType = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*') => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = null;
-      if (acceptType) fileInputRef.current.accept = acceptType;
-      fileInputRef.current.click();
+    const el = fileInputRef.current || (typeof document !== 'undefined' ? document.getElementById('phoenix-chat-file-input') : null);
+    if (el) {
+      try {
+        el.value = '';
+      } catch (e) {}
+      if (acceptType) el.accept = acceptType;
+      el.click();
     }
   };
 
@@ -3196,26 +3237,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const handleRosterTabChange = (tab) => {
     setRosterTab(tab);
-    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobileScreen);
-    if (isMobile) {
-      // On mobile, never auto-select a room when switching tabs; keep user on the list screen
-      return;
-    }
-    if (tab === 'direct') {
-      const dmRooms = groups.filter((g) => g.type === 'direct');
-      if (dmRooms.length > 0) {
-        if (!activeGroup || activeGroup.type !== 'direct') {
-          setActiveGroup(dmRooms[0]);
-        }
-      }
-    } else if (tab === 'groups') {
-      const groupRooms = groups.filter((g) => g.type !== 'direct');
-      if (groupRooms.length > 0) {
-        if (!activeGroup || activeGroup.type === 'direct') {
-          setActiveGroup(groupRooms[0]);
-        }
-      }
-    }
+    // Never auto-select or force room switches upon changing filter/list views
   };
 
   const filteredGroups = useMemo(() => {
@@ -3233,16 +3255,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     });
 
     let baseItems = [];
-    if (rosterTab === 'groups') {
+    if (phoenixFilter === 'groups' || rosterTab === 'groups') {
       baseItems = groups.filter((g) => g.type !== 'direct');
-    } else if (rosterTab === 'direct') {
+    } else if (phoenixFilter === 'direct' || phoenixFilter === 'personal' || rosterTab === 'direct') {
       baseItems = [...activeDmRooms];
     } else {
       // 'all': ONLY real existing groups and active DMs
       baseItems = [...groups.filter((g) => g.type !== 'direct'), ...activeDmRooms];
     }
 
-    // Filter by Phoenix Segmented Tabs: All | Read | Unread
+    // Filter by Phoenix Segmented Tabs: All | Personal | Groups | Unread
     if (phoenixFilter === 'read') {
       baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) === 0);
     } else if (phoenixFilter === 'unread') {
@@ -3403,6 +3425,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     else onNavigateTab('jobcards');
   };
 
+  const renderTextSegmentWithUrls = (str, keyPrefix) => {
+    if (!str) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
+    const parts = str.split(urlRegex);
+    return parts.map((part, pIdx) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={`${keyPrefix}_url_${pIdx}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: '#2563eb',
+              textDecoration: 'underline',
+              wordBreak: 'break-all',
+              fontWeight: 600
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   const renderContentWithMentions = (text) => {
     if (!text) return null;
     const combinedRegex = /(@(?:JC|DES|INV)-[a-zA-Z0-9_-]+)|(@[a-zA-Z0-9._-]+)/gi;
@@ -3410,13 +3460,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     let lastIndex = 0;
     const matches = [...text.matchAll(combinedRegex)];
 
-    if (matches.length === 0) return text;
+    if (matches.length === 0) return renderTextSegmentWithUrls(text, 'plain');
 
     matches.forEach((m, idx) => {
       const matchText = m[0];
       const matchIndex = m.index;
       if (matchIndex > lastIndex) {
-        elements.push(text.substring(lastIndex, matchIndex));
+        elements.push(renderTextSegmentWithUrls(text.substring(lastIndex, matchIndex), `seg_${idx}`));
       }
 
       if (m[1]) {
@@ -3475,7 +3525,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     });
 
     if (lastIndex < text.length) {
-      elements.push(text.substring(lastIndex));
+      elements.push(renderTextSegmentWithUrls(text.substring(lastIndex), 'tail'));
     }
 
     return elements;
@@ -3581,7 +3631,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             </div>
           </div>
 
-          {/* Phoenix Filter Segmented Tabs (All | Read | Unread) */}
+          {/* Phoenix Filter Segmented Tabs (All | Personal | Groups | Unread) */}
           <div style={{ padding: '0 0.85rem 0.65rem', flexShrink: 0 }}>
             <div className="phoenix-tab-segmented">
               <button
@@ -3593,10 +3643,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               </button>
               <button
                 type="button"
-                className={`phoenix-tab-pill ${phoenixFilter === 'read' ? 'active' : ''}`}
-                onClick={() => setPhoenixFilter('read')}
+                className={`phoenix-tab-pill ${phoenixFilter === 'direct' ? 'active' : ''}`}
+                onClick={() => setPhoenixFilter('direct')}
               >
-                <span>Read</span>
+                <span>Personal</span>
+              </button>
+              <button
+                type="button"
+                className={`phoenix-tab-pill ${phoenixFilter === 'groups' ? 'active' : ''}`}
+                onClick={() => setPhoenixFilter('groups')}
+              >
+                <span>Groups</span>
               </button>
               <button
                 type="button"
@@ -3688,24 +3745,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       ) : (
                         <Building2 size={18} color={deptCol} />
                       )}
-                      {isDirect ? (
-                        (() => {
-                          const colleagueId = colleague?._id || colleague?.id;
-                          const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
-                          return (
-                            <span
-                              className="phoenix-online-dot"
-                              style={{
-                                background: isOnline ? '#22c55e' : '#94a3b8',
-                                borderColor: 'var(--bg-card, #ffffff)'
-                              }}
-                              title={isOnline ? 'Active now' : 'Offline'}
-                            />
-                          );
-                        })()
-                      ) : (
-                        <span className="phoenix-online-dot" title="Active channel" />
-                      )}
+                      {isDirect && (() => {
+                        const colleagueId = colleague?._id || colleague?.id;
+                        const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
+                        return (
+                          <span
+                            className="phoenix-online-dot"
+                            style={{
+                              background: isOnline ? '#22c55e' : '#94a3b8',
+                              borderColor: 'var(--bg-card, #ffffff)'
+                            }}
+                            title={isOnline ? 'Online' : 'Offline'}
+                          />
+                        );
+                      })()}
                     </div>
 
                     {/* Center & Right: Name, preview snippet, time, unread badge */}
@@ -3753,6 +3806,63 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 );
               })
+            )}
+
+            {searchQuery.trim().length >= 2 && (
+              <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px 6px' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Matching Messages ({messageSearchResults.length})
+                  </span>
+                  {isSearchingMessages && <RefreshCw size={12} className="spin-loader" color="#3874ff" />}
+                </div>
+
+                {messageSearchResults.length === 0 && !isSearchingMessages ? (
+                  <div style={{ padding: '0.5rem', textAlign: 'center', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    No messages matched "{searchQuery}"
+                  </div>
+                ) : (
+                  messageSearchResults.map((m) => {
+                    const targetRoom = groups.find((g) => String(g._id) === String(m.roomId || m.conversationId));
+                    return (
+                      <div
+                        key={m._id}
+                        onClick={() => {
+                          if (targetRoom) handleSelectGroup(targetRoom);
+                        }}
+                        style={{
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          background: 'var(--bg-card, #ffffff)',
+                          marginBottom: '6px',
+                          border: '1px solid var(--border-light, #e2e8f0)',
+                          transition: 'background 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-card, #ffffff)'; }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#2563eb' }}>
+                          <span>{targetRoom?.name || 'Conversation'}</span>
+                          <span style={{ color: 'var(--text-muted, #94a3b8)', fontWeight: 400, fontSize: '0.7rem' }}>
+                            {formatTime(m.createdAt)}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontSize: '0.78rem',
+                          color: 'var(--text-primary, #1e293b)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          marginTop: '2px'
+                        }}>
+                          {m.content || m.text}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -3840,24 +3950,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           ) : (
                             <Building2 size={18} color={deptCol} />
                           )}
-                          {isDirect ? (
-                            (() => {
-                              const colleagueId = colleague?._id || colleague?.id;
-                              const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
-                              return (
-                                <span
-                                  className="phoenix-online-dot"
-                                  style={{
-                                    background: isOnline ? '#22c55e' : '#94a3b8',
-                                    borderColor: 'var(--bg-card, #ffffff)'
-                                  }}
-                                  title={isOnline ? 'Active now' : 'Offline'}
-                                />
-                              );
-                            })()
-                          ) : (
-                            <span className="phoenix-online-dot" title="Active channel" />
-                          )}
+                          {isDirect && (() => {
+                            const colleagueId = colleague?._id || colleague?.id;
+                            const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
+                            return (
+                              <span
+                                className="phoenix-online-dot"
+                                style={{
+                                  background: isOnline ? '#22c55e' : '#94a3b8',
+                                  borderColor: 'var(--bg-card, #ffffff)'
+                                }}
+                                title={isOnline ? 'Online' : 'Offline'}
+                              />
+                            );
+                          })()}
                         </div>
 
                         {/* Name + Dropdown Chevron + Active Now Status */}
@@ -3894,11 +4000,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           {(() => {
                             const colleagueId = colleague?._id || colleague?.id;
                             const isOnline = isDirect && colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
+                            if (isDirect) {
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: isOnline ? '#22c55e' : '#94a3b8', display: 'inline-block' }} />
+                                  <span style={{ fontSize: '0.72rem', color: isOnline ? '#10b981' : 'var(--text-muted, #64748b)', fontWeight: 600 }}>
+                                    {isOnline ? 'Online' : 'Offline'}
+                                  </span>
+                                </div>
+                              );
+                            }
                             return (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: isDirect ? (isOnline ? '#22c55e' : '#94a3b8') : '#22c55e', display: 'inline-block' }} />
-                                <span style={{ fontSize: '0.72rem', color: isDirect ? (isOnline ? '#10b981' : 'var(--text-muted, #64748b)') : '#10b981', fontWeight: 600 }}>
-                                  {isDirect ? (isOnline ? 'Active now' : 'Offline') : 'Active channel'}
+                                <Users size={12} color="var(--text-muted)" />
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', fontWeight: 500 }}>
+                                  Group Channel • {activeGroup?.members?.length || 0} members
                                 </span>
                               </div>
                             );
@@ -4276,7 +4392,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                   let lastDateHeader = '';
 
-                  return filteredList.map((msg) => {
+                  return filteredList.map((msg, msgIndex) => {
                     const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
                     const isSystemActivity = msg.msgType === 'system_activity';
 
@@ -4522,7 +4638,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 <div
                                   style={{
                                     position: 'absolute',
-                                    top: '24px',
+                                    top: msgIndex >= filteredList.length - 3 ? 'auto' : '24px',
+                                    bottom: msgIndex >= filteredList.length - 3 ? '28px' : 'auto',
                                     right: isMe ? 0 : 'auto',
                                     left: isMe ? 'auto' : 0,
                                     background: '#ffffff',
@@ -5227,26 +5344,52 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             {isMe && (() => {
                               const myIdStr = String(currentUser?._id || currentUser?.id || '');
                               const isRead = Boolean(
-                                msg.readBy &&
-                                msg.readBy.some((u) => {
-                                  const uId = String(typeof u === 'object' ? (u._id || u.id) : u);
-                                  return uId && uId !== myIdStr;
-                                })
+                                msg.status === 'read' ||
+                                (msg.readBy &&
+                                  msg.readBy.some((u) => {
+                                    const uId = String(typeof u === 'object' ? (u._id || u.id) : u);
+                                    return uId && uId !== myIdStr;
+                                  }))
                               );
 
-                              return isRead ? (
-                                <CheckCheck
-                                  size={13}
-                                  color="#3874ff"
-                                  style={{ strokeWidth: 2.4, marginLeft: '2px' }}
-                                  title="Read by recipient"
-                                />
-                              ) : (
+                              const isDelivered = Boolean(
+                                isRead ||
+                                msg.status === 'delivered' ||
+                                (msg.deliveredTo &&
+                                  msg.deliveredTo.some((u) => {
+                                    const uId = String(typeof u === 'object' ? (u._id || u.id) : u);
+                                    return uId && uId !== myIdStr;
+                                  }))
+                              );
+
+                              if (isRead) {
+                                return (
+                                  <CheckCheck
+                                    size={13}
+                                    color="#2563eb"
+                                    style={{ strokeWidth: 2.4, marginLeft: '2px' }}
+                                    title="Read"
+                                  />
+                                );
+                              }
+
+                              if (isDelivered) {
+                                return (
+                                  <CheckCheck
+                                    size={13}
+                                    color="#94a3b8"
+                                    style={{ strokeWidth: 2, marginLeft: '2px' }}
+                                    title="Delivered to device"
+                                  />
+                                );
+                              }
+
+                              return (
                                 <Check
                                   size={12}
-                                  color="#9aa5b8"
+                                  color="#94a3b8"
                                   style={{ strokeWidth: 2, marginLeft: '2px' }}
-                                  title="Sent"
+                                  title="Sent (Offline)"
                                 />
                               );
                             })()}
@@ -5744,15 +5887,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       {/* On desktop: direct paperclip and emoji buttons */}
                       {!isMobileScreen && (
                         <>
-                          <label
-                            htmlFor="phoenix-chat-file-input"
+                          <button
+                            type="button"
                             className="phoenix-toolbar-icon"
-                            onClick={() => openFileDialog('image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*')}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              openFileDialog('image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*');
+                            }}
                             title="Attach File (PDF, Image, Document)"
-                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}
+                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0, background: 'none', border: 'none' }}
                           >
                             <Paperclip size={16} />
-                          </label>
+                          </button>
 
                           <button
                             type="button"

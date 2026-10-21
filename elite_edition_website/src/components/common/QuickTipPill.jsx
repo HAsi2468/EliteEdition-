@@ -21,7 +21,11 @@ export function QuickTipPill({ activeTab = '' }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDismissed, setIsDismissed] = useState(() => {
     try {
-      return localStorage.getItem('seen_tips') === 'true' || sessionStorage.getItem('quick_tips_dismissed') === 'true';
+      return (
+        localStorage.getItem('hide_tips_banner') === 'true' ||
+        localStorage.getItem('seen_tips') === 'true' ||
+        sessionStorage.getItem('quick_tips_dismissed') === 'true'
+      );
     } catch (e) {
       return false;
     }
@@ -51,6 +55,7 @@ export function QuickTipPill({ activeTab = '' }) {
     e.stopPropagation();
     setIsDismissed(true);
     try {
+      localStorage.setItem('hide_tips_banner', 'true');
       localStorage.setItem('seen_tips', 'true');
       sessionStorage.setItem('quick_tips_dismissed', 'true');
     } catch (err) {}

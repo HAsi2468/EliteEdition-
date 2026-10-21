@@ -605,11 +605,12 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
     return () => window.removeEventListener('elite-data-refresh', handleGlobalRefresh);
   }, [fetchDashboardData]);
 
-  // Periodic background refresh every 60 seconds
+  // Periodic background refresh every 120 seconds, only if tab is visible
   useEffect(() => {
     const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       fetchDashboardData();
-    }, 60000);
+    }, 120000);
     return () => clearInterval(timer);
   }, [fetchDashboardData]);
 

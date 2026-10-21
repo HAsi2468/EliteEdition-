@@ -57,11 +57,33 @@ export function IosInstallPrompt({ forceShow = false, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="ios-pwa-title"
-      className="fixed inset-0 z-[100000] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100000,
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        padding: '16px',
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(4px)'
+      }}
     >
-      <div className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-3xl p-6 shadow-2xl text-slate-100 relative overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '440px',
+          backgroundColor: '#0f172a',
+          border: '1px solid #334155',
+          borderRadius: '24px',
+          padding: '24px',
+          color: '#f8fafc',
+          position: 'relative',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+        }}
+      >
         {/* Ambient Top Glow */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-indigo-500 to-amber-500" />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(to right, #06b6d4, #6366f1, #f59e0b)' }} />
 
         {/* Dismiss Button */}
         <button

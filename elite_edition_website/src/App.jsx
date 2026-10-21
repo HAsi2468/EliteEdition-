@@ -134,21 +134,23 @@ export const ROUTE_ALIASES = {
   'fusing': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
   'jobcards_fusing_log': { tab: 'jobcards_fusing_log', dept: 'digital_print' },
   'fabric': { tab: 'jobcards_fabric', dept: 'digital_print' },
-  'challans': { tab: 'jobcards_fabric', dept: 'digital_print' },
-  'challan': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'challans': { tab: 'jobcards_challan', dept: 'digital_print' },
+  'challan': { tab: 'jobcards_challan', dept: 'digital_print' },
+  'jobcards_challan': { tab: 'jobcards_challan', dept: 'digital_print' },
   'jobcards_fabric': { tab: 'jobcards_fabric', dept: 'digital_print' },
   'finance': { tab: 'ee_invoices', dept: 'elite_edition' },
   'billing': { tab: 'ee_invoices', dept: 'elite_edition' },
   'invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
   'invoice': { tab: 'ee_invoices', dept: 'elite_edition' },
   'ee_invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
-  'jobcards': { tab: 'jobcards', dept: 'digital_print' },
-  'jobcard': { tab: 'jobcards', dept: 'digital_print' },
+  'jobcards': { tab: 'jobcards_list', dept: 'digital_print' },
+  'jobcard': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
   'design': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'designs': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'catalogue': { tab: 'jobcards_catalogue', dept: 'digital_print' },
-  'dispatch': { tab: 'jobcards_fabric', dept: 'digital_print' },
+  'dispatch': { tab: 'jobcards_dispatch', dept: 'digital_print' },
+  'jobcards_dispatch': { tab: 'jobcards_dispatch', dept: 'digital_print' },
   'inventory': { tab: 'inventory', dept: 'elite_online' },
   'stock-ledger': { tab: 'inventory', dept: 'elite_online' },
   'stock_ledger': { tab: 'inventory', dept: 'elite_online' },
@@ -191,6 +193,9 @@ export function getCanonicalHashForTab(tab, queryString = '') {
   else if (tab === 'jobcards_printing_log') alias = 'printing';
   else if (tab === 'jobcards_fusing_log') alias = 'fusing';
   else if (tab === 'jobcards_fabric') alias = 'fabric';
+  else if (tab === 'jobcards_challan') alias = 'challans';
+  else if (tab === 'jobcards_dispatch') alias = 'dispatch';
+  else if (tab === 'jobcards_list') alias = 'jobcards';
   else if (tab === 'jobcards_catalogue') alias = 'design';
   else if (tab === 'stock_ledger') alias = 'stock-ledger';
   return `#${alias}${queryString}`;
@@ -3342,11 +3347,20 @@ export default function App() {
           </ErrorBoundary>
           )}
 
-          {/* Persistent CommunicationPanel (Chat & Task Manager - preserved across tab navigation) */}
-          <div style={{ display: (activeTab === 'communication' || activeTab === 'task_management' || activeTab === 'workspace') ? 'flex' : 'none', flex: 1, minHeight: 0, height: '100%', flexDirection: 'column' }}>
+          {/* Dedicated Workforce Tasks Kanban Board */}
+          <div style={{ display: activeTab === 'task_management' ? 'flex' : 'none', flex: 1, minHeight: 0, height: '100%', flexDirection: 'column' }}>
+            {activeTab === 'task_management' && (
+              <Suspense fallback={<DashboardSkeleton />}>
+                <TaskManagerPanel currentUser={currentUser} />
+              </Suspense>
+            )}
+          </div>
+
+          {/* Persistent CommunicationPanel (Chat - preserved across tab navigation) */}
+          <div style={{ display: (activeTab === 'communication' || activeTab === 'workspace') ? 'flex' : 'none', flex: 1, minHeight: 0, height: '100%', flexDirection: 'column' }}>
             <CommunicationPanel
               currentUser={currentUser}
-              initialMainTab={activeTab === 'task_management' ? 'task' : 'chat'}
+              initialMainTab="chat"
               activeTab={activeTab}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onUnreadChange={(count) => setChatUnreadCount(count)}

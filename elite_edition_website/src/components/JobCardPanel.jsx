@@ -2781,7 +2781,17 @@ function JobCardForm({ card, onSave, onClose, department }) {
       } else {
         await api.createJobCard(payload);
         triggerPushNotification('✨ Job Card Created', `Job Card #${form.jobNo} created successfully!`, 'success');
-        dispatchScreenGroupEvent('jobcards', 'New Job Card Created 🚀', `Job Card #${form.jobNo} for ${form.party || 'Customer'} was created and dispatched to Job Cards Group.`, 'jobcards_list');
+        const isTestRecord = (
+          currentUser?.role === 'qa-automation' ||
+          currentUser?.companyId === 'TEST_COMPANY' ||
+          currentUser?.companyId === 'SANDBOX' ||
+          payload?.isSandbox === true ||
+          /^TEST[-_]/i.test(form.jobNo || form.designName || form.designNo || '') ||
+          /^QA[-_]/i.test(form.jobNo || form.designName || form.designNo || '')
+        );
+        if (!isTestRecord) {
+          dispatchScreenGroupEvent('jobcards', 'New Job Card Created 🚀', `Job Card #${form.jobNo} for ${form.party || 'Customer'} was created and dispatched to Job Cards Group.`, 'jobcards_list');
+        }
       }
       onSave();
     } catch (err) {
@@ -3406,7 +3416,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
   const [pageSize, setPageSize] = useState(25);
   const pageSizeRef = useRef(pageSize);
   pageSizeRef.current = pageSize;
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -3842,7 +3852,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
   useEffect(() => {
     fetchCards(false, 1);
-    const interval = setInterval(() => fetchCards(true, pageRef.current), 15000);
+    // Safety fallback poll every 2 minutes only when tab is active (relies primarily on real-time 'elite-data-refresh')
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchCards(true, pageRef.current);
+    }, 120000);
     const handleDataRefresh = () => fetchCards(true, pageRef.current);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
@@ -4014,8 +4028,12 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
           currentUser={currentUser}
           initialSubTab={effectiveSubTab === 'master' ? 'master' : (effectiveSubTab === 'sample' || effectiveSubTab === 'sample_design') ? 'sample' : 'catalogue'} 
         />
-      ) : effectiveSubTab === 'fabric' ? (
-        <FabricInventoryPanel department={department} onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
+      ) : effectiveSubTab === 'fabric' || effectiveSubTab === 'challan' || effectiveSubTab === 'challans' || effectiveSubTab === 'dispatch' || effectiveSubTab === 'outward' ? (
+        <FabricInventoryPanel
+          department={department}
+          initialTab={effectiveSubTab === 'dispatch' || effectiveSubTab === 'outward' ? 'outward' : (effectiveSubTab === 'challan' || effectiveSubTab === 'challans') ? 'challan' : 'dashboard'}
+          onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }}
+        />
       ) : effectiveSubTab === 'costing' || effectiveSubTab === 'costing_pl' ? (
         <DigitalPrintCostingScreen companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
       ) : effectiveSubTab === 'billing' || effectiveSubTab === 'billing_digital' || effectiveSubTab === 'billing_elite' ? (

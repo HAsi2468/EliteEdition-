@@ -1383,6 +1383,7 @@ export default function AdminPanel() {
         display: 'flex',
         gap: '0.5rem',
         overflowX: 'auto',
+        whiteSpace: 'nowrap',
         WebkitOverflowScrolling: 'touch',
         paddingBottom: '8px',
         maxWidth: '100%',

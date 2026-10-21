@@ -127,6 +127,26 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupMsg, setLookupMsg] = useState(null);
 
+  // CMP-ESC: Handle Escape key to dismiss active modals
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (zoomImg) {
+          setZoomImg(null);
+        } else if (showViewModal) {
+          setShowViewModal(null);
+        } else if (showModal) {
+          setShowModal(false);
+          setEditingItem(null);
+        } else if (isDateDropdownOpen) {
+          setIsDateDropdownOpen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomImg, showViewModal, showModal, isDateDropdownOpen]);
+
   const handleOrderLookup = async (searchTerm) => {
     if (!searchTerm || searchTerm.trim().length < 2) return;
     setLookupLoading(true);

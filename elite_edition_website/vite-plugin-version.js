@@ -29,7 +29,7 @@ export default function versionPlugin() {
       const versionData = {
         version: Date.now(),
         releaseVersion: `v${getPkgVersion()}`,
-        releaseName: `v${getPkgVersion()} — Job Card Print Sheet & Production Suite`,
+        releaseName: `v${getPkgVersion()} — Pure Frontend Enterprise UX & Ergonomics Suite`,
         gitCommit: commitHash,
         buildTime: new Date().toISOString(),
       };
@@ -51,7 +51,7 @@ export default function versionPlugin() {
       const versionData = {
         version: Date.now(),
         releaseVersion: `v${getPkgVersion()}`,
-        releaseName: `v${getPkgVersion()} — Job Card Print Sheet & Production Suite`,
+        releaseName: `v${getPkgVersion()} — Pure Frontend Enterprise UX & Ergonomics Suite`,
         gitCommit: commitHash,
         buildTime: new Date().toISOString(),
       };

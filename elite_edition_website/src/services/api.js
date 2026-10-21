@@ -2619,6 +2619,10 @@ export const api = {
     });
   },
 
+  async searchCommunicationMessages(query, limit = 20) {
+    return request(`/communication/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+  },
+
   async getCommunicationMembers(groupId) {
     return request(`/communication/groups/${groupId}/members`);
   },
