@@ -3198,11 +3198,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return;
     }
 
-    let attachLabel = attachedFile?.fileName || '';
-    if (!attachLabel || attachLabel.toLowerCase() === 'blob' || attachLabel.toLowerCase() === 'blob.blob' || attachLabel.startsWith('blob:')) {
-      attachLabel = 'attachment';
-    }
-    const messageText = inputMessage.trim() || (attachedFile ? `Attached ${attachLabel}` : '');
+    const messageText = inputMessage.trim();
 
     const finalMentionedUserIds = Array.from(
       new Set([
@@ -3987,7 +3983,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           {group.lastMessage
                             ? ((group.lastMessage.isDeleted || group.lastMessage.content === 'This message was deleted')
                                 ? '🚫 This message was deleted'
-                                : group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged' : group.lastMessage.content)
+                                : group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged'
+                                : group.lastMessage.attachment
+                                  ? (group.lastMessage.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(group.lastMessage.attachment.fileName || group.lastMessage.attachment.fileUrl || '')
+                                      ? (group.lastMessage.content && !group.lastMessage.content.startsWith('Attached ') && group.lastMessage.content.toLowerCase() !== 'attached blob' ? `📷 ${group.lastMessage.content}` : '📷 Photo')
+                                      : (group.lastMessage.content && !group.lastMessage.content.startsWith('Attached ') ? `📎 ${group.lastMessage.content}` : `📎 ${group.lastMessage.attachment.fileName || 'Attachment'}`))
+                                  : group.lastMessage.content)
                             : (isVirtual ? 'Tap to start a new chat' : (isDirect ? 'Direct conversation' : (group.description || 'Channel conversation')))}
                         </p>
 
@@ -4687,6 +4688,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     const isPollMsg = msg.type === 'poll' || Boolean(msg.pollMeta && msg.pollMeta.question);
                     const isCallLog = msg.type === 'call-log' || Boolean(msg.activityMeta && msg.activityMeta.callType);
 
+                    const rawAttName = msg.attachment?.fileName || (typeof msg.attachment?.fileUrl === 'string' ? msg.attachment.fileUrl.split('/').pop().split('?')[0] : '');
+                    const isImageAttachment = Boolean(msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
+                      msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(rawAttName.toLowerCase())
+                    ));
+                    const isAutoAttachmentText = Boolean(
+                      msg.attachment &&
+                      typeof msg.content === 'string' &&
+                      (!msg.content.trim() ||
+                        /^Attached\s+/i.test(msg.content.trim()) ||
+                        msg.content.trim().toLowerCase() === 'attached blob' ||
+                        msg.content.trim().toLowerCase() === 'attached image' ||
+                        msg.content.trim().toLowerCase() === 'attached file' ||
+                        (msg.attachment.fileName && msg.content.trim() === msg.attachment.fileName))
+                    );
+                    const hasVisibleContent = Boolean(
+                      typeof msg.content === 'string' && msg.content.trim() && (!msg.attachment || !isAutoAttachmentText)
+                    );
+                    const isImageOnly = isImageAttachment && !hasVisibleContent && !msg.replyTo && !isRecordCard && !isPollMsg && !isCallLog;
+
                     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.isAdmin;
                     const senderIdStr = String(typeof msg.senderId === 'object' ? (msg.senderId?._id || msg.senderId?.id) : (msg.senderId || ''));
                     const myIdStr = String(currentUser?._id || currentUser?.id || '');
@@ -4783,8 +4803,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 color: msg.priority === 'urgent'
                                   ? (isMe ? '#ffffff' : '#991b1b')
                                   : (isMe ? '#ffffff' : 'var(--text-primary, #141824)'),
-                                padding: '12px 16px',
-                                borderRadius: '8px',
+                                padding: isImageOnly ? '4px' : (isImageAttachment ? '4px 4px 8px 4px' : '10px 14px'),
+                                borderRadius: isImageOnly ? '10px' : '12px',
                                 border: msg.priority === 'urgent'
                                   ? (isMe ? '1.5px solid #fca5a5' : '1.5px solid #ef4444')
                                   : (isMe ? 'none' : '1px solid var(--border-light, #e3e6ed)'),
@@ -4799,7 +4819,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 maxWidth: '100%',
                                 boxSizing: 'border-box',
                                 position: 'relative',
-                                minWidth: '75px'
+                                minWidth: isImageOnly ? '160px' : '75px'
                               }}
                             >
                             {/* WhatsApp Down-Chevron Trigger */}
@@ -4810,19 +4830,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 onClick={(e) => handleOpenMsgMenu(e, msg._id)}
                                 style={{
                                   position: 'absolute',
-                                  top: '3px',
-                                  right: '3px',
-                                  background: isMe ? 'rgba(255, 255, 255, 0.25)' : 'rgba(241, 245, 249, 0.95)',
+                                  top: isImageOnly ? '8px' : '3px',
+                                  right: isImageOnly ? '8px' : '3px',
+                                  background: isImageOnly ? 'rgba(0, 0, 0, 0.45)' : (isMe ? 'rgba(255, 255, 255, 0.25)' : 'rgba(241, 245, 249, 0.95)'),
                                   border: 'none',
                                   borderRadius: '50%',
-                                  width: '18px',
-                                  height: '18px',
+                                  width: '20px',
+                                  height: '20px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   cursor: 'pointer',
-                                  color: isMe ? '#ffffff' : '#64748b',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                                  color: (isImageOnly || isMe) ? '#ffffff' : '#64748b',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                                   zIndex: 4
                                 }}
                                 title="Message options"
@@ -5399,12 +5419,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                             {/* Attachment: Image, PDF, Spreadsheet or Document */}
                             {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
-                              <div style={{ marginBottom: '0.45rem' }}>
+                              <div style={{ marginBottom: hasVisibleContent ? '0.4rem' : 0 }}>
                                 {(() => {
                                   const rawName = msg.attachment.fileName || (typeof msg.attachment.fileUrl === 'string' ? msg.attachment.fileUrl.split('/').pop().split('?')[0] : 'Attachment');
                                   let fileNameDisplay = rawName;
                                   if (!fileNameDisplay || fileNameDisplay.toLowerCase() === 'blob' || fileNameDisplay.toLowerCase() === 'blob.blob' || fileNameDisplay.startsWith('blob:')) {
-                                    fileNameDisplay = 'Attached Image';
+                                    fileNameDisplay = 'Image';
                                   }
                                   const lowerName = fileNameDisplay.toLowerCase();
                                   const isImg = msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
@@ -5413,38 +5433,30 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                                   if (isImg) {
                                     return (
-                                      <div style={{ position: 'relative' }}>
+                                      <div
+                                        style={{
+                                          position: 'relative',
+                                          borderRadius: '8px',
+                                          overflow: 'hidden',
+                                          cursor: 'zoom-in',
+                                          lineHeight: 0
+                                        }}
+                                        onClick={() => setZoomImg({ url: msg.attachment.fileUrl, fileName: fileNameDisplay })}
+                                        title="Click to view full image"
+                                      >
                                         <img
                                           src={msg.attachment.fileUrl}
                                           alt={fileNameDisplay}
-                                          onClick={() => setZoomImg({ url: msg.attachment.fileUrl, fileName: fileNameDisplay })}
                                           style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '260px',
+                                            width: '100%',
+                                            maxWidth: '380px',
+                                            maxHeight: '340px',
                                             borderRadius: '8px',
                                             cursor: 'zoom-in',
                                             objectFit: 'cover',
-                                            display: 'block',
-                                            border: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light, #e2e8f0)'
+                                            display: 'block'
                                           }}
                                         />
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem', opacity: 0.85, marginTop: '4px' }}>
-                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }} title={fileNameDisplay}>
-                                            {fileNameDisplay} {msg.attachment.fileSize ? `(${formatFileSize(msg.attachment.fileSize)})` : ''}
-                                          </span>
-                                          <a
-                                            href={msg.attachment.fileUrl}
-                                            download={fileNameDisplay}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            onClick={(e) => e.stopPropagation()}
-                                            style={{ color: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', padding: '1px 6px', borderRadius: '4px', background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)' }}
-                                            title="Download attachment"
-                                          >
-                                            <Download size={11} />
-                                            <span>Save</span>
-                                          </a>
-                                        </div>
                                       </div>
                                     );
                                   }
@@ -5583,25 +5595,28 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               </div>
                             )}
 
-                            {/* Text Content + Inline Timestamp & Read Ticks */}
-                            <div style={{
-                              fontSize: '0.88rem',
-                              lineHeight: '1.42',
-                              color: 'inherit',
-                              whiteSpace: 'pre-wrap',
-                              wordBreak: 'break-word',
-                              overflowWrap: 'anywhere',
-                              maxWidth: '100%',
-                              minWidth: 0,
-                              boxSizing: 'border-box'
-                            }}>
-                              {!isPollMsg && renderContentWithMentions(msg.content)}
-                              {msg.isEdited && (
-                                <span style={{ fontSize: '0.68rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
-                                  (edited)
-                                </span>
-                              )}
-                            </div>
+                            {/* Text Content / Caption (only if legitimate text exists) */}
+                            {hasVisibleContent && (
+                              <div style={{
+                                fontSize: '0.88rem',
+                                lineHeight: '1.42',
+                                color: 'inherit',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                overflowWrap: 'anywhere',
+                                maxWidth: '100%',
+                                minWidth: 0,
+                                padding: isImageAttachment ? '4px 6px 2px 6px' : 0,
+                                boxSizing: 'border-box'
+                              }}>
+                                {!isPollMsg && renderContentWithMentions(msg.content)}
+                                {msg.isEdited && (
+                                  <span style={{ fontSize: '0.68rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
+                                    (edited)
+                                  </span>
+                                )}
+                              </div>
+                            )}
                               </>
                             )}
                           </div>

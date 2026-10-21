@@ -486,7 +486,7 @@ const postGroupMessage = async (req, res) => {
       roomId: groupId,
       senderId: senderObjId,
       senderName: resolvedSenderName,
-      content: sanitizedContent || (pollMeta ? pollMeta.question : attachment ? `Attached ${attachment.fileName || 'file'}` : 'Message'),
+      content: sanitizedContent || (pollMeta ? pollMeta.question : ''),
       replyTo: replyTo || null,
       type: msgType,
       msgType: 'human',

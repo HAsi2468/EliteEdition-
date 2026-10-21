@@ -406,7 +406,7 @@ const setupSockets = (io) => {
         const newMessage = await ChatMessage.create({
           roomId,
           senderId: actualSenderId,
-          content: sanitizedContent || (attachment ? `Attached ${attachment.fileName || 'file'}` : 'Message'),
+          content: sanitizedContent || '',
           replyTo: replyTo || null,
           type: msgType,
           msgType: 'human',
