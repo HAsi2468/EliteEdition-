@@ -770,6 +770,72 @@ const createOrGetDirectRoom = async (req, res) => {
 };
 
 /**
+ * Search message content across accessible rooms
+ */
+const searchMessages = async (req, res) => {
+  try {
+    const { q, limit = 20 } = req.query;
+    if (!q || !q.trim()) {
+      return res.status(200).json({ success: true, results: [] });
+    }
+
+    const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.query.userId);
+    const currentUser = rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : null;
+    const isSuperOrAdmin = req.user && (
+      req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.isAdmin === true ||
+      req.user.isMainAdmin === true ||
+      req.headers['x-is-admin'] === 'true'
+    );
+
+    let roomQuery;
+    if (isSuperOrAdmin) {
+      roomQuery = { isArchived: { $ne: true } };
+    } else if (currentUser) {
+      roomQuery = {
+        isArchived: { $ne: true },
+        members: currentUser
+      };
+    } else {
+      return res.status(200).json({ success: true, results: [] });
+    }
+
+    const accessibleRooms = await ChatRoom.find(roomQuery).select('_id name title type').lean();
+    const accessibleRoomIds = accessibleRooms.map(r => r._id);
+
+    if (accessibleRoomIds.length === 0) {
+      return res.status(200).json({ success: true, results: [] });
+    }
+
+    const limitNum = Math.min(parseInt(limit, 10) || 20, 50);
+    const trimmed = q.trim();
+
+    // Query messages by text index or regex search
+    const query = {
+      roomId: { $in: accessibleRoomIds },
+      isDeleted: { $ne: true },
+      $or: [
+        { $text: { $search: trimmed } },
+        { content: { $regex: trimmed, $options: 'i' } }
+      ]
+    };
+
+    const results = await ChatMessage.find(query)
+      .populate('senderId', 'name username email avatarUrl')
+      .populate('roomId', 'name title type')
+      .sort({ createdAt: -1 })
+      .limit(limitNum)
+      .lean();
+
+    return res.status(200).json({ success: true, results });
+  } catch (error) {
+    console.error('Error searching messages:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * Admin option to create custom communication activity group
  */
 const createGroup = async (req, res) => {
@@ -1123,6 +1189,7 @@ module.exports = {
   createGroup,
   deleteGroup,
   deleteMessage,
+  searchMessages,
   forceReloadAllUsers,
   clearAllData,
   broadcastVersionUpdate,

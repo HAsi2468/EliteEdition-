@@ -886,13 +886,16 @@ const setupSockets = (io) => {
     // Handle marking room messages as read
     socket.on('read-room-messages', async (data) => {
       try {
-        const { roomId, userId } = data;
+        const roomId = data?.roomId || data?.conversationId;
+        const userId = data?.userId || socket.userId;
+        if (!roomId || !userId) return;
+
         await ChatMessage.updateMany(
           { roomId, senderId: { $ne: userId }, readBy: { $ne: userId } },
-          { $addToSet: { readBy: userId } }
+          { $addToSet: { readBy: userId, deliveredTo: userId } }
         );
         const targetRoom = await ChatRoom.findById(roomId);
-        let broadcast = io.to(roomId);
+        let broadcast = io.to(String(roomId));
         if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {
           targetRoom.members.forEach((m) => {
             const mIdStr = getMemberIdString(m);
@@ -900,8 +903,42 @@ const setupSockets = (io) => {
           });
         }
         broadcast.emit('room-messages-read', { roomId, userId });
+        broadcast.emit('messages-read', { roomId, conversationId: roomId, userId });
       } catch (error) {
         console.error('Error marking messages as read:', error);
+      }
+    });
+
+    socket.on('mark-as-read', async (data) => {
+      try {
+        const roomId = data?.roomId || data?.conversationId;
+        const userId = data?.userId || socket.userId;
+        if (!roomId || !userId) return;
+
+        await ChatMessage.updateMany(
+          { roomId, senderId: { $ne: userId }, readBy: { $ne: userId } },
+          { $addToSet: { readBy: userId, deliveredTo: userId } }
+        );
+        io.to(String(roomId)).emit('room-messages-read', { roomId, userId });
+        io.to(String(roomId)).emit('messages-read', { roomId, conversationId: roomId, userId });
+      } catch (err) {
+        console.error('Error in mark-as-read:', err);
+      }
+    });
+
+    socket.on('sync-delivered', async (data) => {
+      try {
+        const roomId = data?.roomId || data?.conversationId;
+        const userId = data?.userId || socket.userId;
+        if (!roomId || !userId) return;
+
+        await ChatMessage.updateMany(
+          { roomId, senderId: { $ne: userId }, deliveredTo: { $ne: userId } },
+          { $addToSet: { deliveredTo: userId } }
+        );
+        io.to(String(roomId)).emit('messages-delivered', { roomId, conversationId: roomId, userId });
+      } catch (err) {
+        console.error('Error in sync-delivered:', err);
       }
     });
 
@@ -1219,11 +1256,19 @@ const setupSockets = (io) => {
 
     socket.on('disconnect', () => {
       console.log(`User disconnected from socket: ${socket.id}`);
+      const disconnectedUid = socket.userId || activeUsers.get(socket.id);
       activeUsers.delete(socket.id);
-      if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
-        socket.authorizedCompanies.forEach((cid) => {
-          socket.to(`company:${cid}`).emit('presence_update', { userId: socket.userId, status: 'offline' });
-        });
+
+      const stillOnline = disconnectedUid && Array.from(activeUsers.values()).includes(disconnectedUid);
+      if (disconnectedUid && !stillOnline) {
+        if (socket.authorizedCompanies && socket.authorizedCompanies.length > 0) {
+          socket.authorizedCompanies.forEach((cid) => {
+            socket.to(`company:${cid}`).emit('presence_update', { userId: disconnectedUid, status: 'offline', isOnline: false });
+            socket.to(`company:${cid}`).emit('presence-update', { userId: disconnectedUid, isOnline: false, status: 'offline' });
+          });
+        }
+        io.emit('presence-change', { userId: disconnectedUid, isOnline: false });
+        io.emit('presence-sync', getOnlineUserIds());
       }
     });
   });

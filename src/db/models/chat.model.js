@@ -135,6 +135,13 @@ const chatMessageSchema = new mongoose.Schema(
         default: []
       }
     ],
+    deliveredTo: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: []
+      }
+    ],
     mentions: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -242,6 +249,7 @@ chatMessageSchema.index({ roomId: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, msgType: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, senderId: 1, readBy: 1 });
 chatMessageSchema.index({ senderId: 1 });
+chatMessageSchema.index({ content: 'text' });
 
 const ChatRoom = mongoose.model('ChatRoom', chatRoomSchema, 'chatrooms');
 const ChatMessage = mongoose.model('ChatMessage', chatMessageSchema, 'chatmessages');
