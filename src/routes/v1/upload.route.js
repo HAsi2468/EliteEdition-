@@ -39,7 +39,10 @@ const diskStorage = multer.diskStorage({
 const axios = require('axios');
 const sharp = require('sharp');
 
-const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.jfif', '.png', '.webp', '.pdf', '.gif', '.csv', '.xlsx', '.zip', '.svg', '.bmp']);
+const ALLOWED_EXTENSIONS = new Set([
+  '.jpg', '.jpeg', '.jfif', '.png', '.webp', '.pdf', '.gif',
+  '.csv', '.xlsx', '.xls', '.docx', '.doc', '.txt', '.zip', '.svg', '.bmp'
+]);
 
 const MIME_TO_EXT = {
   'image/jpeg': '.jpg',
@@ -52,8 +55,12 @@ const MIME_TO_EXT = {
   'image/bmp': '.bmp',
   'image/svg+xml': '.svg',
   'application/pdf': '.pdf',
+  'text/plain': '.txt',
   'text/csv': '.csv',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/msword': '.doc',
   'application/zip': '.zip',
 };
 
@@ -71,8 +78,10 @@ function verifyFileSignature(buffer, ext) {
   if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') return true;
   // BMP: 42 4D
   if (buffer[0] === 0x42 && buffer[1] === 0x4D) return true;
-  // ZIP / XLSX: 50 4B 03 04
+  // ZIP / XLSX / DOCX: 50 4B 03 04
   if (buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07)) return true;
+  // Legacy MS Office (DOC/XLS): D0 CF 11 E0
+  if (buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0) return true;
   // CSV / plain text / SVG
   if (ext === '.csv' || ext === '.txt' || ext === '.svg') {
     return !buffer.slice(0, 512).includes(0x00);
@@ -109,10 +118,10 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-// Dynamic multer middleware depending on R2 availability
+// Dynamic multer middleware depending on R2 availability (up to 50MB)
 const upload = multer({
   storage: isR2Configured() ? memoryStorage : diskStorage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max per image/file
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter
 });
 
@@ -186,16 +195,18 @@ router.get('/preview', async (req, res) => {
 });
 
 router.post('/', (req, res, next) => {
-  upload.single('image')(req, res, (err) => {
+  upload.any()(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File size exceeds maximum limit of 100MB' });
+        return res.status(400).json({ error: 'File size exceeds maximum limit of 50MB' });
       }
       return res.status(400).json({ error: err.message || 'File upload validation failed' });
     }
+    req.file = req.file || (req.files && req.files[0]);
     next();
   });
 }, async (req, res) => {
+  req.file = req.file || (req.files && req.files[0]);
   if (!req.file) {
     return res.status(400).json({ error: 'No image or attachment file provided' });
   }

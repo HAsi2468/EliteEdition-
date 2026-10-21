@@ -3688,8 +3688,8 @@ const styles = {
     flexDirection: 'column',
     gap: '1.5rem',
     width: '100%',
-    maxWidth: '1350px',
-    margin: '0 auto',
+    maxWidth: '100%',
+    margin: 0,
   },
   topBar: {
     padding: '1rem 1.5rem',

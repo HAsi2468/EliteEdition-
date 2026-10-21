@@ -601,10 +601,10 @@ export default function FusingDepartment() {
       if (topForm.jobCardId && (String(c._id) === String(topForm.jobCardId) || String(c.id) === String(topForm.jobCardId))) {
         return true;
       }
-      const pStatus = String(c.printStatus || '').toLowerCase();
-      const isPrintDone = pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending'));
+      const pStatus = String(c.printStatus || c.status || '').toLowerCase();
+      const isPrintDone = pStatus === 'printing done' || pStatus === 'printed' || (pStatus.includes('done') && !pStatus.includes('pending'));
       const fStatus = String(c.fusingStatus || 'fusing pending').toLowerCase();
-      const isFusingPending = fStatus !== 'fusing done';
+      const isFusingPending = fStatus !== 'fusing done' && fStatus !== 'fused' && fStatus !== 'done';
       return isPrintDone && isFusingPending;
     });
   }, [cards, topForm.jobCardId, showAllCardsFilter]);

@@ -179,8 +179,11 @@ const getDailyOperationsSummary = async (req, res) => {
         {
           $match: {
             department: 'digital_print',
-            printStatus: 'Printing Done',
-            fusingStatus: { $ne: 'Fusing Done' }
+            $or: [
+              { printStatus: { $in: ['Printing Done', 'PRINTED', 'Printed'] } },
+              { status: { $in: ['PRINTED', 'Printed'] } }
+            ],
+            fusingStatus: { $nin: ['Fusing Done', 'FUSED', 'Fused', 'Done'] }
           }
         },
         {

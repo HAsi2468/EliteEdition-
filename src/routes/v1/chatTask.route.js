@@ -49,8 +49,20 @@ const router = express.Router();
 
 
 // Upload Route for Chat & Workspace (Cloudflare R2 Storage)
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', (req, res, next) => {
+  upload.any()(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ success: false, message: 'File size exceeds maximum limit of 50MB' });
+      }
+      return res.status(400).json({ success: false, message: err.message || 'File upload validation failed' });
+    }
+    req.file = req.file || (req.files && req.files[0]);
+    next();
+  });
+}, async (req, res) => {
   try {
+    req.file = req.file || (req.files && req.files[0]);
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
@@ -68,7 +80,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     // If R2 is configured and file was stored in memory/disk, upload to R2
     if (isR2Configured()) {
-      const fileBuffer = req.file.buffer || fs.readFileSync(req.file.path);
+      const fileBuffer = req.file.buffer || (req.file.path && fs.existsSync(req.file.path) ? fs.readFileSync(req.file.path) : null);
+      if (!fileBuffer) {
+        return res.status(400).json({ success: false, message: 'Unable to read upload payload data' });
+      }
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const ext = path.extname(req.file.originalname) || '.bin';
       const rawBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');

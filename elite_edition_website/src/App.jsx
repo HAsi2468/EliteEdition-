@@ -148,11 +148,10 @@ export const ROUTE_ALIASES = {
   'design': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'designs': { tab: 'jobcards_catalogue', dept: 'digital_print' },
   'catalogue': { tab: 'jobcards_catalogue', dept: 'digital_print' },
-  'jobcards_catalogue': { tab: 'jobcards_catalogue', dept: 'digital_print' },
-  'dispatch': { tab: 'inventory', dept: 'elite_online' },
+  'dispatch': { tab: 'jobcards_fabric', dept: 'digital_print' },
   'inventory': { tab: 'inventory', dept: 'elite_online' },
-  'stock-ledger': { tab: 'stock_ledger', dept: 'elite_online' },
-  'stock_ledger': { tab: 'stock_ledger', dept: 'elite_online' },
+  'stock-ledger': { tab: 'inventory', dept: 'elite_online' },
+  'stock_ledger': { tab: 'inventory', dept: 'elite_online' },
   'ee_complaints': { tab: 'ee_complaints', dept: 'elite_edition' },
   'reports': { tab: 'reports', dept: 'elite_online' },
   'communication': { tab: 'communication', dept: null },
@@ -2356,6 +2355,9 @@ export default function App() {
                 )}
               </button>
 
+              {/* Permanently Docked Rotating Smart Tips Pill */}
+              <QuickTipPill activeTab={activeTab} />
+
               {/* Permanently Docked Enterprise Shortcut Pill: UI Scale, Chat & Tasks */}
               <EnterpriseHUDThemeController 
                 isDocked={true}
@@ -3880,9 +3882,6 @@ export default function App() {
 
       {/* Scroll-Triggered Sticky Drop-Shadows Tracker */}
       <StickyScrollShadowTracker />
-
-      {/* Rotating Smart Tips Banner (dismissible, hidden in chat/tasks) */}
-      <QuickTipPill activeTab={activeTab} />
 
       {/* Guided Feature Tour Controller */}
       <GuidedTourController />

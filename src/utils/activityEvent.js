@@ -70,6 +70,25 @@ async function publishActivity({
   description
 }) {
   try {
+    // 0. QA Automation & Sandbox Isolation: Never broadcast automated test events to live employee groups
+    const cleanActor = String(actorName || '').toLowerCase().trim();
+    const cleanEntity = String(companyEntity || '').toUpperCase().trim();
+    const cleanRef = String(recordRef || '').toUpperCase().trim();
+    if (
+      cleanActor === 'qa-automation' ||
+      cleanActor.includes('qa-bot') ||
+      cleanActor.includes('testing bot') ||
+      cleanEntity === 'SANDBOX' ||
+      cleanEntity === 'TEST' ||
+      cleanEntity === 'SBX' ||
+      cleanRef.startsWith('TEST-') ||
+      cleanRef.startsWith('QA-') ||
+      cleanRef.includes('SANDBOX')
+    ) {
+      logger.info(`[publishActivity] Skipping notification for Sandbox/QA event: ${module} #${recordRef}`);
+      return null;
+    }
+
     let realUserName = (actorName || '').trim();
 
     // 1. If actorId is provided, look up the exact user's name from MongoDB

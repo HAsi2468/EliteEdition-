@@ -680,19 +680,33 @@ const createJobCard = async (req, res) => {
     const pcsStr = card.pcs ? ` (${card.pcs} pcs)` : '';
     const mach = card.machineName || 'Machine';
 
-    publishActivity({
-      actorId: creatorId,
-      actorName: creatorName,
-      action: 'CREATE',
-      module: 'Job Card',
-      recordRef: card.jobNo || 'N/A',
-      recordId: card._id,
-      permissionScope: 'jobcards',
-      department: 'Production',
-      description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** | Design: **${dNo}** | Fabric: **${fab}** | Qty: **${mtr}**${pcsStr} | Machine: **${mach}** by **${creatorName}**.`
-    }).catch(e => logger.warn('publishActivity failed on job card create: %s', e.message));
+    const isSandboxQA = (
+      req.user?.role === 'qa-automation' ||
+      req.user?.companyId === 'SANDBOX' ||
+      req.user?.companyId === 'TEST' ||
+      req.user?.companyId === 'SBX' ||
+      body.isSandbox === true ||
+      String(card.jobNo || '').toUpperCase().startsWith('TEST-') ||
+      String(card.jobNo || '').toUpperCase().startsWith('QA-')
+    );
 
-    emitSocketEvent(req, 'job-created', card);
+    if (!isSandboxQA) {
+      publishActivity({
+        actorId: creatorId,
+        actorName: creatorName,
+        action: 'CREATE',
+        module: 'Job Card',
+        recordRef: card.jobNo || 'N/A',
+        recordId: card._id,
+        permissionScope: 'jobcards',
+        department: 'Production',
+        description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** | Design: **${dNo}** | Fabric: **${fab}** | Qty: **${mtr}**${pcsStr} | Machine: **${mach}** by **${creatorName}**.`
+      }).catch(e => logger.warn('publishActivity failed on job card create: %s', e.message));
+
+      emitSocketEvent(req, 'job-created', card);
+    } else {
+      logger.info(`[createJobCard] Sandbox/QA isolation active for #${card.jobNo} - skipped production notifications`);
+    }
 
     res.status(201).json(card);
   } catch (err) {
