@@ -198,7 +198,7 @@ const createTask = async (req, res) => {
     }
 
     // Robustly determine and validate creatorId
-    if (!req.user || !req.user._id) {
+    if (!req.user || (!req.user._id && !req.user.id)) {
       return res.status(401).json({
         success: false,
         code: 'UNAUTHORIZED',
@@ -206,14 +206,27 @@ const createTask = async (req, res) => {
       });
     }
 
-    const creatorId = new mongoose.Types.ObjectId(req.user._id);
+    const rawCreatorId = req.user._id || req.user.id || customCreatedBy;
+    let creatorId = null;
+    if (rawCreatorId && mongoose.Types.ObjectId.isValid(String(rawCreatorId))) {
+      creatorId = new mongoose.Types.ObjectId(String(rawCreatorId));
+    } else {
+      try {
+        const adminUser = await User.findOne({
+          $or: [{ role: 'admin' }, { role: 'super_admin' }, { username: 'admin' }]
+        }).select('_id');
+        if (adminUser) creatorId = adminUser._id;
+      } catch (uErr) {
+        console.warn('[TaskController] Could not find fallback admin user:', uErr.message);
+      }
+    }
     const creatorName = req.user.name || req.user.username || 'Staff User';
 
     // Sanitize assignees: only keep valid ObjectIds
     let finalAssignees = Array.isArray(assignees)
       ? assignees
-          .filter(a => a && mongoose.Types.ObjectId.isValid(typeof a === 'object' ? (a._id || a.id) : a))
-          .map(a => new mongoose.Types.ObjectId(typeof a === 'object' ? (a._id || a.id) : a))
+          .filter(a => a && mongoose.Types.ObjectId.isValid(String(typeof a === 'object' ? (a._id || a.id) : a)))
+          .map(a => new mongoose.Types.ObjectId(String(typeof a === 'object' ? (a._id || a.id) : a)))
       : [];
 
     // If no staff members were selected, automatically assign to creator if valid
@@ -223,11 +236,13 @@ const createTask = async (req, res) => {
 
     // Sanitize dependencies
     const validDependencies = Array.isArray(dependencies)
-      ? dependencies.filter(d => d && mongoose.Types.ObjectId.isValid(d)).map(d => new mongoose.Types.ObjectId(d))
+      ? dependencies
+          .filter(d => d && mongoose.Types.ObjectId.isValid(String(typeof d === 'object' ? (d._id || d.id) : d)))
+          .map(d => new mongoose.Types.ObjectId(String(typeof d === 'object' ? (d._id || d.id) : d)))
       : [];
 
     const initialAudit = [{
-      user: creatorId,
+      user: creatorId || undefined,
       userName: creatorName,
       fieldChanged: 'Task Created',
       oldValue: '',
@@ -240,9 +255,20 @@ const createTask = async (req, res) => {
       fileUrl: att.fileUrl || att.url,
       fileSize: Number(att.fileSize || att.size) || 0,
       fileType: att.fileType || att.type || 'document',
-      uploadedBy: creatorId || undefined,
-      uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
+      uploadedBy: (att.uploadedBy && mongoose.Types.ObjectId.isValid(String(att.uploadedBy)))
+        ? new mongoose.Types.ObjectId(String(att.uploadedBy))
+        : (creatorId || undefined),
+      uploadedAt: att.uploadedAt && !isNaN(new Date(att.uploadedAt).getTime()) ? new Date(att.uploadedAt) : new Date()
     })).filter(att => !!att.fileUrl) : [];
+
+    // Safely parse dueDate
+    let parsedDueDate = null;
+    if (dueDate) {
+      const d = new Date(dueDate);
+      if (!isNaN(d.getTime())) {
+        parsedDueDate = d;
+      }
+    }
 
     // Prevent rapid double-click duplicate task creation (within 60 seconds)
     const duplicateQuery = {
@@ -264,19 +290,19 @@ const createTask = async (req, res) => {
 
     const task = await Task.create({
       title: title.trim(),
-      description: description.trim(),
+      description: (description || '').trim(),
       priority,
       status,
       department,
-      projectRef: projectRef.trim(),
-      clientName: clientName.trim(),
+      projectRef: (projectRef || '').trim(),
+      clientName: (clientName || '').trim(),
       lotNo: (lotNo || '').trim(),
-      dueDate: dueDate ? new Date(dueDate) : null,
+      dueDate: parsedDueDate,
       estimatedHours: Number(estimatedHours) || 0,
       assignees: finalAssignees,
       dependencies: validDependencies,
-      checklist,
-      tags,
+      checklist: Array.isArray(checklist) ? checklist.filter(c => c && c.text) : [],
+      tags: Array.isArray(tags) ? tags : [],
       attachments: formattedAttachments,
       images: Array.isArray(images) ? images : formattedAttachments.filter(a => /\.(jpg|jpeg|png|webp|gif)$/i.test(a.fileName)).map(a => a.fileUrl),
       createdBy: creatorId || undefined,
@@ -313,7 +339,7 @@ const createTask = async (req, res) => {
         }
 
         // 2. Real-time Socket.IO Alert & Board Sync
-        const io = req.app.get('socketio');
+        const io = req.app && typeof req.app.get === 'function' ? req.app.get('socketio') : null;
         if (io) {
           recipientAssigneeIds.forEach(uId => {
             io.to(`user_${uId}`).emit('task-assigned', {
