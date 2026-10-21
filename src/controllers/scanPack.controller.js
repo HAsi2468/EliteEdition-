@@ -1068,80 +1068,129 @@ const getScanHistory = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const andConditions = [];
+
     const returnPrefixRegex = /^(MYSR|RPC|RP|RET|RMA|FMPR)/i;
-    const query = {};
     if (mode && mode !== 'ALL') {
       if (mode === 'RETURN') {
-        query.$or = [
-          { mode: { $in: ['RETURN', 'RTO'] } },
-          { awb: returnPrefixRegex }
-        ];
+        andConditions.push({
+          $or: [
+            { mode: { $in: ['RETURN', 'RTO'] } },
+            { awb: returnPrefixRegex }
+          ]
+        });
       } else if (mode === 'PACK' || mode === 'DISPATCH') {
-        query.mode = { $in: ['PACK', 'DISPATCH'] };
-        query.awb = { $not: returnPrefixRegex };
+        andConditions.push({
+          mode: { $in: ['PACK', 'DISPATCH'] },
+          awb: { $not: returnPrefixRegex }
+        });
       } else if (mode === 'LOOKUP') {
-        query.mode = { $in: ['LOOKUP', 'ALL'] };
+        andConditions.push({ mode: { $in: ['LOOKUP', 'ALL'] } });
       } else {
-        query.mode = String(mode).toUpperCase();
+        andConditions.push({ mode: String(mode).toUpperCase() });
       }
     }
+
     if (search && search.trim()) {
       const sRegex = new RegExp(search.trim(), 'i');
-      query.$or = [
-        { awb: sRegex },
-        { shippingPackageCode: sRegex },
-        { orderCode: sRegex },
-        { sku: sRegex },
-        { courier: sRegex },
-        { customerName: sRegex },
-        { city: sRegex }
-      ];
+      andConditions.push({
+        $or: [
+          { awb: sRegex },
+          { shippingPackageCode: sRegex },
+          { orderCode: sRegex },
+          { sku: sRegex },
+          { courier: sRegex },
+          { customerName: sRegex },
+          { city: sRegex }
+        ]
+      });
     }
+
     if (courier && courier !== 'ALL') {
       const couriers = String(courier).split(',').map(s => s.trim()).filter(Boolean);
       if (couriers.length > 1) {
-        query.courier = { $in: couriers.map(c => new RegExp(`^${c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+        andConditions.push({
+          courier: { $in: couriers.map(c => new RegExp(c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i')) }
+        });
       } else if (couriers.length === 1) {
-        query.courier = new RegExp(couriers[0], 'i');
+        andConditions.push({ courier: new RegExp(couriers[0].replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') });
       }
     }
+
     if (channel && channel !== 'ALL') {
       const channels = String(channel).split(',').map(s => s.trim()).filter(Boolean);
       if (channels.length > 1) {
-        query.channel = { $in: channels.map(c => new RegExp(`^${c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+        andConditions.push({
+          channel: { $in: channels.map(c => new RegExp(c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i')) }
+        });
       } else if (channels.length === 1) {
-        query.channel = new RegExp(channels[0], 'i');
+        andConditions.push({ channel: new RegExp(channels[0].replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') });
       }
     }
+
     if (status && status !== 'ALL') {
       const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean);
       if (statuses.length > 1) {
-        query.status = { $in: statuses.map(s => new RegExp(`^${s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')) };
+        andConditions.push({
+          status: { $in: statuses.map(s => new RegExp(s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i')) }
+        });
       } else if (statuses.length === 1) {
-        query.status = new RegExp(statuses[0], 'i');
+        andConditions.push({ status: new RegExp(statuses[0].replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') });
       }
     }
+
+    // Helper functions for IST date bounds
+    const parseStartOfDay = (dateStr) => {
+      if (!dateStr) return null;
+      const ymd = String(dateStr).trim().split('T')[0].match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (ymd) {
+        return new Date(`${ymd[1]}-${ymd[2]}-${ymd[3]}T00:00:00.000+05:30`);
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    const parseEndOfDay = (dateStr) => {
+      if (!dateStr) return null;
+      const ymd = String(dateStr).trim().split('T')[0].match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (ymd) {
+        return new Date(`${ymd[1]}-${ymd[2]}-${ymd[3]}T23:59:59.999+05:30`);
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+
     if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = end;
+      const start = startDate ? parseStartOfDay(startDate) : null;
+      const end = endDate ? parseEndOfDay(endDate) : null;
+      const dateCond = {};
+      if (start && !isNaN(start.getTime())) dateCond.$gte = start;
+      if (end && !isNaN(end.getTime())) dateCond.$lte = end;
+
+      if (Object.keys(dateCond).length > 0) {
+        andConditions.push({
+          $or: [
+            { updatedAt: dateCond },
+            { createdAt: dateCond }
+          ]
+        });
       }
     }
+
+    const query = andConditions.length > 0 ? { $and: andConditions } : {};
 
     // Dynamic stats date range filter
     let statsStartIso, statsEndIso;
     let statsStartDate, statsEndDate;
     if (startDate || endDate) {
-      if (startDate) {
-        statsStartDate = new Date(startDate);
-        statsStartIso = statsStartDate.toISOString();
-      }
+      statsStartDate = startDate ? parseStartOfDay(startDate) : today;
+      statsStartIso = statsStartDate.toISOString();
       if (endDate) {
-        statsEndDate = new Date(endDate);
-        statsEndDate.setHours(23, 59, 59, 999);
+        statsEndDate = parseEndOfDay(endDate);
         statsEndIso = statsEndDate.toISOString();
       }
     } else {
@@ -1168,7 +1217,7 @@ const getScanHistory = async (req, res) => {
     }
 
     const [dbLogs, totalLogsCount, dispatchedCount, deliveredCount, returnCount] = await Promise.all([
-      db.ScanLog ? db.ScanLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(cleanLimit).lean() : [],
+      db.ScanLog ? db.ScanLog.find(query).sort({ updatedAt: -1, createdAt: -1 }).skip(skip).limit(cleanLimit).lean() : [],
       db.ScanLog ? db.ScanLog.countDocuments(query) : 0,
       db.SaleOrder.countDocuments(dispatchFilter),
       db.SaleOrder.countDocuments(deliveryFilter),

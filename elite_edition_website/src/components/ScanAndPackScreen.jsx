@@ -239,6 +239,7 @@ export default function ScanAndPackScreen({ currentUser }) {
   const [historyFilters, setHistoryFilters] = useState({});
   const [manifestFilters, setManifestFilters] = useState({});
   const [analyticsFilters, setAnalyticsFilters] = useState({});
+  const historyReqSeqRef = useRef(0);
 
   const historyFilterCategories = React.useMemo(() => [
     {
@@ -246,13 +247,13 @@ export default function ScanAndPackScreen({ currentUser }) {
       name: 'Logistics Partner',
       multi: true,
       options: [
-        { value: 'Flipkart Logistics / Ekart', label: 'Flipkart Logistics / Ekart' },
+        { value: 'Flipkart', label: 'Flipkart / Ekart' },
         { value: 'Delhivery', label: 'Delhivery' },
         { value: 'Shadowfax', label: 'Shadowfax' },
         { value: 'Blue Dart', label: 'Blue Dart' },
         { value: 'Xpressbees', label: 'Xpressbees' },
         { value: 'Ecom Express', label: 'Ecom Express' },
-        { value: 'Amazon Shipping', label: 'Amazon Shipping' }
+        { value: 'Amazon', label: 'Amazon Shipping' }
       ]
     },
     {
@@ -271,6 +272,9 @@ export default function ScanAndPackScreen({ currentUser }) {
       name: 'Operation Status',
       multi: true,
       options: [
+        { value: 'DISPATCHED', label: 'Dispatched / Packed' },
+        { value: 'RETURN_VERIFIED', label: 'Return Verified / Accepted' },
+        { value: 'SCANNED', label: 'Scanned / Recorded' },
         { value: 'SUCCESS', label: 'Success / Verified' },
         { value: 'ALREADY_PACKED', label: 'Already Packed' },
         { value: 'CANCELLED', label: 'Cancelled / Hold' },
@@ -279,6 +283,90 @@ export default function ScanAndPackScreen({ currentUser }) {
       ]
     }
   ], []);
+
+  // 🎯 Client-side filtered displayedHistory for instant, accurate view updates
+  const displayedHistory = React.useMemo(() => {
+    return scanHistory.filter((item) => {
+      // 1. Mode check
+      const upperAwb = String(item.awb || '').toUpperCase();
+      const isReturnRow = item.mode === 'RETURN' ||
+        item.mode === 'RTO' ||
+        item.isReturn ||
+        upperAwb.startsWith('MYSR') ||
+        upperAwb.startsWith('RPC') ||
+        upperAwb.startsWith('RP') ||
+        upperAwb.startsWith('FMPR') ||
+        upperAwb.startsWith('RET');
+
+      if (scanMode === 'PACK') {
+        if (isReturnRow || (item.mode && item.mode !== 'PACK' && item.mode !== 'DISPATCH')) return false;
+      } else if (scanMode === 'RETURN') {
+        if (!isReturnRow) return false;
+      }
+
+      // 2. Date Range Filter
+      if (historyStartDate || historyEndDate) {
+        const rawDate = item.createdAt || item.updatedAt || item.date;
+        if (rawDate) {
+          const itemTime = new Date(rawDate).getTime();
+          if (!isNaN(itemTime)) {
+            if (historyStartDate) {
+              const startObj = new Date(historyStartDate);
+              startObj.setHours(0, 0, 0, 0);
+              if (itemTime < startObj.getTime()) return false;
+            }
+            if (historyEndDate) {
+              const endObj = new Date(historyEndDate);
+              endObj.setHours(23, 59, 59, 999);
+              if (itemTime > endObj.getTime()) return false;
+            }
+          }
+        }
+      }
+
+      // 3. Courier Filter
+      const activeCouriers = historyFilters.courier || [];
+      if (activeCouriers.length > 0) {
+        const itemCourier = String(item.courier || '').toLowerCase();
+        const matchesCourier = activeCouriers.some(c => itemCourier.includes(String(c).toLowerCase()));
+        if (!matchesCourier) return false;
+      }
+
+      // 4. Channel Filter
+      const activeChannels = historyFilters.channel || [];
+      if (activeChannels.length > 0) {
+        const itemChannel = String(item.channel || '').toLowerCase();
+        const matchesChannel = activeChannels.some(ch => itemChannel.includes(String(ch).toLowerCase()));
+        if (!matchesChannel) return false;
+      }
+
+      // 5. Status Filter
+      const activeStatuses = historyFilters.status || [];
+      if (activeStatuses.length > 0) {
+        const itemStatus = String(item.status || '').toLowerCase();
+        const matchesStatus = activeStatuses.some(st => itemStatus.includes(String(st).toLowerCase()));
+        if (!matchesStatus) return false;
+      }
+
+      // 6. Search Query Filter
+      if (historySearchQuery && historySearchQuery.trim()) {
+        const q = historySearchQuery.trim().toLowerCase();
+        const awb = String(item.awb || '').toLowerCase();
+        const pkg = String(item.shippingPackageCode || '').toLowerCase();
+        const ord = String(item.orderCode || '').toLowerCase();
+        const sku = String(item.sku || '').toLowerCase();
+        const name = String(item.itemName || '').toLowerCase();
+        const courier = String(item.courier || '').toLowerCase();
+        const cust = String(item.customerName || '').toLowerCase();
+        const city = String(item.city || '').toLowerCase();
+        if (!awb.includes(q) && !pkg.includes(q) && !ord.includes(q) && !sku.includes(q) && !name.includes(q) && !courier.includes(q) && !cust.includes(q) && !city.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [scanHistory, scanMode, historyStartDate, historyEndDate, historyFilters, historySearchQuery]);
 
   const manifestFilterCategories = React.useMemo(() => [
     {
@@ -361,6 +449,7 @@ export default function ScanAndPackScreen({ currentUser }) {
   };
 
   const fetchHistoryAndStats = async (mode = scanMode, search = historySearchQuery, overrideFilters = {}) => {
+    const currentSeq = ++historyReqSeqRef.current;
     setHistoryLoading(true);
     try {
       const activeStartDate = overrideFilters.startDate !== undefined ? overrideFilters.startDate : historyStartDate;
@@ -379,6 +468,9 @@ export default function ScanAndPackScreen({ currentUser }) {
         status: activeStatus && activeStatus !== 'ALL' ? activeStatus : undefined,
         limit: 100
       });
+
+      if (currentSeq !== historyReqSeqRef.current) return;
+
       if (res && res.success) {
         if (res.stats) setStats(res.stats);
         if (Array.isArray(res.history)) {
@@ -3008,7 +3100,7 @@ export default function ScanAndPackScreen({ currentUser }) {
                 </span>
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px' }}>
-                Persistent history saved across all terminals • Click any row or cell to expand/collapse complete details • {scanHistory.length} records loaded
+                Persistent history saved across all terminals • Click any row or cell to expand/collapse complete details • {displayedHistory.length}{displayedHistory.length !== scanHistory.length ? ` of ${scanHistory.length}` : ''} records loaded
               </div>
             </div>
           </div>
@@ -3064,14 +3156,14 @@ export default function ScanAndPackScreen({ currentUser }) {
             <button
               type="button"
               onClick={() => {
-                if (!scanHistory.length) return alert('No history records to export.');
+                if (!displayedHistory.length) return alert('No history records to export.');
                 const headers = [
                   'Time', 'Date', 'AWB Code', 'Package Code', 'Order ID', 'Channel',
                   'SKU', 'Product Name', 'Brand', 'Size', 'Color',
                   'Customer Name', 'City', 'Payment Mode', 'Payment Status', 'Amount (INR)',
                   'Weight (g)', 'Courier', 'Screen / Mode', 'Operation Status', 'Operator'
                 ];
-                const rows = scanHistory.map(h => [
+                const rows = displayedHistory.map(h => [
                   `"${h.time || ''}"`,
                   `"${h.date || ''}"`,
                   `"${h.awb || ''}"`,
@@ -3148,7 +3240,6 @@ export default function ScanAndPackScreen({ currentUser }) {
                 onCustomChange={(s, e) => {
                   setHistoryStartDate(s);
                   setHistoryEndDate(e);
-                  fetchHistoryAndStats(scanMode, historySearchQuery, { startDate: s, endDate: e });
                 }}
               />
 
@@ -3218,29 +3309,6 @@ export default function ScanAndPackScreen({ currentUser }) {
             </thead>
             <tbody>
               {(() => {
-                const displayedHistory = scanHistory.filter((item) => {
-                  const upperAwb = String(item.awb || '').toUpperCase();
-                  const isReturnRow = item.mode === 'RETURN' ||
-                    item.mode === 'RTO' ||
-                    item.isReturn ||
-                    upperAwb.startsWith('MYSR') ||
-                    upperAwb.startsWith('RPC') ||
-                    upperAwb.startsWith('RP') ||
-                    upperAwb.startsWith('FMPR') ||
-                    upperAwb.startsWith('RET');
-
-                  if (scanMode === 'PACK') {
-                    // Screen 2 (Dispatch Desk) strictly ONLY shows forward dispatches - strictly exclude any returns!
-                    return !isReturnRow && (item.mode === 'PACK' || item.mode === 'DISPATCH' || !item.mode);
-                  }
-                  if (scanMode === 'RETURN') {
-                    // Screen 3 (Return Station) strictly ONLY shows returns!
-                    return isReturnRow;
-                  }
-                  // Screen 1 (Central Dashboard) shows ALL!
-                  return true;
-                });
-
                 if (displayedHistory.length === 0) {
                   return (
                     <tr>
@@ -3870,7 +3938,6 @@ export default function ScanAndPackScreen({ currentUser }) {
                     onCustomChange={(s, e) => {
                       setManifestStartDate(s);
                       setManifestEndDate(e);
-                      fetchManifestPending({ startDate: s, endDate: e });
                     }}
                   />
 
@@ -4330,7 +4397,6 @@ export default function ScanAndPackScreen({ currentUser }) {
                     onCustomChange={(s, e) => {
                       setAnalyticsStartDate(s);
                       setAnalyticsEndDate(e);
-                      openAnalytics({ startDate: s, endDate: e });
                     }}
                   />
 

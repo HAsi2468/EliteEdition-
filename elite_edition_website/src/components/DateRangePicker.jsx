@@ -323,7 +323,6 @@ export default function DateRangePicker({
     if (setDatePreset) setDatePreset(optId);
     if (setCustomDateStart) setCustomDateStart('');
     if (setCustomDateEnd) setCustomDateEnd('');
-    if (onCustomChange) onCustomChange('', '');
     if (onChange) {
       onChange({ preset: optId, ...range });
     }
