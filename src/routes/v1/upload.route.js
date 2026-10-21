@@ -267,7 +267,16 @@ router.post('/', (req, res, next) => {
         }).catch(err => console.warn('[R2] Failed to save designName copy:', err.message));
       }
 
-      return res.json({ url: r2Url, previewUrl: null, filename, folder });
+      return res.json({
+        url: r2Url,
+        fileUrl: r2Url,
+        previewUrl: null,
+        filename,
+        fileName: req.file.originalname || filename,
+        originalName: req.file.originalname || filename,
+        fileSize: req.file.size,
+        folder
+      });
     } catch (err) {
       console.error('[Cloudflare R2] Upload error:', err);
       // Fallback: save to disk if R2 fails
@@ -278,7 +287,16 @@ router.post('/', (req, res, next) => {
         fs.writeFileSync(diskPath, req.file.buffer);
         const fileUrl = `/uploads/${fallbackFilename}`;
         console.warn('[Cloudflare R2] Saved to local disk fallback:', fileUrl);
-        return res.json({ url: fileUrl, filename: fallbackFilename, folder, warning: 'Saved locally as R2 fallback' });
+        return res.json({
+          url: fileUrl,
+          fileUrl,
+          filename: fallbackFilename,
+          fileName: req.file.originalname || fallbackFilename,
+          originalName: req.file.originalname || fallbackFilename,
+          fileSize: req.file.size,
+          folder,
+          warning: 'Saved locally as R2 fallback'
+        });
       } catch (fallbackErr) {
         return res.status(500).json({ error: 'Failed to upload file to Cloudflare R2: ' + err.message });
       }
@@ -297,7 +315,15 @@ router.post('/', (req, res, next) => {
   }
 
   const fileUrl = `/designs/${req.file.filename}`;
-  res.json({ url: fileUrl, folder });
+  res.json({
+    url: fileUrl,
+    fileUrl,
+    filename: req.file.filename,
+    fileName: req.file.originalname || req.file.filename,
+    originalName: req.file.originalname || req.file.filename,
+    fileSize: req.file.size,
+    folder
+  });
 });
 
 /**

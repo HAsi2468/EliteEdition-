@@ -61,18 +61,23 @@ export function useFileUpload(defaultOptions = {}) {
     setError(null);
 
     try {
+      const originalInputFileName = file?.name || '';
       let fileToUpload = file;
       const fileType = getFileType(file);
 
       // Compress large images if enabled
-      if (fileType === 'image' && opts.compress !== false && !file.name.toLowerCase().endsWith('.svg')) {
+      if (fileType === 'image' && opts.compress !== false && !file.name?.toLowerCase().endsWith('.svg')) {
         try {
           const imageCompressionModule = await import('browser-image-compression');
           const imageCompression = imageCompressionModule.default || imageCompressionModule;
-          fileToUpload = await imageCompression(file, {
+          const compressedBlob = await imageCompression(file, {
             maxSizeMB: opts.maxSizeMB || 2,
             maxWidthOrHeight: opts.maxWidthOrHeight || 2560,
             useWebWorker: true
+          });
+          // Re-wrap compressed Blob into a File object with original name preserved
+          fileToUpload = new File([compressedBlob], originalInputFileName || 'image.png', {
+            type: compressedBlob.type || file.type || 'image/png'
           });
         } catch (compressionErr) {
           console.warn('[useFileUpload] Image compression skipped/failed:', compressionErr);
@@ -90,7 +95,7 @@ export function useFileUpload(defaultOptions = {}) {
       } else {
         // Direct to /workspace/upload or /upload
         const formData = new FormData();
-        formData.append('file', fileToUpload);
+        formData.append('file', fileToUpload, originalInputFileName || fileToUpload.name);
         formData.append('folder', folder);
 
         res = await api.request('/workspace/upload', {
@@ -110,12 +115,13 @@ export function useFileUpload(defaultOptions = {}) {
       }
 
       const fileInfo = {
-        fileName: res.fileName || file.name,
+        fileName: res?.fileName || res?.originalName || originalInputFileName || file.name,
+        originalName: res?.originalName || originalInputFileName || file.name,
         fileUrl,
-        fileSize: res.fileSize || file.size,
+        fileSize: res?.fileSize || fileToUpload.size || file.size,
         fileType,
         mimeType: file.type || 'application/octet-stream',
-        folder: res.folder || folder
+        folder: res?.folder || folder
       };
 
       setUploadedFiles((prev) => [...prev, fileInfo]);

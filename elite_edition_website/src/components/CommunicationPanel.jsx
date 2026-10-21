@@ -236,7 +236,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   }, []);
 
   const [editingMessage, setEditingMessage] = useState(null);
-  const [deleteTargetMsgId, setDeleteTargetMsgId] = useState(null);
+  const [deleteTargetMsg, setDeleteTargetMsg] = useState(null);
+  const deleteTargetMsgId = deleteTargetMsg?.id || null;
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [msgMenuUpward, setMsgMenuUpward] = useState({});
 
@@ -298,6 +299,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   const handleOpenMsgMenu = (e, msgId) => {
+    handleCancelMsgHold();
     if (e) {
       if (typeof e.stopPropagation === 'function') e.stopPropagation();
       if (typeof e.preventDefault === 'function') e.preventDefault();
@@ -525,6 +527,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     const handleEscapeDismiss = (e) => {
       if (e.key === 'Escape') {
+        if (mentionQuery !== null) {
+          e.preventDefault();
+          setMentionQuery(null);
+          return;
+        }
+        if (activeMsgMenuId !== null) {
+          e.preventDefault();
+          setActiveMsgMenuId(null);
+          return;
+        }
+        if (deleteTargetMsg !== null) {
+          e.preventDefault();
+          setDeleteTargetMsg(null);
+          return;
+        }
         if (showMobileActionMenu) setShowMobileActionMenu(false);
         else if (showMobileHeaderMenu) setShowMobileHeaderMenu(false);
         else if (showDesktopHeaderMenu) setShowDesktopHeaderMenu(false);
@@ -544,6 +561,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     window.addEventListener('keydown', handleEscapeDismiss);
     return () => window.removeEventListener('keydown', handleEscapeDismiss);
   }, [
+    mentionQuery, activeMsgMenuId, deleteTargetMsg,
     showMobileActionMenu, showMobileHeaderMenu, showDesktopHeaderMenu,
     showNewDmModal, showCreateGroupModal, showMembersModal, showShareModal,
     showGalleryModal, showPollModal, showForwardModal, showClearAllModal,
@@ -1290,8 +1308,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
-  const handleDeleteMessage = (messageId) => {
-    setDeleteTargetMsgId(messageId);
+  const handleDeleteMessage = (msgOrId) => {
+    if (!msgOrId) return;
+    if (typeof msgOrId === 'object') {
+      const text = msgOrId.content || (msgOrId.attachment?.fileName ? `Attachment: ${msgOrId.attachment.fileName}` : 'Message');
+      setDeleteTargetMsg({
+        id: String(msgOrId._id || msgOrId.id),
+        text: text,
+        senderName: msgOrId.senderName || msgOrId.senderId?.name || ''
+      });
+    } else {
+      const found = messages.find((m) => String(m._id) === String(msgOrId));
+      const text = found?.content || (found?.attachment?.fileName ? `Attachment: ${found.attachment.fileName}` : 'Message');
+      setDeleteTargetMsg({
+        id: String(msgOrId),
+        text: text,
+        senderName: found?.senderName || found?.senderId?.name || ''
+      });
+    }
   };
 
   const confirmDeleteMessage = async (messageId) => {
@@ -1332,7 +1366,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     } catch (err) {
       alert(err.message || 'Failed to delete message');
     } finally {
-      setDeleteTargetMsgId(null);
+      setDeleteTargetMsg(null);
     }
   };
 
@@ -4238,7 +4272,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         </div>
 
                         {/* Name + Dropdown Chevron + Active Now Status */}
-                        <div style={{ minWidth: 0 }}>
+                        <div style={{ minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
                           <button
                             type="button"
                             onClick={() => setShowDesktopHeaderMenu(!showDesktopHeaderMenu)}
@@ -4250,7 +4284,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '5px',
-                              textAlign: 'left'
+                              textAlign: 'left',
+                              maxWidth: isMobileScreen ? '145px' : '300px',
+                              minWidth: 0
                             }}
                             title="Click for conversation options"
                           >
@@ -4261,7 +4297,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               color: 'var(--text-primary)',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis'
+                              textOverflow: 'ellipsis',
+                              maxWidth: '100%'
                             }}>
                               {displayName}
                             </h3>
@@ -4273,8 +4310,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             const isOnline = isDirect && colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
                             if (isDirect) {
                               return (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-                                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: isOnline ? '#22c55e' : '#94a3b8', display: 'inline-block' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', maxWidth: isMobileScreen ? '145px' : '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: isOnline ? '#22c55e' : '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
                                   <span style={{ fontSize: '0.72rem', color: isOnline ? '#10b981' : 'var(--text-muted, #64748b)', fontWeight: 600 }}>
                                     {isOnline ? 'Online' : 'Offline'}
                                   </span>
@@ -4282,10 +4319,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               );
                             }
                             return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-                                <Users size={12} color="var(--text-muted)" />
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', fontWeight: 500 }}>
-                                  Group Channel • {activeGroup?.members?.length || 0} members
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', maxWidth: isMobileScreen ? '145px' : '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <Users size={12} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  Group • {activeGroup?.members?.length || 0} members
                                 </span>
                               </div>
                             );
@@ -4679,7 +4716,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       return (
                         <React.Fragment key={msg._id}>
                           {showDateHeader && (
-                            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0', position: 'sticky', top: 0, zIndex: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0', position: 'sticky', top: 0, zIndex: 10, pointerEvents: 'none' }}>
                               <span className="phoenix-date-badge">
                                 {msgDateHeader}
                               </span>
@@ -4784,7 +4821,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     return (
                       <React.Fragment key={msg._id}>
                         {showDateHeader && (
-                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.6rem 0', position: 'sticky', top: 4, zIndex: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.6rem 0', position: 'sticky', top: 4, zIndex: 10, pointerEvents: 'none' }}>
                             <span className="phoenix-date-badge">
                               {msgDateHeader}
                             </span>
@@ -5045,9 +5082,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   {canDelete && (
                                     <button
                                       type="button"
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        if (e) e.stopPropagation();
+                                        handleCancelMsgHold();
                                         setActiveMsgMenuId(null);
-                                        handleDeleteMessage(msg._id);
+                                        handleDeleteMessage(msg);
                                       }}
                                       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', borderTop: '1px solid #fee2e2', fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
                                     >
@@ -5488,10 +5527,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
                               <div style={{ marginBottom: hasVisibleContent ? '0.4rem' : 0 }}>
                                 {(() => {
-                                  const rawName = msg.attachment.fileName || (typeof msg.attachment.fileUrl === 'string' ? msg.attachment.fileUrl.split('/').pop().split('?')[0] : 'Attachment');
+                                  const rawName = msg.attachment.fileName || msg.attachment.originalName || (typeof msg.attachment.fileUrl === 'string' ? decodeURIComponent(msg.attachment.fileUrl.split('/').pop().split('?')[0]) : 'Attachment');
                                   let fileNameDisplay = rawName;
-                                  if (!fileNameDisplay || fileNameDisplay.toLowerCase() === 'blob' || fileNameDisplay.toLowerCase() === 'blob.blob' || fileNameDisplay.startsWith('blob:')) {
-                                    fileNameDisplay = 'Image';
+                                  if (!fileNameDisplay || fileNameDisplay.toLowerCase() === 'blob' || fileNameDisplay.toLowerCase() === 'blob.blob' || fileNameDisplay.startsWith('blob:') || fileNameDisplay.toLowerCase() === 'image') {
+                                    const fromUrl = typeof msg.attachment.fileUrl === 'string' ? decodeURIComponent(msg.attachment.fileUrl.split('/').pop().split('?')[0]) : '';
+                                    fileNameDisplay = (fromUrl && !fromUrl.startsWith('blob')) ? fromUrl : 'Attachment';
                                   }
                                   const lowerName = fileNameDisplay.toLowerCase();
                                   const isImg = msg.attachment.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
@@ -6421,32 +6461,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         value={inputMessage}
                         onPaste={handlePasteClipboard}
                         onKeyDown={(e) => {
-                          if (mentionQuery !== null && mentionCandidates.length > 0) {
-                            if (e.key === 'ArrowDown') {
-                              e.preventDefault();
-                              setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
-                              return;
-                            }
-                            if (e.key === 'ArrowUp') {
-                              e.preventDefault();
-                              setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
-                              return;
-                            }
-                            if (e.key === 'Enter' || e.key === 'Tab') {
-                              e.preventDefault();
-                              if (mentionCandidates[mentionIndex]) {
-                                handleSelectMention(mentionCandidates[mentionIndex]);
-                              }
-                              return;
-                            }
+                          if (mentionQuery !== null) {
                             if (e.key === 'Escape') {
                               e.preventDefault();
+                              e.stopPropagation();
                               setMentionQuery(null);
                               return;
+                            }
+                            if (mentionCandidates.length > 0) {
+                              if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+                                return;
+                              }
+                              if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                                return;
+                              }
+                              if (e.key === 'Enter' || e.key === 'Tab') {
+                                e.preventDefault();
+                                if (mentionCandidates[mentionIndex]) {
+                                  handleSelectMention(mentionCandidates[mentionIndex]);
+                                  return;
+                                }
+                              }
                             }
                           }
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
+                            if (mentionQuery !== null) setMentionQuery(null);
                             handleSendMessage(e);
                           }
                         }}
@@ -6492,6 +6536,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         disabled={!inputMessage.trim() && !attachedFile}
                         className="phoenix-send-btn-compact"
                         title="Send Message"
+                        onMouseDown={() => {
+                          if (mentionQuery !== null) {
+                            setMentionQuery(null);
+                          }
+                        }}
+                        onClick={() => {
+                          if (mentionQuery !== null) {
+                            setMentionQuery(null);
+                          }
+                        }}
                       >
                         <Send size={15} style={{ marginLeft: '1px' }} />
                       </button>
@@ -6931,9 +6985,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       {/* ── WHATSAPP-STYLE UNIVERSAL ATTACHMENT VIEWER ── */}
       {attachmentViewer && (() => {
         const fileUrl = attachmentViewer.url;
-        let fileName = attachmentViewer.fileName || 'Attachment';
-        if (!fileName || fileName.toLowerCase() === 'blob' || fileName.startsWith('blob:')) {
-          fileName = 'Attachment';
+        let fileName = attachmentViewer.fileName || '';
+        if (!fileName || fileName.toLowerCase() === 'blob' || fileName.startsWith('blob:') || fileName.toLowerCase() === 'image' || fileName === 'Attachment') {
+          const fromUrl = typeof fileUrl === 'string' ? decodeURIComponent(fileUrl.split('/').pop().split('?')[0]) : '';
+          fileName = fromUrl || 'Attachment';
         }
         const lowerName = fileName.toLowerCase();
         const isImg = attachmentViewer.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
@@ -8583,7 +8638,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       )}
 
       {/* In-App Delete Message Confirmation Modal */}
-      {deleteTargetMsgId && (
+      {deleteTargetMsg && (
         <div
           style={{
             position: 'fixed',
@@ -8597,7 +8652,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             zIndex: 99999,
             padding: '1rem'
           }}
-          onClick={() => setDeleteTargetMsgId(null)}
+          onClick={() => setDeleteTargetMsg(null)}
         >
           <div
             style={{
@@ -8617,13 +8672,32 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               </div>
               <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Delete Message?</h4>
             </div>
-            <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
               Are you sure you want to delete this message? It will be removed for everyone in this chat.
             </p>
+            {deleteTargetMsg.text && (
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '7px 10px',
+                  fontSize: '0.8rem',
+                  color: '#334155',
+                  maxHeight: '64px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  marginBottom: '1.1rem',
+                  lineHeight: 1.4
+                }}
+              >
+                "{deleteTargetMsg.text.length > 90 ? deleteTargetMsg.text.slice(0, 90) + '…' : deleteTargetMsg.text}"
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => setDeleteTargetMsgId(null)}
+                onClick={() => setDeleteTargetMsg(null)}
                 style={{
                   padding: '7px 14px',
                   borderRadius: '7px',
@@ -8640,9 +8714,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               <button
                 type="button"
                 onClick={() => {
-                  const id = deleteTargetMsgId;
-                  setDeleteTargetMsgId(null);
-                  confirmDeleteMessage(id);
+                  const target = deleteTargetMsg;
+                  setDeleteTargetMsg(null);
+                  if (target?.id) {
+                    confirmDeleteMessage(target.id);
+                  }
                 }}
                 style={{
                   padding: '7px 16px',

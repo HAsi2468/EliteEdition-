@@ -149,11 +149,19 @@ export function ChangelogDrawer({ triggerOnly = false }) {
         id="changelog-drawer-trigger"
         className="changelog-trigger-btn"
         onClick={handleOpen}
-        title="What's New in Elite Edition ERP"
-        aria-label="What's New Release Center"
+        title={unreadCount > 0 ? `System Updates: ${unreadCount} new release note${unreadCount > 1 ? 's' : ''} available (Click to view)` : "What's New in Elite Edition ERP"}
+        aria-label={`What's New Release Center${unreadCount > 0 ? `, ${unreadCount} new updates` : ''}`}
       >
         <Sparkles size={16} style={{ color: unreadCount > 0 ? '#f59e0b' : 'currentColor' }} />
-        {unreadCount > 0 && <span className="changelog-unread-badge">{unreadCount}</span>}
+        {unreadCount > 0 && (
+          <span 
+            className="changelog-unread-badge"
+            title={`${unreadCount} new release update`}
+            aria-label={`${unreadCount} new release update`}
+          >
+            {unreadCount}
+          </span>
+        )}
       </button>
 
       {isOpen && (
