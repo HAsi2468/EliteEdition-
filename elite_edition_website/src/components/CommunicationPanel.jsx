@@ -78,10 +78,13 @@ import {
   Calendar,
   Tag,
   PhoneMissed,
-  PhoneCall,
   Download,
   FileSpreadsheet,
-  Edit3
+  Edit3,
+  ArrowLeft,
+  ZoomIn,
+  ZoomOut,
+  RotateCw
 } from 'lucide-react';
 
 function formatFileSize(bytes) {
@@ -186,7 +189,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [phoenixFilter, setPhoenixFilter] = useState('all'); // 'all' | 'read' | 'unread'
   const [isUrgent, setIsUrgent] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
-  const [zoomImg, setZoomImg] = useState(null);
+  const [attachmentViewer, setAttachmentViewer] = useState(null);
+  const [viewerZoom, setViewerZoom] = useState(1);
+  const [viewerRotation, setViewerRotation] = useState(0);
+
+  const setZoomImg = useCallback((val) => {
+    setViewerZoom(1);
+    setViewerRotation(0);
+    if (!val) {
+      setAttachmentViewer(null);
+      return;
+    }
+    if (typeof val === 'string') {
+      const fileName = val.split('/').pop().split('?')[0] || 'Image';
+      setAttachmentViewer({ url: val, fileName, fileType: 'image' });
+    } else {
+      setAttachmentViewer(val);
+    }
+  }, []);
   const [showInRoomSearch, setShowInRoomSearch] = useState(false);
   const [inRoomQuery, setInRoomQuery] = useState('');
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
@@ -518,7 +538,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         else if (showClearAllModal) setShowClearAllModal(false);
         else if (showChatTaskModal) setShowChatTaskModal(false);
         else if (showDialpad) setShowDialpad(false);
-        else if (zoomImg) setZoomImg(null);
+        else if (attachmentViewer) setAttachmentViewer(null);
       }
     };
     window.addEventListener('keydown', handleEscapeDismiss);
@@ -527,7 +547,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     showMobileActionMenu, showMobileHeaderMenu, showDesktopHeaderMenu,
     showNewDmModal, showCreateGroupModal, showMembersModal, showShareModal,
     showGalleryModal, showPollModal, showForwardModal, showClearAllModal,
-    showChatTaskModal, showDialpad, zoomImg
+    showChatTaskModal, showDialpad, attachmentViewer
   ]);
 
   // ─── Real-Time Voice & Video Calling Handlers (WebRTC) ───
@@ -5441,7 +5461,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                           cursor: 'zoom-in',
                                           lineHeight: 0
                                         }}
-                                        onClick={() => setZoomImg({ url: msg.attachment.fileUrl, fileName: fileNameDisplay })}
+                                        onClick={() => {
+                                          setViewerZoom(1);
+                                          setViewerRotation(0);
+                                          setAttachmentViewer({
+                                            url: msg.attachment.fileUrl,
+                                            fileName: fileNameDisplay,
+                                            fileType: 'image',
+                                            fileSize: msg.attachment.fileSize,
+                                            senderName: msg.senderId?.name || msg.senderName,
+                                            createdAt: msg.createdAt
+                                          });
+                                        }}
                                         title="Click to view full image"
                                       >
                                         <img
@@ -5461,134 +5492,110 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     );
                                   }
 
-                                  // Dedicated PDF, Spreadsheet, or Document Card
+                                  // Dedicated PDF, Spreadsheet, or Document Card (WhatsApp style)
                                   return (
                                     <div
+                                      onClick={() => setAttachmentViewer({
+                                        url: msg.attachment.fileUrl,
+                                        fileName: fileNameDisplay,
+                                        fileType: isPdf ? 'pdf' : (isSheet ? 'spreadsheet' : 'document'),
+                                        fileSize: msg.attachment.fileSize,
+                                        senderName: msg.senderId?.name || msg.senderName,
+                                        createdAt: msg.createdAt
+                                      })}
                                       style={{
-                                        background: isMe ? 'rgba(255, 255, 255, 0.15)' : 'var(--bg-card, #ffffff)',
+                                        background: isMe ? 'rgba(255, 255, 255, 0.18)' : 'var(--bg-card, #ffffff)',
                                         border: isMe ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid var(--border-light, #cbd5e1)',
-                                        borderRadius: '8px',
-                                        padding: '0.6rem 0.75rem',
+                                        borderRadius: '10px',
+                                        padding: '0.65rem 0.85rem',
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '0.45rem',
+                                        alignItems: 'center',
+                                        gap: '10px',
                                         minWidth: '220px',
                                         maxWidth: '340px',
-                                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                                        cursor: 'pointer',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                                        transition: 'all 0.15s ease'
                                       }}
+                                      title="Click to open preview"
                                     >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <div
-                                          style={{
-                                            width: 36,
-                                            height: 36,
-                                            borderRadius: '6px',
-                                            background: isPdf ? '#ef4444' : isSheet ? '#10b981' : '#3b82f6',
-                                            color: '#ffffff',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontWeight: 900,
-                                            fontSize: '0.62rem',
-                                            flexShrink: 0
-                                          }}
-                                        >
-                                          {isPdf ? (
-                                            <>
-                                              <FileText size={15} />
-                                              <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>PDF</span>
-                                            </>
-                                          ) : isSheet ? (
-                                            <>
-                                              <FileSpreadsheet size={15} />
-                                              <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>XLS</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Paperclip size={15} />
-                                              <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>DOC</span>
-                                            </>
-                                          )}
-                                        </div>
-
-                                        <div style={{ minWidth: 0, flex: 1 }}>
-                                          <div
-                                            style={{
-                                              fontWeight: 700,
-                                              fontSize: '0.82rem',
-                                              color: 'inherit',
-                                              whiteSpace: 'nowrap',
-                                              overflow: 'hidden',
-                                              textOverflow: 'ellipsis'
-                                            }}
-                                            title={msg.attachment.fileName}
-                                          >
-                                            {msg.attachment.fileName}
-                                          </div>
-                                          <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>
-                                            {isPdf ? 'PDF Document' : isSheet ? 'Spreadsheet' : 'Attachment'}{msg.attachment.fileSize ? ` • ${formatFileSize(msg.attachment.fileSize)}` : ''}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Action Buttons: Open & Download */}
                                       <div
                                         style={{
+                                          width: 38,
+                                          height: 38,
+                                          borderRadius: '8px',
+                                          background: isPdf ? '#ef4444' : isSheet ? '#10b981' : '#3b82f6',
+                                          color: '#ffffff',
                                           display: 'flex',
-                                          gap: '6px',
-                                          marginTop: '2px',
-                                          paddingTop: '6px',
-                                          borderTop: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light, #e2e8f0)'
+                                          flexDirection: 'column',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 900,
+                                          fontSize: '0.62rem',
+                                          flexShrink: 0
                                         }}
                                       >
-                                        <a
-                                          href={msg.attachment.fileUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          style={{
-                                            flex: 1,
-                                            padding: '4px 8px',
-                                            fontSize: '0.74rem',
-                                            fontWeight: 700,
-                                            borderRadius: '4px',
-                                            background: isMe ? 'rgba(255,255,255,0.25)' : '#2563eb',
-                                            color: '#ffffff',
-                                            textAlign: 'center',
-                                            textDecoration: 'none',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '4px'
-                                          }}
-                                        >
-                                          <ExternalLink size={12} /> {isPdf ? 'View PDF' : 'Open'}
-                                        </a>
-
-                                        <a
-                                          href={msg.attachment.fileUrl}
-                                          download={msg.attachment.fileName}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          style={{
-                                            padding: '4px 8px',
-                                            fontSize: '0.74rem',
-                                            fontWeight: 700,
-                                            borderRadius: '4px',
-                                            background: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)',
-                                            color: 'inherit',
-                                            textAlign: 'center',
-                                            textDecoration: 'none',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '4px'
-                                          }}
-                                          title="Download File"
-                                        >
-                                          <Download size={12} /> Download
-                                        </a>
+                                        {isPdf ? (
+                                          <>
+                                            <FileText size={16} />
+                                            <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>PDF</span>
+                                          </>
+                                        ) : isSheet ? (
+                                          <>
+                                            <FileSpreadsheet size={16} />
+                                            <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>XLS</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Paperclip size={16} />
+                                            <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>DOC</span>
+                                          </>
+                                        )}
                                       </div>
+
+                                      <div style={{ minWidth: 0, flex: 1 }}>
+                                        <div
+                                          style={{
+                                            fontWeight: 700,
+                                            fontSize: '0.84rem',
+                                            color: 'inherit',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                          }}
+                                          title={fileNameDisplay}
+                                        >
+                                          {fileNameDisplay}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '2px' }}>
+                                          {isPdf ? 'PDF' : isSheet ? 'Spreadsheet' : 'Document'}{msg.attachment.fileSize ? ` • ${formatFileSize(msg.attachment.fileSize)}` : ''}
+                                        </div>
+                                      </div>
+
+                                      <a
+                                        href={msg.attachment.fileUrl}
+                                        download={fileNameDisplay}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                          width: 32,
+                                          height: 32,
+                                          borderRadius: '50%',
+                                          background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(37,99,235,0.1)',
+                                          color: isMe ? '#ffffff' : '#2563eb',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          textDecoration: 'none',
+                                          flexShrink: 0,
+                                          border: 'none',
+                                          cursor: 'pointer'
+                                        }}
+                                        title="Download file"
+                                      >
+                                        <Download size={15} />
+                                      </a>
                                     </div>
                                   );
                                 })()}
@@ -5823,11 +5830,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <img
                         src={attachedFile.fileUrl}
                         alt="Preview"
-                        onClick={() => setZoomImg({ url: attachedFile.fileUrl, fileName: attachedFile.fileName || 'Preview' })}
+                        onClick={() => {
+                          setViewerZoom(1);
+                          setViewerRotation(0);
+                          setAttachmentViewer({
+                            url: attachedFile.fileUrl,
+                            fileName: attachedFile.fileName || 'Preview',
+                            fileType: 'image',
+                            fileSize: attachedFile.fileSize,
+                            senderName: 'Draft Attachment'
+                          });
+                        }}
                         style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border-light)', cursor: 'zoom-in' }}
                       />
                     ) : (
                       <div
+                        onClick={() => {
+                          if (attachedFile.fileUrl) {
+                            setViewerZoom(1);
+                            setViewerRotation(0);
+                            setAttachmentViewer({
+                              url: attachedFile.fileUrl,
+                              fileName: attachedFile.fileName || 'Attachment',
+                              fileType: attachedFile.fileType,
+                              fileSize: attachedFile.fileSize,
+                              senderName: 'Draft Attachment'
+                            });
+                          }
+                        }}
                         style={{
                           width: 38,
                           height: 38,
@@ -5840,7 +5870,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           justifyContent: 'center',
                           fontWeight: 900,
                           fontSize: '0.62rem',
-                          flexShrink: 0
+                          flexShrink: 0,
+                          cursor: attachedFile.fileUrl ? 'pointer' : 'default'
                         }}
                       >
                         {attachedFile.fileType === 'pdf' ? (
@@ -5879,14 +5910,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{attachedFile.fileType === 'pdf' ? 'PDF Document' : attachedFile.fileType === 'image' ? 'Image' : attachedFile.fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}</span>
                         {attachedFile.fileSize && <span>• {formatFileSize(attachedFile.fileSize)}</span>}
-                        <a
-                          href={attachedFile.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'underline' }}
-                        >
-                          Preview
-                        </a>
+                        {attachedFile.fileUrl && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewerZoom(1);
+                              setViewerRotation(0);
+                              setAttachmentViewer({
+                                url: attachedFile.fileUrl,
+                                fileName: attachedFile.fileName || 'Attachment',
+                                fileType: attachedFile.fileType,
+                                fileSize: attachedFile.fileSize,
+                                senderName: 'Draft Attachment'
+                              });
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              color: '#2563eb',
+                              fontWeight: 700,
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              fontSize: 'inherit'
+                            }}
+                          >
+                            Preview
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -6830,41 +6881,260 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
       )}
 
-      {/* ── IMAGE LIGHTBOX MODAL ── */}
-      {zoomImg && (() => {
-        const imgUrl = typeof zoomImg === 'object' ? zoomImg.url : zoomImg;
-        let imgName = (typeof zoomImg === 'object' ? zoomImg.fileName : '') || (typeof imgUrl === 'string' ? imgUrl.split('/').pop().split('?')[0] : '') || 'image.png';
-        if (!imgName || imgName.toLowerCase() === 'blob' || imgName.startsWith('blob:')) {
-          imgName = 'image.png';
+      {/* ── WHATSAPP-STYLE UNIVERSAL ATTACHMENT VIEWER ── */}
+      {attachmentViewer && (() => {
+        const fileUrl = attachmentViewer.url;
+        let fileName = attachmentViewer.fileName || 'Attachment';
+        if (!fileName || fileName.toLowerCase() === 'blob' || fileName.startsWith('blob:')) {
+          fileName = 'Attachment';
         }
+        const lowerName = fileName.toLowerCase();
+        const isImg = attachmentViewer.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
+        const isPdf = attachmentViewer.fileType === 'pdf' || lowerName.endsWith('.pdf');
+        const isSpreadsheet = attachmentViewer.fileType === 'spreadsheet' || /\.(xls|xlsx|csv)$/i.test(lowerName);
+        const isDoc = /\.(doc|docx|txt|rtf)$/i.test(lowerName);
+
+        const vBtnStyle = {
+          background: 'rgba(255, 255, 255, 0.12)',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '6px',
+          height: '34px',
+          minWidth: '34px',
+          padding: '0 8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          textDecoration: 'none',
+          transition: 'background 0.15s ease'
+        };
+
         return (
-          <div onClick={() => setZoomImg(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '90vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', color: '#fff' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <Eye size={16} />
-                <span title={imgName} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60vw' }}>{imgName}</span>
+          <div
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setAttachmentViewer(null);
+            }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 999999,
+              background: 'rgba(11, 15, 25, 0.96)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              flexDirection: 'column',
+              outline: 'none',
+              userSelect: 'none'
+            }}
+          >
+            {/* Top Toolbar */}
+            <div
+              style={{
+                height: '60px',
+                padding: '0 1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                background: 'rgba(17, 24, 39, 0.88)',
+                color: '#ffffff',
+                flexShrink: 0
+              }}
+            >
+              {/* Left: Back/Close & Metadata */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setAttachmentViewer(null)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 36,
+                    height: 36,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    cursor: 'pointer'
+                  }}
+                  title="Close (Esc)"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.92rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '45vw'
+                      }}
+                      title={fileName}
+                    >
+                      {fileName}
+                    </span>
+                    {attachmentViewer.fileSize ? (
+                      <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.15)', opacity: 0.85 }}>
+                        {formatFileSize(attachmentViewer.fileSize)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {attachmentViewer.senderName && (
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>
+                      {attachmentViewer.senderName}{attachmentViewer.createdAt ? ` • ${formatTime(attachmentViewer.createdAt)}` : ''}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+
+              {/* Right: Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isImg && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setViewerZoom((prev) => Math.max(0.4, Number((prev - 0.25).toFixed(2))))}
+                      style={vBtnStyle}
+                      title="Zoom Out (-)"
+                    >
+                      <ZoomOut size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewerZoom(1)}
+                      style={{ ...vBtnStyle, fontSize: '0.72rem', fontWeight: 700, minWidth: '46px' }}
+                      title="Reset Zoom (100%)"
+                    >
+                      {Math.round(viewerZoom * 100)}%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewerZoom((prev) => Math.min(4, Number((prev + 0.25).toFixed(2))))}
+                      style={vBtnStyle}
+                      title="Zoom In (+)"
+                    >
+                      <ZoomIn size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewerRotation((prev) => (prev + 90) % 360)}
+                      style={vBtnStyle}
+                      title="Rotate 90°"
+                    >
+                      <RotateCw size={16} />
+                    </button>
+                  </>
+                )}
+
                 <a
-                  href={imgUrl}
-                  download={imgName}
+                  href={fileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn"
-                  style={{ background: 'var(--brand-primary, #6366f1)', color: '#fff', padding: '6px 14px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+                  style={vBtnStyle}
+                  title="Open in new window"
                 >
-                  <Download size={14} /> Download
+                  <ExternalLink size={16} />
                 </a>
+
+                <a
+                  href={fileUrl}
+                  download={fileName}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    textDecoration: 'none',
+                    cursor: 'pointer'
+                  }}
+                  title="Download file"
+                >
+                  <Download size={15} />
+                  <span>Download</span>
+                </a>
+
                 <button
-                  onClick={() => setZoomImg(null)}
-                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  type="button"
+                  onClick={() => setAttachmentViewer(null)}
+                  style={{ ...vBtnStyle, marginLeft: '4px' }}
+                  title="Close viewer"
                 >
                   <X size={18} />
                 </button>
               </div>
             </div>
-            <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '82vh' }}>
-              <img src={imgUrl} alt={imgName} style={{ maxWidth: '100%', maxHeight: '82vh', borderRadius: '8px', boxShadow: '0 8px 30px rgba(0,0,0,0.6)', objectFit: 'contain' }} />
+
+            {/* Viewer Body */}
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: isPdf || isSpreadsheet || isDoc ? '0.75rem 1rem 1rem' : '1rem',
+                overflow: 'hidden',
+                position: 'relative'
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget && isImg) setAttachmentViewer(null);
+              }}
+            >
+              {isImg ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    height: '100%',
+                    overflow: viewerZoom > 1 ? 'auto' : 'hidden'
+                  }}
+                >
+                  <img
+                    src={fileUrl}
+                    alt={fileName}
+                    style={{
+                      maxWidth: viewerZoom === 1 ? '92vw' : 'none',
+                      maxHeight: viewerZoom === 1 ? '82vh' : 'none',
+                      transform: `scale(${viewerZoom}) rotate(${viewerRotation}deg)`,
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.15s ease-out',
+                      borderRadius: '6px',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
+                      objectFit: 'contain'
+                    }}
+                  />
+                </div>
+              ) : isPdf ? (
+                <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                  <iframe
+                    src={fileUrl}
+                    title={fileName}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                  />
+                </div>
+              ) : (
+                <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                  <iframe
+                    src={`https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`}
+                    title={fileName}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         );
@@ -7170,11 +7440,48 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <img
                               src={att.fileUrl}
                               alt={att.fileName}
-                              onClick={() => setZoomImg({ url: att.fileUrl, fileName: att.fileName || 'Attachment' })}
+                              onClick={() => {
+                                setViewerZoom(1);
+                                setViewerRotation(0);
+                                setAttachmentViewer({
+                                  url: att.fileUrl,
+                                  fileName: att.fileName || 'Photo',
+                                  fileType: 'image',
+                                  fileSize: att.fileSize,
+                                  senderName: m.senderId?.name || 'Staff',
+                                  createdAt: m.createdAt
+                                });
+                              }}
                               style={{ width: '100%', height: '110px', objectFit: 'cover', cursor: 'zoom-in' }}
                             />
                           ) : (
-                            <div style={{ height: '110px', background: isAudio ? '#eff6ff' : '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0.5rem', textContent: 'center' }}>
+                            <div
+                              onClick={() => {
+                                if (isAudio) return;
+                                const isPdf = att.fileType === 'pdf' || att.fileName?.toLowerCase().endsWith('.pdf');
+                                const isSheet = ['xlsx', 'xls', 'csv'].some((ext) => att.fileName?.toLowerCase().endsWith(ext));
+                                setViewerZoom(1);
+                                setViewerRotation(0);
+                                setAttachmentViewer({
+                                  url: att.fileUrl,
+                                  fileName: att.fileName || 'Document',
+                                  fileType: isPdf ? 'pdf' : isSheet ? 'spreadsheet' : 'document',
+                                  fileSize: att.fileSize,
+                                  senderName: m.senderId?.name || 'Staff',
+                                  createdAt: m.createdAt
+                                });
+                              }}
+                              style={{
+                                height: '110px',
+                                background: isAudio ? '#eff6ff' : '#f8fafc',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0.5rem',
+                                cursor: isAudio ? 'default' : 'pointer'
+                              }}
+                            >
                               {isAudio ? <Volume2 size={28} color="#2563eb" /> : <FileText size={28} color="#64748b" />}
                               <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px', textAlign: 'center', wordBreak: 'break-all' }}>
                                 {att.fileName || 'File'}
@@ -7193,6 +7500,39 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             </div>
 
                             <div style={{ marginTop: '0.4rem', display: 'flex', gap: '0.4rem' }}>
+                              {!isAudio && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const isPdf = att.fileType === 'pdf' || att.fileName?.toLowerCase().endsWith('.pdf');
+                                    const isSheet = ['xlsx', 'xls', 'csv'].some((ext) => att.fileName?.toLowerCase().endsWith(ext));
+                                    setViewerZoom(1);
+                                    setViewerRotation(0);
+                                    setAttachmentViewer({
+                                      url: att.fileUrl,
+                                      fileName: att.fileName || (isImg ? 'Photo' : 'Document'),
+                                      fileType: isImg ? 'image' : isPdf ? 'pdf' : isSheet ? 'spreadsheet' : 'document',
+                                      fileSize: att.fileSize,
+                                      senderName: m.senderId?.name || 'Staff',
+                                      createdAt: m.createdAt
+                                    });
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '0.25rem',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 600,
+                                    textAlign: 'center',
+                                    borderRadius: '4px',
+                                    background: 'var(--bg-secondary, #f1f5f9)',
+                                    color: 'var(--text-primary, #334155)',
+                                    border: '1px solid var(--border-light, #cbd5e1)',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Open
+                                </button>
+                              )}
                               <a
                                 href={att.fileUrl}
                                 download={att.fileName}
