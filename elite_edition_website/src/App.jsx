@@ -1419,13 +1419,20 @@ export default function App() {
       return;
     }
 
-    // Performance Optimization: Only load heavy inventory, sales, catalog, and parties when on inventory/catalog/dashboard tabs!
+    // Performance Optimization: Never load dashboard/inventory data when on Communication screen!
+    if (activeTabRef.current === 'communication') {
+      setLoading(false);
+      return;
+    }
+
     const isHeavyDataTab = ['inventory', 'catalog', 'dashboard', 'elite_online'].includes(activeTabRef.current);
     if (!isHeavyDataTab) {
-      try {
-        const user = await api.refreshCurrentUser();
-        if (user) setCurrentUser(user);
-      } catch (e) {}
+      if (!currentUser) {
+        try {
+          const user = await api.refreshCurrentUser();
+          if (user) setCurrentUser(user);
+        } catch (e) {}
+      }
       setLoading(false);
       return;
     }
@@ -1433,12 +1440,12 @@ export default function App() {
     setLoading(true);
     setError('');
     try {
-      // Run requests in parallel including user permissions sync
+      // Run requests in parallel with pagination limits to prevent 504 timeouts
       const [inventoryResult, catalogResult, salesResult, partiesResult, userResult] = await Promise.allSettled([
         api.getInventory(),
         api.getProductsCatalog({ limit: 50 }),
         api.getSales({ limit: 50 }),
-        api.getParties(),
+        api.getParties({ limit: 50 }),
         api.refreshCurrentUser(),
       ]);
 

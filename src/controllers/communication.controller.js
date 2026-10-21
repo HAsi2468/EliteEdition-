@@ -112,6 +112,9 @@ const getGroups = async (req, res) => {
         const msgsToPopulate = latestAgg.map((x) => x.lastMsg);
         await ChatMessage.populate(msgsToPopulate, { path: 'senderId', select: 'name username email' });
         latestAgg.forEach((x) => {
+          if (x.lastMsg && x.lastMsg.isDeleted) {
+            x.lastMsg.content = 'This message was deleted';
+          }
           lastMsgMap[String(x._id)] = x.lastMsg;
         });
       }

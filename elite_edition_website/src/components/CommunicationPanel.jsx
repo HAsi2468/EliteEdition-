@@ -1286,6 +1286,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               : m
           )
         );
+        setGroups((prevGroups) =>
+          prevGroups.map((g) => {
+            if (String(g._id) === String(activeGroup?._id)) {
+              if (g.lastMessage && String(g.lastMessage._id || g.lastMessage) === String(messageId)) {
+                return {
+                  ...g,
+                  lastMessage: {
+                    ...(typeof g.lastMessage === 'object' ? g.lastMessage : {}),
+                    content: 'This message was deleted',
+                    isDeleted: true
+                  }
+                };
+              }
+            }
+            return g;
+          })
+        );
         if (socket) {
           socket.emit('delete-message', { messageId, roomId: activeGroup?._id });
         }
@@ -1472,6 +1489,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               ? { ...m, content: 'This message was deleted', isDeleted: true, attachment: null }
               : m
           )
+        );
+        setGroups((prevGroups) =>
+          prevGroups.map((g) => {
+            if (!data.roomId || String(g._id) === String(data.roomId)) {
+              if (g.lastMessage && String(g.lastMessage._id || g.lastMessage) === String(data.messageId)) {
+                return {
+                  ...g,
+                  lastMessage: {
+                    ...(typeof g.lastMessage === 'object' ? g.lastMessage : {}),
+                    content: 'This message was deleted',
+                    isDeleted: true
+                  }
+                };
+              }
+            }
+            return g;
+          })
         );
       }
     };
@@ -3943,7 +3977,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           fontWeight: group.unreadCount > 0 ? 600 : 400
                         }}>
                           {group.lastMessage
-                            ? (group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged' : group.lastMessage.content)
+                            ? ((group.lastMessage.isDeleted || group.lastMessage.content === 'This message was deleted')
+                                ? '🚫 This message was deleted'
+                                : group.lastMessage.msgType === 'system_activity' ? '🤖 Activity Logged' : group.lastMessage.content)
                             : (isVirtual ? 'Tap to start a new chat' : (isDirect ? 'Direct conversation' : (group.description || 'Channel conversation')))}
                         </p>
 
