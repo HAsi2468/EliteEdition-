@@ -4225,11 +4225,42 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       {error && <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)',
         borderRadius:'var(--radius-sm)', padding:'0.75rem 1rem', color:'#fca5a5', fontSize:'0.85rem' }}>{error}</div>}
 
-      {/* Cards Grid */}
+      {/* Cards Grid / Skeleton Loading */}
       {loading && cards.length === 0 ? (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'3rem', color:'var(--text-muted)' }}>
-          <RefreshCw size={32} className="spin-loader" color="var(--primary)"/>
-          <p style={{ marginTop:'1rem' }}>Loading job cards…</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem', width: '100%' }}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div
+              key={i}
+              className="glass-panel"
+              style={{
+                padding: '1.25rem',
+                borderRadius: '16px',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ width: '90px', height: '24px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ width: '80px', height: '20px', background: '#f1f5f9', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <div style={{ width: '64px', height: '64px', background: '#f1f5f9', borderRadius: '10px', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ width: '70%', height: '14px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ width: '50%', height: '12px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ width: '40%', height: '12px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                </div>
+              </div>
+              <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '3px', animation: 'pulse 1.5s infinite', marginTop: '4px' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid #f8fafc' }}>
+                <div style={{ width: '60px', height: '12px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ width: '100px', height: '28px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
+              </div>
+            </div>
+          ))}
         </div>
       ) : cards.length === 0 ? (
         <div className="glass-panel" style={{ padding:'3rem', textAlign:'center' }}>

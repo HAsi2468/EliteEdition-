@@ -684,10 +684,11 @@ const createJobCard = async (req, res) => {
       req.user?.role === 'qa-automation' ||
       req.user?.companyId === 'SANDBOX' ||
       req.user?.companyId === 'TEST' ||
+      req.user?.companyId === 'TEST_COMPANY' ||
       req.user?.companyId === 'SBX' ||
       body.isSandbox === true ||
-      String(card.jobNo || '').toUpperCase().startsWith('TEST-') ||
-      String(card.jobNo || '').toUpperCase().startsWith('QA-')
+      /^TEST[-_]/i.test(card.jobNo || card.designName || card.designNo || '') ||
+      /^QA[-_]/i.test(card.jobNo || card.designName || card.designNo || '')
     );
 
     if (!isSandboxQA) {

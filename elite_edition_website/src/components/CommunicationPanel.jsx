@@ -5484,6 +5484,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 {/* Hidden File Input for Attachments and Photos */}
                 <input
                   type="file"
+                  id="phoenix-chat-file-input"
                   ref={fileInputRef}
                   style={{ display: 'none' }}
                   onChange={handleFileUpload}
@@ -5743,15 +5744,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       {/* On desktop: direct paperclip and emoji buttons */}
                       {!isMobileScreen && (
                         <>
-                          <button
-                            type="button"
+                          <label
+                            htmlFor="phoenix-chat-file-input"
                             className="phoenix-toolbar-icon"
                             onClick={() => openFileDialog('image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*')}
                             title="Attach File (PDF, Image, Document)"
-                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
+                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}
                           >
                             <Paperclip size={16} />
-                          </button>
+                          </label>
 
                           <button
                             type="button"

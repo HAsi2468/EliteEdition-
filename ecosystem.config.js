@@ -8,6 +8,7 @@ module.exports = {
       wait_ready: true,
       listen_timeout: 10000,
       kill_timeout: 5000,
+      max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
         PORT: 3001

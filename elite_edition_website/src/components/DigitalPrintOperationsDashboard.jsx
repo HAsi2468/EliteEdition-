@@ -1082,10 +1082,10 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
             </div>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#141824', lineHeight: 1.2 }}>
-                {summary.dailyPrintedJobs || 0} Print Orders
+                {summary.dailyPrintedJobs || 0} Printed (Today)
               </h4>
               <p style={{ margin: 0, fontSize: '0.75rem', color: '#6e7891', fontWeight: 500 }}>
-                {summary.dailyPrintedMeters ? `${fmtMtr(summary.dailyPrintedMeters)} printed today` : 'Awaiting print run'}
+                {summary.dailyPrintedMeters ? `${fmtMtr(summary.dailyPrintedMeters)} printed today` : 'Awaiting today\'s print run'}
               </p>
             </div>
           </div>

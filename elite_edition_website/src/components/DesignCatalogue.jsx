@@ -1454,17 +1454,41 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           borderRadius: 'var(--radius-sm)', padding: '0.75rem 1rem', color: '#fca5a5', fontSize: '0.85rem' }}>{error}</div>
       )}
 
-      {/* Grid catalogue */}
+      {/* Grid catalogue / Skeleton Loading */}
       {loading && designs.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4rem 1.5rem', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '1rem 0' }}>
-          <div style={{ position: 'relative', width: '64px', height: '64px', marginBottom: '1.25rem' }}>
-            <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid transparent', borderTopColor: '#2563eb', borderRightColor: '#8b5cf6', animation: 'spin 1.1s linear infinite' }} />
-            <div style={{ position: 'absolute', inset: '4px', borderRadius: '50%', background: 'linear-gradient(135deg, #1d4ed8, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', boxShadow: '0 0 20px rgba(37, 99, 235, 0.45)', animation: 'pulseGlow 2s infinite' }}>
-              <BookOpen size={24} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem', margin: '1rem 0' }}>
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div
+              key={i}
+              className="glass-panel"
+              style={{
+                padding: '1rem',
+                borderRadius: '16px',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ width: '70px', height: '18px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ width: '50px', height: '18px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
+              </div>
+              <div style={{ height: '180px', background: '#f1f5f9', borderRadius: '10px', animation: 'pulse 1.5s infinite' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ width: '60%', height: '16px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ width: '80%', height: '12px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid #f8fafc' }}>
+                <div style={{ width: '65px', height: '14px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ width: '28px', height: '28px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ width: '28px', height: '28px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
+                </div>
+              </div>
             </div>
-          </div>
-          <h4 style={{ margin: '0 0 0.35rem', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Loading Design Catalogue</h4>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>Retrieving master catalog specifications & preview artwork...</p>
+          ))}
         </div>
       ) : designs.length === 0 ? (
         <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>

@@ -86,27 +86,59 @@ app.use(
 	})
 );
 
-// Apply strict Content-Security-Policy middleware
-app.use(createCspMiddleware());
+// Production-grade hardened CORS middleware engine
+app.use(createCorsMiddleware());
 
-// parse json request body
+// parse cookies for session authentication and CSRF Double-Submit token extraction
+app.use(cookieParser());
+
+const { requireAuth } = require('./middlewares/auth.middleware');
+
+const isPublicRoute = (path) => {
+  const p = (path || '').toLowerCase();
+  return (
+    p === '/v1/auth/ping' ||
+    p === '/api/v1/auth/ping' ||
+    p.startsWith('/v1/auth') ||
+    p.startsWith('/api/v1/auth') ||
+    p === '/v1/notifications/vapid-key' ||
+    p === '/api/v1/notifications/vapid-key' ||
+    p === '/v1/clients/login' ||
+    p === '/api/v1/clients/login' ||
+    p.startsWith('/v1/verify') ||
+    p.startsWith('/api/v1/verify') ||
+    p.startsWith('/verify') ||
+    p.startsWith('/v1/telemetry') ||
+    p.startsWith('/api/v1/telemetry') ||
+    p === '/v1/designs/download-zip' ||
+    p === '/api/v1/designs/download-zip'
+  );
+};
+
+// Early Auth Guard: Enforce valid Bearer token verification BEFORE body-parsing on all protected /v1 endpoints
+// Prevents unauthenticated malformed JSON probes (e.g. POST '{') from throwing 400 before authentication
+const earlyAuthGuard = (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const targetPath = req.originalUrl ? req.originalUrl.split('?')[0] : req.path;
+  if (isPublicRoute(targetPath)) {
+    return next();
+  }
+  return requireAuth(req, res, next);
+};
+
+app.use(['/v1', '/api/v1'], earlyAuthGuard);
+
+// parse json request body (runs only after early auth guard for protected endpoints)
 app.use(express.json({ limit: '50mb' }));
 
 // parse urlencoded request body
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// parse cookies for session authentication and CSRF Double-Submit token extraction
-app.use(cookieParser());
-
 // sanitize request data against MongoDB Operator Injection
-
 app.use(mongoSanitize());
 
 // gzip compression
 app.use(compression());
-
-// Production-grade hardened CORS middleware engine
-app.use(createCorsMiddleware());
 
 const jwtUtils = require('./utils/auth');
 
@@ -510,34 +542,15 @@ app.post(
   csrfManager.handshakeHandler
 );
 
-const { requireAuth } = require('./middlewares/auth.middleware');
-
-const isPublicRoute = (path) => {
-  const p = (path || '').toLowerCase();
-  return (
-    p.startsWith('/v1/auth') ||
-    p.startsWith('/api/v1/auth') ||
-    p === '/v1/clients/login' ||
-    p === '/api/v1/clients/login' ||
-    p.startsWith('/v1/verify') ||
-    p.startsWith('/api/v1/verify') ||
-    p.startsWith('/verify') ||
-    p.startsWith('/v1/telemetry') ||
-    p.startsWith('/api/v1/telemetry') ||
-    p === '/v1/designs/download-zip' ||
-    p === '/api/v1/designs/download-zip'
-  );
-};
-
+// Centralized REST Authentication Gate: ensures req.user is verified (already enforced early before body-parser)
 const restAuthGate = (req, res, next) => {
   const targetPath = req.originalUrl ? req.originalUrl.split('?')[0] : req.path;
-  if (isPublicRoute(targetPath)) {
+  if (isPublicRoute(targetPath) || req.user) {
     return next();
   }
   return requireAuth(req, res, next);
 };
 
-// 1. Centralized REST Authentication Gate: enforces valid Bearer token verification across all /v1 endpoints
 app.use(['/v1', '/api/v1'], restAuthGate);
 
 // 2. Anti-CSRF Verification Middleware: protects all state-changing endpoints (POST/PUT/PATCH/DELETE)

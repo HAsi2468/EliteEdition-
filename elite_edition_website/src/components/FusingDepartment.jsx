@@ -1522,8 +1522,12 @@ export default function FusingDepartment() {
     const pannaButterKgMap = {};
 
     cards.forEach(c => {
-      const isDone = c.fusingStatus === 'Fusing Done';
-      if (c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done') {
+      const pStatus = String(c.printStatus || c.status || '').toLowerCase();
+      const isPrintDone = pStatus === 'printing done' || pStatus === 'printed' || (pStatus.includes('done') && !pStatus.includes('pending'));
+      const fStatus = String(c.fusingStatus || 'fusing pending').toLowerCase();
+      const isDone = fStatus === 'fusing done' || fStatus === 'fused' || fStatus === 'done' || c.fusingStatus === 'Fusing Done';
+
+      if (isPrintDone && !isDone) {
         readyForFusingCount++;
       }
       if (isDone) {
@@ -2964,17 +2968,19 @@ export default function FusingDepartment() {
           </div>
         </div>
 
-        {/* Pending Fusing */}
+        {/* Ready for Fusing (reconciled with Dashboard Pipeline) */}
         <div className="fusing-metric-card accent-amber">
           <div className="fusing-metric-top">
-            <span className="fusing-metric-label">Pending Fusing</span>
+            <span className="fusing-metric-label">Ready for Fusing</span>
             <Clock size={18} color="#D97706" />
           </div>
           <div className="fusing-metric-val" style={{ color: '#D97706' }}>
-            {stats.pendingCount}
+            {stats.readyForFusingCount}
             <span className="fusing-metric-unit">cards</span>
           </div>
-          <div className="fusing-metric-subtitle">Awaiting heat press run</div>
+          <div className="fusing-metric-subtitle">
+            Printed & awaiting heat press ({stats.pendingCount} total un-fused)
+          </div>
         </div>
       </section>
 
