@@ -1183,9 +1183,10 @@ export default function App() {
     }
   }, [isAuthenticated]);
 
-  // Load initial global data when navigating from communication tab to other department screens
+  // Load initial global data only when navigating to inventory/catalog/dashboard screens
   useEffect(() => {
-    if (isAuthenticated && activeTab !== 'communication' && items.length === 0 && !api.isClientUser()) {
+    const isHeavyDataTab = ['inventory', 'catalog', 'dashboard', 'elite_online'].includes(activeTab);
+    if (isAuthenticated && isHeavyDataTab && items.length === 0 && !api.isClientUser()) {
       fetchData();
     }
   }, [activeTab, isAuthenticated, items.length]);
@@ -1418,8 +1419,9 @@ export default function App() {
       return;
     }
 
-    // Performance Optimization: If user is on the Communication/Chat tab, skip heavy inventory, sales, catalog, and parties requests!
-    if (activeTabRef.current === 'communication') {
+    // Performance Optimization: Only load heavy inventory, sales, catalog, and parties when on inventory/catalog/dashboard tabs!
+    const isHeavyDataTab = ['inventory', 'catalog', 'dashboard', 'elite_online'].includes(activeTabRef.current);
+    if (!isHeavyDataTab) {
       try {
         const user = await api.refreshCurrentUser();
         if (user) setCurrentUser(user);
@@ -1434,8 +1436,8 @@ export default function App() {
       // Run requests in parallel including user permissions sync
       const [inventoryResult, catalogResult, salesResult, partiesResult, userResult] = await Promise.allSettled([
         api.getInventory(),
-        api.getProductsCatalog(),
-        api.getSales({ limit: 200 }),
+        api.getProductsCatalog({ limit: 50 }),
+        api.getSales({ limit: 50 }),
         api.getParties(),
         api.refreshCurrentUser(),
       ]);

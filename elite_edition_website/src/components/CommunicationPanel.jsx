@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import ReactDOM from 'react-dom';
 import { api, getBaseUrl } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
+import socketManager from '../services/socketManager';
 import TaskManagerPanel from './TaskManagerPanel';
 import JobCardPdfModal from './JobCardPdfModal';
 import ErrorBoundary from './common/ErrorBoundary';
@@ -198,10 +199,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [onlineUserIds, setOnlineUserIds] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState([]);
   const [isChatDragging, setIsChatDragging] = useState(false);
-  const [isSocketConnected, setIsSocketConnected] = useState(true);
+  const [isSocketConnected, setIsSocketConnected] = useState(() => {
+    try {
+      return socketManager.getStatus() === 'connected';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    const unsub = socketManager.onStatusChange((status) => {
+      setIsSocketConnected(status === 'connected');
+    });
+    setIsSocketConnected(socketManager.getStatus() === 'connected');
+    return () => unsub();
+  }, []);
+
   const [editingMessage, setEditingMessage] = useState(null);
   const [deleteTargetMsgId, setDeleteTargetMsgId] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [msgMenuUpward, setMsgMenuUpward] = useState({});
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -258,6 +275,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       clearTimeout(msgHoldTimerRef.current);
       msgHoldTimerRef.current = null;
     }
+  };
+
+  const handleOpenMsgMenu = (e, msgId) => {
+    if (e) {
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+    }
+    if (activeMsgMenuId === msgId) {
+      setActiveMsgMenuId(null);
+      return;
+    }
+    let upward = false;
+    if (e && e.currentTarget && typeof e.currentTarget.getBoundingClientRect === 'function') {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      upward = spaceBelow < 290;
+    }
+    setMsgMenuUpward((prev) => ({ ...prev, [msgId]: upward }));
+    setActiveMsgMenuId(msgId);
   };
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [viewportHeight, setViewportHeight] = useState(null);
@@ -1335,6 +1371,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         }
       }
 
+      if (socket && uId && msg && msg.roomId) {
+        socket.emit('sync-delivered', { roomId: msg.roomId, userId: uId });
+      }
+
         setGroups((prevGroups) => {
         return prevGroups.map((g) => {
           if (String(g._id) === String(msg.roomId)) {
@@ -1458,6 +1498,31 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               const readArr = m.readBy ? m.readBy.map((u) => String(typeof u === 'object' ? (u._id || u.id) : u)) : [];
               if (!readArr.includes(String(data.userId))) {
                 return { ...m, readBy: [...(m.readBy || []), data.userId] };
+              }
+              return m;
+            })
+          );
+        }
+      }
+    };
+
+    const handleMessagesDelivered = (data) => {
+      if (data && data.roomId) {
+        const currentActiveId = activeGroupIdRef.current;
+        if (currentActiveId && String(data.roomId) === String(currentActiveId)) {
+          setMessages((prev) =>
+            prev.map((m) => {
+              const myId = String(currentUser?._id || currentUser?.id || '');
+              const senderId = String(typeof m.senderId === 'object' ? (m.senderId?._id || m.senderId?.id) : m.senderId);
+              if (senderId === myId) {
+                const currentDelivered = Array.isArray(m.deliveredTo) ? m.deliveredTo.map(String) : [];
+                if (!currentDelivered.includes(String(data.userId))) {
+                  return {
+                    ...m,
+                    deliveredTo: [...(m.deliveredTo || []), data.userId],
+                    status: m.status === 'read' ? 'read' : 'delivered'
+                  };
+                }
               }
               return m;
             })
@@ -1657,6 +1722,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     socket.on('message-deleted', handleDeleted);
     socket.on('message-pin-updated', handlePinUpdated);
     socket.on('room-messages-read', handleRoomMessagesRead);
+    socket.on('messages-delivered', handleMessagesDelivered);
     socket.on('poll-updated', handlePollUpdated);
     socket.on('communication-data-cleared', handleDataCleared);
     socket.on('presence-sync', handlePresenceSync);
@@ -1682,6 +1748,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('message-deleted', handleDeleted);
       socket.off('message-pin-updated', handlePinUpdated);
       socket.off('room-messages-read', handleRoomMessagesRead);
+      socket.off('messages-delivered', handleMessagesDelivered);
       socket.off('poll-updated', handlePollUpdated);
       socket.off('communication-data-cleared', handleDataCleared);
       socket.off('presence-sync', handlePresenceSync);
@@ -1971,6 +2038,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         const myId = currentUser?._id || currentUser?.id;
         if (socket && myId && groupId) {
           socket.emit('read-room-messages', { roomId: groupId, userId: myId });
+          socket.emit('sync-delivered', { roomId: groupId, userId: myId });
         }
         setGroups((prev) =>
           prev.map((g) => (String(g._id) === String(groupId) ? { ...g, unreadCount: 0 } : g))
@@ -3832,10 +3900,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       )}
                       {isDirect && (() => {
                         const colleagueId = colleague?._id || colleague?.id;
-                        const isOnline = colleagueId ? (
-                          onlineUserIds.has(String(colleagueId)) ||
-                          Boolean(colleague?.lastSeen && (Date.now() - new Date(colleague.lastSeen).getTime() < 2 * 60 * 1000))
-                        ) : false;
+                        const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
                         return (
                           <span
                             className={`phoenix-online-dot ${isOnline ? 'is-online' : 'is-offline'}`}
@@ -3911,12 +3976,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 ) : (
                   messageSearchResults.map((m) => {
-                    const targetRoom = groups.find((g) => String(g._id) === String(m.roomId || m.conversationId));
+                    const rawRoomId = typeof m.roomId === 'object' ? (m.roomId?._id || m.roomId?.id) : (m.roomId || m.conversationId);
+                    const roomName = typeof m.roomId === 'object' ? (m.roomId?.name || m.roomId?.title) : null;
+                    const targetRoom = groups.find((g) => String(g._id) === String(rawRoomId));
                     return (
                       <div
                         key={m._id}
                         onClick={() => {
-                          if (targetRoom) handleSelectGroup(targetRoom);
+                          if (targetRoom) {
+                            handleSelectGroup(targetRoom);
+                          } else if (rawRoomId) {
+                            handleSelectGroup({ _id: rawRoomId, name: roomName || 'Conversation', type: m.roomId?.type || 'group' });
+                          }
                         }}
                         style={{
                           padding: '7px 10px',
@@ -3931,7 +4002,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-card, #ffffff)'; }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#2563eb' }}>
-                          <span>{targetRoom?.name || 'Conversation'}</span>
+                          <span>{targetRoom?.name || roomName || 'Conversation'}</span>
                           <span style={{ color: 'var(--text-muted, #94a3b8)', fontWeight: 400, fontSize: '0.7rem' }}>
                             {formatTime(m.createdAt)}
                           </span>
@@ -4040,10 +4111,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           )}
                           {isDirect && (() => {
                             const colleagueId = colleague?._id || colleague?.id;
-                            const isOnline = colleagueId ? (
-                              onlineUserIds.has(String(colleagueId)) ||
-                              Boolean(colleague?.lastSeen && (Date.now() - new Date(colleague.lastSeen).getTime() < 2 * 60 * 1000))
-                            ) : false;
+                            const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
                             return (
                               <span
                                 className={`phoenix-online-dot ${isOnline ? 'is-online' : 'is-offline'}`}
@@ -4090,10 +4158,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                           {(() => {
                             const colleagueId = colleague?._id || colleague?.id;
-                            const isOnline = isDirect && colleagueId ? (
-                              onlineUserIds.has(String(colleagueId)) ||
-                              Boolean(colleague?.lastSeen && (Date.now() - new Date(colleague.lastSeen).getTime() < 2 * 60 * 1000))
-                            ) : false;
+                            const isOnline = isDirect && colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
                             if (isDirect) {
                               return (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
@@ -4622,7 +4687,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             minWidth: 0,
                             boxSizing: 'border-box',
                             marginBottom: '6px',
-                            position: 'relative'
+                            position: 'relative',
+                            zIndex: activeMsgMenuId === msg._id ? 100 : 1
                           }}
                         >
                           {!isMe && (
@@ -4665,10 +4731,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               onTouchStart={() => handleStartMsgHold(msg._id)}
                               onTouchEnd={handleCancelMsgHold}
                               onTouchCancel={handleCancelMsgHold}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                setActiveMsgMenuId((prev) => (prev === msg._id ? null : msg._id));
-                              }}
+                              onContextMenu={(e) => handleOpenMsgMenu(e, msg._id)}
                               style={{
                                 background: msg.priority === 'urgent'
                                   ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
@@ -4700,10 +4763,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               <button
                                 type="button"
                                 className="wa-bubble-trigger"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMsgMenuId(activeMsgMenuId === msg._id ? null : msg._id);
-                                }}
+                                onClick={(e) => handleOpenMsgMenu(e, msg._id)}
                                 style={{
                                   position: 'absolute',
                                   top: '3px',
@@ -4729,11 +4789,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                             {/* 3-Second Hold / Options Popup Menu */}
                             {!msg.isDeleted && activeMsgMenuId === msg._id && (() => {
-                              const isNearBottom = msgIndex >= Math.max(0, filteredList.length - 4);
+                              const isUpward = msgMenuUpward[msg._id] !== undefined
+                                ? msgMenuUpward[msg._id]
+                                : (msgIndex >= Math.max(0, filteredList.length - 4));
                               return (
                                 <>
                                   <div
-                                    style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                                    style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setActiveMsgMenuId(null);
@@ -4742,17 +4804,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   <div
                                     style={{
                                       position: 'absolute',
-                                      top: isNearBottom ? 'auto' : '24px',
-                                      bottom: isNearBottom ? '100%' : 'auto',
-                                      marginBottom: isNearBottom ? '8px' : 0,
+                                      top: isUpward ? 'auto' : '24px',
+                                      bottom: isUpward ? 'calc(100% + 4px)' : 'auto',
+                                      marginBottom: isUpward ? '4px' : 0,
                                       right: isMe ? 0 : 'auto',
                                       left: isMe ? 'auto' : 0,
                                       background: '#ffffff',
                                       borderRadius: '10px',
-                                      boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
-                                      zIndex: 50,
+                                      boxShadow: '0 12px 35px rgba(0,0,0,0.25)',
+                                      zIndex: 99999,
                                       minWidth: '190px',
-                                      maxHeight: 'calc(100vh - 140px)',
+                                      maxHeight: 'min(280px, 65vh)',
                                       overflowY: 'auto',
                                       padding: '6px 0',
                                       border: '1.5px solid #bfdbfe',
