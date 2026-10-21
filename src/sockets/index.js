@@ -936,7 +936,15 @@ const setupSockets = (io) => {
           { roomId, senderId: { $ne: userId }, deliveredTo: { $ne: userId } },
           { $addToSet: { deliveredTo: userId } }
         );
-        io.to(String(roomId)).emit('messages-delivered', { roomId, conversationId: roomId, userId });
+        const targetRoom = await ChatRoom.findById(roomId);
+        let broadcast = io.to(String(roomId));
+        if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {
+          targetRoom.members.forEach((m) => {
+            const mIdStr = getMemberIdString(m);
+            if (mIdStr) broadcast = broadcast.to(`user_${mIdStr}`);
+          });
+        }
+        broadcast.emit('messages-delivered', { roomId, conversationId: roomId, userId });
       } catch (err) {
         console.error('Error in sync-delivered:', err);
       }

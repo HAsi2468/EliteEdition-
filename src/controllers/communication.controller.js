@@ -810,15 +810,13 @@ const searchMessages = async (req, res) => {
 
     const limitNum = Math.min(parseInt(limit, 10) || 20, 50);
     const trimmed = q.trim();
+    const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Query messages by text index or regex search
+    // Query messages by case-insensitive regex search
     const query = {
       roomId: { $in: accessibleRoomIds },
       isDeleted: { $ne: true },
-      $or: [
-        { $text: { $search: trimmed } },
-        { content: { $regex: trimmed, $options: 'i' } }
-      ]
+      content: { $regex: escapedQuery, $options: 'i' }
     };
 
     const results = await ChatMessage.find(query)
