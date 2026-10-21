@@ -346,6 +346,10 @@ export default function App() {
   }, []);
 
   const [activeTab, setActiveTab] = useState(initialNav.tab);
+  const activeTabRef = useRef(initialNav.tab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
   const [items, setItems] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
   const [sales, setSales] = useState([]);
@@ -1160,6 +1164,7 @@ export default function App() {
       // NO MORE 60s background polling! 100% Real-time Socket.io events across all screens!
 
       const handleDataRefresh = () => {
+        if (activeTabRef.current === 'communication') return;
         fetchData();
       };
       window.addEventListener('elite-data-refresh', handleDataRefresh);
@@ -1177,6 +1182,13 @@ export default function App() {
       };
     }
   }, [isAuthenticated]);
+
+  // Load initial global data when navigating from communication tab to other department screens
+  useEffect(() => {
+    if (isAuthenticated && activeTab !== 'communication' && items.length === 0 && !api.isClientUser()) {
+      fetchData();
+    }
+  }, [activeTab, isAuthenticated, items.length]);
 
   // Global Socket.io Real-Time Push Notification & Multi-Department Listener
   useEffect(() => {
@@ -1402,6 +1414,16 @@ export default function App() {
       if (clientData) {
         setCurrentUser(clientData);
       }
+      setLoading(false);
+      return;
+    }
+
+    // Performance Optimization: If user is on the Communication/Chat tab, skip heavy inventory, sales, catalog, and parties requests!
+    if (activeTabRef.current === 'communication') {
+      try {
+        const user = await api.refreshCurrentUser();
+        if (user) setCurrentUser(user);
+      } catch (e) {}
       setLoading(false);
       return;
     }

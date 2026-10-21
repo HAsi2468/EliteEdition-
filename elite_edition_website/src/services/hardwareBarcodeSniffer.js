@@ -20,8 +20,8 @@ class HardwareBarcodeSniffer {
   constructor() {
     this.buffer = '';
     this.timestamps = [];
-    this.maxInterKeyDelay = 45; // Max ms between keys for scanner burst
-    this.minBarcodeLength = 3;  // Minimum characters for valid barcode
+    this.maxInterKeyDelay = 35; // Max ms between keys for genuine hardware scanner burst
+    this.minBarcodeLength = 4;  // Minimum characters for valid barcode
     this.subscribers = new Set();
     this.isEnabled = true;
     this.cleanupTimer = null;
@@ -61,6 +61,16 @@ class HardwareBarcodeSniffer {
 
   handleKeyDown(e) {
     if (!this.isEnabled || !e || typeof e.key !== 'string') return;
+
+    // NEVER intercept keystrokes if the user is typing inside an interactive input, textarea, or contenteditable
+    // UNLESS that field specifically opts into hardware scanning via data-barcode-scanner or data-barcode-target
+    const target = e.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || (typeof target.closest === 'function' && target.closest('[contenteditable="true"]')))) {
+      if (!target.dataset || (!target.dataset.barcodeScanner && !target.dataset.barcodeTarget)) {
+        this.resetBuffer();
+        return;
+      }
+    }
 
     // Ignore modifier keys alone
     if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab'].includes(e.key)) {

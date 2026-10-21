@@ -222,9 +222,17 @@
   height: 10px !important;
   border-radius: 50% !important;
   border: 2px solid #ffffff !important;
-  background: #22c55e !important;
+  background: #94a3b8;
   z-index: 2 !important;
   box-sizing: content-box !important;
+}
+
+.phoenix-online-dot.is-online {
+  background: #22c55e !important;
+}
+
+.phoenix-online-dot.is-offline {
+  background: #94a3b8 !important;
 }
 
 /* ─── UNREAD PILL ─── */

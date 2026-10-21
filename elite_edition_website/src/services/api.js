@@ -2619,6 +2619,13 @@ export const api = {
     });
   },
 
+  async editCommunicationMessage(messageId, content) {
+    return request(`/communication/messages/${messageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    });
+  },
+
   async searchCommunicationMessages(query, limit = 20) {
     return request(`/communication/search?q=${encodeURIComponent(query)}&limit=${limit}`);
   },

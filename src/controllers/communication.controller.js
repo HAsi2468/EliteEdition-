@@ -1173,6 +1173,76 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /v1/communication/messages/:messageId
+ * Edit an existing chat message content
+ */
+const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    const userId = req.user ? (req.user._id || req.user.id) : null;
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin =
+      userRole === 'admin' ||
+      userRole === 'super_admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      Boolean(req.user?.isAdmin) ||
+      req.headers['x-is-admin'] === 'true';
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, message: 'Message content cannot be empty' });
+    }
+
+    const message = await ChatMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    if (message.isDeleted) {
+      return res.status(400).json({ success: false, message: 'Cannot edit a deleted message' });
+    }
+
+    const isSender = String(message.senderId) === String(userId);
+    const messageAgeHours = (Date.now() - new Date(message.createdAt).getTime()) / (1000 * 60 * 60);
+
+    if (!isMasterAdmin && (!isSender || messageAgeHours > 24)) {
+      return res.status(403).json({
+        success: false,
+        message: isSender
+          ? 'You can only edit messages within 24 hours of sending.'
+          : 'You do not have permission to edit this message.'
+      });
+    }
+
+    message.content = content.trim();
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    const targetRoomId = message.roomId || message.groupId;
+
+    // Real-time broadcast to room participants
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    if (io && targetRoomId) {
+      io.to(String(targetRoomId)).emit('message-edited', {
+        messageId: message._id,
+        newContent: message.content,
+        roomId: targetRoomId
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Message edited successfully',
+      data: message
+    });
+  } catch (error) {
+    console.error('Error editing message:', error);
+    res.status(500).json({ success: false, message: 'Failed to edit message', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -1189,6 +1259,7 @@ module.exports = {
   createGroup,
   deleteGroup,
   deleteMessage,
+  editMessage,
   searchMessages,
   forceReloadAllUsers,
   clearAllData,

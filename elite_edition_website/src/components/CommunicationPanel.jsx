@@ -79,7 +79,8 @@ import {
   PhoneMissed,
   PhoneCall,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Edit3
 } from 'lucide-react';
 
 function formatFileSize(bytes) {
@@ -197,6 +198,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [onlineUserIds, setOnlineUserIds] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState([]);
   const [isChatDragging, setIsChatDragging] = useState(false);
+  const [isSocketConnected, setIsSocketConnected] = useState(true);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [deleteTargetMsgId, setDeleteTargetMsgId] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -1229,8 +1234,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
-  const handleDeleteMessage = async (messageId) => {
-    if (!window.confirm('Are you sure you want to delete this message? This action cannot be undone.')) return;
+  const handleDeleteMessage = (messageId) => {
+    setDeleteTargetMsgId(messageId);
+  };
+
+  const confirmDeleteMessage = async (messageId) => {
+    if (!messageId) return;
     try {
       const res = await api.deleteCommunicationMessage(messageId);
       if (res.success) {
@@ -1249,6 +1258,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     } catch (err) {
       alert(err.message || 'Failed to delete message');
+    } finally {
+      setDeleteTargetMsgId(null);
     }
   };
 
@@ -1287,6 +1298,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (!socket) return;
 
     const handleConnect = () => {
+      setIsSocketConnected(true);
       if (uId) {
         socket.emit('register-user', uId);
       }
@@ -1295,7 +1307,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     };
 
-    handleConnect();
+    const handleDisconnect = () => {
+      setIsSocketConnected(false);
+    };
+
+    const handleConnectError = () => {
+      setIsSocketConnected(false);
+    };
+
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      setIsSocketConnected(false);
+    }
 
     const handleReceiveMessage = (msg) => {
       const currentActiveId = activeGroupIdRef.current;
@@ -1623,6 +1647,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     };
 
     socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
     socket.on('receive-message', handleReceiveMessage);
     socket.on('message-acknowledged', handleAck);
     socket.on('activity-notification', handleActivity);
@@ -1646,6 +1672,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     return () => {
       socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
       socket.off('receive-message', handleReceiveMessage);
       socket.off('message-acknowledged', handleAck);
       socket.off('activity-notification', handleActivity);
@@ -1668,6 +1696,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('webrtc-ice-candidate', handleWebRtcIceCandidate);
     };
   }, [socket, currentUser]);
+
+  // Fallback 10-second polling when WebSocket is disconnected/reconnecting so delivery ticks and messages update
+  useEffect(() => {
+    if (isSocketConnected || !activeGroup?._id) return;
+    const fallbackPollInterval = setInterval(() => {
+      if (activeGroupIdRef.current) {
+        fetchGroupMessages(activeGroupIdRef.current, msgFilter, false);
+      }
+    }, 10000);
+    return () => clearInterval(fallbackPollInterval);
+  }, [isSocketConnected, activeGroup?._id, msgFilter]);
 
   // Handle global answering from outside tabs (e.g. from App.jsx global call banner)
   useEffect(() => {
@@ -3015,6 +3054,38 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     e.preventDefault();
     if ((!inputMessage.trim() && !attachedFile) || !activeGroup) return;
 
+    if (editingMessage) {
+      const msgId = editingMessage._id;
+      const editedContent = inputMessage.trim();
+      if (!editedContent) return;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          String(m._id) === String(msgId)
+            ? { ...m, content: editedContent, isEdited: true }
+            : m
+        )
+      );
+
+      if (api.editCommunicationMessage) {
+        api.editCommunicationMessage(msgId, editedContent).catch((err) => {
+          console.warn('HTTP edit message error, socket fallback active:', err.message);
+        });
+      }
+
+      if (socket && activeGroup?._id) {
+        socket.emit('edit-message', {
+          messageId: msgId,
+          newContent: editedContent,
+          roomId: activeGroup._id
+        });
+      }
+
+      setEditingMessage(null);
+      setInputMessage('');
+      return;
+    }
+
     const senderId = currentUser?.id || currentUser?._id;
     if (!senderId) {
       alert('User session not loaded. Please log in again.');
@@ -3579,7 +3650,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: 'var(--text-primary, #141824)', letterSpacing: '-0.02em' }}>
                 Chats
               </h2>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#25b865', display: 'inline-block' }} title="Live Presence Active" />
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: isSocketConnected ? '#25b865' : '#f59e0b',
+                  display: 'inline-block'
+                }}
+                title={isSocketConnected ? "Live Presence Active" : "Reconnecting to server..."}
+              />
+              {!isSocketConnected && (
+                <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 700 }}>
+                  Reconnecting...
+                </span>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -3747,10 +3832,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       )}
                       {isDirect && (() => {
                         const colleagueId = colleague?._id || colleague?.id;
-                        const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
+                        const isOnline = colleagueId ? (
+                          onlineUserIds.has(String(colleagueId)) ||
+                          Boolean(colleague?.lastSeen && (Date.now() - new Date(colleague.lastSeen).getTime() < 2 * 60 * 1000))
+                        ) : false;
                         return (
                           <span
-                            className="phoenix-online-dot"
+                            className={`phoenix-online-dot ${isOnline ? 'is-online' : 'is-offline'}`}
                             style={{
                               background: isOnline ? '#22c55e' : '#94a3b8',
                               borderColor: 'var(--bg-card, #ffffff)'
@@ -3952,10 +4040,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           )}
                           {isDirect && (() => {
                             const colleagueId = colleague?._id || colleague?.id;
-                            const isOnline = colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
+                            const isOnline = colleagueId ? (
+                              onlineUserIds.has(String(colleagueId)) ||
+                              Boolean(colleague?.lastSeen && (Date.now() - new Date(colleague.lastSeen).getTime() < 2 * 60 * 1000))
+                            ) : false;
                             return (
                               <span
-                                className="phoenix-online-dot"
+                                className={`phoenix-online-dot ${isOnline ? 'is-online' : 'is-offline'}`}
                                 style={{
                                   background: isOnline ? '#22c55e' : '#94a3b8',
                                   borderColor: 'var(--bg-card, #ffffff)'
@@ -3999,7 +4090,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                           {(() => {
                             const colleagueId = colleague?._id || colleague?.id;
-                            const isOnline = isDirect && colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
+                            const isOnline = isDirect && colleagueId ? (
+                              onlineUserIds.has(String(colleagueId)) ||
+                              Boolean(colleague?.lastSeen && (Date.now() - new Date(colleague.lastSeen).getTime() < 2 * 60 * 1000))
+                            ) : false;
                             if (isDirect) {
                               return (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
@@ -4589,6 +4683,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 fontSize: '0.88rem',
                                 lineHeight: 1.5,
                                 wordBreak: 'break-word',
+                                overflowWrap: 'anywhere',
+                                whiteSpace: 'pre-wrap',
+                                maxWidth: '100%',
                                 position: 'relative',
                                 minWidth: '75px'
                               }}
@@ -4626,33 +4723,38 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             )}
 
                             {/* 3-Second Hold / Options Popup Menu */}
-                            {!msg.isDeleted && activeMsgMenuId === msg._id && (
-                              <>
-                                <div
-                                  style={{ position: 'fixed', inset: 0, zIndex: 49 }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMsgMenuId(null);
-                                  }}
-                                />
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    top: msgIndex >= filteredList.length - 3 ? 'auto' : '24px',
-                                    bottom: msgIndex >= filteredList.length - 3 ? '28px' : 'auto',
-                                    right: isMe ? 0 : 'auto',
-                                    left: isMe ? 'auto' : 0,
-                                    background: '#ffffff',
-                                    borderRadius: '10px',
-                                    boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
-                                    zIndex: 50,
-                                    minWidth: '190px',
-                                    padding: '6px 0',
-                                    border: '1.5px solid #bfdbfe',
-                                    animation: 'fadeIn 0.15s ease'
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
+                            {!msg.isDeleted && activeMsgMenuId === msg._id && (() => {
+                              const isNearBottom = msgIndex >= Math.max(0, filteredList.length - 4);
+                              return (
+                                <>
+                                  <div
+                                    style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveMsgMenuId(null);
+                                    }}
+                                  />
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: isNearBottom ? 'auto' : '24px',
+                                      bottom: isNearBottom ? '100%' : 'auto',
+                                      marginBottom: isNearBottom ? '8px' : 0,
+                                      right: isMe ? 0 : 'auto',
+                                      left: isMe ? 'auto' : 0,
+                                      background: '#ffffff',
+                                      borderRadius: '10px',
+                                      boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
+                                      zIndex: 50,
+                                      minWidth: '190px',
+                                      maxHeight: 'calc(100vh - 140px)',
+                                      overflowY: 'auto',
+                                      padding: '6px 0',
+                                      border: '1.5px solid #bfdbfe',
+                                      animation: 'fadeIn 0.15s ease'
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                   {/* Quick Reactions Bar */}
                                   <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>
                                     {['👍', '❤️', '😂', '😮', '😢', '🙏', '👏', '🔥'].map((emo) => (
@@ -4707,6 +4809,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     <span>{msg.isPinned ? 'Unpin message' : 'Pin message'}</span>
                                   </button>
 
+                                  {isSender && !msg.isDeleted && !isPollMsg && !isCallLog && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMsgMenuId(null);
+                                        setEditingMessage(msg);
+                                        setInputMessage(msg.content || '');
+                                        if (chatTextareaRef.current) {
+                                          chatTextareaRef.current.focus();
+                                        }
+                                      }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                    >
+                                      <Edit3 size={14} color="#0284c7" />
+                                      <span>Edit Message</span>
+                                    </button>
+                                  )}
+
                                   {msg.content && (
                                     <button
                                       type="button"
@@ -4738,7 +4858,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   )}
                                 </div>
                               </>
-                            )}
+                            );
+                          })()}
 
                             {/* Bubble Content */}
                             {msg.isDeleted ? (
@@ -5315,8 +5436,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             )}
 
                             {/* Text Content + Inline Timestamp & Read Ticks */}
-                            <div style={{ fontSize: '0.88rem', lineHeight: '1.42', color: 'inherit' }}>
+                            <div style={{
+                              fontSize: '0.88rem',
+                              lineHeight: '1.42',
+                              color: 'inherit',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              overflowWrap: 'anywhere',
+                              maxWidth: '100%',
+                              minWidth: 0
+                            }}>
                               {!isPollMsg && renderContentWithMentions(msg.content)}
+                              {msg.isEdited && (
+                                <span style={{ fontSize: '0.68rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
+                                  (edited)
+                                </span>
+                              )}
                             </div>
                               </>
                             )}
@@ -5613,6 +5748,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               )}
 
+              {/* Editing Message Banner */}
+              {editingMessage && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 12px',
+                    background: '#eff6ff',
+                    border: '1.5px solid #bfdbfe',
+                    borderRadius: '8px',
+                    marginBottom: '6px',
+                    fontSize: '0.8rem',
+                    color: '#1d4ed8',
+                    animation: 'fadeIn 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                    <Edit3 size={14} color="#2563eb" />
+                    <span style={{ fontWeight: 800 }}>Editing:</span>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px', color: '#475569' }}>
+                      {editingMessage.content}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMessage(null);
+                      setInputMessage('');
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: '2px' }}
+                    title="Cancel editing"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
               {/* Chat Input Form (Compact Modern Single-Row SaaS Bar) */}
               <form
                 onSubmit={handleSendMessage}
@@ -5900,15 +6073,74 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <Paperclip size={16} />
                           </button>
 
-                          <button
-                            type="button"
-                            className="phoenix-toolbar-icon"
-                            title="Emoji"
-                            onClick={() => setInputMessage((prev) => prev + ' 😊')}
-                            style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
-                          >
-                            <Smile size={16} />
-                          </button>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              className="phoenix-toolbar-icon"
+                              title="Emoji Picker"
+                              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                              style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}
+                            >
+                              <Smile size={16} />
+                            </button>
+
+                            {showEmojiPicker && (
+                              <>
+                                <div
+                                  style={{ position: 'fixed', inset: 0, zIndex: 99990 }}
+                                  onClick={() => setShowEmojiPicker(false)}
+                                />
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: '100%',
+                                    left: 0,
+                                    marginBottom: '8px',
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 10px 25px rgba(0,0,0,0.18)',
+                                    zIndex: 99995,
+                                    padding: '8px',
+                                    width: '280px',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(7, 1fr)',
+                                    gap: '4px',
+                                    animation: 'fadeIn 0.15s ease'
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {[
+                                    '😊', '😂', '👍', '❤️', '🔥', '🎉', '👏',
+                                    '🙏', '✨', '🚀', '💯', '🤝', '✅', '❌',
+                                    '⚠️', '💡', '📦', '📄', '📞', '💬', '⏳',
+                                    '🎯', '😎', '🤩', '🤔', '😴', '🤐', '🙋‍♂️'
+                                  ].map((emo) => (
+                                    <button
+                                      key={emo}
+                                      type="button"
+                                      onClick={() => {
+                                        setInputMessage((prev) => prev + emo);
+                                        if (chatTextareaRef.current) chatTextareaRef.current.focus();
+                                      }}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        fontSize: '1.25rem',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '6px',
+                                        textAlign: 'center'
+                                      }}
+                                      title={emo}
+                                    >
+                                      {emo}
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>
@@ -7769,6 +8001,87 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           </div>
         </div>,
         document.body
+      )}
+
+      {/* In-App Delete Message Confirmation Modal */}
+      {deleteTargetMsgId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '1rem'
+          }}
+          onClick={() => setDeleteTargetMsgId(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '14px',
+              padding: '1.4rem',
+              maxWidth: '380px',
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              animation: 'fadeIn 0.15s ease'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.75rem' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', flexShrink: 0 }}>
+                <Trash2 size={18} />
+              </div>
+              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Delete Message?</h4>
+            </div>
+            <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
+              Are you sure you want to delete this message? It will be removed for everyone in this chat.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteTargetMsgId(null)}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '7px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = deleteTargetMsgId;
+                  setDeleteTargetMsgId(null);
+                  confirmDeleteMessage(id);
+                }}
+                style={{
+                  padding: '7px 16px',
+                  borderRadius: '7px',
+                  border: 'none',
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* WebRTC Remote Audio Player (auto-plays incoming voice on speaker) */}
