@@ -161,7 +161,9 @@ fabricTransactionSchema.pre('save', async function () {
 });
 
 // ── Indexes for query optimization ──
-// Stock overview & panna grouping (getStockOverview, getStockByPanna, getTransactions)
+// Department-scoped stock overview, transactions & grouping
+fabricTransactionSchema.index({ department: 1, type: 1, date: -1 });
+fabricTransactionSchema.index({ department: 1, fabricQuality: 1 });
 fabricTransactionSchema.index({ type: 1, department: 1 });
 // Lot stock lookup (getLotStock, fabricChallan lot queries)
 fabricTransactionSchema.index({ fabricQuality: 1, panna: 1, type: 1 });

@@ -784,65 +784,89 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     });
   }, [isInwardOpen, inwardForm.vendorName, inwardForm.challanNo, inwardForm.fabricQuality, inwardForm.panna, inwardForm.qty, inwardForm.date, transactions, editingTransaction]);
 
+  const fetchActiveJobCards = async () => {
+    try {
+      const jRes = await api.getJobCards({
+        status: 'In Progress',
+        skipStats: 'true',
+        limit: 300
+      });
+      if (jRes && jRes.data) setInProgressJobCards(jRes.data);
+    } catch (e) {
+      console.warn('Failed to fetch job cards for fabric dropdown', e);
+    }
+  };
+
   const fetchData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     setError('');
     try {
-      const cfg = await api.getPrintConfig();
-      if (cfg && Array.isArray(cfg.fabrics)) {
-        setFabricsList(cfg.fabrics);
-      } else if (cfg && cfg.fabrics) {
-        setFabricsList(Object.keys(cfg.fabrics));
+      const [
+        cfgRes,
+        vRes,
+        stockRes,
+        transRes,
+        pannaRes,
+        ltRes
+      ] = await Promise.allSettled([
+        api.getPrintConfig(),
+        api.getFabricVendors(),
+        api.getFabricStock({ department }),
+        api.getFabricTransactions({ department }),
+        api.getFabricStockByPanna({ department }),
+        api.getLotTransfers()
+      ]);
+
+      if (cfgRes.status === 'fulfilled' && cfgRes.value) {
+        const cfg = cfgRes.value;
+        if (Array.isArray(cfg.fabrics)) {
+          setFabricsList(cfg.fabrics);
+        } else if (cfg.fabrics) {
+          setFabricsList(Object.keys(cfg.fabrics));
+        }
+        if (cfg.parties) setPartiesList(cfg.parties);
+        if (cfg.widths) {
+          const defaultWidths = ['58', '44', '36'];
+          const cleanWidths = cfg.widths.map(w => String(w).replace(/['"]/g, '')).filter(Boolean);
+          const combined = Array.from(new Set([...defaultWidths, ...cleanWidths]));
+          setWidthsList(combined);
+        } else {
+          setWidthsList(['58', '44', '36']);
+        }
+        if (cfg.billToOptions) setBillToOptions(cfg.billToOptions);
+        if (cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
+        if (Array.isArray(cfg.deliveryOptions) && cfg.deliveryOptions.length > 0) {
+          setDeliveryByOptions(cfg.deliveryOptions);
+        }
+        if (cfg.lotPartyMap) setLotPartyMap(cfg.lotPartyMap);
       }
 
-      try {
-        const vRes = await api.getFabricVendors();
-        if (vRes) setVendorsList(vRes);
-      } catch (e) {
-        console.warn('Failed to fetch fabric vendors', e);
+      if (vRes.status === 'fulfilled' && vRes.value) {
+        setVendorsList(vRes.value);
       }
 
-      if (cfg && cfg.parties) setPartiesList(cfg.parties);
-      if (cfg && cfg.widths) {
-        const defaultWidths = ['58', '44', '36'];
-        const cleanWidths = cfg.widths.map(w => String(w).replace(/['"]/g, '')).filter(Boolean);
-        const combined = Array.from(new Set([...defaultWidths, ...cleanWidths]));
-        setWidthsList(combined);
-      } else {
-        setWidthsList(['58', '44', '36']);
-      }
-      if (cfg && cfg.billToOptions) setBillToOptions(cfg.billToOptions);
-      if (cfg && cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
-      if (cfg && Array.isArray(cfg.deliveryOptions) && cfg.deliveryOptions.length > 0) {
-        setDeliveryByOptions(cfg.deliveryOptions);
-      }
-      if (cfg && cfg.lotPartyMap) setLotPartyMap(cfg.lotPartyMap);
-
-      try {
-        const jRes = await api.getJobCards({ limit: 5000 });
-        if (jRes && jRes.data) setInProgressJobCards(jRes.data);
-      } catch (e) {
-        console.warn('Failed to fetch job cards', e);
+      if (stockRes.status === 'fulfilled' && stockRes.value?.success) {
+        setStock(stockRes.value.data || []);
       }
 
-      const stockRes = await api.getFabricStock({ department });
-      if (stockRes.success) setStock(stockRes.data);
+      if (transRes.status === 'fulfilled' && transRes.value?.success) {
+        setTransactions(transRes.value.data || []);
+      }
 
-      const transRes = await api.getFabricTransactions({ department });
-      if (transRes.success) setTransactions(transRes.data);
+      if (pannaRes.status === 'fulfilled' && pannaRes.value?.success) {
+        setPannaStock(pannaRes.value.data || []);
+      }
 
-      // Panna-wise stock
-      try {
-        const pRes = await api.getFabricStockByPanna({ department });
-        if (pRes && pRes.success) setPannaStock(pRes.data || []);
-      } catch (e) { console.warn('Failed to fetch panna stock', e); }
+      if (ltRes.status === 'fulfilled' && ltRes.value?.success) {
+        setLotTransfers(ltRes.value.data || []);
+      }
 
-      // Lot Transfers
-      try {
-        const ltRes = await api.getLotTransfers();
-        if (ltRes && ltRes.success) setLotTransfers(ltRes.data || []);
-      } catch (e) { console.warn('Failed to fetch lot transfers', e); }
-
+      // Preload active job cards in background without blocking screen render
+      if (inProgressJobCards.length === 0) {
+        setTimeout(() => {
+          fetchActiveJobCards();
+        }, 150);
+      }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to load fabric inventory data.');
     } finally {
@@ -906,18 +930,23 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   useEffect(() => {
     fetchData(false);
-    fetchRequirement(false);
-    fetchChallans();
-    fetchStockAdjustments();
+    if (activeTab === 'requirement') {
+      fetchRequirement(false);
+    }
+    // Defer adjustments fetch so main stock displays immediately
+    const adjTimer = setTimeout(() => {
+      fetchStockAdjustments();
+    }, 300);
+
     const intervalId = setInterval(() => {
       // Pause polling if browser tab is hidden
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       fetchData(true);
-      fetchRequirement(true);
-      // NOTE: fetchChallans is intentionally excluded here.
-      // It has its own useEffect that fires on challanSearch/date changes.
+      if (activeTab === 'requirement') {
+        fetchRequirement(true);
+      }
       fetchStockAdjustments();
-    }, 120000); // 120s auto-sync interval (relies primarily on real-time event bus)
+    }, 120000); // 120s auto-sync interval
 
     const handleDataRefresh = () => {
       fetchData(true);
@@ -928,6 +957,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
     return () => {
+      clearTimeout(adjTimer);
       clearInterval(intervalId);
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
     };
@@ -939,6 +969,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       fetchRequirement(false);
     }
   }, [activeTab]);
+
+  // On-demand loader: ensure active job cards are loaded whenever Outward/Challan modals are opened
+  useEffect(() => {
+    if ((isInwardOpen || isOutwardOpen || isChallanOpen || activeTab === 'challans') && inProgressJobCards.length === 0) {
+      fetchActiveJobCards();
+    }
+  }, [isInwardOpen, isOutwardOpen, isChallanOpen, activeTab, inProgressJobCards.length]);
 
   // ─── Fetch ALL lots (no filter) — client side will filter by fabric ───
   const fetchAllLots = async () => {

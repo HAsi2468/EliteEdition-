@@ -139,6 +139,11 @@ const billingInvoiceSchema = new mongoose.Schema(
 // ── Indexes for query optimization & idempotency ──
 // Business key idempotency: prevent duplicate invoices per company
 billingInvoiceSchema.index({ companyEntity: 1, invoiceNo: 1 }, { unique: true });
+// Company-scoped query, sort & stats indexes
+billingInvoiceSchema.index({ companyEntity: 1, invoiceSeq: -1, created_at: -1 });
+billingInvoiceSchema.index({ companyEntity: 1, paymentStatus: 1 });
+billingInvoiceSchema.index({ companyEntity: 1, invoiceDate: -1 });
+billingInvoiceSchema.index({ companyEntity: 1, 'customer.name': 1 });
 // Date-sorted invoice listing
 billingInvoiceSchema.index({ invoiceDate: -1 });
 // Filter by PAID/UNPAID

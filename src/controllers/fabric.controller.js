@@ -311,7 +311,7 @@ const getTransactions = async (req, res) => {
     if (req.query.type) {
       filter.type = req.query.type;
     }
-    let query = FabricTransaction.find(filter).sort({ date: -1, createdAt: -1 });
+    let query = FabricTransaction.find(filter).sort({ date: -1, createdAt: -1 }).lean();
     if (req.query.limit) {
       query = query.limit(parseInt(req.query.limit, 10));
     }
@@ -723,7 +723,10 @@ const getFabricRequirement = async (req, res) => {
       jobFilter.department = { $in: [dept, new RegExp(`^${dept}$`, 'i')] };
     }
 
-    const jobs = await JobCard.find(jobFilter).sort({ jobNo: 1 }).lean();
+    const jobs = await JobCard.find(jobFilter)
+      .select('jobNo fabric panna totalMtr consumption pcs printMtr party priority dispatchDate deliveryDate department status printStatus')
+      .sort({ jobNo: 1 })
+      .lean();
 
     // Group requirement by fabric + panna
     const requirementMap = {};

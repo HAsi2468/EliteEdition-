@@ -2896,14 +2896,19 @@ export default function EliteBillingDepartment({
     terms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.'
   });
 
-  // ── Fetch Initial Data ─────────────────────────────────────────────────────
-  const loadData = async () => {
-    setLoading(true);
-    setError('');
+  // ── Debounced Search to Prevent Request Flooding ───────────────────────────
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // ── Fetch Master Data (Customers, Items, Vendors) ──────────────────────────
+  const fetchMasterData = async () => {
     try {
-      const [sRes, iRes, cRes, itemRes, vRes] = await Promise.all([
-        api.getBillingDashboardStats(companyEntity),
-        api.getBillingInvoices({ companyEntity, search, paymentStatus: statusFilter }),
+      const [cRes, itemRes, vRes] = await Promise.all([
         api.getBillingCustomers(companyEntity),
         api.getBillingItems(companyEntity),
         api.getBillingVendors(companyEntity).catch(err => {
@@ -2912,8 +2917,6 @@ export default function EliteBillingDepartment({
         })
       ]);
 
-      if (sRes?.data) setStats(sRes.data);
-      if (iRes?.data) setInvoices(Array.isArray(iRes.data) ? iRes.data : []);
       if (cRes?.data) setCustomers(Array.isArray(cRes.data) ? cRes.data : []);
       if (itemRes?.data) setItemsList(Array.isArray(itemRes.data) ? itemRes.data : []);
       if (vRes) {
@@ -2921,25 +2924,63 @@ export default function EliteBillingDepartment({
         setVendorsList(vData);
       }
     } catch (err) {
+      console.warn('Billing master data load warning:', err);
+    }
+  };
+
+  // ── Fetch Invoices & Dashboard Stats ──────────────────────────────────────
+  const fetchInvoicesAndStats = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    setError('');
+    try {
+      const [sRes, iRes] = await Promise.all([
+        api.getBillingDashboardStats(companyEntity),
+        api.getBillingInvoices({ companyEntity, search: debouncedSearch, paymentStatus: statusFilter })
+      ]);
+
+      if (sRes?.data) setStats(sRes.data);
+      if (iRes?.data) setInvoices(Array.isArray(iRes.data) ? iRes.data : []);
+    } catch (err) {
+      if (!isSilent) setError(err.message || 'Failed to load billing invoices');
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await Promise.all([
+        fetchInvoicesAndStats(true),
+        fetchMasterData()
+      ]);
+    } catch (err) {
       setError(err.message || 'Failed to load billing data');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchInvoices = loadData;
+  const fetchInvoices = fetchInvoicesAndStats;
 
+  // Master data only needs to be fetched on companyEntity change
   useEffect(() => {
-    loadData();
-  }, [search, statusFilter, companyEntity]);
+    fetchMasterData();
+  }, [companyEntity]);
+
+  // Invoices & Stats fetch on debouncedSearch, statusFilter, or companyEntity
+  useEffect(() => {
+    fetchInvoicesAndStats(false);
+  }, [debouncedSearch, statusFilter, companyEntity]);
 
   useEffect(() => {
     const handleBillingDataRefresh = () => {
-      loadData();
+      fetchInvoicesAndStats(true);
     };
     window.addEventListener('elite-data-refresh', handleBillingDataRefresh);
     return () => window.removeEventListener('elite-data-refresh', handleBillingDataRefresh);
-  }, [search, statusFilter, companyEntity]);
+  }, [debouncedSearch, statusFilter, companyEntity]);
 
   // Auto-populate Invoice from Challan with Saved Customer Auto-Selection & Multi-Challan Merging
   const loadInvoiceFromChallan = async (chInput) => {

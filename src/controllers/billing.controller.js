@@ -117,44 +117,67 @@ const getBillingDashboardStats = async (req, res) => {
   try {
     const { companyEntity } = req.query;
     const filter = buildCompanyFilter(companyEntity);
-
-    const totalInvoices = await BillingInvoice.countDocuments(filter);
-    const invoices = await BillingInvoice.find(filter).lean();
-
-    let totalInvoiced = 0;
-    let totalPaid = 0;
-    let totalBalanceDue = 0;
-    let paidCount = 0;
-    let unpaidCount = 0;
-    let overdueCount = 0;
-
     const now = new Date();
 
-    invoices.forEach(inv => {
-      totalInvoiced += inv.grandTotal || 0;
-      totalPaid += inv.paidAmount || 0;
-      totalBalanceDue += inv.balanceDue || 0;
-
-      if (inv.paymentStatus === 'PAID') {
-        paidCount++;
-      } else {
-        unpaidCount++;
-        if (inv.dueDate && new Date(inv.dueDate) < now) {
-          overdueCount++;
+    const [totalInvoices, statsAgg] = await Promise.all([
+      BillingInvoice.countDocuments(filter),
+      BillingInvoice.aggregate([
+        { $match: filter },
+        {
+          $group: {
+            _id: null,
+            totalInvoiced: { $sum: { $ifNull: ['$grandTotal', 0] } },
+            totalPaid: { $sum: { $ifNull: ['$paidAmount', 0] } },
+            totalBalanceDue: { $sum: { $ifNull: ['$balanceDue', 0] } },
+            paidCount: {
+              $sum: { $cond: [{ $eq: ['$paymentStatus', 'PAID'] }, 1, 0] }
+            },
+            unpaidCount: {
+              $sum: { $cond: [{ $ne: ['$paymentStatus', 'PAID'] }, 1, 0] }
+            },
+            partiallyPaidCount: {
+              $sum: { $cond: [{ $eq: ['$paymentStatus', 'PARTIALLY_PAID'] }, 1, 0] }
+            },
+            overdueCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ['$paymentStatus', 'PAID'] },
+                      { $ne: ['$dueDate', null] },
+                      { $lt: ['$dueDate', now] }
+                    ]
+                  },
+                  1,
+                  0
+                ]
+              }
+            }
+          }
         }
-      }
-    });
+      ])
+    ]);
+
+    const s = (statsAgg && statsAgg[0]) ? statsAgg[0] : {};
+    const totalInvoiced = parseFloat((s.totalInvoiced || 0).toFixed(2));
+    const totalPaid = parseFloat((s.totalPaid || 0).toFixed(2));
+    const totalBalanceDue = parseFloat((s.totalBalanceDue || 0).toFixed(2));
 
     res.json({
       success: true,
       data: {
         totalInvoices,
-        totalInvoiced: parseFloat(totalInvoiced.toFixed(2)),
-        totalPaid: parseFloat(totalPaid.toFixed(2)),
-        totalBalanceDue: parseFloat(totalBalanceDue.toFixed(2)),
-        paidCount,
-        unpaidCount,
-        overdueCount
+        invoiceCount: totalInvoices,
+        totalRevenue: totalInvoiced,
+        totalInvoiced,
+        totalPaid,
+        totalBalanceDue,
+        paidAmount: totalPaid,
+        balanceDue: totalBalanceDue,
+        paidCount: s.paidCount || 0,
+        unpaidCount: s.unpaidCount || 0,
+        partiallyPaidCount: s.partiallyPaidCount || 0,
+        overdueCount: s.overdueCount || 0
       }
     });
   } catch (error) {
@@ -299,15 +322,18 @@ const getInvoices = async (req, res) => {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const invoices = await BillingInvoice.find(filter)
-      .sort({ invoiceSeq: -1, created_at: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    const [invoices, total] = await Promise.all([
+      BillingInvoice.find(filter)
+        .sort({ invoiceSeq: -1, created_at: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      BillingInvoice.countDocuments(filter)
+    ]);
 
-    const total = await BillingInvoice.countDocuments(filter);
-
-    await enrichInvoiceItemsWithImages(invoices);
+    if (req.query.enrichImages === 'true') {
+      await enrichInvoiceItemsWithImages(invoices);
+    }
 
     res.json({
       success: true,
