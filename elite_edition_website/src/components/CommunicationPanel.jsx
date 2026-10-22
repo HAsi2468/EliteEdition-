@@ -5063,45 +5063,77 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   }
 
                   const sortedList = [...filteredList].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
-                  let lastDateHeader = '';
 
-                  return sortedList.map((msg, msgIndex) => {
-                    const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
-                    const isSystemActivity = msg.msgType === 'system_activity';
+                  // Group messages by day for native WhatsApp/iOS floating sticky date headers
+                  const dayGroups = [];
+                  let curGroup = null;
 
-                    // Compute Date Header
-                    const msgDateHeader = formatMessageDateHeader(msg.createdAt);
-                    const showDateHeader = msgDateHeader && msgDateHeader !== lastDateHeader;
-                    if (showDateHeader) {
-                      lastDateHeader = msgDateHeader;
+                  sortedList.forEach((msg) => {
+                    const dateHeader = formatMessageDateHeader(msg.createdAt);
+                    if (!curGroup || curGroup.dateHeader !== dateHeader) {
+                      curGroup = {
+                        dateHeader,
+                        key: `day_${dateHeader}_${msg._id}`,
+                        messages: []
+                      };
+                      dayGroups.push(curGroup);
                     }
+                    curGroup.messages.push(msg);
+                  });
 
-                    if (isSystemActivity) {
-                      const actBadge = getActionBadgeStyle(msg.actionType);
-                      return (
-                        <React.Fragment key={msg._id}>
-                          {showDateHeader && (
-                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '1rem 0 0.5rem', width: '100%', clear: 'both' }}>
-                              <span className="phoenix-date-badge">
-                                {msgDateHeader}
-                              </span>
-                            </div>
-                          )}
+                  return dayGroups.map((group) => (
+                    <div
+                      key={group.key}
+                      className="phoenix-day-group"
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}
+                    >
+                      {/* WhatsApp / Telegram Floating Sticky Date Header (constrained by parent day group) */}
+                      <div
+                        className="phoenix-sticky-date-wrapper"
+                        style={{
+                          position: 'sticky',
+                          top: 4,
+                          zIndex: 10,
+                          display: 'flex',
+                          justifyContent: 'center',
+                          padding: '6px 0',
+                          pointerEvents: 'none',
+                          width: '100%'
+                        }}
+                      >
+                        <span className="phoenix-date-badge">
+                          {group.dateHeader}
+                        </span>
+                      </div>
 
-                          <div
-                            style={{
-                              alignSelf: 'center',
-                              width: '100%',
-                              maxWidth: '720px',
-                              background: 'var(--bg-card)',
-                              border: `1px solid ${actBadge.border}`,
-                              borderLeft: `4px solid ${actBadge.color}`,
-                              borderRadius: '10px',
-                              padding: '0.75rem 1rem',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                              margin: '0.2rem 0'
-                            }}
-                          >
+                      {group.messages.map((msg, msgIndex) => {
+                        const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
+                        const isSystemActivity = msg.msgType === 'system_activity';
+
+                        if (isSystemActivity) {
+                          const actBadge = getActionBadgeStyle(msg.actionType);
+                          return (
+                            <div
+                              key={msg._id}
+                              style={{
+                                alignSelf: 'center',
+                                width: '100%',
+                                maxWidth: '720px',
+                                background: 'var(--bg-card)',
+                                border: `1px solid ${actBadge.border}`,
+                                borderLeft: `4px solid ${actBadge.color}`,
+                                borderRadius: '10px',
+                                padding: '0.75rem 1rem',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                                margin: '0.2rem 0'
+                              }}
+                            >
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                 <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', background: actBadge.bg, color: actBadge.color, border: `1px solid ${actBadge.border}` }}>
@@ -5148,9 +5180,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               </div>
                             </div>
                           </div>
-                        </React.Fragment>
-                      );
-                    }
+                        );
+                      }
 
                     const isAudioMsg = msg.type === 'audio-voice' || (msg.attachment && msg.attachment.fileType === 'audio');
                     const isRecordCard = msg.type === 'record-card' || Boolean(msg.activityMeta && msg.activityMeta.module);
@@ -5184,19 +5215,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     const canDelete = !msg.isDeleted && (isAdmin || (isSender && isWithin24h));
 
                     return (
-                      <React.Fragment key={msg._id}>
-                        {showDateHeader && (
-                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '1rem 0 0.5rem', width: '100%', clear: 'both' }}>
-                            <span className="phoenix-date-badge">
-                              {msgDateHeader}
-                            </span>
-                          </div>
-                        )}
-
-                        <div
-                          id={`msg_${msg._id}`}
-                          data-msg-id={msg._id}
-                          onTouchStart={(e) => {
+                      <div
+                        key={msg._id}
+                        id={`msg_${msg._id}`}
+                        data-msg-id={msg._id}
+                        onTouchStart={(e) => {
                             if (isMobileScreen) {
                               touchStartXRef.current = e.touches[0].clientX;
                             }
@@ -6234,12 +6257,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             </div>
                           )}
 
-                          </div>
-                        </div>
-                      </React.Fragment>
-                    );
-                  });
-                })()}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
                 </ErrorBoundary>
                 <div ref={chatBottomRef} />
               </div>
