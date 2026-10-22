@@ -219,7 +219,10 @@ function normalizeRef(ref) {
 /**
  * Automated 3-Way Reconciliation Matching Engine
  */
-function reconcileTransactions(statementItems = [], erpItems = [], partyType = 'customer') {
+function reconcileTransactions(statementItems = [], erpItems = [], partyType = 'customer', options = {}) {
+  const toleranceDays = Number(options.toleranceDays) || 20;
+  const toleranceAmount = Number(options.toleranceAmount) || 1.0;
+
   const matchedItems = [];
   const probableItems = [];
   const discrepantItems = [];
@@ -249,7 +252,7 @@ function reconcileTransactions(statementItems = [], erpItems = [], partyType = '
       const erpAmt = getNetVal(erpMatch);
       const diff = Math.abs(stAmt - erpAmt);
 
-      if (diff <= 1.0) {
+      if (diff <= toleranceAmount) {
         // Full Match
         stItem._matched = true;
         erpMatch._matched = true;
@@ -305,14 +308,14 @@ function reconcileTransactions(statementItems = [], erpItems = [], partyType = '
       if (erp._matched) return false;
       const erpAmt = getNetVal(erp);
       const diff = Math.abs(stAmt - erpAmt);
-      if (diff > 1.0) return false;
+      if (diff > toleranceAmount) return false;
 
-      // Check date proximity if available (within 15 days)
+      // Check date proximity if available (within specified toleranceDays)
       if (stItem.date && erp.date) {
         const d1 = new Date(stItem.date);
         const d2 = new Date(erp.date);
         const daysDiff = Math.abs((d1 - d2) / (1000 * 60 * 60 * 24));
-        return daysDiff <= 20;
+        return daysDiff <= toleranceDays;
       }
       return true;
     });

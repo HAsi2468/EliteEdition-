@@ -197,11 +197,12 @@ async function investigateDiscrepancies({
   variance,
   unmatchedStatementItems,
   unmatchedErpItems,
-  discrepantItems
+  discrepantItems,
+  userPrompt = ''
 }) {
   const systemPrompt = `You are a Principal Forensic Accountant and Auditor for Elite Edition, a high-volume textile and garment manufacturing ERP.
 Analyze the following reconciliation discrepancy report between our internal ERP books and the external statement received from the party.
-
+${userPrompt ? `\nUSER SPECIFIC DIRECTIVES & AUDIT FOCUS:\n"${userPrompt}"\nPlease pay special attention to the user directives above during your analysis.\n` : ''}
 PARTY: ${partyName} (${partyType.toUpperCase()})
 ERP Balance: ₹${erpClosingBalance}
 Statement Balance: ₹${statementClosingBalance}

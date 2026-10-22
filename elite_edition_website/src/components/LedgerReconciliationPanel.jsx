@@ -22,7 +22,9 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Filter,
-  Edit2
+  Edit2,
+  Play,
+  FileSpreadsheet
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { api } from '../services/api';
@@ -34,8 +36,8 @@ const fmtINR = (val) => {
 };
 
 export default function LedgerReconciliationPanel() {
-  // ── Statement 1 State (Book A) ─────────────────────────────────────────────
-  const [stmt1Name, setStmt1Name] = useState('Statement 1 (Book A / Internal Ledger)');
+  // ── Elite Files State (Book A) ─────────────────────────────────────────────
+  const [stmt1Name, setStmt1Name] = useState('Elite Files');
   const [stmt1Mode, setStmt1Mode] = useState('file'); // 'file', 'text', 'manual'
   const [stmt1File, setStmt1File] = useState(null);
   const [stmt1Base64, setStmt1Base64] = useState('');
@@ -46,8 +48,8 @@ export default function LedgerReconciliationPanel() {
   const fileInputRef1 = useRef(null);
   const isParsing1Ref = useRef(false);
 
-  // ── Statement 2 State (Book B) ─────────────────────────────────────────────
-  const [stmt2Name, setStmt2Name] = useState('Statement 2 (Book B / Counterparty / Bank)');
+  // ── Party / Vendor OR Other file State (Book B) ─────────────────────────────
+  const [stmt2Name, setStmt2Name] = useState('Party / Vendor OR Other file');
   const [stmt2Mode, setStmt2Mode] = useState('file'); // 'file', 'text', 'manual'
   const [stmt2File, setStmt2File] = useState(null);
   const [stmt2Base64, setStmt2Base64] = useState('');
@@ -57,6 +59,11 @@ export default function LedgerReconciliationPanel() {
   const [stmt2OpeningBal, setStmt2OpeningBal] = useState(0);
   const fileInputRef2 = useRef(null);
   const isParsing2Ref = useRef(false);
+
+  // ── AI Prompt Directive State ─────────────────────────────────────────────
+  const [reconciliationPrompt, setReconciliationPrompt] = useState(
+    'Match entries by voucher number and date (±15 days). Identify all missing invoices, rate differences, and payment deductions.'
+  );
 
   // ── Reconciliation Results ────────────────────────────────────────────────
   const [reconciling, setReconciling] = useState(false);
@@ -128,16 +135,16 @@ export default function LedgerReconciliationPanel() {
           setStmt1Transactions(res.parsedData.transactions);
         }
         if (res.parsedData.openingBalance) setStmt1OpeningBal(Number(res.parsedData.openingBalance));
-        if (res.parsedData.statementParty && (!stmt1Name || stmt1Name.includes('Statement 1'))) {
+        if (res.parsedData.statementParty && (!stmt1Name || stmt1Name === 'Elite Files' || stmt1Name.includes('Statement 1'))) {
           setStmt1Name(res.parsedData.statementParty);
         }
         return res.parsedData.transactions || [];
       } else {
-        alert(res?.message || 'Failed to extract transactions for Statement 1');
+        alert(res?.message || 'Failed to extract transactions for Elite Files');
       }
     } catch (err) {
-      console.error('Error parsing Statement 1:', err);
-      const msg = err.response?.data?.message || err.message || 'Error parsing Statement 1 with Grok AI';
+      console.error('Error parsing Elite Files:', err);
+      const msg = err.response?.data?.message || err.message || 'Error parsing Elite Files with Grok AI';
       alert(msg);
     } finally {
       isParsing1Ref.current = false;
@@ -146,7 +153,7 @@ export default function LedgerReconciliationPanel() {
     return false;
   };
 
-  // Helper to parse Statement 2
+  // Helper to parse Statement 2 (Party / Other File)
   const parseStmt2WithData = async (b64, txt, party) => {
     if (isParsing2Ref.current) return false;
     const base64ToUse = b64 !== undefined ? b64 : stmt2Base64;
@@ -168,16 +175,16 @@ export default function LedgerReconciliationPanel() {
           setStmt2Transactions(res.parsedData.transactions);
         }
         if (res.parsedData.openingBalance) setStmt2OpeningBal(Number(res.parsedData.openingBalance));
-        if (res.parsedData.statementParty && (!stmt2Name || stmt2Name.includes('Statement 2'))) {
+        if (res.parsedData.statementParty && (!stmt2Name || stmt2Name === 'Party / Vendor OR Other file' || stmt2Name.includes('Statement 2'))) {
           setStmt2Name(res.parsedData.statementParty);
         }
         return res.parsedData.transactions || [];
       } else {
-        alert(res?.message || 'Failed to extract transactions for Statement 2');
+        alert(res?.message || 'Failed to extract transactions for Party / Vendor OR Other file');
       }
     } catch (err) {
-      console.error('Error parsing Statement 2:', err);
-      const msg = err.response?.data?.message || err.message || 'Error parsing Statement 2 with Grok AI';
+      console.error('Error parsing Party File:', err);
+      const msg = err.response?.data?.message || err.message || 'Error parsing Party / Other File with Grok AI';
       alert(msg);
     } finally {
       isParsing2Ref.current = false;
@@ -289,20 +296,20 @@ export default function LedgerReconciliationPanel() {
       let t1 = stmt1Transactions;
       let t2 = stmt2Transactions;
 
-      // If Statement 1 not yet parsed, auto-parse now
+      // If Elite Files not yet parsed, auto-parse now
       if (!t1.length && (stmt1Base64 || stmt1Text.trim())) {
         const parsed1 = await parseStmt1WithData();
         if (Array.isArray(parsed1)) t1 = parsed1;
       }
 
-      // If Statement 2 not yet parsed, auto-parse now
+      // If Party / Other File not yet parsed, auto-parse now
       if (!t2.length && (stmt2Base64 || stmt2Text.trim())) {
         const parsed2 = await parseStmt2WithData();
         if (Array.isArray(parsed2)) t2 = parsed2;
       }
 
       if (!t1.length && !t2.length) {
-        alert('Please upload or paste statements for Book 1 and Book 2 before reconciling.');
+        alert('Please upload or paste data for Elite Files and Party / Other File before reconciling.');
         return;
       }
 
@@ -314,15 +321,25 @@ export default function LedgerReconciliationPanel() {
       const totalCredit2 = t2.reduce((acc, t) => acc + (Number(t.credit) || 0), 0);
       const netBal2 = Number(stmt2OpeningBal || 0) + (totalDebit2 - totalCredit2);
 
+      // Parse custom prompt directives if present
+      const daysMatch = reconciliationPrompt ? reconciliationPrompt.match(/(\d+)\s*days?/i) : null;
+      const toleranceDays = daysMatch ? Number(daysMatch[1]) : 20;
+
+      const amtMatch = reconciliationPrompt ? reconciliationPrompt.match(/(?:₹|rs\.?|tolerance|diff)\s*(\d+(?:\.\d+)?)/i) : null;
+      const toleranceAmount = amtMatch ? Number(amtMatch[1]) : 2.0;
+
       const payload = {
         partyType: 'general',
         partyName: `${stmt1Name} vs ${stmt2Name}`,
         statementItems: t2, // Counterparty
-        erpItems: t1, // Internal / Book 1
+        erpItems: t1, // Internal / Elite Files
         statementOpeningBalance: stmt2OpeningBal,
         statementClosingBalance: netBal2,
         erpOpeningBalance: stmt1OpeningBal,
-        erpClosingBalance: netBal1
+        erpClosingBalance: netBal1,
+        toleranceDays,
+        toleranceAmount,
+        userPrompt: reconciliationPrompt
       };
 
       const res = await api.runReconciliationMatching(payload);
@@ -357,7 +374,8 @@ export default function LedgerReconciliationPanel() {
         variance: reconciliationResult.summary?.variance || (stmt1Stats.netBalance - stmt2Stats.netBalance),
         unmatchedStatementItems: reconciliationResult.unmatchedStatementItems || [],
         unmatchedErpItems: reconciliationResult.unmatchedErpItems || [],
-        discrepantItems: reconciliationResult.discrepantItems || []
+        discrepantItems: reconciliationResult.discrepantItems || [],
+        userPrompt: reconciliationPrompt
       };
 
       const res = await api.runGrokForensicAudit(payload);
@@ -474,37 +492,65 @@ export default function LedgerReconciliationPanel() {
 
     // 1. Summary Sheet
     const summaryData = [
-      ['UNIVERSAL STATEMENT RECONCILIATION REPORT'],
-      ['Book 1 Name', stmt1Name],
-      ['Book 2 Name', stmt2Name],
+      ['ELITE EDITION - RECONCILIATION & AUDIT REPORT'],
+      ['Elite Files (Book 1)', stmt1Name],
+      ['Party / Other File (Book 2)', stmt2Name],
       ['Date Generated', new Date().toLocaleString('en-IN')],
       [],
-      ['RECONCILIATION SUMMARY'],
-      ['Book 1 Net Balance', stmt1Stats.netBalance],
-      ['Book 2 Net Balance', stmt2Stats.netBalance],
-      ['Net Variance', reconciliationResult.summary?.variance || (stmt1Stats.netBalance - stmt2Stats.netBalance)],
+      ['RECONCILIATION METRICS', 'VALUES'],
+      ['Elite Files Net Balance', stmt1Stats.netBalance],
+      ['Party / Other File Net Balance', stmt2Stats.netBalance],
+      ['Net Variance / Discrepancy', reconciliationResult.summary?.variance || (stmt1Stats.netBalance - stmt2Stats.netBalance)],
       ['Total Matched Entries', reconciliationResult.summary?.matchedCount || 0],
       ['Probable Matches', reconciliationResult.summary?.probableCount || 0],
       ['Amount Discrepancies', reconciliationResult.summary?.discrepantCount || 0],
-      ['Unmatched in Book 2', reconciliationResult.summary?.unmatchedStatementCount || 0],
-      ['Unmatched in Book 1', reconciliationResult.summary?.unmatchedErpCount || 0]
+      ['In Party File Only (Missing in Elite)', reconciliationResult.summary?.unmatchedStatementCount || 0],
+      ['In Elite Files Only (Missing in Party)', reconciliationResult.summary?.unmatchedErpCount || 0]
     ];
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
 
-    // 2. Matched Sheet
+    // 2. Comparison Matrix Sheet (All Items)
+    if (filteredMatrixItems && filteredMatrixItems.length > 0) {
+      const matrixRows = filteredMatrixItems.map(item => ({
+        'Match Status': item._bucket === 'matched' ? 'MATCHED' : item._bucket === 'probable' ? 'PROBABLE' : item._bucket === 'discrepant' ? 'AMOUNT DIFF' : item._bucket === 'unmatchedStmt' ? 'PARTY ONLY' : 'ELITE ONLY',
+        'Date': item.date || item.erpDate || item.statementDate || '',
+        'Voucher / Ref': item.voucherNo || item.erpVoucherNo || item.ref || '',
+        'Narration': item.narration || item.erpNarration || item.statementNarration || '',
+        'Elite Amount (₹)': item.erpAmount !== undefined ? item.erpAmount : item.debit ? item.debit : item.credit ? item.credit : '',
+        'Party Amount (₹)': item.statementAmount !== undefined ? item.statementAmount : item.amount || '',
+        'Difference (₹)': item.difference || 0,
+        'Notes': item.reason || item.notes || ''
+      }));
+      const wsMatrix = XLSX.utils.json_to_sheet(matrixRows);
+      XLSX.utils.book_append_sheet(wb, wsMatrix, 'Comparison Matrix');
+    }
+
+    // 3. Matched Sheet
     if (reconciliationResult.matchedItems?.length) {
       const wsMatched = XLSX.utils.json_to_sheet(reconciliationResult.matchedItems);
       XLSX.utils.book_append_sheet(wb, wsMatched, 'Matched Entries');
     }
 
-    // 3. Discrepant Sheet
+    // 4. Discrepant Sheet
     if (reconciliationResult.discrepantItems?.length) {
       const wsDisc = XLSX.utils.json_to_sheet(reconciliationResult.discrepantItems);
       XLSX.utils.book_append_sheet(wb, wsDisc, 'Discrepancies');
     }
 
-    const fileName = `Reconciliation_${stmt1Name.replace(/[^a-zA-Z0-9]/g, '_')}_vs_${stmt2Name.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+    // 5. Party Only Sheet
+    if (reconciliationResult.unmatchedStatementItems?.length) {
+      const wsPartyOnly = XLSX.utils.json_to_sheet(reconciliationResult.unmatchedStatementItems);
+      XLSX.utils.book_append_sheet(wb, wsPartyOnly, 'In Party Only');
+    }
+
+    // 6. Elite Only Sheet
+    if (reconciliationResult.unmatchedErpItems?.length) {
+      const wsEliteOnly = XLSX.utils.json_to_sheet(reconciliationResult.unmatchedErpItems);
+      XLSX.utils.book_append_sheet(wb, wsEliteOnly, 'In Elite Only');
+    }
+
+    const fileName = `Reconciliation_${stmt1Name.replace(/[^a-zA-Z0-9]/g, '_')}_vs_${stmt2Name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -652,15 +698,15 @@ export default function LedgerReconciliationPanel() {
         </div>
       </div>
 
-      {/* ── TWO INGESTION CARDS: STATEMENT 1 VS STATEMENT 2 ──────────────────── */}
+      {/* ── TWO INGESTION CARDS: ELITE FILES VS PARTY / OTHER FILE ─────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
-        {/* ── CARD 1: STATEMENT 1 (BOOK A) ──────────────────────────────────── */}
+        {/* ── CARD 1: ELITE FILES (BOOK A) ──────────────────────────────────── */}
         <div style={{ background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
           {/* Card 1 Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-              <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#4f46e5', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                A
+              <span style={{ padding: '3px 9px', borderRadius: '6px', background: '#4f46e5', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800 }}>
+                Elite
               </span>
               <input
                 type="text"
@@ -699,18 +745,18 @@ export default function LedgerReconciliationPanel() {
               onClick={() => fileInputRef1.current?.click()}
               style={{ border: '2px dashed #a5b4fc', borderRadius: '10px', padding: '1.25rem', textAlign: 'center', background: '#eef2ff', cursor: 'pointer' }}
             >
-              <input type="file" ref={fileInputRef1} onChange={handleFile1Upload} accept="image/*,application/pdf" style={{ display: 'none' }} />
+              <input type="file" ref={fileInputRef1} onChange={handleFile1Upload} accept="image/*,application/pdf,.xlsx,.xls,.csv" style={{ display: 'none' }} />
               <UploadCloud size={24} color="#4f46e5" style={{ margin: '0 auto 6px auto' }} />
               <div style={{ fontWeight: 800, fontSize: '0.84rem', color: '#3730a3' }}>
-                {stmt1File ? stmt1File.name : 'Upload Statement 1 (PDF / Image / Scan)'}
+                {stmt1File ? stmt1File.name : 'Upload Elite File (PDF / Image / Scan / Excel)'}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Tally, Busy, bank statements, photos</div>
+              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Tally, Busy, bank statements, photos, or Excel sheets</div>
             </div>
           )}
 
           {stmt1Mode === 'text' && (
             <textarea
-              placeholder="Paste raw ledger text for Statement 1 here..."
+              placeholder="Paste raw ledger text or CSV for Elite Files here..."
               value={stmt1Text}
               onChange={(e) => setStmt1Text(e.target.value)}
               rows={4}
@@ -718,7 +764,7 @@ export default function LedgerReconciliationPanel() {
             />
           )}
 
-          {/* Action to Parse Statement 1 */}
+          {/* Action to Parse Elite File */}
           {(stmt1Mode === 'file' || stmt1Mode === 'text') && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
@@ -739,7 +785,7 @@ export default function LedgerReconciliationPanel() {
                 }}
               >
                 <Sparkles size={14} className={stmt1Parsing ? 'animate-spin' : ''} />
-                <span>{stmt1Parsing ? 'Extracting...' : 'Parse Book 1 with AI'}</span>
+                <span>{stmt1Parsing ? 'Extracting...' : 'Parse Elite File with AI'}</span>
               </button>
             </div>
           )}
@@ -759,13 +805,13 @@ export default function LedgerReconciliationPanel() {
           </div>
         </div>
 
-        {/* ── CARD 2: STATEMENT 2 (BOOK B) ──────────────────────────────────── */}
+        {/* ── CARD 2: PARTY / VENDOR OR OTHER FILE (BOOK B) ─────────────────── */}
         <div style={{ background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
           {/* Card 2 Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-              <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#0ea5e9', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                B
+              <span style={{ padding: '3px 9px', borderRadius: '6px', background: '#0ea5e9', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800 }}>
+                Party / Other
               </span>
               <input
                 type="text"
@@ -804,18 +850,18 @@ export default function LedgerReconciliationPanel() {
               onClick={() => fileInputRef2.current?.click()}
               style={{ border: '2px dashed #7dd3fc', borderRadius: '10px', padding: '1.25rem', textAlign: 'center', background: '#f0f9ff', cursor: 'pointer' }}
             >
-              <input type="file" ref={fileInputRef2} onChange={handleFile2Upload} accept="image/*,application/pdf" style={{ display: 'none' }} />
+              <input type="file" ref={fileInputRef2} onChange={handleFile2Upload} accept="image/*,application/pdf,.xlsx,.xls,.csv" style={{ display: 'none' }} />
               <UploadCloud size={24} color="#0284c7" style={{ margin: '0 auto 6px auto' }} />
               <div style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0369a1' }}>
-                {stmt2File ? stmt2File.name : 'Upload Statement 2 (PDF / Image / Scan)'}
+                {stmt2File ? stmt2File.name : 'Upload Party / Vendor OR Other file (PDF / Image / Scan / Excel)'}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Party bills, passbooks, vendor invoices</div>
+              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Party bills, passbooks, vendor invoices, or Excel sheets</div>
             </div>
           )}
 
           {stmt2Mode === 'text' && (
             <textarea
-              placeholder="Paste raw ledger text for Statement 2 here..."
+              placeholder="Paste raw ledger text or CSV for Party / Vendor OR Other file here..."
               value={stmt2Text}
               onChange={(e) => setStmt2Text(e.target.value)}
               rows={4}
@@ -823,7 +869,7 @@ export default function LedgerReconciliationPanel() {
             />
           )}
 
-          {/* Action to Parse Statement 2 */}
+          {/* Action to Parse Party / Other File */}
           {(stmt2Mode === 'file' || stmt2Mode === 'text') && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
@@ -844,7 +890,7 @@ export default function LedgerReconciliationPanel() {
                 }}
               >
                 <Sparkles size={14} className={stmt2Parsing ? 'animate-spin' : ''} />
-                <span>{stmt2Parsing ? 'Extracting...' : 'Parse Book 2 with AI'}</span>
+                <span>{stmt2Parsing ? 'Extracting...' : 'Parse Party / Other File with AI'}</span>
               </button>
             </div>
           )}
@@ -865,29 +911,131 @@ export default function LedgerReconciliationPanel() {
         </div>
       </div>
 
-      {/* ── EXECUTE MATCHING ACTION BUTTON ─────────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <button
-          onClick={handleRunReconciliation}
-          disabled={reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim())}
-          style={{
-            padding: '0.85rem 2.2rem',
-            borderRadius: '12px',
-            border: 'none',
-            background: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim()) ? '#94a3b8' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-            color: '#ffffff',
-            fontWeight: 800,
-            fontSize: '0.98rem',
-            cursor: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim()) ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.65rem',
-            boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)'
-          }}
-        >
-          <Scale size={20} className={reconciling ? 'animate-spin' : ''} />
-          <span>{reconciling ? 'Reconciling Statements...' : 'Execute AI 3-Way Reconciliation'}</span>
-        </button>
+      {/* ── AI RECONCILIATION PROMPT & RUN ENGINE ───────────────────────────── */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          border: '1.5px solid #c7d2fe',
+          borderRadius: '16px',
+          padding: '1.25rem 1.5rem',
+          boxShadow: '0 4px 20px rgba(99, 102, 241, 0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.85rem'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ display: 'inline-flex', padding: '6px', borderRadius: '8px', background: '#e0e7ff', color: '#4338ca' }}>
+              <Sparkles size={16} />
+            </span>
+            <div>
+              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#1e1b4b' }}>
+                AI Reconciliation Prompt & Directives
+              </span>
+              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>
+                Instruct Grok AI on matching rules, date/amount tolerances, voucher mappings, and missing bill detection.
+              </span>
+            </div>
+          </div>
+
+          {/* Quick preset directives */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {[
+              { label: '🎯 Exact Match', text: 'Match strictly by voucher number and exact amounts.' },
+              { label: '📅 Date Flexible (±15 Days)', text: 'Match by voucher with ±15 days date tolerance window.' },
+              { label: '🔍 Find Missing Bills', text: 'Identify and list all bills present in Elite Files but missing from Party statement.' },
+              { label: '💰 TDS / Rate Diff (±₹100)', text: 'Allow up to ₹100 variance for TDS, roundoff, and rate discrepancies.' }
+            ].map((chip, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setReconciliationPrompt(chip.text)}
+                style={{
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '20px',
+                  padding: '3px 10px',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  color: '#334155',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Prompt Input Box & Run Button Row */}
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'stretch', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '280px', position: 'relative' }}>
+            <textarea
+              value={reconciliationPrompt}
+              onChange={(e) => setReconciliationPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  handleRunReconciliation();
+                }
+              }}
+              rows={3}
+              placeholder="Write custom prompt (e.g. 'Match entries by voucher number and date within 15 days, highlight bills in Elite Files missing from Party statement, flag any debit/credit mismatches...')"
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '0.75rem 0.9rem',
+                borderRadius: '10px',
+                border: '1.5px solid #cbd5e1',
+                fontSize: '0.82rem',
+                fontFamily: 'inherit',
+                lineHeight: 1.45,
+                outline: 'none',
+                resize: 'vertical',
+                background: '#ffffff'
+              }}
+            />
+            <div style={{ position: 'absolute', right: '10px', bottom: '8px', fontSize: '0.65rem', color: '#94a3b8', pointerEvents: 'none' }}>
+              Press Ctrl+Enter to Run
+            </div>
+          </div>
+
+          {/* Prominent Run Button */}
+          <button
+            onClick={handleRunReconciliation}
+            disabled={reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim())}
+            style={{
+              padding: '0.85rem 2rem',
+              borderRadius: '12px',
+              border: 'none',
+              background: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim())
+                ? '#94a3b8'
+                : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '0.96rem',
+              cursor: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim()) ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              minWidth: '180px',
+              boxShadow: '0 8px 20px rgba(79, 70, 229, 0.35)',
+              transition: 'transform 0.15s, box-shadow 0.15s'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Play size={18} fill={reconciling ? 'none' : '#ffffff'} className={reconciling ? 'animate-spin' : ''} />
+              <span>{reconciling ? 'Reconciling...' : 'Run'}</span>
+            </div>
+            <span style={{ fontSize: '0.68rem', opacity: 0.85, fontWeight: 500 }}>
+              AI Reconcile Files
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ── RECONCILIATION RESULTS DASHBOARD ────────────────────────────────── */}
@@ -985,8 +1133,8 @@ export default function LedgerReconciliationPanel() {
                   { id: 'matched', label: 'Matched', count: reconciliationResult.summary?.matchedCount || 0, color: '#16a34a' },
                   { id: 'probable', label: 'Probable', count: reconciliationResult.summary?.probableCount || 0, color: '#ca8a04' },
                   { id: 'discrepant', label: 'Discrepancies', count: reconciliationResult.summary?.discrepantCount || 0, color: '#dc2626' },
-                  { id: 'unmatchedStmt', label: 'In Book 2 Only', count: reconciliationResult.summary?.unmatchedStatementCount || 0, color: '#ea580c' },
-                  { id: 'unmatchedErp', label: 'In Book 1 Only', count: reconciliationResult.summary?.unmatchedErpCount || 0, color: '#7c3aed' }
+                  { id: 'unmatchedStmt', label: 'In Party Only', count: reconciliationResult.summary?.unmatchedStatementCount || 0, color: '#ea580c' },
+                  { id: 'unmatchedErp', label: 'In Elite Only', count: reconciliationResult.summary?.unmatchedErpCount || 0, color: '#7c3aed' }
                 ].map((tab) => {
                   const isActive = activeFilterTab === tab.id;
                   return (
@@ -1017,16 +1165,41 @@ export default function LedgerReconciliationPanel() {
                 })}
               </div>
 
-              {/* Search */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', minWidth: '220px' }}>
-                <Search size={14} color="#94a3b8" />
-                <input
-                  type="text"
-                  placeholder="Search vouchers, narration..."
-                  value={matrixSearch}
-                  onChange={(e) => setMatrixSearch(e.target.value)}
-                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.78rem', width: '100%' }}
-                />
+              {/* Search & Excel Export */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', minWidth: '200px' }}>
+                  <Search size={14} color="#94a3b8" />
+                  <input
+                    type="text"
+                    placeholder="Search vouchers, narration..."
+                    value={matrixSearch}
+                    onChange={(e) => setMatrixSearch(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.78rem', width: '100%' }}
+                  />
+                </div>
+
+                <button
+                  onClick={handleExportExcel}
+                  title="Download complete reconciliation report in Excel (.xlsx)"
+                  style={{
+                    background: '#10b981',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '8px',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <FileSpreadsheet size={15} />
+                  <span>Download in Excel (.xlsx)</span>
+                </button>
               </div>
             </div>
 
@@ -1039,8 +1212,8 @@ export default function LedgerReconciliationPanel() {
                     <th style={{ padding: '0.65rem 0.85rem', width: '110px' }}>Date</th>
                     <th style={{ padding: '0.65rem 0.85rem', width: '150px' }}>Voucher / Ref</th>
                     <th style={{ padding: '0.65rem 0.85rem' }}>Narration</th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '130px', textAlign: 'right' }}>Book 1 Amount</th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '130px', textAlign: 'right' }}>Book 2 Amount</th>
+                    <th style={{ padding: '0.65rem 0.85rem', width: '130px', textAlign: 'right' }}>Elite Files Amount</th>
+                    <th style={{ padding: '0.65rem 0.85rem', width: '130px', textAlign: 'right' }}>Party / Other Amount</th>
                     <th style={{ padding: '0.65rem 0.85rem', width: '110px', textAlign: 'right' }}>Difference</th>
                   </tr>
                 </thead>
@@ -1075,12 +1248,12 @@ export default function LedgerReconciliationPanel() {
                         badgeColor = '#b91c1c';
                         badgeIcon = <AlertTriangle size={13} />;
                       } else if (isBook2Only) {
-                        badgeText = 'BOOK 2 ONLY';
+                        badgeText = 'PARTY ONLY';
                         badgeBg = '#ffedd5';
                         badgeColor = '#c2410c';
                         badgeIcon = <ArrowDownLeft size={13} />;
                       } else if (isBook1Only) {
-                        badgeText = 'BOOK 1 ONLY';
+                        badgeText = 'ELITE ONLY';
                         badgeBg = '#ede9fe';
                         badgeColor = '#6d28d9';
                         badgeIcon = <ArrowUpRight size={13} />;

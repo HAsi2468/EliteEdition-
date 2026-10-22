@@ -102,7 +102,10 @@ async function runReconciliation(req, res) {
       statementOpeningBalance = 0,
       statementClosingBalance = 0,
       startDate,
-      endDate
+      endDate,
+      toleranceDays = 20,
+      toleranceAmount = 1.0,
+      userPrompt = ''
     } = req.body;
 
     // 1. Use provided book entries directly or fetch from ERP if partyId provided
@@ -118,11 +121,12 @@ async function runReconciliation(req, res) {
       });
     }
 
-    // 2. Run matching engine
+    // 2. Run matching engine with custom prompt tolerances
     const matchResults = ledgerReconciliationService.reconcileTransactions(
       statementItems,
       erpTransactions,
-      partyType
+      partyType,
+      { toleranceDays, toleranceAmount, userPrompt }
     );
 
     // 3. Compute balances
@@ -169,7 +173,8 @@ async function aiAuditDiscrepancies(req, res) {
       variance = 0,
       unmatchedStatementItems = [],
       unmatchedErpItems = [],
-      discrepantItems = []
+      discrepantItems = [],
+      userPrompt = ''
     } = req.body;
 
     const auditReport = await xaiService.investigateDiscrepancies({
@@ -180,7 +185,8 @@ async function aiAuditDiscrepancies(req, res) {
       variance,
       unmatchedStatementItems,
       unmatchedErpItems,
-      discrepantItems
+      discrepantItems,
+      userPrompt
     });
 
     return res.status(200).json({
