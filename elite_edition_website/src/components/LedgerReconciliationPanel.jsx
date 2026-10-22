@@ -44,6 +44,7 @@ export default function LedgerReconciliationPanel() {
   const [stmt1Transactions, setStmt1Transactions] = useState([]);
   const [stmt1OpeningBal, setStmt1OpeningBal] = useState(0);
   const fileInputRef1 = useRef(null);
+  const isParsing1Ref = useRef(false);
 
   // ── Statement 2 State (Book B) ─────────────────────────────────────────────
   const [stmt2Name, setStmt2Name] = useState('Statement 2 (Book B / Counterparty / Bank)');
@@ -55,9 +56,11 @@ export default function LedgerReconciliationPanel() {
   const [stmt2Transactions, setStmt2Transactions] = useState([]);
   const [stmt2OpeningBal, setStmt2OpeningBal] = useState(0);
   const fileInputRef2 = useRef(null);
+  const isParsing2Ref = useRef(false);
 
   // ── Reconciliation Results ────────────────────────────────────────────────
   const [reconciling, setReconciling] = useState(false);
+  const isReconcilingRef = useRef(false);
   const [reconciliationResult, setReconciliationResult] = useState(null);
   const [activeFilterTab, setActiveFilterTab] = useState('all');
   const [matrixSearch, setMatrixSearch] = useState('');
@@ -105,11 +108,13 @@ export default function LedgerReconciliationPanel() {
 
   // Helper to parse Statement 1
   const parseStmt1WithData = async (b64, txt, party) => {
+    if (isParsing1Ref.current) return false;
     const base64ToUse = b64 !== undefined ? b64 : stmt1Base64;
     const textToUse = txt !== undefined ? txt : stmt1Text;
     const nameToUse = party !== undefined ? party : stmt1Name;
     if (!base64ToUse && !textToUse.trim()) return false;
 
+    isParsing1Ref.current = true;
     setStmt1Parsing(true);
     try {
       const res = await api.parseReconciliationStatement({
@@ -135,6 +140,7 @@ export default function LedgerReconciliationPanel() {
       const msg = err.response?.data?.message || err.message || 'Error parsing Statement 1 with Grok AI';
       alert(msg);
     } finally {
+      isParsing1Ref.current = false;
       setStmt1Parsing(false);
     }
     return false;
@@ -142,11 +148,13 @@ export default function LedgerReconciliationPanel() {
 
   // Helper to parse Statement 2
   const parseStmt2WithData = async (b64, txt, party) => {
+    if (isParsing2Ref.current) return false;
     const base64ToUse = b64 !== undefined ? b64 : stmt2Base64;
     const textToUse = txt !== undefined ? txt : stmt2Text;
     const nameToUse = party !== undefined ? party : stmt2Name;
     if (!base64ToUse && !textToUse.trim()) return false;
 
+    isParsing2Ref.current = true;
     setStmt2Parsing(true);
     try {
       const res = await api.parseReconciliationStatement({
@@ -172,6 +180,7 @@ export default function LedgerReconciliationPanel() {
       const msg = err.response?.data?.message || err.message || 'Error parsing Statement 2 with Grok AI';
       alert(msg);
     } finally {
+      isParsing2Ref.current = false;
       setStmt2Parsing(false);
     }
     return false;
@@ -273,6 +282,8 @@ export default function LedgerReconciliationPanel() {
 
   // Run AI 3-Way Reconciliation
   const handleRunReconciliation = async () => {
+    if (isReconcilingRef.current) return;
+    isReconcilingRef.current = true;
     setReconciling(true);
     try {
       let t1 = stmt1Transactions;
@@ -292,7 +303,6 @@ export default function LedgerReconciliationPanel() {
 
       if (!t1.length && !t2.length) {
         alert('Please upload or paste statements for Book 1 and Book 2 before reconciling.');
-        setReconciling(false);
         return;
       }
 
@@ -325,6 +335,7 @@ export default function LedgerReconciliationPanel() {
       console.error('Reconciliation error:', err);
       alert('Failed to execute reconciliation: ' + (err.message || ''));
     } finally {
+      isReconcilingRef.current = false;
       setReconciling(false);
     }
   };

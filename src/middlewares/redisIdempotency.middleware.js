@@ -28,6 +28,12 @@ function redisIdempotencyMiddleware(options = {}) {
       return next();
     }
 
+    // Skip idempotency locking for analytical AI queries and statement parsing
+    const url = req.originalUrl || req.url || '';
+    if (url.includes('/ledger-reconciliation') || url.includes('/copilot') || url.includes('/ai/')) {
+      return next();
+    }
+
     const rawKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
 
     if (!rawKey) {
