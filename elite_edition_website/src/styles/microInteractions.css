@@ -23,7 +23,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
+textarea:not(.phoenix-chat-textarea):focus-visible,
 [role="button"]:focus-visible,
 [tabindex]:focus-visible {
   outline: none !important;
