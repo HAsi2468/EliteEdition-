@@ -2840,6 +2840,21 @@ export const api = {
     });
   },
 
+  // ERP-Core Orchestrator Autonomous Agent
+  async sendOrchestratorPrompt(payload) {
+    return request('/ai/orchestrator', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async confirmOrchestratorAction(payload) {
+    return request('/ai/orchestrator/confirm', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
   // ── Task Management Module (TaskOPad) Endpoints ──
   async getTasks(params = {}) {
     const queryParams = new URLSearchParams();

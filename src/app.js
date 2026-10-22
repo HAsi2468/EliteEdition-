@@ -564,9 +564,9 @@ app.use(['/v1', '/api/v1'], redisIdempotencyMiddleware({ required: false }));
 const { approvalInterceptor } = require('./middlewares/approvalInterceptor.middleware');
 app.use(['/v1', '/api/v1'], approvalInterceptor);
 
-// v1 and api/v1 api routes
 app.use('/v1', routes);
 app.use('/api/v1', routes);
+app.use('/api/chat', require('./routes/v1/chat.route'));
 app.use('/api/infrastructure', require('./routes/infrastructureRoutes'));
 
 // Public verification route for physical challan, job card, and tax invoice QR scanning (without /v1 prefix)

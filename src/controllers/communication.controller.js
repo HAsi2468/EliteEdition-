@@ -634,6 +634,19 @@ const postGroupMessage = async (req, res) => {
       }
     }
 
+    // ERP-Core Orchestrator Autonomous Trigger
+    try {
+      const orchestratorController = require('./orchestrator.controller');
+      orchestratorController.processChatMessage({
+        room: targetRoom,
+        message: newMessage,
+        user: req.user,
+        io
+      }).catch((err) => console.warn('[postGroupMessage Orchestrator trigger error]:', err.message));
+    } catch (orchErr) {
+      console.warn('[postGroupMessage Orchestrator trigger error]:', orchErr.message);
+    }
+
     res.json({ success: true, data: populatedMessage });
   } catch (error) {
     console.error('[postGroupMessage ERROR]:', error.message, error.stack);

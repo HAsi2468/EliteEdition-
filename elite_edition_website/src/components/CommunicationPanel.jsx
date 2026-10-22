@@ -6,6 +6,8 @@ import socketManager from '../services/socketManager';
 import TaskManagerPanel from './TaskManagerPanel';
 import JobCardPdfModal from './JobCardPdfModal';
 import ErrorBoundary from './common/ErrorBoundary';
+import ToolResultDispatcher from './cards/ToolResultDispatcher';
+import ChatContainer from './cards/ChatContainer';
 import { useFileUpload } from '../hooks/useFileUpload';
 import '../styles/communication.css';
 import {
@@ -330,6 +332,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [messageSearchResults, setMessageSearchResults] = useState([]);
   const [isSearchingMessages, setIsSearchingMessages] = useState(false);
   const [streamHistoryError, setStreamHistoryError] = useState(null);
+  const [showCopilotModal, setShowCopilotModal] = useState(false);
+
+  const handleCopilotCardAction = (actionType, payload) => {
+    if (actionType === "advance_stage") {
+      setInputMessage(`Advance job card ${payload.jobCardId} to the next stage`);
+    } else if (actionType === "reserve_stock") {
+      setInputMessage(`Reserve 500 meters of item ${payload.itemCode} for our next job`);
+    } else if (actionType === "view_details") {
+      window.open(`/job-cards?search=${encodeURIComponent(payload.jobCardId)}`, "_blank");
+    }
+  };
 
   // Mobile View Guarantee: When user navigates to Communication, ALWAYS display the Chats list screen on mobile!
   useEffect(() => {
@@ -3399,6 +3412,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const candidates = [];
 
+    // Prepend @ERP-Core Orchestrator autonomous operational agent
+    if (!q || 'erp-core orchestrator'.includes(q) || 'orchestrator'.includes(q) || 'bot'.includes(q) || 'ai'.includes(q) || 'agent'.includes(q)) {
+      candidates.push({
+        _id: 'ORCHESTRATOR_BOT',
+        id: 'ORCHESTRATOR_BOT',
+        name: 'ERP-Core Orchestrator',
+        displayName: 'ERP-Core Orchestrator',
+        title: '⚡ ERP-Core Orchestrator',
+        role: 'Autonomous Operational Agent (Production, Stock, Billing)',
+        isOrchestrator: true
+      });
+    }
+
     // Prepend @all / Everyone option for group or channel chats
     const canMentionAll = !activeGroup || activeGroup.type === 'group' || (activeGroup.members && activeGroup.members.length > 1);
     if (canMentionAll && (!q || 'all'.startsWith(q) || 'everyone'.startsWith(q))) {
@@ -3419,6 +3445,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const handleSelectMention = (user) => {
     const isAll = user.isSpecialAll || user._id === 'ALL_MEMBERS' || user.name === 'all';
+    const isBot = user.isOrchestrator || user._id === 'ORCHESTRATOR_BOT';
     const textarea = chatTextareaRef.current;
     const cursorPos = textarea?.selectionStart ?? inputMessage.length;
 
@@ -3426,7 +3453,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const textAfterCursor = inputMessage.slice(cursorPos);
     const replacedBefore = textBeforeCursor.replace(/(?:^|\s)@([a-zA-Z0-9._-]*(?:\s[a-zA-Z0-9._-]+)?)$/, (match) => {
       const leadingSpace = match.startsWith(' ') ? ' ' : '';
-      return `${leadingSpace}${isAll ? '@all ' : `@${user.name || user.username || 'User'} `}`;
+      return `${leadingSpace}${isAll ? '@all ' : isBot ? '@ERP-Core Orchestrator ' : `@${user.name || user.username || 'User'} `}`;
     });
 
     const newMsg = replacedBefore + textAfterCursor;
@@ -5019,6 +5046,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           <Video size={isMobileScreen ? 14 : 16} />
                         </button>
 
+                        {/* ERP Operations Copilot Quick Trigger */}
+                        <button
+                          type="button"
+                          className="phoenix-action-btn-neutral"
+                          style={{
+                            width: isMobileScreen ? 32 : 36,
+                            height: isMobileScreen ? 32 : 36,
+                            color: '#2563eb',
+                            background: 'rgba(37,99,235,0.08)',
+                            border: '1px solid rgba(37,99,235,0.2)'
+                          }}
+                          onClick={() => setShowCopilotModal(true)}
+                          title="Open ERP Operations Copilot"
+                        >
+                          <Zap size={isMobileScreen ? 14 : 16} />
+                        </button>
+
                         {/* Three Dots More Options Menu */}
                         <div style={{ position: 'relative' }}>
                           <button
@@ -6452,6 +6496,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 )}
                               </div>
                             )}
+
+                            {/* Embedded interactive tool widgets for ERP Copilot / Orchestrator */}
+                            {Array.isArray(msg.toolEvents) && msg.toolEvents.map((evt, tIdx) => (
+                              <ToolResultDispatcher
+                                key={`copilot_tool_${tIdx}`}
+                                toolName={evt.tool}
+                                result={evt.result}
+                                onCardAction={handleCopilotCardAction}
+                              />
+                            ))}
                               </>
                             )}
                           </div>
@@ -9591,6 +9645,28 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ERP Copilot Dialog Window */}
+      {showCopilotModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+          onClick={() => setShowCopilotModal(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '680px' }}>
+            <ChatContainer onClose={() => setShowCopilotModal(false)} />
           </div>
         </div>
       )}

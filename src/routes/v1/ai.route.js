@@ -2,6 +2,8 @@ const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { z } = require('zod');
 const { validateRequest } = require('../../middlewares/validateRequest');
+const { requireAuth } = require('../../middlewares/auth.middleware');
+const orchestratorController = require('../../controllers/orchestrator.controller');
 const router = express.Router();
 
 let genAI = null;
@@ -497,7 +499,11 @@ Provide a concise, professional 2-sentence shop-floor advisory on machine settin
     console.error('Error in /v1/ai/calculate-measurement:', err);
     return res.status(500).json({ error: 'Failed to calculate measurements: ' + err.message });
   }
-});
+// POST /v1/ai/orchestrator - Operational ERP Orchestrator Agent
+router.post('/orchestrator', requireAuth, orchestratorController.handlePrompt);
+
+// POST /v1/ai/orchestrator/confirm - Confirm Tier 3 High-Impact Mutation
+router.post('/orchestrator/confirm', requireAuth, orchestratorController.handleConfirm);
 
 module.exports = router;
 
