@@ -1253,8 +1253,17 @@ export default function App() {
     };
 
     const handleJobStageUpdate = (data) => {
-      if (data && data.jobNo) {
-        triggerPushNotification('⚙️ Job Stage Updated', `Job #${data.jobNo} moved to '${data.newStage}'`, 'success', 'jobcards_list');
+      const rawStage = data?.newStage || data?.stage || data?.status;
+      const stageName = rawStage && String(rawStage).trim() !== 'undefined' && String(rawStage).trim() !== 'null' ? String(rawStage).trim() : null;
+      if (data && data.jobNo && stageName) {
+        const toastKey = `job_stage_${data.jobNo}_${stageName}`;
+        const now = Date.now();
+        const lastToastTime = window._eliteRecentToasts?.get(toastKey) || 0;
+        if (!window._eliteRecentToasts) window._eliteRecentToasts = new Map();
+        if (now - lastToastTime > 5000) {
+          window._eliteRecentToasts.set(toastKey, now);
+          triggerPushNotification('⚙️ Job Stage Updated', `Job #${data.jobNo} moved to '${stageName}'`, 'success', 'jobcards_list');
+        }
       }
       triggerGlobalDataRefresh();
     };

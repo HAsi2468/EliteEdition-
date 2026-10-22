@@ -1645,7 +1645,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         setMessages((prev) => {
           // Filter out matching optimistic placeholder if real message arrives
           const filtered = prev.filter((m) => !(m.isOptimistic && ((m.clientMsgId && msg.clientMsgId && m.clientMsgId === msg.clientMsgId) || m.content === msg.content || String(m._id) === String(msg._id))));
-          return mergeMessages(filtered, [msg]);
+          return mergeMessages(filtered, [{ ...msg, isOptimistic: false }]);
         });
         if (socket && uId) {
           socket.emit('read-room-messages', { roomId: currentActiveId, userId: uId });
@@ -2184,6 +2184,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }));
     }
 
+    // Reset pagination and stream state on room switch
+    setPage(1);
+    setHasMoreMessages(true);
+    setLoadingMoreMessages(false);
+
     // Instantly show cached messages if available
     const cached = messagesCacheRef.current[targetGroup._id];
     if (cached && cached.length > 0) {
@@ -2298,15 +2303,28 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   const fetchGroupMessages = async (groupId, filter, showLoader = false) => {
+    if (!groupId) return;
     if (showLoader) setLoadingMessages(true);
     try {
-      const params = { limit: 100 };
+      const params = { limit: 50 };
       if (filter === 'human' || filter === 'system_activity') {
         params.msgType = filter;
       }
 
-      const res = await api.getCommunicationMessages(groupId, params);
-      if (res.success && res.data) {
+      // Safety timeout: prevent loading state from hanging indefinitely (>8s)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Network timeout loading stream history')), 8000)
+      );
+
+      const fetchPromise = api.getCommunicationMessages(groupId, params);
+      const res = await Promise.race([fetchPromise, timeoutPromise]);
+
+      // If user navigated away to another room before response arrived, drop stale payload
+      if (activeGroupIdRef.current && String(activeGroupIdRef.current) !== String(groupId)) {
+        return;
+      }
+
+      if (res && res.success && res.data) {
         let list = res.data;
         if (filter === 'urgent') {
           list = list.filter((m) => m.priority === 'urgent');
@@ -2314,6 +2332,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           list = list.filter((m) => m.attachment && m.attachment.fileUrl);
         }
         setMessages(list);
+        setPage(1);
+        setHasMoreMessages(list.length >= 50);
+
         if (!filter || filter === 'all') {
           messagesCacheRef.current[groupId] = list;
         }
@@ -2330,7 +2351,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     } catch (err) {
       console.error('Failed to fetch group messages:', err);
     } finally {
-      setLoadingMessages(false);
+      if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
+        setLoadingMessages(false);
+      }
     }
   };
 
@@ -3143,7 +3166,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       document.body.removeChild(link);
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
     } catch (e) {
-      const proxyUrl = `/api/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}`;
+      const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}`;
       const link = document.createElement('a');
       link.href = proxyUrl;
       link.download = cleanName;
@@ -3455,19 +3478,29 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     // Only load older messages if container actually overflows and user deliberately scrolled to the top
     if (loadingMoreMessages || !hasMoreMessages) return;
     if (el.scrollHeight > el.clientHeight + 60 && el.scrollTop <= 15) {
-      const nextPage = page + 1;
       setLoadingMoreMessages(true);
       const scrollHeightBefore = el.scrollHeight;
 
       try {
-        const params = { page: nextPage, limit: 50 };
+        const oldestRealMsg = messages.find((m) => m && m._id && !m.isOptimistic);
+        const params = { limit: 50 };
+        if (oldestRealMsg) {
+          if (oldestRealMsg.roomSeq != null) {
+            params.beforeSeq = oldestRealMsg.roomSeq;
+          } else if (oldestRealMsg._id) {
+            params.before = oldestRealMsg._id;
+          }
+        } else {
+          params.page = page + 1;
+        }
         if (msgFilter === 'human' || msgFilter === 'system_activity') params.msgType = msgFilter;
 
         const res = await api.getCommunicationMessages(activeGroup._id, params);
         if (res.success && res.data) {
           if (res.data.length < 50) setHasMoreMessages(false);
-          setMessages((prev) => [...res.data, ...prev]);
-          setPage(nextPage);
+          // Monotonically merge and deduplicate to eliminate duplicate pairs on prepend
+          setMessages((prev) => mergeMessages(prev, res.data));
+          setPage((p) => p + 1);
 
           requestAnimationFrame(() => {
             if (chatScrollRef.current) {
@@ -3561,9 +3594,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       ])
     );
 
+    const clientMsgId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+
     const messagePayload = {
       roomId: activeGroup._id,
       senderId,
+      clientMsgId,
       content: messageText,
       priority: isUrgent ? 'urgent' : 'normal',
       replyTo: replyToMessage ? replyToMessage._id : undefined,
@@ -3574,6 +3610,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const tempId = 'temp_' + Date.now();
     const tempMsg = {
       _id: tempId,
+      clientMsgId,
       roomId: activeGroup._id,
       senderId: typeof currentUser === 'object' ? currentUser : { _id: senderId, name: 'You' },
       content: messageText,
@@ -3620,10 +3657,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     try {
       const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
       if (res && res.success && res.data) {
-        const realMsg = res.data;
+        const realMsg = { ...res.data, isOptimistic: false };
         setMessages((prev) => {
-          const filtered = prev.filter((m) => m._id !== tempId && String(m._id) !== String(realMsg._id));
-          return [...filtered, realMsg];
+          const filtered = prev.filter((m) => m._id !== tempId && m.clientMsgId !== clientMsgId && String(m._id) !== String(realMsg._id));
+          return mergeMessages(filtered, [realMsg]);
         });
       } else {
         throw new Error(res?.message || 'Server did not acknowledge message saving');
@@ -3631,11 +3668,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     } catch (err) {
       console.warn('HTTP post message failed, falling back to socket emit or error flag:', err.message);
       if (socket && socket.connected) {
-        socket.emit('send-message', messagePayload);
+        socket.emit('send-message', messagePayload, (ack) => {
+          const ackMsg = ack?.message || ack?.data;
+          if (ack?.success && ackMsg) {
+            setMessages((prev) => {
+              const filtered = prev.filter((m) => m._id !== tempId && m.clientMsgId !== clientMsgId && String(m._id) !== String(ackMsg._id));
+              return mergeMessages(filtered, [{ ...ackMsg, isOptimistic: false }]);
+            });
+          }
+        });
       } else {
         setMessages((prev) =>
           prev.map((m) =>
-            m._id === tempId
+            m._id === tempId || m.clientMsgId === clientMsgId
               ? { ...m, isOptimistic: false, sendFailed: true, sendError: err.message || 'Send failed' }
               : m
           )
@@ -4347,16 +4392,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 <div>Loading conversations...</div>
               </div>
             ) : filteredGroups.length === 0 ? (
-              <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                <div>No conversations found in {phoenixFilter}.</div>
-                <button
-                  type="button"
-                  onClick={handleOpenNewDmModal}
-                  style={{ marginTop: '0.75rem', background: 'none', border: 'none', color: '#3874ff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  + Start a new direct conversation
-                </button>
-              </div>
+              searchQuery.trim().length >= 2 && (messageSearchResults.length > 0 || isSearchingMessages) ? null : (
+                <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  <div>No conversations found in {phoenixFilter}.</div>
+                  <button
+                    type="button"
+                    onClick={handleOpenNewDmModal}
+                    style={{ marginTop: '0.75rem', background: 'none', border: 'none', color: '#3874ff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    + Start a new direct conversation
+                  </button>
+                </div>
+              )
             ) : (
               filteredGroups.map((group) => {
                 const isVirtual = group.isVirtualContact;
