@@ -85,12 +85,12 @@ export default function LedgerReconciliationPanel() {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [partyPhone, setPartyPhone] = useState('');
 
-  // ── Grok Financial Copilot ────────────────────────────────────────────────
+  // ── Elite AI Financial Copilot ──────────────────────────────────────────────
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotMessages, setCopilotMessages] = useState([
     {
       role: 'assistant',
-      content: 'Hello! I am your Universal Grok Financial Copilot. Upload or paste any two ledgers, bank statements, or account summaries, and I will assist you with cross-matching, missing voucher identification, and variance resolution.'
+      content: 'Hello! I am your Universal Elite AI Financial Copilot. Upload or paste any two ledgers, bank statements, or account summaries, and I will assist you with cross-matching, missing voucher identification, and variance resolution.'
     }
   ]);
   const [copilotInput, setCopilotInput] = useState('');
@@ -144,7 +144,7 @@ export default function LedgerReconciliationPanel() {
       }
     } catch (err) {
       console.error('Error parsing Elite Files:', err);
-      const msg = err.response?.data?.message || err.message || 'Error parsing Elite Files with Grok AI';
+      const msg = err.response?.data?.message || err.message || 'Error parsing Elite Files with Elite AI';
       alert(msg);
     } finally {
       isParsing1Ref.current = false;
@@ -184,7 +184,7 @@ export default function LedgerReconciliationPanel() {
       }
     } catch (err) {
       console.error('Error parsing Party File:', err);
-      const msg = err.response?.data?.message || err.message || 'Error parsing Party / Other File with Grok AI';
+      const msg = err.response?.data?.message || err.message || 'Error parsing Party / Other File with Elite AI';
       alert(msg);
     } finally {
       isParsing2Ref.current = false;
@@ -387,7 +387,7 @@ export default function LedgerReconciliationPanel() {
       }
     } catch (err) {
       console.error('Forensic audit error:', err);
-      alert('Grok AI audit encountered an error.');
+      alert('Elite AI audit encountered an error.');
     } finally {
       setAuditing(false);
     }
@@ -625,27 +625,28 @@ export default function LedgerReconciliationPanel() {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+              <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#ffffff' }}>
                 Universal AI Ledger &amp; Statement Reconciler
               </h2>
               <span
                 style={{
                   background: 'rgba(56, 189, 248, 0.2)',
                   color: '#38bdf8',
-                  padding: '2px 9px',
+                  padding: '3px 10px',
                   borderRadius: '20px',
                   fontSize: '0.72rem',
                   fontWeight: 700,
-                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  border: '1px solid rgba(56, 189, 248, 0.45)',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '4px',
+                  boxShadow: '0 0 12px rgba(56, 189, 248, 0.25)'
                 }}
               >
-                <Sparkles size={12} /> Powered by Grok Vision AI
+                <Sparkles size={12} /> Powered by Elite AI
               </span>
             </div>
-            <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', opacity: 0.85 }}>
+            <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', opacity: 0.9, color: '#e0e7ff' }}>
               Reconcile any two statements, ledgers, or bank books with automated 3-way fuzzy matching &amp; deep forensic audit
             </p>
           </div>
@@ -934,33 +935,33 @@ export default function LedgerReconciliationPanel() {
                 AI Reconciliation Prompt & Directives
               </span>
               <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>
-                Instruct Grok AI on matching rules, date/amount tolerances, voucher mappings, and missing bill detection.
+                Instruct Elite AI on matching rules, date/amount tolerances, voucher mappings, and missing bill detection.
               </span>
             </div>
           </div>
 
           {/* Quick preset directives */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
             {[
-              { label: '🎯 Exact Match', text: 'Match strictly by voucher number and exact amounts.' },
-              { label: '📅 Date Flexible (±15 Days)', text: 'Match by voucher with ±15 days date tolerance window.' },
-              { label: '🔍 Find Missing Bills', text: 'Identify and list all bills present in Elite Files but missing from Party statement.' },
-              { label: '💰 TDS / Rate Diff (±₹100)', text: 'Allow up to ₹100 variance for TDS, roundoff, and rate discrepancies.' }
+              { label: '🎯 Exact Match', text: 'Match strictly by voucher number and exact amounts.', bg: '#f0fdf4', border: '#bbf7d0', color: '#166534' },
+              { label: '📅 Date Flexible (±15 Days)', text: 'Match by voucher with ±15 days date tolerance window.', bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' },
+              { label: '🔍 Find Missing Bills', text: 'Identify and list all bills present in Elite Files but missing from Party statement.', bg: '#faf5ff', border: '#e9d5ff', color: '#7e22ce' },
+              { label: '💰 TDS / Rate Diff (±₹100)', text: 'Allow up to ₹100 variance for TDS, roundoff, and rate discrepancies.', bg: '#fffbeb', border: '#fde68a', color: '#b45309' }
             ].map((chip, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => setReconciliationPrompt(chip.text)}
                 style={{
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
+                  background: chip.bg,
+                  border: `1px solid ${chip.border}`,
                   borderRadius: '20px',
-                  padding: '3px 10px',
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  color: '#334155',
+                  padding: '4px 11px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: chip.color,
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.15s ease'
                 }}
               >
                 {chip.label}
@@ -1087,7 +1088,7 @@ export default function LedgerReconciliationPanel() {
                 <div style={{ fontSize: '0.72rem', color: '#a5b4fc', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Sparkles size={13} color="#38bdf8" /> DEEP FORENSIC AUDIT
                 </div>
-                <div style={{ fontSize: '0.86rem', fontWeight: 800, marginTop: '4px' }}>
+                <div style={{ fontSize: '0.86rem', fontWeight: 800, marginTop: '4px', color: '#ffffff' }}>
                   {auditReport ? 'Audit Report Ready' : 'Investigate Discrepancy Drivers'}
                 </div>
               </div>
@@ -1207,14 +1208,14 @@ export default function LedgerReconciliationPanel() {
             <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '120px' }}>Match Status</th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '110px' }}>Date</th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '150px' }}>Voucher / Ref</th>
-                    <th style={{ padding: '0.65rem 0.85rem' }}>Narration</th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '130px', textAlign: 'right' }}>Elite Files Amount</th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '130px', textAlign: 'right' }}>Party / Other Amount</th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '110px', textAlign: 'right' }}>Difference</th>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1', color: '#475569', fontWeight: 700, fontSize: '0.73rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    <th style={{ padding: '0.75rem 0.85rem', width: '125px' }}>Match Status</th>
+                    <th style={{ padding: '0.75rem 0.85rem', width: '110px' }}>Date</th>
+                    <th style={{ padding: '0.75rem 0.85rem', width: '150px' }}>Voucher / Ref</th>
+                    <th style={{ padding: '0.75rem 0.85rem' }}>Narration</th>
+                    <th style={{ padding: '0.75rem 0.85rem', width: '140px', textAlign: 'right' }}>Elite Files Amount</th>
+                    <th style={{ padding: '0.75rem 0.85rem', width: '140px', textAlign: 'right' }}>Party / Other Amount</th>
+                    <th style={{ padding: '0.75rem 0.85rem', width: '120px', textAlign: 'right' }}>Difference</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1304,7 +1305,7 @@ export default function LedgerReconciliationPanel() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <Sparkles size={22} color="#4f46e5" />
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                  Grok AI Forensic Audit Report
+                  Elite AI Forensic Audit Report
                 </h3>
               </div>
               <button onClick={() => setShowAuditModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '0.4rem 0.6rem', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
@@ -1392,15 +1393,17 @@ export default function LedgerReconciliationPanel() {
       {/* ── COPILOT CHAT DRAWER ──────────────────────────────────────────────── */}
       {copilotOpen && (
         <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '420px', maxWidth: '100vw', background: '#ffffff', borderLeft: '1.5px solid #cbd5e1', boxShadow: '-15px 0 35px -5px rgba(0,0,0,0.18)', zIndex: 10000, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #1e1b4b, #312e81)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #3730a3', background: 'linear-gradient(135deg, #1e1b4b, #312e81)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <Bot size={20} color="#38bdf8" />
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                <Bot size={20} color="#38bdf8" />
+              </div>
               <div>
-                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>Grok Financial Copilot</h4>
-                <span style={{ fontSize: '0.72rem', color: '#a5b4fc' }}>Universal Statement Reconciler</span>
+                <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em' }}>Elite AI Financial Copilot</h4>
+                <span style={{ fontSize: '0.72rem', color: '#a5b4fc', fontWeight: 500, display: 'block' }}>Universal Statement Reconciler</span>
               </div>
             </div>
-            <button onClick={() => setCopilotOpen(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            <button onClick={() => setCopilotOpen(false)} style={{ background: 'rgba(255, 255, 255, 0.12)', border: 'none', color: '#ffffff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.9rem', transition: 'background 0.15s' }}>✕</button>
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', background: '#f8fafc' }}>
@@ -1411,7 +1414,7 @@ export default function LedgerReconciliationPanel() {
             ))}
             {copilotLoading && (
               <div style={{ alignSelf: 'flex-start', background: '#ffffff', border: '1px solid #e2e8f0', padding: '0.65rem 0.95rem', borderRadius: '12px', fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sparkles size={14} className="animate-spin" color="#4f46e5" /> Grok is reasoning...
+                <Sparkles size={14} className="animate-spin" color="#4f46e5" /> Elite AI is reasoning...
               </div>
             )}
             <div ref={copilotChatEndRef} />
