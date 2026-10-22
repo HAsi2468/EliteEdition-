@@ -1183,29 +1183,66 @@ const getScanHistory = async (req, res) => {
 
     const query = andConditions.length > 0 ? { $and: andConditions } : {};
 
-    // Dynamic stats date range filter
-    let statsStartIso, statsEndIso;
-    let statsStartDate, statsEndDate;
+    // Dynamic stats date range & multi-dimension filter
+    const statsDateCond = {};
     if (startDate || endDate) {
-      statsStartDate = startDate ? parseStartOfDay(startDate) : today;
-      statsStartIso = statsStartDate.toISOString();
-      if (endDate) {
-        statsEndDate = parseEndOfDay(endDate);
-        statsEndIso = statsEndDate.toISOString();
-      }
-    } else {
-      statsStartDate = today;
-      statsStartIso = today.toISOString();
+      const s = startDate ? parseStartOfDay(startDate) : null;
+      const e = endDate ? parseEndOfDay(endDate) : null;
+      if (s && !isNaN(s.getTime())) statsDateCond.$gte = s;
+      if (e && !isNaN(e.getTime())) statsDateCond.$lte = e;
     }
 
-    const dispatchFilter = { dispatchDate: { $gte: statsStartIso } };
-    if (statsEndIso) dispatchFilter.dispatchDate.$lte = statsEndIso;
+    // 1. Precise ScanLog filters
+    const scanPackFilter = { mode: { $in: ['PACK', 'DISPATCH'] } };
+    const scanDeliveredFilter = { status: 'DELIVERED' };
+    const scanReturnFilter = { mode: { $in: ['RETURN', 'RTO'] } };
 
-    const deliveryFilter = { deliveryTime: { $gte: statsStartIso } };
-    if (statsEndIso) deliveryFilter.deliveryTime.$lte = statsEndIso;
+    if (Object.keys(statsDateCond).length > 0) {
+      scanPackFilter.$or = [{ updatedAt: statsDateCond }, { createdAt: statsDateCond }];
+      scanDeliveredFilter.$or = [{ updatedAt: statsDateCond }, { createdAt: statsDateCond }];
+      scanReturnFilter.$or = [{ updatedAt: statsDateCond }, { createdAt: statsDateCond }];
+    }
 
-    const returnFilter = { createdAt: { $gte: statsStartDate } };
-    if (statsEndDate) returnFilter.createdAt.$lte = statsEndDate;
+    if (channel && channel !== 'ALL') {
+      const channels = String(channel).split(',').map(s => s.trim()).filter(Boolean);
+      const chRegex = channels.length > 1
+        ? { $in: channels.map(c => new RegExp(c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i')) }
+        : new RegExp(channels[0].replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+      scanPackFilter.channel = chRegex;
+      scanDeliveredFilter.channel = chRegex;
+      scanReturnFilter.channel = chRegex;
+    }
+
+    if (courier && courier !== 'ALL') {
+      const couriers = String(courier).split(',').map(s => s.trim()).filter(Boolean);
+      const crRegex = couriers.length > 1
+        ? { $in: couriers.map(c => new RegExp(c.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i')) }
+        : new RegExp(couriers[0].replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+      scanPackFilter.courier = crRegex;
+      scanDeliveredFilter.courier = crRegex;
+      scanReturnFilter.courier = crRegex;
+    }
+
+    // 2. Order collection filters
+    const dispatchFilter = {};
+    const deliveryFilter = {};
+    const returnFilter = {};
+
+    if (Object.keys(statsDateCond).length > 0) {
+      if (statsDateCond.$gte) {
+        dispatchFilter.dispatchDate = { $gte: statsDateCond.$gte.toISOString() };
+        deliveryFilter.deliveryTime = { $gte: statsDateCond.$gte.toISOString() };
+        returnFilter.createdAt = { $gte: statsDateCond.$gte };
+      }
+      if (statsDateCond.$lte) {
+        if (!dispatchFilter.dispatchDate) dispatchFilter.dispatchDate = {};
+        dispatchFilter.dispatchDate.$lte = statsDateCond.$lte.toISOString();
+        if (!deliveryFilter.deliveryTime) deliveryFilter.deliveryTime = {};
+        deliveryFilter.deliveryTime.$lte = statsDateCond.$lte.toISOString();
+        if (!returnFilter.createdAt) returnFilter.createdAt = {};
+        returnFilter.createdAt.$lte = statsDateCond.$lte;
+      }
+    }
 
     if (channel && channel !== 'ALL') {
       dispatchFilter.channel = new RegExp(channel.trim(), 'i');
@@ -1216,13 +1253,29 @@ const getScanHistory = async (req, res) => {
       deliveryFilter.shippingCourier = new RegExp(courier.trim(), 'i');
     }
 
-    const [dbLogs, totalLogsCount, dispatchedCount, deliveredCount, returnCount] = await Promise.all([
+    const [
+      dbLogs,
+      totalLogsCount,
+      scanPackCount,
+      scanDeliveredCount,
+      scanReturnCount,
+      soDispatchCount,
+      soDeliveredCount,
+      soReturnCount
+    ] = await Promise.all([
       db.ScanLog ? db.ScanLog.find(query).sort({ updatedAt: -1, createdAt: -1 }).skip(skip).limit(cleanLimit).lean() : [],
       db.ScanLog ? db.ScanLog.countDocuments(query) : 0,
-      db.SaleOrder.countDocuments(dispatchFilter),
-      db.SaleOrder.countDocuments(deliveryFilter),
-      db.ReturnRecord.countDocuments(returnFilter)
+      db.ScanLog ? db.ScanLog.countDocuments(scanPackFilter) : 0,
+      db.ScanLog ? db.ScanLog.countDocuments(scanDeliveredFilter) : 0,
+      db.ScanLog ? db.ScanLog.countDocuments(scanReturnFilter) : 0,
+      db.SaleOrder ? db.SaleOrder.countDocuments(dispatchFilter) : 0,
+      db.SaleOrder ? db.SaleOrder.countDocuments(deliveryFilter) : 0,
+      db.ReturnRecord ? db.ReturnRecord.countDocuments(returnFilter) : 0
     ]);
+
+    const effectiveDispatched = Math.max(scanPackCount, soDispatchCount);
+    const effectiveDelivered = Math.max(scanDeliveredCount, soDeliveredCount);
+    const effectiveReturned = Math.max(scanReturnCount, soReturnCount);
 
     // Deduplicate dbLogs by unique AWB - each AWB code is strictly unique
     const uniqueLogsMap = new Map();
@@ -1278,10 +1331,10 @@ const getScanHistory = async (req, res) => {
     res.json({
       success: true,
       stats: {
-        dispatchedToday: dispatchedCount,
-        deliveredToday: deliveredCount,
-        returnedToday: returnCount,
-        totalScansToday: dispatchedCount + deliveredCount + returnCount
+        dispatchedToday: effectiveDispatched,
+        deliveredToday: effectiveDelivered,
+        returnedToday: effectiveReturned,
+        totalScansToday: effectiveDispatched + effectiveDelivered + effectiveReturned
       },
       history,
       total: totalLogsCount || history.length,

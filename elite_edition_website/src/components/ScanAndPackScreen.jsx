@@ -1774,17 +1774,98 @@ export default function ScanAndPackScreen({ currentUser }) {
         </div>
       </div>
 
+      {/* ── 🎯 Top Level Filter Bar (DateRangePicker + UnifiedFilterPopover + Clear/Reset) ── */}
+      <div style={{
+        padding: '0.65rem 1rem',
+        background: '#ffffff',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Filter size={15} color="#0284c7" />
+              <span>Filter KPI & Register:</span>
+            </span>
+
+            <DateRangePicker
+              preset={historyDatePreset}
+              onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                setHistoryDatePreset(p);
+                setHistoryStartDate(ds || '');
+                setHistoryEndDate(de || '');
+                fetchHistoryAndStats(scanMode, historySearchQuery, { startDate: ds, endDate: de });
+              }}
+              customStart={historyStartDate}
+              customEnd={historyEndDate}
+              onCustomChange={(s, e) => {
+                setHistoryStartDate(s);
+                setHistoryEndDate(e);
+              }}
+            />
+
+            <UnifiedFilterPopover
+              categories={historyFilterCategories}
+              activeFilters={historyFilters}
+              onChange={(newFilters) => {
+                setHistoryFilters(newFilters);
+                fetchHistoryAndStats(scanMode, historySearchQuery, {
+                  courier: (newFilters.courier || []).join(','),
+                  channel: (newFilters.channel || []).join(','),
+                  status: (newFilters.status || []).join(',')
+                });
+              }}
+              onClear={() => {
+                setHistoryFilters({});
+                fetchHistoryAndStats(scanMode, historySearchQuery, { courier: '', channel: '', status: '' });
+              }}
+              placeholder="Logistics / Channel / Status"
+              showChips={true}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {(Object.keys(historyFilters).some(k => historyFilters[k]?.length > 0) || (historyDatePreset && historyDatePreset !== 'all') || historyStartDate || historyEndDate) && (
+              <button
+                type="button"
+                onClick={handleResetHistoryFilters}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#dc2626',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={12} />
+                <span>Reset Filters</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* 📊 3 KPI Stat Counters */}
       {(() => {
-        const periodText = historyDatePreset === 'TODAY' 
+        const periodText = (historyDatePreset === 'TODAY' || historyDatePreset === 'today')
           ? 'Today' 
-          : historyDatePreset === 'YESTERDAY' 
+          : (historyDatePreset === 'YESTERDAY' || historyDatePreset === 'yesterday')
           ? 'Yesterday' 
-          : historyDatePreset === '7DAYS' 
+          : (historyDatePreset === '7DAYS' || historyDatePreset === 'last_7_days')
           ? '(Last 7D)' 
-          : historyDatePreset === '30DAYS' 
+          : (historyDatePreset === '30DAYS' || historyDatePreset === 'last_30_days')
           ? '(Last 30D)' 
-          : historyDatePreset === 'CUSTOM'
+          : (historyDatePreset === 'CUSTOM' || historyDatePreset === 'custom')
           ? `(${historyStartDate || '...'} to ${historyEndDate || '...'})`
           : '(All Scans)';
 
