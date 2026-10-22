@@ -88,26 +88,82 @@ CRITICAL RULES:
 3. If an entry is a credit/receipt, debit should be 0 and credit should be the amount.
 4. Output strictly valid JSON. Do not wrap with markdown code blocks.`;
 
-  const messages = [{ role: 'system', content: systemPrompt }];
+  let textToParse = rawText ? String(rawText).trim() : '';
+  let validImageForVision = null;
 
-  if (imageBase64) {
+  if (imageBase64 && typeof imageBase64 === 'string') {
+    const isPdf = imageBase64.startsWith('data:application/pdf') ||
+                  imageBase64.includes('application/pdf') ||
+                  imageBase64.substring(0, 50).includes('JVBERi0');
+
+    const isExcel = imageBase64.includes('spreadsheet') ||
+                    imageBase64.includes('excel') ||
+                    imageBase64.substring(0, 50).includes('UEsDB');
+
+    if (isPdf) {
+      try {
+        const pdfParse = require('pdf-parse');
+        const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+        const pdfBuffer = Buffer.from(cleanBase64, 'base64');
+        const pdfData = await pdfParse(pdfBuffer);
+        if (pdfData && pdfData.text && pdfData.text.trim().length > 10) {
+          textToParse = (textToParse ? textToParse + '\n\n' : '') + pdfData.text;
+        } else {
+          logger.warn('Uploaded PDF contained no extractable text stream.');
+        }
+      } catch (pdfErr) {
+        logger.error('Error extracting text from PDF with pdf-parse:', pdfErr);
+      }
+    } else if (isExcel) {
+      try {
+        const ExcelJS = require('exceljs');
+        const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+        const excelBuffer = Buffer.from(cleanBase64, 'base64');
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(excelBuffer);
+        let extractedExcelText = '';
+        workbook.eachSheet((worksheet) => {
+          worksheet.eachRow((row) => {
+            const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
+            extractedExcelText += vals.map(v => (v !== null && v !== undefined ? (typeof v === 'object' && v.text ? v.text : String(v)) : '')).join(' | ') + '\n';
+          });
+        });
+        if (extractedExcelText.trim().length > 10) {
+          textToParse = (textToParse ? textToParse + '\n\n' : '') + extractedExcelText;
+        }
+      } catch (excelErr) {
+        logger.error('Error extracting text from Excel with exceljs:', excelErr);
+      }
+    } else if (imageBase64.startsWith('data:image/')) {
+      validImageForVision = imageBase64;
+    }
+  }
+
+  const messages = [{ role: 'system', content: systemPrompt }];
+  let selectedModel = FAST_MODEL;
+
+  if (validImageForVision && (!textToParse || textToParse.length < 30)) {
+    selectedModel = 'grok-2-vision-1212';
     messages.push({
       role: 'user',
       content: [
         { type: 'text', text: `Please parse this ledger statement image for ${partyType || 'party'}: ${partyName || 'Unknown'}. Extract all transactions accurately.` },
-        { type: 'image_url', image_url: { url: imageBase64 } }
+        { type: 'image_url', image_url: { url: validImageForVision } }
       ]
     });
   } else {
+    if (!textToParse) {
+      throw new Error('Unable to extract readable text or supported image from the uploaded statement file.');
+    }
     messages.push({
       role: 'user',
-      content: `Here is the raw statement text for ${partyType || 'party'}: ${partyName || 'Unknown'}:\n\n${rawText}\n\nParse into the required JSON structure.`
+      content: `Here is the statement document content for ${partyType || 'party'}: ${partyName || 'Unknown'}:\n\n${textToParse}\n\nParse into the required JSON structure.`
     });
   }
 
   const result = await chatCompletion({
     messages,
-    model: FAST_MODEL,
+    model: selectedModel,
     temperature: 0.1,
     responseFormat: { type: 'json_object' }
   });

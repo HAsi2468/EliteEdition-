@@ -108,6 +108,25 @@ export default function LedgerReconciliationPanel() {
     const file = e.target.files?.[0];
     if (!file) return;
     setStmt1File(file);
+
+    // If Excel or CSV, extract text and rows immediately via SheetJS
+    if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const csvText = XLSX.utils.sheet_to_csv(worksheet);
+          setStmt1Text(csvText);
+        } catch (err) {
+          console.warn('SheetJS preview extraction error:', err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => setStmt1Base64(ev.target.result);
     reader.readAsDataURL(file);
@@ -118,6 +137,25 @@ export default function LedgerReconciliationPanel() {
     const file = e.target.files?.[0];
     if (!file) return;
     setStmt2File(file);
+
+    // If Excel or CSV, extract text and rows immediately via SheetJS
+    if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const csvText = XLSX.utils.sheet_to_csv(worksheet);
+          setStmt2Text(csvText);
+        } catch (err) {
+          console.warn('SheetJS preview extraction error:', err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => setStmt2Base64(ev.target.result);
     reader.readAsDataURL(file);
@@ -147,7 +185,8 @@ export default function LedgerReconciliationPanel() {
       }
     } catch (err) {
       console.error('Error parsing Statement 1:', err);
-      alert('Error parsing Statement 1 with Grok AI');
+      const msg = err.response?.data?.message || err.message || 'Error parsing Statement 1 with Grok AI';
+      alert(msg);
     } finally {
       setStmt1Parsing(false);
     }
@@ -177,7 +216,8 @@ export default function LedgerReconciliationPanel() {
       }
     } catch (err) {
       console.error('Error parsing Statement 2:', err);
-      alert('Error parsing Statement 2 with Grok AI');
+      const msg = err.response?.data?.message || err.message || 'Error parsing Statement 2 with Grok AI';
+      alert(msg);
     } finally {
       setStmt2Parsing(false);
     }

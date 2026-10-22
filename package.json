@@ -78,6 +78,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.9",
     "openai": "^7.42.0",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1",
     "pg": "^8.23.0",
     "puppeteer": "^24.43.1",
