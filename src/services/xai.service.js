@@ -4,9 +4,9 @@ const logger = require('../config/logger');
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_BASE_URL = 'https://api.x.ai/v1';
 
-// Preferred models
-const FAST_MODEL = 'grok-4.20-non-reasoning';
-const REASONING_MODEL = 'grok-4.20';
+// Preferred models verified against xAI active endpoints
+const FAST_MODEL = 'grok-4.20-0309-non-reasoning';
+const REASONING_MODEL = 'grok-4.20-0309-reasoning';
 
 /**
  * Send chat completion to xAI Grok API
@@ -16,7 +16,7 @@ async function chatCompletion({
   model = FAST_MODEL,
   temperature = 0.2,
   responseFormat = null,
-  maxTokens = 4000
+  maxTokens = 12000
 }) {
   try {
     const payload = {
@@ -143,7 +143,7 @@ CRITICAL RULES:
   let selectedModel = FAST_MODEL;
 
   if (validImageForVision && (!textToParse || textToParse.length < 30)) {
-    selectedModel = 'grok-2-vision-1212';
+    selectedModel = FAST_MODEL;
     messages.push({
       role: 'user',
       content: [

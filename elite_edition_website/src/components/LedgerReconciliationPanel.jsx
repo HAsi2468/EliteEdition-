@@ -103,83 +103,30 @@ export default function LedgerReconciliationPanel() {
     return { totalDebit, totalCredit, netBalance, count: stmt2Transactions.length };
   }, [stmt2Transactions, stmt2OpeningBal]);
 
-  // Handle File 1 Upload
-  const handleFile1Upload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setStmt1File(file);
+  // Helper to parse Statement 1
+  const parseStmt1WithData = async (b64, txt, party) => {
+    const base64ToUse = b64 !== undefined ? b64 : stmt1Base64;
+    const textToUse = txt !== undefined ? txt : stmt1Text;
+    const nameToUse = party !== undefined ? party : stmt1Name;
+    if (!base64ToUse && !textToUse.trim()) return false;
 
-    // If Excel or CSV, extract text and rows immediately via SheetJS
-    if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const data = new Uint8Array(ev.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const csvText = XLSX.utils.sheet_to_csv(worksheet);
-          setStmt1Text(csvText);
-        } catch (err) {
-          console.warn('SheetJS preview extraction error:', err);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    const reader = new FileReader();
-    reader.onload = (ev) => setStmt1Base64(ev.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  // Handle File 2 Upload
-  const handleFile2Upload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setStmt2File(file);
-
-    // If Excel or CSV, extract text and rows immediately via SheetJS
-    if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const data = new Uint8Array(ev.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const csvText = XLSX.utils.sheet_to_csv(worksheet);
-          setStmt2Text(csvText);
-        } catch (err) {
-          console.warn('SheetJS preview extraction error:', err);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    const reader = new FileReader();
-    reader.onload = (ev) => setStmt2Base64(ev.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  // Parse Statement 1 via Grok AI
-  const handleParseStmt1 = async () => {
-    if (!stmt1Base64 && !stmt1Text.trim()) {
-      alert('Please upload a statement image/PDF or paste statement text for Statement 1.');
-      return;
-    }
     setStmt1Parsing(true);
     try {
       const res = await api.parseReconciliationStatement({
-        rawText: stmt1Text,
-        imageBase64: stmt1Base64,
+        rawText: textToUse,
+        imageBase64: base64ToUse,
         partyType: 'general',
-        partyName: stmt1Name
+        partyName: nameToUse
       });
       if (res?.success && res.parsedData) {
-        if (Array.isArray(res.parsedData.transactions)) {
+        if (Array.isArray(res.parsedData.transactions) && res.parsedData.transactions.length > 0) {
           setStmt1Transactions(res.parsedData.transactions);
         }
         if (res.parsedData.openingBalance) setStmt1OpeningBal(Number(res.parsedData.openingBalance));
+        if (res.parsedData.statementParty && (!stmt1Name || stmt1Name.includes('Statement 1'))) {
+          setStmt1Name(res.parsedData.statementParty);
+        }
+        return res.parsedData.transactions || [];
       } else {
         alert(res?.message || 'Failed to extract transactions for Statement 1');
       }
@@ -190,27 +137,33 @@ export default function LedgerReconciliationPanel() {
     } finally {
       setStmt1Parsing(false);
     }
+    return false;
   };
 
-  // Parse Statement 2 via Grok AI
-  const handleParseStmt2 = async () => {
-    if (!stmt2Base64 && !stmt2Text.trim()) {
-      alert('Please upload a statement image/PDF or paste statement text for Statement 2.');
-      return;
-    }
+  // Helper to parse Statement 2
+  const parseStmt2WithData = async (b64, txt, party) => {
+    const base64ToUse = b64 !== undefined ? b64 : stmt2Base64;
+    const textToUse = txt !== undefined ? txt : stmt2Text;
+    const nameToUse = party !== undefined ? party : stmt2Name;
+    if (!base64ToUse && !textToUse.trim()) return false;
+
     setStmt2Parsing(true);
     try {
       const res = await api.parseReconciliationStatement({
-        rawText: stmt2Text,
-        imageBase64: stmt2Base64,
+        rawText: textToUse,
+        imageBase64: base64ToUse,
         partyType: 'general',
-        partyName: stmt2Name
+        partyName: nameToUse
       });
       if (res?.success && res.parsedData) {
-        if (Array.isArray(res.parsedData.transactions)) {
+        if (Array.isArray(res.parsedData.transactions) && res.parsedData.transactions.length > 0) {
           setStmt2Transactions(res.parsedData.transactions);
         }
         if (res.parsedData.openingBalance) setStmt2OpeningBal(Number(res.parsedData.openingBalance));
+        if (res.parsedData.statementParty && (!stmt2Name || stmt2Name.includes('Statement 2'))) {
+          setStmt2Name(res.parsedData.statementParty);
+        }
+        return res.parsedData.transactions || [];
       } else {
         alert(res?.message || 'Failed to extract transactions for Statement 2');
       }
@@ -221,7 +174,84 @@ export default function LedgerReconciliationPanel() {
     } finally {
       setStmt2Parsing(false);
     }
+    return false;
   };
+
+  // Handle File 1 Upload
+  const handleFile1Upload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStmt1File(file);
+
+    // If Excel or CSV, extract text and rows immediately via SheetJS
+    let localCsv = '';
+    if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          localCsv = XLSX.utils.sheet_to_csv(worksheet);
+          setStmt1Text(localCsv);
+        } catch (err) {
+          console.warn('SheetJS preview extraction error:', err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const b64 = ev.target.result;
+      setStmt1Base64(b64);
+      // Auto-trigger Grok extraction on upload
+      parseStmt1WithData(b64, localCsv);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle File 2 Upload
+  const handleFile2Upload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStmt2File(file);
+
+    // If Excel or CSV, extract text and rows immediately via SheetJS
+    let localCsv = '';
+    if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          localCsv = XLSX.utils.sheet_to_csv(worksheet);
+          setStmt2Text(localCsv);
+        } catch (err) {
+          console.warn('SheetJS preview extraction error:', err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const b64 = ev.target.result;
+      setStmt2Base64(b64);
+      // Auto-trigger Grok extraction on upload
+      parseStmt2WithData(b64, localCsv);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Parse Statement 1 via Grok AI button
+  const handleParseStmt1 = () => parseStmt1WithData();
+
+  // Parse Statement 2 via Grok AI button
+  const handleParseStmt2 = () => parseStmt2WithData();
 
   // Add Manual Row to Statement 1
   const handleAddRowStmt1 = () => {
@@ -243,22 +273,46 @@ export default function LedgerReconciliationPanel() {
 
   // Run AI 3-Way Reconciliation
   const handleRunReconciliation = async () => {
-    if (!stmt1Transactions.length && !stmt2Transactions.length) {
-      alert('Please parse or add transactions into Statement 1 and Statement 2 before reconciling.');
-      return;
-    }
-
     setReconciling(true);
     try {
+      let t1 = stmt1Transactions;
+      let t2 = stmt2Transactions;
+
+      // If Statement 1 not yet parsed, auto-parse now
+      if (!t1.length && (stmt1Base64 || stmt1Text.trim())) {
+        const parsed1 = await parseStmt1WithData();
+        if (Array.isArray(parsed1)) t1 = parsed1;
+      }
+
+      // If Statement 2 not yet parsed, auto-parse now
+      if (!t2.length && (stmt2Base64 || stmt2Text.trim())) {
+        const parsed2 = await parseStmt2WithData();
+        if (Array.isArray(parsed2)) t2 = parsed2;
+      }
+
+      if (!t1.length && !t2.length) {
+        alert('Please upload or paste statements for Book 1 and Book 2 before reconciling.');
+        setReconciling(false);
+        return;
+      }
+
+      const totalDebit1 = t1.reduce((acc, t) => acc + (Number(t.debit) || 0), 0);
+      const totalCredit1 = t1.reduce((acc, t) => acc + (Number(t.credit) || 0), 0);
+      const netBal1 = Number(stmt1OpeningBal || 0) + (totalDebit1 - totalCredit1);
+
+      const totalDebit2 = t2.reduce((acc, t) => acc + (Number(t.debit) || 0), 0);
+      const totalCredit2 = t2.reduce((acc, t) => acc + (Number(t.credit) || 0), 0);
+      const netBal2 = Number(stmt2OpeningBal || 0) + (totalDebit2 - totalCredit2);
+
       const payload = {
         partyType: 'general',
         partyName: `${stmt1Name} vs ${stmt2Name}`,
-        statementItems: stmt2Transactions, // Counterparty
-        erpItems: stmt1Transactions, // Internal / Book 1
+        statementItems: t2, // Counterparty
+        erpItems: t1, // Internal / Book 1
         statementOpeningBalance: stmt2OpeningBal,
-        statementClosingBalance: stmt2Stats.netBalance,
+        statementClosingBalance: netBal2,
         erpOpeningBalance: stmt1OpeningBal,
-        erpClosingBalance: stmt1Stats.netBalance
+        erpClosingBalance: netBal1
       };
 
       const res = await api.runReconciliationMatching(payload);
@@ -269,7 +323,7 @@ export default function LedgerReconciliationPanel() {
       }
     } catch (err) {
       console.error('Reconciliation error:', err);
-      alert('Failed to execute reconciliation.');
+      alert('Failed to execute reconciliation: ' + (err.message || ''));
     } finally {
       setReconciling(false);
     }
@@ -804,16 +858,16 @@ export default function LedgerReconciliationPanel() {
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <button
           onClick={handleRunReconciliation}
-          disabled={reconciling || (!stmt1Transactions.length && !stmt2Transactions.length)}
+          disabled={reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim())}
           style={{
             padding: '0.85rem 2.2rem',
             borderRadius: '12px',
             border: 'none',
-            background: reconciling || (!stmt1Transactions.length && !stmt2Transactions.length) ? '#94a3b8' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+            background: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim()) ? '#94a3b8' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
             color: '#ffffff',
             fontWeight: 800,
             fontSize: '0.98rem',
-            cursor: reconciling || (!stmt1Transactions.length && !stmt2Transactions.length) ? 'not-allowed' : 'pointer',
+            cursor: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim()) ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.65rem',
