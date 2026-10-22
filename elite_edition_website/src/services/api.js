@@ -2607,10 +2607,13 @@ export const api = {
     return request(`/communication/groups/${groupId}/messages${qs}`);
   },
 
-  async sendCommunicationMessage(groupId, data) {
+  async sendCommunicationMessage(groupId, data, options = {}) {
+    const idempotencyKey = data?.clientMsgId || options.idempotencyKey;
     return request(`/communication/groups/${groupId}/messages`, {
       method: 'POST',
       body: JSON.stringify(data),
+      idempotencyKey,
+      ...options,
     });
   },
 

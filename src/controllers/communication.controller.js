@@ -169,11 +169,11 @@ const getGroups = async (req, res) => {
 const getGroupMessages = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { page = 1, limit = 50, msgType } = req.query;
+    const { page = 1, limit = 50, msgType, beforeSeq, before, afterSeq, after } = req.query;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
-    const skip = (pageNum - 1) * limitNum;
+    const skip = (beforeSeq || before || afterSeq || after) ? 0 : (pageNum - 1) * limitNum;
 
     const room = await ChatRoom.findById(groupId).select('_id type members');
     if (!room) {
@@ -211,6 +211,18 @@ const getGroupMessages = async (req, res) => {
 
     const roomObjId = mongoose.Types.ObjectId.isValid(groupId) ? new mongoose.Types.ObjectId(groupId) : groupId;
     const query = { roomId: roomObjId };
+
+    // Cursor-based pagination filtering (older messages: beforeSeq / before; newer messages: afterSeq / after)
+    if (beforeSeq) {
+      query.roomSeq = { $lt: parseInt(beforeSeq, 10) };
+    } else if (before && mongoose.Types.ObjectId.isValid(before)) {
+      query._id = { $lt: new mongoose.Types.ObjectId(before) };
+    } else if (afterSeq) {
+      query.roomSeq = { $gt: parseInt(afterSeq, 10) };
+    } else if (after && mongoose.Types.ObjectId.isValid(after)) {
+      query._id = { $gt: new mongoose.Types.ObjectId(after) };
+    }
+
     if (msgType === 'human') {
       query.$or = [{ msgType: 'human' }, { msgType: { $exists: false } }, { msgType: null }, { msgType: '' }];
     } else if (msgType === 'system_activity') {
@@ -399,10 +411,25 @@ const postGroupMessage = async (req, res) => {
       }
     }
 
-    const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds } = req.body;
+    const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds, clientMsgId: inClientMsgId } = req.body;
+    const clientMsgId = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || inClientMsgId || null;
 
     if (!content && !attachment && type !== 'poll') {
       return res.status(400).json({ success: false, message: 'Message content, attachment, or poll is required' });
+    }
+
+    // Idempotency: Return existing message on retry or duplicate POST instead of creating duplicate DB document
+    if (clientMsgId) {
+      const existingMsg = await ChatMessage.findOne({ roomId: groupId, clientMsgId })
+        .populate('senderId', 'name username email role')
+        .populate('readBy', 'name username email')
+        .populate('pollMeta.options.votes', 'name username email')
+        .populate({ path: 'reactions.user', select: 'name username email' })
+        .populate({ path: 'replyTo', populate: { path: 'senderId', select: 'name username email' } })
+        .lean();
+      if (existingMsg) {
+        return res.status(200).json({ success: true, data: existingMsg, duplicate: true });
+      }
     }
 
     // Attachment security validation (block executables and oversized files)
@@ -506,7 +533,8 @@ const postGroupMessage = async (req, res) => {
       roomId: groupId,
       senderId: senderObjId,
       senderName: resolvedSenderName,
-      content: sanitizedContent || (pollMeta ? pollMeta.question : ''),
+      clientMsgId: clientMsgId || undefined,
+      content: sanitizedContent || (pollMeta ? pollMeta.question : (attachment?.fileName || '')),
       replyTo: replyTo || null,
       type: msgType,
       msgType: 'human',

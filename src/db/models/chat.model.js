@@ -98,7 +98,8 @@ const chatMessageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      default: '',
+      trim: true,
     },
     type: {
       type: String,
@@ -125,6 +126,7 @@ const chatMessageSchema = new mongoose.Schema(
       fileType: { type: String },
       fileUrl: { type: String },
       fileSize: { type: Number },
+      mimeType: { type: String },
       durationSec: { type: Number }
     },
 
@@ -233,6 +235,12 @@ const chatMessageSchema = new mongoose.Schema(
         recordRef: { type: String, default: '' },
       }
     ],
+    // Client-side idempotency tracking key to prevent duplicate sends/retries
+    clientMsgId: {
+      type: String,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -248,6 +256,7 @@ chatRoomSchema.index({ isArchived: 1, updatedAt: -1 });
 chatMessageSchema.index({ roomId: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, msgType: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, senderId: 1, readBy: 1 });
+chatMessageSchema.index({ roomId: 1, clientMsgId: 1 }, { sparse: true });
 chatMessageSchema.index({ senderId: 1 });
 chatMessageSchema.index({ content: 'text' });
 

@@ -250,6 +250,28 @@ function CsvDataViewer({ fileUrl, fileName }) {
   );
 }
 
+// Unified Message Deduplication & Monotonic Ordering Helper
+const mergeMessages = (prev = [], incoming = []) => {
+  const map = new Map();
+  for (const m of (prev || [])) {
+    if (m && m._id) map.set(String(m._id), m);
+  }
+  for (const m of (incoming || [])) {
+    if (m && m._id) {
+      const existing = map.get(String(m._id));
+      map.set(String(m._id), existing ? { ...existing, ...m } : m);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.roomSeq != null && b.roomSeq != null && a.roomSeq !== b.roomSeq) {
+      return a.roomSeq - b.roomSeq;
+    }
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    return timeA - timeB;
+  });
+};
+
 export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat', activeTab = 'communication', onUnreadChange }) {
   const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
 
@@ -492,28 +514,42 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    let rAFId = null;
+    let lastHeight = null;
+
     const handleResize = () => {
-      const isMob = window.innerWidth < 768;
-      setIsMobileScreen(isMob);
-      if (isMob) {
-        const vv = window.visualViewport;
-        setViewportHeight(vv ? vv.height : window.innerHeight);
-      } else {
-        setViewportHeight(null);
-      }
+      if (rAFId) cancelAnimationFrame(rAFId);
+      rAFId = requestAnimationFrame(() => {
+        const isMob = window.innerWidth < 768;
+        setIsMobileScreen(isMob);
+        if (isMob) {
+          const vv = window.visualViewport;
+          const newH = vv ? Math.round(vv.height) : window.innerHeight;
+          // Only trigger state re-render if height change is substantial (> 30px, e.g. software keyboard)
+          if (lastHeight === null || Math.abs(newH - lastHeight) > 30) {
+            lastHeight = newH;
+            setViewportHeight(newH);
+          }
+        } else {
+          if (lastHeight !== null) {
+            lastHeight = null;
+            setViewportHeight(null);
+          }
+        }
+      });
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleResize);
-      window.visualViewport.addEventListener('scroll', handleResize);
+      // NOTE: Do NOT attach to visualViewport 'scroll' to prevent rapid re-render loops while scrolling on mobile
     }
     return () => {
+      if (rAFId) cancelAnimationFrame(rAFId);
       window.removeEventListener('resize', handleResize);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleResize);
-        window.visualViewport.removeEventListener('scroll', handleResize);
       }
     };
   }, []);
@@ -645,6 +681,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [page, setPage] = useState(1);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const loadingOlderRef = useRef(false);
+  const hasMoreMessagesRef = useRef(true);
   const chatScrollRef = useRef(null);
 
   // Admin Clear All Data Modal State
@@ -1551,10 +1590,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     activeGroupIdRef.current = activeGroup?._id;
   }, [activeGroup?._id]);
 
-  // Keep in-memory cache synchronized with current messages
+  // Keep in-memory cache synchronized with current messages without cross-room pollution
   useEffect(() => {
-    if (activeGroup?._id && messages && messages.length > 0) {
-      messagesCacheRef.current[activeGroup._id] = messages;
+    if (activeGroup?._id && Array.isArray(messages) && messages.length > 0) {
+      const firstWithRoom = messages.find((m) => m && m.roomId);
+      if (firstWithRoom && String(firstWithRoom.roomId) === String(activeGroup._id)) {
+        messagesCacheRef.current[activeGroup._id] = messages;
+      }
     }
   }, [activeGroup?._id, messages]);
 
@@ -1601,10 +1643,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       const currentActiveId = activeGroupIdRef.current;
       if (currentActiveId && String(msg.roomId) === String(currentActiveId)) {
         setMessages((prev) => {
-          // Filter out optimistic placeholder if real message arrives
-          const filtered = prev.filter((m) => !(m.isOptimistic && (m.content === msg.content || String(m._id) === String(msg._id))));
-          if (filtered.some((m) => String(m._id) === String(msg._id))) return filtered;
-          return [...filtered, msg];
+          // Filter out matching optimistic placeholder if real message arrives
+          const filtered = prev.filter((m) => !(m.isOptimistic && ((m.clientMsgId && msg.clientMsgId && m.clientMsgId === msg.clientMsgId) || m.content === msg.content || String(m._id) === String(msg._id))));
+          return mergeMessages(filtered, [msg]);
         });
         if (socket && uId) {
           socket.emit('read-room-messages', { roomId: currentActiveId, userId: uId });
@@ -2067,22 +2108,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       );
 
       if (activeRoomMsgs.length > 0) {
-        setMessages((prev) => {
-          const map = new Map();
-          for (const m of prev) {
-            map.set(String(m._id), m);
-          }
-          for (const m of activeRoomMsgs) {
-            const existing = map.get(String(m._id));
-            map.set(String(m._id), existing ? { ...existing, ...m } : m);
-          }
-          return Array.from(map.values()).sort((a, b) => {
-            if (a.roomSeq != null && b.roomSeq != null && a.roomSeq !== b.roomSeq) {
-              return a.roomSeq - b.roomSeq;
-            }
-            return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-          });
-        });
+        setMessages((prev) => mergeMessages(prev, activeRoomMsgs));
       }
 
       // Also update groups' lastMessage & updatedAt
@@ -2451,9 +2477,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return;
     }
 
+    const ext = file.type ? file.type.split('/')[1] || 'png' : 'png';
     let rawFileName = file.name || '';
     if (!rawFileName || rawFileName.toLowerCase() === 'blob' || rawFileName === 'blob.blob') {
-      const ext = file.type ? file.type.split('/')[1] || 'png' : 'png';
       rawFileName = `upload-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
     }
     const lowerName = rawFileName.toLowerCase();

@@ -302,7 +302,7 @@ const setupSockets = (io) => {
     // Handle sending a standard text message (supports quoted replies, attachments, mentions, priority, voice notes, record cards)
     socket.on('send-message', async (data, callback) => {
       try {
-        const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds } = data;
+        const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds, clientMsgId } = data;
         
         // Anti-Spoofing: Bind sender strictly to authenticated socket user when available
         const actualSenderId = socket.userId || (socket.user ? String(socket.user._id) : senderId);
@@ -310,6 +310,22 @@ const setupSockets = (io) => {
           socket.emit('error-notice', { message: 'Authentication required to post messages' });
           if (typeof callback === 'function') callback({ success: false, error: 'Authentication required' });
           return;
+        }
+
+        // Idempotency check: If clientMsgId already saved (e.g. from HTTP attempt), return existing message
+        if (clientMsgId) {
+          const existingMsg = await ChatMessage.findOne({ roomId, clientMsgId })
+            .populate('senderId', 'name username email')
+            .populate('readBy', 'name username email')
+            .populate({ path: 'reactions.user', select: 'name username email' })
+            .populate({ path: 'replyTo', populate: { path: 'senderId', select: 'name username email' } })
+            .populate('mentions', 'name username email');
+          if (existingMsg) {
+            if (typeof callback === 'function') {
+              callback({ success: true, message: existingMsg, duplicate: true });
+            }
+            return;
+          }
         }
 
         // Socket Flood Rate Limiting (max 10 messages per 3 seconds per socket)
@@ -426,7 +442,8 @@ const setupSockets = (io) => {
         const newMessage = await ChatMessage.create({
           roomId,
           senderId: actualSenderId,
-          content: sanitizedContent || '',
+          clientMsgId: clientMsgId || undefined,
+          content: sanitizedContent || (attachment?.fileName || ''),
           replyTo: replyTo || null,
           type: msgType,
           msgType: 'human',
