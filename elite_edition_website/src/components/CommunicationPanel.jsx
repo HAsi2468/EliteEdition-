@@ -5062,9 +5062,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     );
                   }
 
+                  const sortedList = [...filteredList].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
                   let lastDateHeader = '';
 
-                  return filteredList.map((msg, msgIndex) => {
+                  return sortedList.map((msg, msgIndex) => {
                     const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
                     const isSystemActivity = msg.msgType === 'system_activity';
 
@@ -5080,7 +5081,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       return (
                         <React.Fragment key={msg._id}>
                           {showDateHeader && (
-                            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0', position: 'sticky', top: 0, zIndex: 10, pointerEvents: 'none' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '1rem 0 0.5rem', width: '100%', clear: 'both' }}>
                               <span className="phoenix-date-badge">
                                 {msgDateHeader}
                               </span>
@@ -5185,7 +5186,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     return (
                       <React.Fragment key={msg._id}>
                         {showDateHeader && (
-                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.6rem 0', position: 'sticky', top: 4, zIndex: 10, pointerEvents: 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '1rem 0 0.5rem', width: '100%', clear: 'both' }}>
                             <span className="phoenix-date-badge">
                               {msgDateHeader}
                             </span>
