@@ -1304,8 +1304,15 @@ export default function JobPrintingLog() {
     setSubmitting(true);
     try {
       const payload = {
-        ...editModalLog,
-        meters: parseFloat(editModalLog.meters)
+        date: editModalLog.date,
+        shift: editModalLog.shift || 'General',
+        pass: editModalLog.pass || '',
+        jobNo: editModalLog.jobNo,
+        jobCardId: editModalLog.jobCardId,
+        machineName: editModalLog.machineName,
+        meters: parseFloat(editModalLog.meters),
+        operatorName: editModalLog.operatorName || '',
+        notes: editModalLog.notes || ''
       };
 
       await api.updateJobPrintLog(editModalLog._id, payload);

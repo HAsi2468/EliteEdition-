@@ -981,7 +981,16 @@ export const api = {
     return request(`/jobPrintLogs/job/${jobNoOrId}`);
   },
   async updateJobPrintLog(id, data) {
-    return request(`/jobPrintLogs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const cleanData = data && typeof data === 'object' ? { ...data } : {};
+    delete cleanData._id;
+    delete cleanData.id;
+    delete cleanData.matchedJob;
+    delete cleanData.__v;
+    delete cleanData.createdAt;
+    delete cleanData.updatedAt;
+    delete cleanData.created_date_time;
+    delete cleanData.updated_date_time;
+    return request(`/jobPrintLogs/${id}`, { method: 'PUT', body: JSON.stringify(cleanData) });
   },
   async deleteJobPrintLog(id) {
     return request(`/jobPrintLogs/${id}`, { method: 'DELETE' });
