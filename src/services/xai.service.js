@@ -102,12 +102,21 @@ CRITICAL RULES:
 
     if (isPdf) {
       try {
-        const pdfParse = require('pdf-parse');
         const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
         const pdfBuffer = Buffer.from(cleanBase64, 'base64');
-        const pdfData = await pdfParse(pdfBuffer);
-        if (pdfData && pdfData.text && pdfData.text.trim().length > 10) {
-          textToParse = (textToParse ? textToParse + '\n\n' : '') + pdfData.text;
+        const pdfModule = require('pdf-parse');
+        let pdfText = '';
+        if (typeof pdfModule === 'function') {
+          const pdfData = await pdfModule(pdfBuffer);
+          pdfText = pdfData?.text || '';
+        } else if (pdfModule && pdfModule.PDFParse) {
+          const parser = new pdfModule.PDFParse({ data: pdfBuffer });
+          const res = await parser.getText();
+          pdfText = res?.text || '';
+          await parser.destroy();
+        }
+        if (pdfText && pdfText.trim().length > 10) {
+          textToParse = (textToParse ? textToParse + '\n\n' : '') + pdfText;
         } else {
           logger.warn('Uploaded PDF contained no extractable text stream.');
         }
