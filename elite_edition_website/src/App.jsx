@@ -1253,13 +1253,14 @@ export default function App() {
     };
 
     const handleJobStageUpdate = (data) => {
+      if (!window._eliteRecentToasts) window._eliteRecentToasts = new Map();
       const rawStage = data?.newStage || data?.stage || data?.status;
       const stageName = rawStage && String(rawStage).trim() !== 'undefined' && String(rawStage).trim() !== 'null' ? String(rawStage).trim() : null;
       if (data && data.jobNo && stageName) {
-        const toastKey = `job_stage_${data.jobNo}_${stageName}`;
+        // Collapse all identical stage events for this jobNo within 5 seconds (only 1 toast)
+        const toastKey = `job_stage_${data.jobNo}`;
         const now = Date.now();
-        const lastToastTime = window._eliteRecentToasts?.get(toastKey) || 0;
-        if (!window._eliteRecentToasts) window._eliteRecentToasts = new Map();
+        const lastToastTime = window._eliteRecentToasts.get(toastKey) || 0;
         if (now - lastToastTime > 5000) {
           window._eliteRecentToasts.set(toastKey, now);
           triggerPushNotification('⚙️ Job Stage Updated', `Job #${data.jobNo} moved to '${stageName}'`, 'success', 'jobcards_list');

@@ -327,7 +327,9 @@ const broadcastApprovalResolution = (req, approval, status, executionResult = nu
           if (modLower.includes('jobcard') || modLower.includes('job')) {
             io.to(r).emit('job-updated', payload);
             io.to(r).emit('jobCardUpdated', payload);
-            io.to(r).emit('job-stage-updated', payload);
+            if (payload && (payload.newStage || payload.stage) && String(payload.newStage || payload.stage) !== 'undefined') {
+              io.to(r).emit('job-stage-updated', payload);
+            }
           }
           if (modLower.includes('fabric')) {
             io.to(r).emit('fabric-updated', { type: 'transaction-updated', data: payload });

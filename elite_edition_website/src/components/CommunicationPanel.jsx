@@ -42,6 +42,7 @@ import {
   Info,
   Paperclip,
   AlertTriangle,
+  AlertCircle,
   FileText,
   Image as ImageIcon,
   X,
@@ -253,22 +254,62 @@ function CsvDataViewer({ fileUrl, fileName }) {
 // Unified Message Deduplication & Monotonic Ordering Helper
 const mergeMessages = (prev = [], incoming = []) => {
   const map = new Map();
-  for (const m of (prev || [])) {
-    if (m && m._id) map.set(String(m._id), m);
-  }
-  for (const m of (incoming || [])) {
-    if (m && m._id) {
-      const existing = map.get(String(m._id));
-      map.set(String(m._id), existing ? { ...existing, ...m } : m);
+  const clientMsgIdMap = new Map();
+  const signatureMap = new Map();
+
+  const getSignature = (m) => {
+    if (!m) return '';
+    const sId = typeof m.senderId === 'object' ? (m.senderId?._id || m.senderId?.id) : m.senderId;
+    const time = m.createdAt ? new Date(m.createdAt).toISOString().slice(0, 19) : '';
+    const content = (m.content || '').trim().slice(0, 80);
+    return `${sId}_${time}_${content}`;
+  };
+
+  const processMsg = (m) => {
+    if (!m) return;
+    const id = m._id ? String(m._id) : null;
+    const cId = m.clientMsgId ? String(m.clientMsgId) : null;
+    const sig = getSignature(m);
+
+    let matchedKey = null;
+    if (id && map.has(id)) {
+      matchedKey = id;
+    } else if (cId && clientMsgIdMap.has(cId)) {
+      matchedKey = clientMsgIdMap.get(cId);
+    } else if (sig && signatureMap.has(sig)) {
+      matchedKey = signatureMap.get(sig);
     }
-  }
+
+    if (matchedKey && map.has(matchedKey)) {
+      const existing = map.get(matchedKey);
+      const isExistingTemp = existing.isOptimistic || String(existing._id).startsWith('temp_');
+      const isNewReal = !m.isOptimistic && !String(m._id).startsWith('temp_');
+
+      if (isExistingTemp && isNewReal) {
+        map.delete(matchedKey);
+        map.set(id || matchedKey, { ...existing, ...m, isOptimistic: false });
+      } else {
+        map.set(matchedKey, { ...existing, ...m });
+      }
+    } else {
+      const key = id || cId || `temp_${Math.random()}`;
+      map.set(key, m);
+      if (cId) clientMsgIdMap.set(cId, key);
+      if (sig) signatureMap.set(sig, key);
+    }
+  };
+
+  for (const m of (prev || [])) processMsg(m);
+  for (const m of (incoming || [])) processMsg(m);
+
   return Array.from(map.values()).sort((a, b) => {
     if (a.roomSeq != null && b.roomSeq != null && a.roomSeq !== b.roomSeq) {
       return a.roomSeq - b.roomSeq;
     }
     const timeA = new Date(a.createdAt || 0).getTime();
     const timeB = new Date(b.createdAt || 0).getTime();
-    return timeA - timeB;
+    if (timeA !== timeB) return timeA - timeB;
+    return String(a._id || '').localeCompare(String(b._id || ''));
   });
 };
 
@@ -288,6 +329,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [searchQuery, setSearchQuery] = useState('');
   const [messageSearchResults, setMessageSearchResults] = useState([]);
   const [isSearchingMessages, setIsSearchingMessages] = useState(false);
+  const [streamHistoryError, setStreamHistoryError] = useState(null);
 
   // Mobile View Guarantee: When user navigates to Communication, ALWAYS display the Chats list screen on mobile!
   useEffect(() => {
@@ -685,6 +727,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const loadingOlderRef = useRef(false);
   const hasMoreMessagesRef = useRef(true);
   const chatScrollRef = useRef(null);
+  const fetchAbortControllerRef = useRef(null);
 
   // Admin Clear All Data Modal State
   const [showClearAllModal, setShowClearAllModal] = useState(false);
@@ -2184,9 +2227,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }));
     }
 
-    // Reset pagination and stream state on room switch
+    // Abort any ongoing stream history fetch from previous room
+    if (fetchAbortControllerRef.current) {
+      try { fetchAbortControllerRef.current.abort(); } catch (e) {}
+    }
+    fetchAbortControllerRef.current = new AbortController();
+
+    // Reset pagination, error, and stream state on room switch
+    activeGroupIdRef.current = targetGroup._id;
+    setStreamHistoryError(null);
     setPage(1);
     setHasMoreMessages(true);
+    hasMoreMessagesRef.current = true;
     setLoadingMoreMessages(false);
 
     // Instantly show cached messages if available
@@ -2312,7 +2364,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const fetchGroupMessages = async (groupId, filter, showLoader = false) => {
     if (!groupId) return;
-    if (showLoader) setLoadingMessages(true);
+    if (showLoader) {
+      setLoadingMessages(true);
+      setStreamHistoryError(null);
+    }
     try {
       const params = { limit: 50 };
       if (filter === 'human' || filter === 'system_activity') {
@@ -2342,6 +2397,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         setMessages(list);
         setPage(1);
         setHasMoreMessages(list.length >= 50);
+        hasMoreMessagesRef.current = list.length >= 50;
+        setStreamHistoryError(null);
 
         if (!filter || filter === 'all') {
           messagesCacheRef.current[groupId] = list;
@@ -2355,9 +2412,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         setGroups((prev) =>
           prev.map((g) => (String(g._id) === String(groupId) ? { ...g, unreadCount: 0 } : g))
         );
+      } else {
+        if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
+          setStreamHistoryError(res?.message || 'Failed to load stream history');
+        }
       }
     } catch (err) {
       console.error('Failed to fetch group messages:', err);
+      if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
+        setStreamHistoryError(err.message || 'Network timeout loading stream history');
+      }
     } finally {
       if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
         setLoadingMessages(false);
@@ -3514,24 +3578,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       const scrollHeightBefore = el.scrollHeight;
 
       try {
-        const oldestRealMsg = messages.find((m) => m && m._id && !m.isOptimistic);
+        const oldestRealMsg = messages.find((m) => m && m._id && !m.isOptimistic && !String(m._id).startsWith('temp_'));
         const params = { limit: 50 };
-        if (oldestRealMsg) {
-          if (oldestRealMsg.roomSeq != null) {
-            params.beforeSeq = oldestRealMsg.roomSeq;
-          } else if (oldestRealMsg._id) {
-            params.before = oldestRealMsg._id;
-          }
+        if (oldestRealMsg && oldestRealMsg._id) {
+          params.before = String(oldestRealMsg._id);
         } else {
           params.page = page + 1;
         }
         if (msgFilter === 'human' || msgFilter === 'system_activity') params.msgType = msgFilter;
 
         const res = await api.getCommunicationMessages(activeGroup._id, params);
-        if (res.success && res.data) {
-          if (res.data.length < 50) setHasMoreMessages(false);
+        if (res && res.success && res.data) {
+          const incoming = res.data || [];
+          if (incoming.length < 50) {
+            setHasMoreMessages(false);
+            hasMoreMessagesRef.current = false;
+          }
           // Monotonically merge and deduplicate to eliminate duplicate pairs on prepend
-          setMessages((prev) => mergeMessages(prev, res.data));
+          setMessages((prev) => mergeMessages(prev, incoming));
           setPage((p) => p + 1);
 
           requestAnimationFrame(() => {
@@ -3539,6 +3603,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight - scrollHeightBefore;
             }
           });
+        } else {
+          setHasMoreMessages(false);
+          hasMoreMessagesRef.current = false;
         }
       } catch (err) {
         console.error('Failed to load older messages:', err);
@@ -5236,6 +5303,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         <RefreshCw size={20} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
                         <div>Loading stream history...</div>
+                      </div>
+                    );
+                  }
+
+                  if (streamHistoryError) {
+                    return (
+                      <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1.5rem' }}>
+                        <AlertCircle size={28} color="#ef4444" style={{ marginBottom: '0.5rem' }} />
+                        <div style={{ fontWeight: 600, color: '#ef4444', marginBottom: '0.6rem' }}>{streamHistoryError}</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStreamHistoryError(null);
+                            if (activeGroup?._id) fetchGroupMessages(activeGroup._id, msgFilter, true);
+                          }}
+                          style={{
+                            padding: '6px 14px',
+                            background: '#2563eb',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Retry
+                        </button>
                       </div>
                     );
                   }

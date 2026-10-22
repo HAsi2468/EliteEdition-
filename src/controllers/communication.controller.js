@@ -229,15 +229,15 @@ const getGroupMessages = async (req, res) => {
     const roomObjId = mongoose.Types.ObjectId.isValid(groupId) ? new mongoose.Types.ObjectId(groupId) : groupId;
     const query = { roomId: roomObjId };
 
-    // Cursor-based pagination filtering (older messages: beforeSeq / before; newer messages: afterSeq / after)
-    if (beforeSeq) {
-      query.roomSeq = { $lt: parseInt(beforeSeq, 10) };
-    } else if (before && mongoose.Types.ObjectId.isValid(before)) {
+    // Cursor-based pagination filtering (older messages: before / beforeSeq; newer messages: after / afterSeq)
+    if (before && mongoose.Types.ObjectId.isValid(before)) {
       query._id = { $lt: new mongoose.Types.ObjectId(before) };
-    } else if (afterSeq) {
-      query.roomSeq = { $gt: parseInt(afterSeq, 10) };
+    } else if (beforeSeq) {
+      query.roomSeq = { $lt: parseInt(beforeSeq, 10) };
     } else if (after && mongoose.Types.ObjectId.isValid(after)) {
       query._id = { $gt: new mongoose.Types.ObjectId(after) };
+    } else if (afterSeq) {
+      query.roomSeq = { $gt: parseInt(afterSeq, 10) };
     }
 
     if (msgType === 'human') {
@@ -259,16 +259,18 @@ const getGroupMessages = async (req, res) => {
           path: 'replyTo',
           populate: { path: 'senderId', select: 'name username email' }
         })
-        .sort({ roomSeq: -1, createdAt: -1 })
+        .sort({ _id: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean()
     ]);
 
-    // Return in monotonic chronological order (roomSeq ascending, fallback createdAt)
+    // Return in monotonic chronological order (ascending by timestamp and _id)
     messages.sort((a, b) => {
-      if (a.roomSeq && b.roomSeq) return a.roomSeq - b.roomSeq;
-      return new Date(a.createdAt) - new Date(b.createdAt);
+      const tA = new Date(a.createdAt || 0).getTime();
+      const tB = new Date(b.createdAt || 0).getTime();
+      if (tA !== tB) return tA - tB;
+      return String(a._id).localeCompare(String(b._id));
     });
 
     res.json({
