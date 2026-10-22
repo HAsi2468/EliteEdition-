@@ -843,11 +843,16 @@ const searchMessages = async (req, res) => {
     const trimmed = q.trim();
     const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Query messages by case-insensitive regex search
+    // Query messages by case-insensitive regex search (matching content or attachment file names)
     const query = {
       roomId: { $in: accessibleRoomIds },
       isDeleted: { $ne: true },
-      content: { $regex: escapedQuery, $options: 'i' }
+      $or: [
+        { content: { $regex: escapedQuery, $options: 'i' } },
+        { 'attachment.fileName': { $regex: escapedQuery, $options: 'i' } },
+        { 'attachment.originalName': { $regex: escapedQuery, $options: 'i' } },
+        { 'attachment.name': { $regex: escapedQuery, $options: 'i' } }
+      ]
     };
 
     const results = await ChatMessage.find(query)

@@ -68,11 +68,36 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   const formatLocalDate = (d) => {
     if (!d) return '';
+    if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) {
+      return d.substring(0, 10);
+    }
     const dateObj = typeof d === 'string' ? new Date(d) : d;
-    const y = dateObj.getFullYear();
-    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    if (isNaN(dateObj?.getTime?.())) return '';
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(dateObj);
+    } catch (_) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  };
+
+  const formatTaskDueDateDisplay = (d, options = { day: '2-digit', month: '2-digit', year: 'numeric' }) => {
+    if (!d) return '—';
+    if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) {
+      const [y, m, day] = d.substring(0, 10).split('-').map(Number);
+      const noonDate = new Date(y, m - 1, day, 12, 0, 0);
+      return noonDate.toLocaleDateString('en-GB', options);
+    }
+    const dateObj = typeof d === 'string' ? new Date(d) : d;
+    if (isNaN(dateObj?.getTime?.())) return '—';
+    return dateObj.toLocaleDateString('en-GB', { ...options, timeZone: 'Asia/Kolkata' });
   };
 
   const isTaskOverdue = (task) => {
@@ -503,7 +528,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setEditDesc(task.description || '');
     setEditPriority(task.priority || 'medium');
     setEditDepartment(task.department || 'General');
-    setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+    setEditDueDate(task.dueDate ? formatLocalDate(task.dueDate) : '');
     setEditEstHours(task.estimatedHours != null ? String(task.estimatedHours) : '');
     setEditProjectRef(task.projectRef || '');
     setEditClientName(task.clientName || '');
@@ -1205,7 +1230,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
               const checkDone = (t.checklist || []).filter((c) => c.completed).length;
               const logged = (t.timeLogs || []).reduce((sum, l) => sum + (l.hours || 0), 0).toFixed(1);
               const assigner = t.createdBy ? (typeof t.createdBy === 'object' ? (t.createdBy.name || t.createdBy.username) : 'Staff') : 'Admin';
-              const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+              const dueStr = formatTaskDueDateDisplay(t.dueDate);
               const tagsList = Array.isArray(t.tags) ? t.tags.map(tag => (typeof tag === 'object' && tag ? tag.text : tag)).filter(Boolean) : [];
               const attachmentsList = Array.isArray(t.attachments) ? t.attachments.filter(Boolean) : [];
 
@@ -2737,7 +2762,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                       flexShrink: 0
                                     }}>
                                       <AlertCircle size={11} color="#dc2626" />
-                                      <span>Overdue{t.dueDate ? ` (${new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })})` : ''}</span>
+                                      <span>Overdue{t.dueDate ? ` (${formatTaskDueDateDisplay(t.dueDate, { day: '2-digit', month: 'short' })})` : ''}</span>
                                     </span>
                                   )}
 
@@ -2946,10 +2971,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                         border: `1px solid ${isOverdue ? '#fecaca' : '#e2e8f0'}`,
                                         color: isOverdue ? '#dc2626' : '#475569'
                                       }}
-                                      title={`Due date: ${new Date(t.dueDate).toLocaleDateString()}`}
+                                      title={`Due date: ${formatTaskDueDateDisplay(t.dueDate)}`}
                                     >
                                       <Calendar size={11} color={isOverdue ? '#dc2626' : '#64748b'} />
-                                      <span>{new Date(t.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                                      <span>{formatTaskDueDateDisplay(t.dueDate)}</span>
                                     </div>
                                   ) : null}
 
@@ -5225,7 +5250,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Due Date</label>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'Done' ? '#dc2626' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Calendar size={13} />
-                    <span>{selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : 'No deadline set'}</span>
+                    <span>{selectedTask.dueDate ? formatTaskDueDateDisplay(selectedTask.dueDate) : 'No deadline set'}</span>
                     {selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'Done' && (
                       <span style={{ fontSize: '0.6rem', color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
                         OVERDUE

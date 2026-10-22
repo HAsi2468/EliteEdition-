@@ -44,7 +44,7 @@ export function useFileUpload(defaultOptions = {}) {
     if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
     if (type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(name)) return 'audio';
     if (/\.(xls|xlsx|csv)$/i.test(name)) return 'spreadsheet';
-    if (/\.(doc|docx|txt|rtf)$/i.test(name)) return 'document';
+    if (/\.(doc|docx|txt|rtf|md|markdown|json)$/i.test(name)) return 'document';
     if (/\.(zip|rar|7z|tar|gz)$/i.test(name)) return 'archive';
     return 'file';
   }, []);

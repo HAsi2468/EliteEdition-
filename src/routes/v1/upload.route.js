@@ -41,7 +41,8 @@ const sharp = require('sharp');
 
 const ALLOWED_EXTENSIONS = new Set([
   '.jpg', '.jpeg', '.jfif', '.png', '.webp', '.pdf', '.gif',
-  '.csv', '.xlsx', '.xls', '.docx', '.doc', '.txt', '.zip', '.svg', '.bmp'
+  '.csv', '.xlsx', '.xls', '.docx', '.doc', '.txt', '.zip', '.svg', '.bmp',
+  '.md', '.markdown', '.json'
 ]);
 
 const MIME_TO_EXT = {
@@ -57,6 +58,9 @@ const MIME_TO_EXT = {
   'application/pdf': '.pdf',
   'text/plain': '.txt',
   'text/csv': '.csv',
+  'text/markdown': '.md',
+  'text/x-markdown': '.md',
+  'application/json': '.json',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
   'application/vnd.ms-excel': '.xls',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
@@ -82,8 +86,8 @@ function verifyFileSignature(buffer, ext) {
   if (buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07)) return true;
   // Legacy MS Office (DOC/XLS): D0 CF 11 E0
   if (buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0) return true;
-  // CSV / plain text / SVG
-  if (ext === '.csv' || ext === '.txt' || ext === '.svg') {
+  // CSV / plain text / SVG / Markdown / JSON (no null bytes in initial chunk)
+  if (ext === '.csv' || ext === '.txt' || ext === '.svg' || ext === '.md' || ext === '.markdown' || ext === '.json') {
     return !buffer.slice(0, 512).includes(0x00);
   }
   // Generic fallback: check if starts with known safe image magic bytes
@@ -357,6 +361,7 @@ router.get('/download', async (req, res) => {
       responseType: 'stream',
       timeout: 30000
     });
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName)}"`);
     if (response.headers['content-type']) {
       res.setHeader('Content-Type', response.headers['content-type']);

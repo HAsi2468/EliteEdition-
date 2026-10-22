@@ -125,57 +125,76 @@ function CsvDataViewer({ fileUrl, fileName }) {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetch(fileUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load file');
-        return res.text();
-      })
-      .then((text) => {
-        if (!active) return;
-        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-        if (lines.length === 0) {
-          setData({ headers: ['(Empty File)'], rows: [], totalRows: 0 });
+
+    const loadCsv = async () => {
+      let text = null;
+      try {
+        const res = await fetch(fileUrl);
+        if (res.ok) {
+          text = await res.text();
+        }
+      } catch (e) {
+        // Direct fetch failed (e.g. CORS on r2.dev), fallback to download proxy
+      }
+
+      if (!text) {
+        try {
+          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.csv')}`;
+          const res = await fetch(proxyUrl);
+          if (res.ok) {
+            text = await res.text();
+          } else {
+            throw new Error('Failed to load spreadsheet stream');
+          }
+        } catch (err) {
+          if (!active) return;
+          setError(err.message || 'Unable to load preview');
           setLoading(false);
           return;
         }
+      }
 
-        const firstLine = lines[0];
-        let delimiter = ',';
-        if (firstLine.includes('\t')) delimiter = '\t';
-        else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
+      if (!active) return;
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length === 0) {
+        setData({ headers: ['(Empty File)'], rows: [], totalRows: 0 });
+        setLoading(false);
+        return;
+      }
 
-        const parseLine = (line) => {
-          const result = [];
-          let cur = '';
-          let inQuotes = false;
-          for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (ch === '"' || ch === "'") {
-              inQuotes = !inQuotes;
-            } else if (ch === delimiter && !inQuotes) {
-              result.push(cur.trim());
-              cur = '';
-            } else {
-              cur += ch;
-            }
+      const firstLine = lines[0];
+      let delimiter = ',';
+      if (firstLine.includes('\t')) delimiter = '\t';
+      else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
+
+      const parseLine = (line) => {
+        const result = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"' || ch === "'") {
+            inQuotes = !inQuotes;
+          } else if (ch === delimiter && !inQuotes) {
+            result.push(cur.trim());
+            cur = '';
+          } else {
+            cur += ch;
           }
-          result.push(cur.trim());
-          return result;
-        };
+        }
+        result.push(cur.trim());
+        return result;
+      };
 
-        const headers = parseLine(lines[0]);
-        const rows = lines.slice(1, 51).map((l) => parseLine(l));
-        setData({ headers, rows, totalRows: lines.length - 1 });
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err.message || 'Unable to load preview');
-        setLoading(false);
-      });
+      const headers = parseLine(lines[0]);
+      const rows = lines.slice(1, 101).map((l) => parseLine(l));
+      setData({ headers, rows, totalRows: lines.length - 1 });
+      setLoading(false);
+    };
 
+    loadCsv();
     return () => { active = false; };
-  }, [fileUrl]);
+  }, [fileUrl, fileName]);
 
   if (loading) {
     return (
@@ -368,26 +387,56 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       setIsSearchingMessages(false);
       return;
     }
+
+    // Instant local matches from loaded active room messages
+    const lowerQ = q.toLowerCase();
+    const localMatches = (messages || []).filter((m) => {
+      if (m.isDeleted) return false;
+      const textMatch = (m.content || '').toLowerCase().includes(lowerQ);
+      const fileMatch = m.attachment && (
+        (m.attachment.fileName || '').toLowerCase().includes(lowerQ) ||
+        (m.attachment.originalName || '').toLowerCase().includes(lowerQ) ||
+        (m.attachment.name || '').toLowerCase().includes(lowerQ)
+      );
+      return textMatch || fileMatch;
+    }).map((m) => ({
+      ...m,
+      roomId: m.roomId || activeGroup
+    }));
+
+    if (localMatches.length > 0) {
+      setMessageSearchResults(localMatches);
+    }
+
     const timer = setTimeout(async () => {
       try {
         setIsSearchingMessages(true);
-        const res = await api.searchCommunicationMessages(q, 20);
+        const res = await api.searchCommunicationMessages(q, 30);
+        let serverMatches = [];
         if (res && res.success && Array.isArray(res.results)) {
-          setMessageSearchResults(res.results);
+          serverMatches = res.results;
         } else if (res && res.success && Array.isArray(res.data)) {
-          setMessageSearchResults(res.data);
+          serverMatches = res.data;
+        }
+
+        // Merge local and server matches, deduplicating by _id
+        const combinedMap = new Map();
+        localMatches.forEach((m) => combinedMap.set(String(m._id), m));
+        serverMatches.forEach((m) => combinedMap.set(String(m._id), m));
+        setMessageSearchResults(Array.from(combinedMap.values()));
+      } catch (err) {
+        console.warn('Message search error:', err);
+        if (localMatches.length > 0) {
+          setMessageSearchResults(localMatches);
         } else {
           setMessageSearchResults([]);
         }
-      } catch (err) {
-        console.warn('Message search error:', err);
-        setMessageSearchResults([]);
       } finally {
         setIsSearchingMessages(false);
       }
-    }, 280);
+    }, 250);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, messages, activeGroup]);
 
   const audioElementRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -3427,7 +3476,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   const handleSendMessage = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (uploadingFile) {
+      alert('Please wait for the attachment to finish uploading before sending.');
+      return;
+    }
     if ((!inputMessage.trim() && !attachedFile) || !activeGroup) return;
 
     if (editingMessage) {
@@ -3505,7 +3558,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       replyTo: replyToMessage || undefined,
       attachment: attachedFile || undefined,
       readBy: [senderId],
-      isOptimistic: true
+      isOptimistic: true,
+      sendFailed: false
     };
 
     setMessages((prev) => [...prev, tempMsg]);
@@ -3545,12 +3599,61 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           const filtered = prev.filter((m) => m._id !== tempId && String(m._id) !== String(realMsg._id));
           return [...filtered, realMsg];
         });
+      } else {
+        throw new Error(res?.message || 'Server did not acknowledge message saving');
       }
     } catch (err) {
-      console.warn('HTTP post message failed, falling back to socket emit:', err.message);
-      if (socket) {
+      console.warn('HTTP post message failed, falling back to socket emit or error flag:', err.message);
+      if (socket && socket.connected) {
         socket.emit('send-message', messagePayload);
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === tempId
+              ? { ...m, isOptimistic: false, sendFailed: true, sendError: err.message || 'Send failed' }
+              : m
+          )
+        );
       }
+    }
+  };
+
+  const handleRetryFailedMessage = async (failedMsg) => {
+    if (!failedMsg || !activeGroup?._id) return;
+    const senderId = currentUser?.id || currentUser?._id;
+    const messagePayload = {
+      roomId: activeGroup._id,
+      senderId,
+      content: failedMsg.content || '',
+      priority: failedMsg.priority || 'normal',
+      replyTo: failedMsg.replyTo ? (failedMsg.replyTo._id || failedMsg.replyTo) : undefined,
+      attachment: failedMsg.attachment || undefined,
+    };
+    setMessages((prev) =>
+      prev.map((m) =>
+        m._id === failedMsg._id
+          ? { ...m, isOptimistic: true, sendFailed: false, sendError: null }
+          : m
+      )
+    );
+    try {
+      const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
+      if (res && res.success && res.data) {
+        setMessages((prev) =>
+          prev.map((m) => (m._id === failedMsg._id ? res.data : m))
+        );
+      } else {
+        throw new Error(res?.message || 'Server rejected retry');
+      }
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === failedMsg._id
+            ? { ...m, isOptimistic: false, sendFailed: true, sendError: err.message || 'Retry failed' }
+            : m
+        )
+      );
+      alert('Retry failed: ' + err.message);
     }
   };
 
@@ -3592,8 +3695,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleOpenMembers = async () => {
     if (!activeGroup) return;
     setShowMembersModal(true);
-    setLoadingMembers(true);
     setIsEditingMembers(false);
+
+    // Optimistically pre-populate members from activeGroup.members if available
+    if (Array.isArray(activeGroup.members) && activeGroup.members.length > 0) {
+      const immediateMembers = activeGroup.members.map((m) => {
+        if (typeof m === 'object' && m !== null) return m;
+        const matched = (allUsers || []).find((u) => String(u._id || u.id) === String(m));
+        return matched || { _id: m, name: 'Staff Member', email: '' };
+      });
+      setGroupMembers(immediateMembers);
+      setEditMemberIds(immediateMembers.map((m) => String(m._id || m.id || m)));
+    }
+
+    setLoadingMembers(true);
     try {
       const uId = currentUser?._id || currentUser?.id;
       const [membersRes, usersRes] = await Promise.all([
@@ -3789,7 +3904,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (!isoString) return '';
     try {
       const date = new Date(isoString);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString('en-IN', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata'
+      });
     } catch (e) {
       return '';
     }
@@ -3801,7 +3922,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (!dtStr) return '';
     try {
       const dt = new Date(dtStr);
-      return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      if (isNaN(dt.getTime())) return '';
+      return dt.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata'
+      });
     } catch (e) {
       return '';
     }
@@ -4535,12 +4662,33 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               );
                             }
                             return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', maxWidth: isMobileScreen ? '145px' : '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                <Users size={12} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenMembers();
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: 0,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  marginTop: '2px',
+                                  maxWidth: isMobileScreen ? '145px' : '300px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title="Click to view group members"
+                              >
+                                <Users size={12} color="#2563eb" style={{ flexShrink: 0 }} />
+                                <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   Group • {activeGroup?.members?.length || 0} members
                                 </span>
-                              </div>
+                              </button>
                             );
                           })()}
                         </div>
@@ -5365,11 +5513,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     const el = document.getElementById(`msg_${targetId}`);
                                     if (el) {
                                       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                      el.style.transition = 'background-color 0.4s ease';
-                                      el.style.backgroundColor = 'rgba(37,99,235,0.15)';
+                                      el.classList.remove('reply-jump-pulse');
+                                      void el.offsetWidth; // Force CSS reflow to re-trigger animation
+                                      el.classList.add('reply-jump-pulse');
                                       setTimeout(() => {
-                                        el.style.backgroundColor = '';
-                                      }, 1400);
+                                        el.classList.remove('reply-jump-pulse');
+                                      }, 1700);
                                     }
                                   }
                                 }}
@@ -5951,6 +6100,45 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             {msg.isPinned && <Pin size={10} color="#d97706" style={{ transform: 'rotate(45deg)' }} />}
                             <span>{formatTime(msg.createdAt)}</span>
                             {isMe && (() => {
+                              if (msg.sendFailed) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRetryFailedMessage(msg);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: 0,
+                                      cursor: 'pointer',
+                                      color: '#ef4444',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '2px',
+                                      fontWeight: 700,
+                                      fontSize: '0.66rem'
+                                    }}
+                                    title={msg.sendError || 'Failed to send. Click to retry.'}
+                                  >
+                                    <AlertCircle size={11} color="#ef4444" />
+                                    <span>Failed (Retry)</span>
+                                  </button>
+                                );
+                              }
+
+                              if (msg.isOptimistic) {
+                                return (
+                                  <Clock
+                                    size={11}
+                                    color="var(--text-muted, #94a3b8)"
+                                    style={{ marginLeft: '2px' }}
+                                    title="Sending..."
+                                  />
+                                );
+                              }
+
                               const myIdStr = String(currentUser?._id || currentUser?.id || '');
                               const isRead = Boolean(
                                 msg.status === 'read' ||
@@ -5998,7 +6186,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   size={12}
                                   color="#94a3b8"
                                   style={{ strokeWidth: 2, marginLeft: '2px' }}
-                                  title="Sent (Offline)"
+                                  title="Sent"
                                 />
                               );
                             })()}
@@ -6322,7 +6510,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   ref={fileInputRef}
                   style={{ display: 'none' }}
                   onChange={handleFileUpload}
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,audio/*"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.md,.markdown,.json,audio/*"
                 />
 
                 {/* @mention Suggestion Dropdown */}
@@ -6761,9 +6949,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       {/* Compact Circular Send Button */}
                       <button
                         type="submit"
-                        disabled={!inputMessage.trim() && !attachedFile}
+                        disabled={(!inputMessage.trim() && !attachedFile) || uploadingFile}
                         className="phoenix-send-btn-compact"
-                        title="Send Message"
+                        title={uploadingFile ? "Uploading attachment..." : "Send Message"}
+                        style={uploadingFile ? { opacity: 0.7, cursor: 'not-allowed' } : {}}
                         onMouseDown={() => {
                           if (mentionQuery !== null) {
                             setMentionQuery(null);
@@ -6775,7 +6964,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           }
                         }}
                       >
-                        <Send size={15} style={{ marginLeft: '1px' }} />
+                        {uploadingFile ? (
+                          <RefreshCw size={13} className="spin-loader" color="#ffffff" />
+                        ) : (
+                          <Send size={15} style={{ marginLeft: '1px' }} />
+                        )}
                       </button>
                     </div>
                   </>
@@ -7171,6 +7364,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                             <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                            <span
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                background: onlineUserIds.has(String(u._id)) ? '#22c55e' : '#94a3b8',
+                                display: 'inline-block',
+                                flexShrink: 0
+                              }}
+                              title={onlineUserIds.has(String(u._id)) ? 'Online' : 'Offline'}
+                            />
                             <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{u.name || u.username}</div>
                           </div>
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</span>
@@ -7192,17 +7396,61 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {groupMembers.map((m) => (
-                    <div key={m._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-light)' }}>
-                      <div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>{m.name}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.email}</div>
+                  {groupMembers.map((m) => {
+                    const mId = String(m._id || m.id || m);
+                    const isOnline = onlineUserIds.has(mId);
+                    return (
+                      <div
+                        key={mId}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-main)',
+                          border: '1px solid var(--border-light)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: isOnline ? '#22c55e' : '#94a3b8',
+                              display: 'inline-block',
+                              flexShrink: 0,
+                              boxShadow: isOnline ? '0 0 0 2px rgba(34, 197, 94, 0.25)' : 'none'
+                            }}
+                            title={isOnline ? 'Online now' : 'Offline'}
+                          />
+                          <div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <span>{m.name || m.username || 'Staff'}</span>
+                              <span style={{ fontSize: '0.66rem', fontWeight: 600, color: isOnline ? '#16a34a' : '#94a3b8' }}>
+                                • {isOnline ? 'Online' : 'Offline'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.email}</div>
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            background: m.role === 'admin' ? 'rgba(37,99,235,0.12)' : 'rgba(100,116,139,0.12)',
+                            color: m.role === 'admin' ? 'var(--primary)' : 'var(--text-muted)'
+                          }}
+                        >
+                          {m.role || 'user'}
+                        </span>
                       </div>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '2px 8px', borderRadius: '10px', background: m.role === 'admin' ? 'rgba(37,99,235,0.12)' : 'rgba(100,116,139,0.12)', color: m.role === 'admin' ? 'var(--primary)' : 'var(--text-muted)' }}>
-                        {m.role || 'user'}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
