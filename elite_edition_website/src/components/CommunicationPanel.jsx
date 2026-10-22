@@ -2269,7 +2269,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             }
           });
 
-          return Array.from(serverMap.values());
+          const merged = Array.from(serverMap.values());
+          merged.sort((a, b) => {
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            const timeA = new Date(a.lastMessage?.createdAt || a.updatedAt || a.createdAt || 0).getTime();
+            const timeB = new Date(b.lastMessage?.createdAt || b.updatedAt || b.createdAt || 0).getTime();
+            return timeB - timeA;
+          });
+          return merged;
         });
 
         const savedRoomId = typeof localStorage !== 'undefined' ? localStorage.getItem('elite_active_chat_room_id') : null;
@@ -2710,6 +2718,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     };
 
     setMessages((prev) => [...prev, tempMsg]);
+    setGroups((prevGroups) => {
+      return prevGroups.map((g) => {
+        if (String(g._id) === String(currentGroup._id)) {
+          return {
+            ...g,
+            lastMessage: tempMsg,
+            updatedAt: tempMsg.createdAt || new Date().toISOString()
+          };
+        }
+        return g;
+      });
+    });
     setIsUrgent(false);
 
     try {
@@ -2719,6 +2739,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         setMessages((prev) => {
           const filtered = prev.filter((m) => m._id !== tempId && String(m._id) !== String(realMsg._id));
           return [...filtered, realMsg];
+        });
+        setGroups((prevGroups) => {
+          return prevGroups.map((g) => {
+            if (String(g._id) === String(currentGroup._id)) {
+              return {
+                ...g,
+                lastMessage: realMsg,
+                updatedAt: realMsg.createdAt || new Date().toISOString()
+              };
+            }
+            return g;
+          });
         });
       }
     } catch (err) {
@@ -3626,6 +3658,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     };
 
     setMessages((prev) => [...prev, tempMsg]);
+    setGroups((prevGroups) => {
+      return prevGroups.map((g) => {
+        if (String(g._id) === String(activeGroup._id)) {
+          return {
+            ...g,
+            lastMessage: tempMsg,
+            updatedAt: tempMsg.createdAt || new Date().toISOString()
+          };
+        }
+        return g;
+      });
+    });
     isNearBottomRef.current = true;
     requestAnimationFrame(() => {
       if (chatScrollRef.current) {
@@ -3662,6 +3706,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           const filtered = prev.filter((m) => m._id !== tempId && m.clientMsgId !== clientMsgId && String(m._id) !== String(realMsg._id));
           return mergeMessages(filtered, [realMsg]);
         });
+        setGroups((prevGroups) => {
+          return prevGroups.map((g) => {
+            if (String(g._id) === String(activeGroup._id)) {
+              return {
+                ...g,
+                lastMessage: realMsg,
+                updatedAt: realMsg.createdAt || new Date().toISOString()
+              };
+            }
+            return g;
+          });
+        });
       } else {
         throw new Error(res?.message || 'Server did not acknowledge message saving');
       }
@@ -3674,6 +3730,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             setMessages((prev) => {
               const filtered = prev.filter((m) => m._id !== tempId && m.clientMsgId !== clientMsgId && String(m._id) !== String(ackMsg._id));
               return mergeMessages(filtered, [{ ...ackMsg, isOptimistic: false }]);
+            });
+            setGroups((prevGroups) => {
+              return prevGroups.map((g) => {
+                if (String(g._id) === String(activeGroup._id)) {
+                  return {
+                    ...g,
+                    lastMessage: ackMsg,
+                    updatedAt: ackMsg.createdAt || new Date().toISOString()
+                  };
+                }
+                return g;
+              });
             });
           }
         });
@@ -3891,10 +3959,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (phoenixFilter === 'groups' || rosterTab === 'groups') {
       baseItems = groups.filter((g) => g.type !== 'direct');
     } else if (phoenixFilter === 'direct' || phoenixFilter === 'personal' || rosterTab === 'direct') {
-      baseItems = [...activeDmRooms];
+      baseItems = groups.filter((g) => g.type === 'direct');
     } else {
-      // 'all': ONLY real existing groups and active DMs
-      baseItems = [...groups.filter((g) => g.type !== 'direct'), ...activeDmRooms];
+      // 'all': WhatsApp style: ALL active groups and active DMs merged together
+      baseItems = [...groups];
     }
 
     // Filter by Phoenix Segmented Tabs: All | Personal | Groups | Unread
@@ -3904,7 +3972,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       baseItems = baseItems.filter((g) => (Number(g.unreadCount) || 0) > 0);
     }
 
-    // When NO search query is typed, show ONLY existing chats (no random un-messaged users)
+    // WhatsApp Recency Sorting Helper:
+    // Determine the most recent activity timestamp for each chat room
+    const getChatTimestamp = (g) => {
+      const msgTime = g.lastMessage?.createdAt;
+      const t = msgTime || g.updatedAt || g.createdAt || 0;
+      const parsed = new Date(t).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    // Sort WhatsApp-style: Most recent message sent/received always appears at the top!
+    baseItems.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return getChatTimestamp(b) - getChatTimestamp(a);
+    });
+
+    // When NO search query is typed, show ONLY existing chats sorted WhatsApp style
     if (!term) return baseItems;
 
     // Filter existing chats matching the search term
@@ -3980,6 +4064,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
+        timeZone: 'Asia/Kolkata'
+      });
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const formatChatListTime = (isoString) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      if (isToday) {
+        return date.toLocaleTimeString('en-IN', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Kolkata'
+        });
+      }
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      }
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
         timeZone: 'Asia/Kolkata'
       });
     } catch (e) {
@@ -4483,7 +4597,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           {displayName}
                         </span>
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                          {group.lastMessage ? formatTime(group.lastMessage.createdAt) : ''}
+                          {group.lastMessage ? formatChatListTime(group.lastMessage.createdAt) : ''}
                         </span>
                       </div>
 

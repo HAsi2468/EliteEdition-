@@ -156,6 +156,16 @@ const getGroups = async (req, res) => {
       return roomObj;
     });
 
+    // WhatsApp-Style Recency Sort:
+    // Sort all rooms by the timestamp of their latest message, or fall back to room.updatedAt / createdAt
+    roomsWithMeta.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      const timeA = new Date(a.lastMessage?.createdAt || a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.lastMessage?.createdAt || b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
     res.json({ success: true, data: roomsWithMeta });
   } catch (error) {
     console.error('Error fetching communication groups:', error);
