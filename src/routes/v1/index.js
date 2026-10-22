@@ -86,6 +86,7 @@ router.use('/textile-compute', require('./textileCompute.route'));
 router.use('/gst', require('./gst.route'));
 router.use('/document-templates', require('./documentTemplate.route'));
 router.use('/chat', require('./chat.route'));
+router.use('/ledger-reconciliation', require('./ledgerReconciliation.route'));
 
 module.exports = router;
 

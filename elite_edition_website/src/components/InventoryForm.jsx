@@ -208,6 +208,14 @@ export default function InventoryForm({ item, isCatalog = true, onSubmit, onClos
         });
       }
 
+      // If still not matched, query live Uniware API directly
+      if (!matchedCatalog) {
+        const liveRes = await api.lookupUniwareSku(rawSku).catch(() => null);
+        if (liveRes && liveRes.found && liveRes.product) {
+          matchedCatalog = liveRes.product;
+        }
+      }
+
       if (matchedCatalog) {
         const baseCatalogSku = (matchedCatalog.skuCode || rawSku).trim();
         const extractedSize = extractSizeFromSku(rawSku) || (Array.isArray(matchedCatalog.size) ? matchedCatalog.size[0] : matchedCatalog.size) || '';

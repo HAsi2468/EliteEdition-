@@ -342,7 +342,8 @@ router.get('/download', async (req, res) => {
     return res.status(400).send('Missing url parameter');
   }
 
-  const safeName = originalName.replace(/["\r\n]/g, '_');
+  const safeName = (originalName || 'download').replace(/["\r\n]/g, '_');
+  const asciiName = safeName.replace(/[^\x20-\x7E]/g, '_');
 
   // If local file path
   if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('/designs/')) {
@@ -362,9 +363,13 @@ router.get('/download', async (req, res) => {
       timeout: 30000
     });
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName)}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
+    res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
     if (response.headers['content-type']) {
       res.setHeader('Content-Type', response.headers['content-type']);
+    }
+    if (response.headers['content-length']) {
+      res.setHeader('Content-Length', response.headers['content-length']);
     }
     response.data.pipe(res);
   } catch (err) {

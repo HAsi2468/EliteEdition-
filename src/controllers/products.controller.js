@@ -129,7 +129,7 @@ const getAllProductsList = async (req, res) => {
   } = req.query;
 
   const isDefaultQuery = !search && !dateStart && !dateEnd && (!page || Number(page) === 1);
-  const cappedLimit = Math.min(parseInt(limit, 10) || 50, 100);
+  const cappedLimit = Math.min(parseInt(limit, 10) || 50, 5000);
   const cacheKey = `default_prod_${cappedLimit}_${sortField || ''}_${sortOrder || ''}`;
 
   if (isDefaultQuery && productsListCache.has(cacheKey)) {
@@ -1413,6 +1413,15 @@ const createProduct = async (req, res) => {
     let createdInvProduct = await db.InventoryProduct.create(productPayload).catch(() => null);
 
     if (!createdProduct && !createdInvProduct) {
+      // Find existing product and update it gracefully
+      const existing = await db.InventoryProduct.findOne({ skuCode: cleanSku }) || await db.Product.findOne({ skuCode: cleanSku });
+      if (existing) {
+        Object.assign(existing, productPayload);
+        await existing.save();
+        emitSocketEvent(req, 'inventory-created', existing);
+        emitSocketEvent(req, 'catalog-updated', existing);
+        return res.status(200).json({ ...existing.toObject(), id: existing._id.toString(), message: 'Product updated successfully' });
+      }
       return res.status(400).json({ error: 'Product with this skuCode already exists' });
     }
 
@@ -1774,6 +1783,98 @@ const resetAndSyncUniwareSkus = async (req, res) => {
   }
 };
 
+const lookupUniwareSku = async (req, res) => {
+  const rawSku = (req.query.sku || req.query.skuCode || '').trim();
+  if (!rawSku) {
+    return res.status(400).json({ error: 'SKU is required' });
+  }
+
+  try {
+    const Product = db.Product;
+    // 1. First check MongoDB by exact sku or regex
+    let localItem = await Product.findOne({
+      $or: [
+        { skuCode: rawSku },
+        { sku: rawSku },
+        { skuCode: { $regex: `^${rawSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+        { sku: { $regex: `^${rawSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+      ]
+    }).lean();
+
+    if (localItem) {
+      return res.json({
+        found: true,
+        source: 'local_database',
+        product: localItem
+      });
+    }
+
+    // 2. Query Uniware Unicommerce API live
+    const { getAccessToken, fetchProductData } = require('../services/api.service');
+    const token = await getAccessToken();
+    if (!token) {
+      return res.status(503).json({ error: 'Unicommerce token unavailable' });
+    }
+
+    const { elements } = await fetchProductData(rawSku, token).catch(() => ({ elements: [] }));
+    if (elements && elements.length > 0) {
+      const uItem = elements[0];
+      const doc = {
+        skuCode: uItem.skuCode,
+        sku: uItem.skuCode,
+        name: uItem.name || 'KURTA SET',
+        description: uItem.description || uItem.name || '',
+        brand: uItem.brand || '',
+        party: uItem.brand || '',
+        color: uItem.color ? [uItem.color] : [],
+        size: uItem.size ? [uItem.size] : [],
+        price: uItem.price || 0,
+        length: uItem.length,
+        width: uItem.width,
+        height: uItem.height,
+        weight: uItem.weight,
+        gstTaxTypeCode: uItem.gstTaxTypeCode || '5',
+        imageUrl: uItem.imageUrl || '',
+        category: uItem.categoryName || '',
+        categoryName: uItem.categoryName || '',
+        updatedAt: new Date()
+      };
+
+      // Upsert into local database so it is saved permanently
+      const saved = await Product.findOneAndUpdate(
+        { skuCode: uItem.skuCode },
+        { $set: doc },
+        { upsert: true, returnDocument: 'after' }
+      ).lean();
+
+      return res.json({
+        found: true,
+        source: 'uniware_live',
+        product: saved || doc
+      });
+    }
+
+    return res.json({
+      found: false,
+      message: `SKU "${rawSku}" not found in Uniware or local catalog.`
+    });
+  } catch (err) {
+    logger.error('lookupUniwareSku error: %o', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const triggerCatalogImageSync = async (req, res) => {
+  try {
+    const { runCatalogAndImageSync } = require('../services/catalogImageSync.service');
+    const result = await runCatalogAndImageSync({ triggerSource: 'MANUAL_API' });
+    res.json(result);
+  } catch (error) {
+    logger.error('Error triggering catalog image sync: %o', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllProductsList,
   readFile,
@@ -1808,6 +1909,8 @@ module.exports = {
   updateProduct,
   instantSyncFromSaleOrders,
   resetAndSyncUniwareSkus,
+  lookupUniwareSku,
+  triggerCatalogImageSync,
 };
 
 

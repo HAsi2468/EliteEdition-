@@ -2226,10 +2226,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       try {
         const custRes = await api.getBillingCustomers();
         const customerList = (custRes && custRes.data && Array.isArray(custRes.data)) ? custRes.data : Array.isArray(custRes) ? custRes : [];
-        const matched = customerList.find(c =>
-          (c.businessName && c.businessName.trim().toLowerCase() === party.trim().toLowerCase()) ||
-          (c.name && c.name.trim().toLowerCase() === party.trim().toLowerCase())
-        );
+        const pLower = party.trim().toLowerCase();
+        const matched = customerList.find(c => {
+          const bLower = (c.businessName || '').trim().toLowerCase();
+          const nLower = (c.name || '').trim().toLowerCase();
+          return (bLower && bLower === pLower) ||
+                 (nLower && nLower === pLower) ||
+                 (bLower && (bLower.startsWith(pLower) || pLower.startsWith(bLower))) ||
+                 (nLower && (nLower.startsWith(pLower) || pLower.startsWith(nLower)));
+        });
         if (matched) {
           contactPersonName = matched.name || party;
           businessName = matched.businessName || party;

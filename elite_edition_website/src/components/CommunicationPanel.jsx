@@ -142,8 +142,11 @@ function CsvDataViewer({ fileUrl, fileName }) {
 
       if (!text) {
         try {
-          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.csv')}`;
-          const res = await fetch(proxyUrl);
+          const token = localStorage.getItem('elite_auth_token') || '';
+          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.csv')}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+          const res = await fetch(proxyUrl, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
           if (res.ok) {
             text = await res.text();
           } else {
@@ -248,6 +251,103 @@ function CsvDataViewer({ fileUrl, fileName }) {
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function TextFileViewer({ fileUrl, fileName }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [content, setContent] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    const loadText = async () => {
+      let text = null;
+      try {
+        const res = await fetch(fileUrl);
+        if (res.ok) text = await res.text();
+      } catch (e) {
+        // Direct fetch failed, fallback to proxy
+      }
+
+      if (text === null) {
+        try {
+          const token = localStorage.getItem('elite_auth_token') || '';
+          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.txt')}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+          const res = await fetch(proxyUrl, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (res.ok) {
+            text = await res.text();
+          } else {
+            throw new Error('Failed to load text preview');
+          }
+        } catch (err) {
+          if (!active) return;
+          setError(err.message || 'Unable to preview text');
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!active) return;
+      setContent(text || '');
+      setLoading(false);
+    };
+
+    loadText();
+    return () => { active = false; };
+  }, [fileUrl, fileName]);
+
+  const handleCopy = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', gap: '10px' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#3874ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <span style={{ fontSize: '0.85rem' }}>Loading text document...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#f87171' }}>
+        <p style={{ margin: 0, fontWeight: 700 }}>Could not preview text document.</p>
+        <p style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '4px' }}>Please use the Download button above to open this file.</p>
+      </div>
+    );
+  }
+
+  const lineCount = content ? content.split('\n').length : 0;
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#0f172a', borderRadius: '8px', overflow: 'hidden', color: '#e2e8f0' }}>
+      <div style={{ padding: '8px 14px', background: '#1e293b', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
+        <span style={{ color: '#94a3b8' }}>{fileName} • {content.length} characters • {lineCount} line{lineCount !== 1 ? 's' : ''}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{ background: copied ? '#059669' : '#334155', color: '#ffffff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, transition: 'background 0.2s' }}
+        >
+          {copied ? '✓ Copied' : 'Copy Text'}
+        </button>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+        <pre style={{ margin: 0, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.82rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#f1f5f9' }}>
+          {content}
+        </pre>
       </div>
     </div>
   );
@@ -3274,27 +3374,60 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleDownloadAttachment = async (url, name) => {
     if (!url) return;
     const cleanName = name || 'download';
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Direct fetch failed');
-      const blob = await response.blob();
+    const token = localStorage.getItem('elite_auth_token') || '';
+
+    // Safe helper to trigger file save from blob
+    const triggerBlobDownload = (blob) => {
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = cleanName;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      }, 60000);
+    };
+
+    // 1. Try direct fetch first
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const blob = await response.blob();
+        triggerBlobDownload(blob);
+        return;
+      }
     } catch (e) {
-      const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}`;
-      const link = document.createElement('a');
-      link.href = proxyUrl;
-      link.download = cleanName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Direct CORS blocked, fallback to backend download proxy
     }
+
+    // 2. Fetch via backend download proxy with auth
+    try {
+      const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      const res = await fetch(proxyUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        triggerBlobDownload(blob);
+        return;
+      }
+    } catch (err) {
+      console.warn('[handleDownloadAttachment] Proxy fetch error:', err);
+    }
+
+    // 3. Fallback: Browser download navigation link with token in query param
+    const finalUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+    const link = document.createElement('a');
+    link.href = finalUrl;
+    link.download = cleanName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) link.parentNode.removeChild(link);
+    }, 2000);
   };
 
 
@@ -7900,8 +8033,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         const lowerName = fileName.toLowerCase();
         const isImg = attachmentViewer.fileType === 'image' || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
         const isPdf = attachmentViewer.fileType === 'pdf' || lowerName.endsWith('.pdf');
-        const isCsv = /\.(csv|tsv|txt)$/i.test(lowerName) || attachmentViewer.fileType === 'csv';
-        const isSpreadsheet = attachmentViewer.fileType === 'spreadsheet' || /\.(xls|xlsx|csv)$/i.test(lowerName);
+        const isCsv = /\.(csv|tsv)$/i.test(lowerName) || attachmentViewer.fileType === 'csv';
+        const isText = /\.(txt|log|json|md|xml|yml|yaml|ini|env)$/i.test(lowerName) || attachmentViewer.fileType === 'text';
+        const isSpreadsheet = attachmentViewer.fileType === 'spreadsheet' || /\.(xls|xlsx)$/i.test(lowerName);
         const isDoc = /\.(doc|docx|rtf)$/i.test(lowerName);
 
         const vBtnStyle = {
@@ -8133,6 +8267,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     title={fileName}
                     style={{ width: '100%', height: '100%', border: 'none' }}
                   />
+                </div>
+              ) : isText ? (
+                <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#0f172a', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                  <TextFileViewer fileUrl={fileUrl} fileName={fileName} />
                 </div>
               ) : isCsv ? (
                 <div style={{ width: '100%', height: '100%', maxWidth: '1100px', borderRadius: '8px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>

@@ -507,5 +507,32 @@ router.post('/orchestrator', requireAuth, orchestratorController.handlePrompt);
 // POST /v1/ai/orchestrator/confirm - Confirm Tier 3 High-Impact Mutation
 router.post('/orchestrator/confirm', requireAuth, orchestratorController.handleConfirm);
 
-module.exports = router;
+// ── ERP Copilot Chat Agent ────────────────────────────────────────────────────
+const chatController    = require('../../controllers/chatController');
+const approvalController = require('../../controllers/approvalController');
 
+// POST /v1/ai/chat/agent/stream  — SSE streaming (primary)
+router.post('/chat/agent/stream', requireAuth, chatController.handleAgentChatStream);
+
+// POST /v1/ai/chat/agent         — Non-streaming JSON fallback
+router.post('/chat/agent', requireAuth, chatController.handleAgentChat);
+
+// GET  /v1/ai/chat/conversations  — List persisted conversation stubs
+router.get('/chat/conversations', requireAuth, chatController.listConversations);
+
+// GET  /v1/ai/chat/conversations/:id — Full conversation hydration
+router.get('/chat/conversations/:id', requireAuth, chatController.getConversation);
+
+// DELETE /v1/ai/chat/conversations/:id — Delete a conversation
+router.delete('/chat/conversations/:id', requireAuth, chatController.deleteConversation);
+
+// POST /v1/ai/chat/actions/execute   — User confirms HITL ticket (PENDING_SELF)
+router.post('/chat/actions/execute', requireAuth, approvalController.executeConfirmedAction);
+
+// POST /v1/ai/chat/approvals/decision — Manager approves/rejects escalated ticket
+router.post('/chat/approvals/decision', requireAuth, approvalController.managerDecision);
+
+// GET  /v1/ai/chat/approvals/pending  — Manager views pending escalations
+router.get('/chat/approvals/pending', requireAuth, approvalController.getPendingApprovals);
+
+module.exports = router;

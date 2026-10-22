@@ -1,6 +1,11 @@
 import React from "react";
 import { JobCardWidget } from "./JobCardWidget";
 import { InventoryCardWidget } from "./InventoryCardWidget";
+import { FabricOptimizerCard } from "./FabricOptimizerCard";
+import { InkEstimatorCard } from "./InkEstimatorCard";
+import { BottleneckWatchdogCard } from "./BottleneckWatchdogCard";
+import { NavigatorShortcutCard } from "./NavigatorShortcutCard";
+import { ConfirmationCardWidget } from "./ConfirmationCardWidget";
 
 export function ToolResultDispatcher({ toolName, result, onCardAction }) {
   if (!result || result.error) {
@@ -26,6 +31,11 @@ export function ToolResultDispatcher({ toolName, result, onCardAction }) {
   // Handle nested result data wrapper if present
   const unwrappedData = result.data ? { ...result, ...result.data } : result;
 
+  // Intercept Human-in-the-Loop Confirmation Requests
+  if (result.requiresConfirmation || toolName === "request_action_confirmation") {
+    return <ConfirmationCardWidget data={unwrappedData} onAction={onCardAction} />;
+  }
+
   switch (toolName) {
     case "get_job_card_status":
     case "update_job_stage":
@@ -35,6 +45,18 @@ export function ToolResultDispatcher({ toolName, result, onCardAction }) {
     case "check_stock_balance":
     case "inventory_lookup_and_reserve":
       return <InventoryCardWidget data={unwrappedData} onAction={onCardAction} />;
+
+    case "optimize_fabric_rolls":
+      return <FabricOptimizerCard data={unwrappedData} onAction={onCardAction} />;
+
+    case "estimate_ink_consumption":
+      return <InkEstimatorCard data={unwrappedData} onAction={onCardAction} />;
+
+    case "get_production_bottlenecks":
+      return <BottleneckWatchdogCard data={unwrappedData} onAction={onCardAction} />;
+
+    case "navigate_erp_screen":
+      return <NavigatorShortcutCard data={unwrappedData} onAction={onCardAction} />;
 
     default:
       // Fallback for tools without dedicated custom widgets

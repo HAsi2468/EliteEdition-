@@ -18,6 +18,7 @@ require('./schedule/fetchFromAPISScheduler');
 require('./schedule/myntraScheduler').startMyntraScheduler();
 require('./schedule/eodExecutiveBriefingScheduler').startEodExecutiveBriefingScheduler();
 require('./schedule/infrastructureBillingScheduler').startInfrastructureBillingScheduler();
+require('./schedule/catalogImageSyncScheduler').startCatalogImageSyncScheduler();
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const userModel = require('./db/models/user.model');
@@ -111,7 +112,11 @@ const isPublicRoute = (path) => {
     p.startsWith('/v1/telemetry') ||
     p.startsWith('/api/v1/telemetry') ||
     p === '/v1/designs/download-zip' ||
-    p === '/api/v1/designs/download-zip'
+    p === '/api/v1/designs/download-zip' ||
+    p.startsWith('/v1/upload/download') ||
+    p.startsWith('/api/v1/upload/download') ||
+    p.startsWith('/v1/upload/preview') ||
+    p.startsWith('/api/v1/upload/preview')
   );
 };
 

@@ -589,16 +589,22 @@ const postGroupMessage = async (req, res) => {
       })
       .populate('mentions', 'name username email');
 
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+
     // Intelligent Dispatch: Real-time WebSocket + selective background Web Push
-    await dispatchChatMessage({
-      io,
-      roomId: groupId,
-      populatedMessage,
-      targetRoom,
-      senderId: strSender,
-      rawContent: content,
-      priority: priority === 'urgent' ? 'urgent' : 'normal',
-    });
+    try {
+      await dispatchChatMessage({
+        io,
+        roomId: groupId,
+        populatedMessage,
+        targetRoom,
+        senderId: strSender,
+        rawContent: content,
+        priority: priority === 'urgent' ? 'urgent' : 'normal',
+      });
+    } catch (dispatchErr) {
+      console.warn('[postGroupMessage dispatch warning]:', dispatchErr.message);
+    }
 
     // Targeted notification for mentioned users
     if (mentions.length > 0 && io) {

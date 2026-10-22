@@ -33,11 +33,6 @@ function sanitizeChatMessage(text, maxLength = 10000) {
     sanitized = sanitized.replace(pattern, '');
   });
 
-  // Basic HTML entity encoding for raw tags while keeping readable text
-  sanitized = sanitized
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
   // Truncate to maximum permissible character length
   if (sanitized.length > maxLength) {
     sanitized = sanitized.substring(0, maxLength);

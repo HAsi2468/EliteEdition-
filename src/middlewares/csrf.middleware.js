@@ -53,7 +53,9 @@ const createCsrfMiddleware = (options = {}) => {
       path.includes('/challanVerification') ||
       path.startsWith('/verify/challan') ||
       path.startsWith('/verify/jobcard') ||
-      path.startsWith('/verify/invoice')
+      path.startsWith('/verify/invoice') ||
+      path.includes('/ai/chat') ||
+      path.includes('/ai/orchestrator')
     ) {
       return next();
     }

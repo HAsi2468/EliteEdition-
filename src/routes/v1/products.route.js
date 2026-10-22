@@ -14,6 +14,7 @@ router.route('/')
   .post(productsController.createProduct);
 router.route('/list').get(productsController.getAllProductsList);
 router.route('/get_orders').get(getSalseList);
+router.route('/lookup-uniware-sku').get(productsController.lookupUniwareSku);
 router.route('/fetchFromAPIS').get(productsController.fetchFromAPIS);
 router.route('/get_sku_details').get(productsController.searchBySku);
 router.route('/report').get(productsController.fetchSalesReport);
@@ -31,6 +32,10 @@ router.route('/instantSyncFromSaleOrders')
 router.route('/reset-and-sync-uniware-skus')
   .get(productsController.resetAndSyncUniwareSkus)
   .post(productsController.resetAndSyncUniwareSkus);
+
+router.route('/sync-catalog-images')
+  .get(productsController.triggerCatalogImageSync)
+  .post(productsController.triggerCatalogImageSync);
 
 router.route('/:id')
   .put(productsController.updateProduct)

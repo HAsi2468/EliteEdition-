@@ -586,7 +586,7 @@ export const api = {
   _productsCatalogCacheTime: 0,
 
   async getProductsCatalog(params = {}) {
-    const { limit = 50, search, forceRefresh = false } = (typeof params === 'object' && params !== null) ? params : {};
+    const { limit = 2000, search, forceRefresh = false } = (typeof params === 'object' && params !== null) ? params : {};
     const now = Date.now();
     if (!forceRefresh && !search && this._productsCatalogCache && (now - this._productsCatalogCacheTime < 60000)) {
       return this._productsCatalogCache;
@@ -624,6 +624,10 @@ export const api = {
     return request(`/products/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  async lookupUniwareSku(sku) {
+    return request(`/products/lookup-uniware-sku?sku=${encodeURIComponent(sku)}`);
   },
 
   async syncMissingProducts() {
@@ -2138,7 +2142,7 @@ export const api = {
     return request(`/billing/reports/gstr1-table12?${query.toString()}`);
   },
 
-  async getNextInvoiceNo(companyEntity = 'Elite Online') {
+  async getNextInvoiceNo(companyEntity = 'Elite Digital Print') {
     return request(`/billing/invoices/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
   },
 
@@ -2340,7 +2344,7 @@ export const api = {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token');
-    const url = `${baseUrl}/billing/invoices/${id}/pdf${duplicate ? '?duplicate=true' : ''}`;
+    const url = `${baseUrl}/billing/invoices/${id}/pdf?t=${Date.now()}${duplicate ? '&duplicate=true' : ''}`;
     const response = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
@@ -3331,8 +3335,78 @@ export const api = {
     }
     const blob = await response.blob();
     return { data: blob };
+  },
+
+  // ==========================================
+  // LEDGER RECONCILIATION & GROK AI FORENSIC AUDIT
+  // ==========================================
+  async getReconciliationParties({ partyType = 'customer', search = '', companyEntity = '' } = {}) {
+    const params = new URLSearchParams();
+    if (partyType) params.append('partyType', partyType);
+    if (search) params.append('search', search);
+    if (companyEntity) params.append('companyEntity', companyEntity);
+    return request(`/ledger-reconciliation/parties?${params.toString()}`);
+  },
+
+  async getErpLedger({ partyType = 'customer', partyName = '', partyId = '', startDate = '', endDate = '', companyEntity = '' } = {}) {
+    const params = new URLSearchParams();
+    if (partyType) params.append('partyType', partyType);
+    if (partyName) params.append('partyName', partyName);
+    if (partyId) params.append('partyId', partyId);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (companyEntity) params.append('companyEntity', companyEntity);
+    return request(`/ledger-reconciliation/erp-ledger?${params.toString()}`);
+  },
+
+  async parseReconciliationStatement({ rawText = '', imageBase64 = '', partyType = 'customer', partyName = '' }) {
+    return request('/ledger-reconciliation/parse-statement', {
+      method: 'POST',
+      body: JSON.stringify({ rawText, imageBase64, partyType, partyName })
+    });
+  },
+
+  async runReconciliationMatching(payload) {
+    return request('/ledger-reconciliation/reconcile', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async runGrokForensicAudit(payload) {
+    return request('/ledger-reconciliation/ai-audit', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async draftSettlementNotice(payload) {
+    return request('/ledger-reconciliation/draft-settlement-notice', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async sendGrokCopilotMessage({ query, conversationHistory = [], erpContext = {} }) {
+    return request('/ledger-reconciliation/copilot-chat', {
+      method: 'POST',
+      body: JSON.stringify({ query, conversationHistory, erpContext })
+    });
+  },
+
+  async saveReconciliationSession(sessionData) {
+    return request('/ledger-reconciliation/save-session', {
+      method: 'POST',
+      body: JSON.stringify(sessionData)
+    });
+  },
+
+  async getReconciliationHistory() {
+    return request('/ledger-reconciliation/sessions-history');
   }
 };
+
+export default api;
 
 
 

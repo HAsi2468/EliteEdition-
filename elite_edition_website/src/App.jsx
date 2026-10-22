@@ -93,7 +93,8 @@ import {
   MoreHorizontal,
   CheckSquare,
   Lock,
-  Unlock
+  Unlock,
+  Scale
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -143,6 +144,9 @@ export const ROUTE_ALIASES = {
   'invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
   'invoice': { tab: 'ee_invoices', dept: 'elite_edition' },
   'ee_invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'ledger-reconciliation': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'ledger_reconciliation': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'reconciliation': { tab: 'ee_invoices', dept: 'elite_edition' },
   'jobcards': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcard': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
@@ -887,11 +891,25 @@ export default function App() {
   useEffect(() => {
     const handleNavTab = (e) => {
       if (e && e.detail) {
-        setActiveTab(e.detail);
+        if (typeof e.detail === 'string') {
+          setActiveTab(e.detail);
+        } else if (typeof e.detail === 'object' && e.detail.screen) {
+          if (e.detail.department) {
+            setActiveDepartment(e.detail.department);
+          }
+          setActiveTab(e.detail.screen);
+          if (e.detail.searchQuery) {
+            window.dispatchEvent(new CustomEvent('erp:set-search-query', { detail: e.detail.searchQuery }));
+          }
+        }
       }
     };
     window.addEventListener('elite-navigate-tab', handleNavTab);
-    return () => window.removeEventListener('elite-navigate-tab', handleNavTab);
+    window.addEventListener('erp:navigate', handleNavTab);
+    return () => {
+      window.removeEventListener('elite-navigate-tab', handleNavTab);
+      window.removeEventListener('erp:navigate', handleNavTab);
+    };
   }, []);
 
   // Auto-switch department if user lacks permission for current activeDepartment
@@ -1453,7 +1471,7 @@ export default function App() {
       // Run requests in parallel with pagination limits to prevent 504 timeouts
       const [inventoryResult, catalogResult, salesResult, partiesResult, userResult] = await Promise.allSettled([
         api.getInventory(),
-        api.getProductsCatalog({ limit: 50 }),
+        api.getProductsCatalog({ limit: 2000, forceRefresh: true }),
         api.getSales({ limit: 50 }),
         api.getParties({ limit: 50 }),
         api.refreshCurrentUser(),
@@ -3001,6 +3019,9 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_invoices')) &&
                       renderNavItem('ee_invoices', 'Finance', Receipt, null, 'Finance')
                     }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_invoices')) &&
+                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
+                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_complaints')) &&
                       renderNavItem('ee_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
                     }
@@ -3020,6 +3041,9 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_invoices')) &&
                       renderNavItem('ef_invoices', 'Finance', Receipt, null, 'Finance')
                     }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_invoices')) &&
+                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
+                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_complaints')) &&
                       renderNavItem('ef_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
                     }
@@ -3038,6 +3062,9 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_invoices')) &&
                       renderNavItem('so_invoices', 'Finance', Receipt, null, 'Finance')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_invoices')) &&
+                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_complaints')) &&
                       renderNavItem('so_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
@@ -3087,6 +3114,9 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
                       renderNavItem('jobcards_billing', 'Finance', Receipt, null, 'Finance')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
+                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) &&
                       renderNavItem('jobcards_costing', 'Costing', TrendingUp, null, 'Costing')
@@ -3307,8 +3337,8 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Elite Edition" />
           ) : activeTab === 'ee_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Edition" />
-          ) : activeTab === 'ee_invoices' ? (
-            <EliteBillingDepartment companyEntity="Elite Edition" />
+          ) : activeTab === 'ee_invoices' || activeTab === 'ledger-reconciliation' || activeTab === 'reconciliation' ? (
+            <EliteBillingDepartment companyEntity="Elite Edition" initialTab={activeTab === 'ledger-reconciliation' || activeTab === 'reconciliation' ? 'reconciliation' : null} />
           ) : activeTab === 'ef_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ef_settings' ? (

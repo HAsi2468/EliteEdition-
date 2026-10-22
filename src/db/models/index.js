@@ -88,6 +88,9 @@ const db = {
   DocumentPrintLog: require('./documentPrintLog.model'),
   CourierManifest: require('./courierManifest.model'),
   ScanLog: require('./scanLog.model'),
+  // ── AI Copilot Persistence ──
+  AIChatConversation: require('./aiChatConversation.model').AIChatConversation,
+  PendingAction: require('./pendingAction.model').PendingAction,
   mongoose,
 };
 

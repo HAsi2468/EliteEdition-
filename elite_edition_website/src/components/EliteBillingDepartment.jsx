@@ -8,6 +8,7 @@ import FabricInventoryPanel from './FabricInventoryPanel';
 import CorporateDeliveryChallanPanel from './CorporateDeliveryChallanPanel';
 import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
 import GstCreditAnalysisPanel from './GstCreditAnalysisPanel';
+import LedgerReconciliationPanel from './LedgerReconciliationPanel';
 
 import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
@@ -196,8 +197,30 @@ export default function EliteBillingDepartment({
     if (initialTab && initialTab !== 'costing') {
       return initialTab;
     }
+    const hash = window.location.hash.toLowerCase();
+    if (hash.includes('ledger-reconciliation') || hash.includes('reconciliation')) {
+      return 'reconciliation';
+    }
     return isCorporateEntity ? 'invoices' : 'challans';
   });
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    const handleHash = () => {
+      const h = window.location.hash.toLowerCase();
+      if (h.includes('ledger-reconciliation') || h.includes('reconciliation')) {
+        setActiveTab('reconciliation');
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
     totalInvoices: 0,
@@ -3025,14 +3048,14 @@ export default function EliteBillingDepartment({
         isLocked: true
       }));
 
-      const nextRes = await api.getNextInvoiceNo();
+      const nextRes = await api.getNextInvoiceNo(companyEntity);
       const cfg = await api.getPrintConfig().catch(() => ({}));
       const dueDays = cfg?.paymentDueDays || 30;
       const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
       const challanTagStr = (linkedChallanNos || []).join(', ');
 
       setInvoiceForm({
-        invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
+        invoiceNo: nextRes.invoiceNo || 'EDP/26-27/1001',
         invoiceSeq: nextRes.nextSeq || 1001,
         ourChallanNo: challanTagStr,
         deliveryBy: mergeDeliveryBy || '',
@@ -3114,7 +3137,7 @@ export default function EliteBillingDepartment({
         const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
 
         setInvoiceForm({
-          invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
+          invoiceNo: nextRes.invoiceNo || 'EDP/26-27/1001',
           invoiceSeq: nextRes.nextSeq || 1001,
           invoiceDate: new Date().toISOString().split('T')[0],
           dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
@@ -3550,7 +3573,7 @@ export default function EliteBillingDepartment({
       const { manualRoundOff, manualTdsAmount, _tdsPreset, ...formRest } = invoiceForm;
       const payload = {
         ...formRest,
-        companyEntity: companyEntity || 'Elite Online',
+        companyEntity: companyEntity || 'Elite Digital Print',
         items: calculatedInvoice.items,
         subtotal: calculatedInvoice.subtotal,
         discountTotal: calculatedInvoice.discountTotal,
@@ -3848,6 +3871,7 @@ export default function EliteBillingDepartment({
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
             { id: 'purchase', label: 'Purchases' },
             { id: 'gst', label: 'GST Summary' },
+            { id: 'reconciliation', label: 'Ledger Reconciliation' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
             { id: 'expense', label: 'Expenses & Ledger' },
             { id: 'customers', label: `Customers (${customers.length})` },
@@ -6195,6 +6219,15 @@ export default function EliteBillingDepartment({
             loadData();
             fetchPurchases();
           }}
+        />
+      )}
+
+      {/* ── 3-WAY LEDGER RECONCILIATION & GROK FORENSIC AUDIT ─────────────── */}
+      {activeTab === 'reconciliation' && (
+        <LedgerReconciliationPanel
+          companyEntity={companyEntity}
+          customers={customers}
+          vendors={vendorsList}
         />
       )}
 

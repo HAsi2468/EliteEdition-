@@ -306,7 +306,8 @@ const convertToInvoice = async (req, res) => {
     // Generate Next Sequential Invoice No for the company
     let invPrefix = 'SO/26-27/';
     if (companyEntity === 'Elite Edition') invPrefix = 'EE/26-27/';
-    if (companyEntity === 'Elite Fabtex') invPrefix = 'EF/26-27/';
+    else if (companyEntity === 'Elite Fabtex') invPrefix = 'EF/26-27/';
+    else if (companyEntity === 'Elite Digital Print' || companyEntity === 'Elite Digital Prints') invPrefix = 'EDP/26-27/';
 
     const lastInv = await BillingInvoice.findOne({
       companyEntity,
@@ -316,7 +317,7 @@ const convertToInvoice = async (req, res) => {
       .lean();
 
     let nextInvSeq = lastInv && lastInv.invoiceSeq ? lastInv.invoiceSeq + 1 : 1;
-    const nextInvNo = `${invPrefix}${String(nextInvSeq).padStart(3, '0')}`;
+    const nextInvNo = `${invPrefix}${nextInvSeq}`;
 
     // Map items from Challan to Invoice line items
     const invoiceItems = (challan.items || []).map((it) => ({

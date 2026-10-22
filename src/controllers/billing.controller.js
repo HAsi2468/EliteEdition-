@@ -934,6 +934,25 @@ const syncJobCardsForInvoice = async (invoice) => {
 };
 
 // ── 6. UPDATE INVOICE ────────────────────────────────────────────────────────
+// Helper to purge disk-cached PDFs for an invoice on edits/payments
+const invalidateInvoicePdfCache = (invoiceId) => {
+  try {
+    const cacheDir = path.join(__dirname, '../../uploads/cached_invoices');
+    if (!fs.existsSync(cacheDir) || !invoiceId) return;
+    const prefix = `inv_${invoiceId}_`;
+    const files = fs.readdirSync(cacheDir);
+    files.forEach(f => {
+      if (f.startsWith(prefix)) {
+        try { fs.unlinkSync(path.join(cacheDir, f)); } catch (e) {}
+      }
+    });
+  } catch (err) {
+    if (typeof logger !== 'undefined' && logger.warn) {
+      logger.warn(`Failed to invalidate invoice cache for ${invoiceId}: ${err.message}`);
+    }
+  }
+};
+
 const updateInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
@@ -998,6 +1017,9 @@ const updateInvoice = async (req, res) => {
     if (!invoice) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
+
+    // Invalidate cached PDF on disk so subsequent downloads/prints immediately reflect edits
+    invalidateInvoicePdfCache(req.params.id);
 
     // Sync linked Challans to INVOICED and revert unlinked ones to PENDING
     await syncChallanStatusForInvoice(invoice);
@@ -1078,10 +1100,16 @@ const mergeChallans = async (req, res) => {
     };
 
     if (rawParty) {
+      const cleanParty = rawParty.trim();
+      const escapedParty = cleanParty.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const matchedCust = await BillingCustomer.findOne({
         $or: [
-          { name: { $regex: `^${rawParty.trim()}$`, $options: 'i' } },
-          { businessName: { $regex: `^${rawParty.trim()}$`, $options: 'i' } }
+          { name: { $regex: `^${escapedParty}$`, $options: 'i' } },
+          { businessName: { $regex: `^${escapedParty}$`, $options: 'i' } },
+          { name: { $regex: `^${escapedParty}\\b`, $options: 'i' } },
+          { businessName: { $regex: `^${escapedParty}\\b`, $options: 'i' } },
+          { name: { $regex: escapedParty, $options: 'i' } },
+          { businessName: { $regex: escapedParty, $options: 'i' } }
         ]
       }).lean();
       if (matchedCust) {
@@ -1257,6 +1285,7 @@ const deleteInvoice = async (req, res) => {
     await StitchingChallan.updateMany(queryInv, { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } });
     await syncJobCardsForInvoice(invoice);
 
+    invalidateInvoicePdfCache(req.params.id);
     res.json({ success: true, message: 'Invoice deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1297,6 +1326,7 @@ const recordPayment = async (req, res) => {
     });
 
     await invoice.save();
+    invalidateInvoicePdfCache(req.params.id);
     res.json({ success: true, data: invoice });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1597,16 +1627,19 @@ const downloadInvoicePdf = async (req, res) => {
 
     const includeDuplicate = req.query?.duplicate === 'true';
 
+    const noCache = req.query?.nocache === 'true' || req.query?.refresh === 'true';
+
     // Fast Disk Caching for Invoice PDFs to eliminate 25s hangs on preview
     const cacheDir = path.join(__dirname, '../../uploads/cached_invoices');
     if (!fs.existsSync(cacheDir)) {
       try { fs.mkdirSync(cacheDir, { recursive: true }); } catch (e) {}
     }
-    const invUpdatedAt = invoice.updatedAt ? new Date(invoice.updatedAt).getTime() : 0;
+    const rawUpdatedAt = invoice.updated_at || invoice.updatedAt || invoice.created_at || invoice.createdAt;
+    const invUpdatedAt = rawUpdatedAt ? new Date(rawUpdatedAt).getTime() : (invoice.version || 0);
     const cacheFileName = `inv_${invoice._id}_${invUpdatedAt}_${includeDuplicate ? 'dup' : 'orig'}.pdf`;
     const cachedFilePath = path.join(cacheDir, cacheFileName);
 
-    if (fs.existsSync(cachedFilePath)) {
+    if (!noCache && fs.existsSync(cachedFilePath)) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNo}.pdf"`);
       return fs.createReadStream(cachedFilePath).pipe(res);
@@ -1614,9 +1647,44 @@ const downloadInvoicePdf = async (req, res) => {
 
     await enrichInvoiceItemsWithImages(invoice);
 
+    // Ensure customer details are up to date from BillingCustomer
+    if (invoice.customer) {
+      try {
+        const BillingCustomer = require('../db/models/billingCustomer.model');
+        let matchedCustomer = null;
+        if (invoice.customer.customerId) {
+          matchedCustomer = await BillingCustomer.findById(invoice.customer.customerId).lean();
+        }
+        if (!matchedCustomer && invoice.customer.name) {
+          const cleanName = invoice.customer.name.trim();
+          matchedCustomer = await BillingCustomer.findOne({
+            $or: [
+              { name: cleanName },
+              { businessName: cleanName },
+              { name: { $regex: `^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, $options: 'i' } }
+            ]
+          }).lean();
+        }
+        if (matchedCustomer) {
+          invoice.customer = {
+            ...matchedCustomer,
+            ...invoice.customer,
+            name: matchedCustomer.name || invoice.customer.name,
+            businessName: matchedCustomer.businessName || invoice.customer.businessName || matchedCustomer.name,
+            gstin: matchedCustomer.gstin || invoice.customer.gstin,
+            billingAddress: matchedCustomer.billingAddress || invoice.customer.billingAddress,
+            state: matchedCustomer.state || invoice.customer.state || 'Gujarat',
+            stateCode: matchedCustomer.stateCode || invoice.customer.stateCode || '24'
+          };
+        }
+      } catch (custErr) {
+        if (typeof logger !== 'undefined' && logger.warn) logger.warn(`Customer enrichment warning in PDF: ${custErr.message}`);
+      }
+    }
+
     const PrintConfig = require('../db/models/printConfig.model');
     const JobCard = require('../db/models/jobCard.model');
-    const companyEntity = invoice.companyEntity || 'Elite Online';
+    const companyEntity = invoice.companyEntity || 'Elite Digital Print';
     const config = await PrintConfig.findOne({ companyEntity }).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
 
     const rawCompName = config.companyName || companyEntity.toUpperCase();
