@@ -354,6 +354,10 @@ class SocketManager {
       }, this.HEARTBEAT_TIMEOUT_MS);
 
       try {
+        if (!this.socket || !this.socket.connected) {
+          clearTimeout(timeoutId);
+          return;
+        }
         // Ping with 'ping-heartbeat' or fallback to 'ping-health'
         this.socket.emit('ping-heartbeat', { clientTime: Date.now() }, () => {
           ackReceived = true;
@@ -526,6 +530,10 @@ class SocketManager {
     }, 8000);
 
     try {
+      if (!this.socket || !this.socket.connected) {
+        clearTimeout(pingTimeout);
+        return;
+      }
       this.socket.emit('ping-health', () => {
         acked = true;
         clearTimeout(pingTimeout);
@@ -559,6 +567,11 @@ class SocketManager {
     }, 8000);
 
     try {
+      if (!this.socket || !this.socket.connected) {
+        clearTimeout(timeout);
+        this._isVerifyingAlive = false;
+        return;
+      }
       this.socket.emit('ping-health', () => {
         hasAcked = true;
         clearTimeout(timeout);

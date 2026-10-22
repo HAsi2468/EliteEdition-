@@ -306,6 +306,7 @@ const setupSockets = (io) => {
         
         // Anti-Spoofing: Bind sender strictly to authenticated socket user when available
         const actualSenderId = socket.userId || (socket.user ? String(socket.user._id) : senderId);
+        const strSender = String(actualSenderId || '');
         if (!actualSenderId) {
           socket.emit('error-notice', { message: 'Authentication required to post messages' });
           if (typeof callback === 'function') callback({ success: false, error: 'Authentication required' });
@@ -391,7 +392,7 @@ const setupSockets = (io) => {
         if (isMentionAll && targetRoom && Array.isArray(targetRoom.members)) {
           targetRoom.members.forEach((m) => {
             const mIdStr = String(typeof m === 'object' ? (m._id || m.id) : m);
-            if (mIdStr && mIdStr !== senderIdStr && !mentions.includes(mIdStr)) {
+            if (mIdStr && mIdStr !== strSender && !mentions.includes(mIdStr)) {
               mentions.push(mIdStr);
             }
           });
@@ -412,7 +413,7 @@ const setupSockets = (io) => {
           } catch (err) {
             console.warn('[socket send-message mention resolution error]:', err.message);
           }
-          mentions = Array.from(new Set(mentions)).filter((id) => id !== 'ALL_MEMBERS' && id !== senderIdStr);
+          mentions = Array.from(new Set(mentions)).filter((id) => id !== 'ALL_MEMBERS' && id !== strSender);
         }
 
         // Parse record mentions e.g. @JC-1004, @DES-55, @INV-201
@@ -438,13 +439,16 @@ const setupSockets = (io) => {
         );
         const roomSeq = updatedRoom?.lastSeq || 1;
 
+        const cleanReplyTo = (replyTo && mongoose.Types.ObjectId.isValid(replyTo)) ? new mongoose.Types.ObjectId(replyTo) : null;
+        const messageContent = (sanitizedContent || '').trim() || (attachment?.fileName ? attachment.fileName : 'Message');
+
         // Save message to MongoDB strictly setting server-enforced createdAt and monotonic roomSeq
         const newMessage = await ChatMessage.create({
           roomId,
           senderId: actualSenderId,
           clientMsgId: clientMsgId || undefined,
-          content: sanitizedContent || (attachment?.fileName || ''),
-          replyTo: replyTo || null,
+          content: messageContent,
+          replyTo: cleanReplyTo,
           type: msgType,
           msgType: 'human',
           priority: priority === 'urgent' ? 'urgent' : 'normal',
@@ -452,7 +456,7 @@ const setupSockets = (io) => {
           activityMeta: activityMeta || undefined,
           recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
           mentions: mentions.length > 0 ? mentions : undefined,
-          readBy: [senderId],
+          readBy: [actualSenderId],
           createdAt: new Date(),
           roomSeq
         });
@@ -581,7 +585,10 @@ const setupSockets = (io) => {
           }, 600);
         }
       } catch (error) {
-        console.error('Error saving message:', error);
+        console.error('[Socket send-message ERROR]:', error.message, error.stack);
+        if (typeof callback === 'function') {
+          callback({ success: false, error: error.message });
+        }
       }
     });
 

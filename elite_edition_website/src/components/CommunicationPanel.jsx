@@ -484,9 +484,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         }
 
         // Merge local and server matches, deduplicating by _id
+        const isSuperAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin' || currentUser?.isAdmin;
         const combinedMap = new Map();
         localMatches.forEach((m) => combinedMap.set(String(m._id), m));
-        serverMatches.forEach((m) => combinedMap.set(String(m._id), m));
+        serverMatches.forEach((m) => {
+          const rawRoomId = typeof m.roomId === 'object' ? (m.roomId?._id || m.roomId?.id) : (m.roomId || m.conversationId);
+          const hasRoomAccess = isSuperAdmin || (groups || []).some((g) => String(g._id) === String(rawRoomId));
+          if (hasRoomAccess) {
+            combinedMap.set(String(m._id), m);
+          }
+        });
         setMessageSearchResults(Array.from(combinedMap.values()));
       } catch (err) {
         console.warn('Message search error:', err);
@@ -500,7 +507,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [searchQuery, messages, activeGroup]);
+  }, [searchQuery, messages, activeGroup, groups, currentUser]);
 
   const audioElementRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -1581,6 +1588,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const confirmDeleteMessage = async (messageId) => {
     if (!messageId) return;
+    if (String(messageId).startsWith('temp_')) {
+      setMessages((prev) => prev.filter((m) => String(m._id) !== String(messageId) && m.clientMsgId !== messageId));
+      setDeleteTargetMsg(null);
+      return;
+    }
     try {
       const res = await api.deleteCommunicationMessage(messageId);
       if (res.success) {
@@ -3791,7 +3803,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     } catch (err) {
       console.warn('HTTP post message failed, falling back to socket emit or error flag:', err.message);
       if (socket && socket.connected) {
+        let ackResolved = false;
+        const fallbackTimer = setTimeout(() => {
+          if (!ackResolved) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m._id === tempId || m.clientMsgId === clientMsgId
+                  ? { ...m, isOptimistic: false, sendFailed: true, sendError: 'Send timed out' }
+                  : m
+              )
+            );
+          }
+        }, 5000);
+
         socket.emit('send-message', messagePayload, (ack) => {
+          ackResolved = true;
+          clearTimeout(fallbackTimer);
           const ackMsg = ack?.message || ack?.data;
           if (ack?.success && ackMsg) {
             setMessages((prev) => {
@@ -3810,6 +3837,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 return g;
               });
             });
+          } else {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m._id === tempId || m.clientMsgId === clientMsgId
+                  ? { ...m, isOptimistic: false, sendFailed: true, sendError: ack?.error || 'Send failed' }
+                  : m
+              )
+            );
           }
         });
       } else {
@@ -3827,9 +3862,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleRetryFailedMessage = async (failedMsg) => {
     if (!failedMsg || !activeGroup?._id) return;
     const senderId = currentUser?.id || currentUser?._id;
+    const clientMsgId = failedMsg.clientMsgId || failedMsg._id;
     const messagePayload = {
       roomId: activeGroup._id,
       senderId,
+      clientMsgId,
       content: failedMsg.content || '',
       priority: failedMsg.priority || 'normal',
       replyTo: failedMsg.replyTo ? (failedMsg.replyTo._id || failedMsg.replyTo) : undefined,
@@ -3846,12 +3883,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
       if (res && res.success && res.data) {
         setMessages((prev) =>
-          prev.map((m) => (m._id === failedMsg._id ? res.data : m))
+          prev.map((m) => (m._id === failedMsg._id ? { ...res.data, isOptimistic: false, sendFailed: false } : m))
         );
       } else {
         throw new Error(res?.message || 'Server rejected retry');
       }
     } catch (err) {
+      console.warn('Retry failed:', err.message);
       setMessages((prev) =>
         prev.map((m) =>
           m._id === failedMsg._id
@@ -3859,7 +3897,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             : m
         )
       );
-      alert('Retry failed: ' + err.message);
     }
   };
 
@@ -5661,6 +5698,37 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     onClick={(e) => e.stopPropagation()}
                                   >
 
+                                  {(msg.isOptimistic || String(msg._id).startsWith('temp_') || msg.sendFailed) ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px' }}>
+                                      {msg.sendFailed && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveMsgMenuId(null);
+                                            handleRetryFailedMessage(msg);
+                                          }}
+                                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#2563eb', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
+                                        >
+                                          <RefreshCw size={14} color="#2563eb" />
+                                          <span>Retry Send</span>
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          if (e) e.stopPropagation();
+                                          handleCancelMsgHold();
+                                          setActiveMsgMenuId(null);
+                                          setMessages((prev) => prev.filter((m) => m._id !== msg._id && m.clientMsgId !== msg.clientMsgId));
+                                        }}
+                                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', textAlign: 'left', fontWeight: 600 }}
+                                      >
+                                        <Trash2 size={14} color="#dc2626" />
+                                        <span>Remove Unsent Message</span>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
                                   {/* Quick Reactions Bar */}
                                   <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>
                                     {['👍', '❤️', '😂', '😮', '😢', '🙏', '👏', '🔥'].map((emo) => (
@@ -5763,6 +5831,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       <Trash2 size={14} color="#dc2626" />
                                       <span>Delete Message</span>
                                     </button>
+                                  )}
+                                    </>
                                   )}
                                 </div>
                               </>

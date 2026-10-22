@@ -179,6 +179,10 @@ const getGroups = async (req, res) => {
 const getGroupMessages = async (req, res) => {
   try {
     const { groupId } = req.params;
+    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing Group ID' });
+    }
+
     const { page = 1, limit = 50, msgType, beforeSeq, before, afterSeq, after } = req.query;
 
     const pageNum = parseInt(page, 10);
@@ -284,8 +288,8 @@ const getGroupMessages = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching group messages:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch messages', error: error.message });
+    console.error('[getGroupMessages ERROR]:', error.message, error.stack);
+    res.status(500).json({ success: false, message: 'Failed to fetch messages: ' + error.message, error: error.message });
   }
 };
 
@@ -501,7 +505,7 @@ const postGroupMessage = async (req, res) => {
     if (isMentionAll && targetRoom && Array.isArray(targetRoom.members)) {
       targetRoom.members.forEach((m) => {
         const mIdStr = String(typeof m === 'object' ? (m._id || m.id) : m);
-        if (mIdStr && mIdStr !== String(senderId) && !mentions.includes(mIdStr)) {
+        if (mIdStr && mIdStr !== strSender && !mentions.includes(mIdStr)) {
           mentions.push(mIdStr);
         }
       });
@@ -522,7 +526,7 @@ const postGroupMessage = async (req, res) => {
       } catch (err) {
         console.warn('[postGroupMessage mention resolution error]:', err.message);
       }
-      mentions = Array.from(new Set(mentions)).filter((id) => id !== 'ALL_MEMBERS' && id !== String(senderId));
+      mentions = Array.from(new Set(mentions)).filter((id) => id !== 'ALL_MEMBERS' && id !== strSender);
     }
 
     // Parse record mentions
@@ -548,13 +552,17 @@ const postGroupMessage = async (req, res) => {
     );
     const roomSeq = updatedRoom?.lastSeq || 1;
 
+    // Validate replyTo: if optimistic temp ID, ignore to prevent CastError
+    const cleanReplyTo = (replyTo && mongoose.Types.ObjectId.isValid(replyTo)) ? new mongoose.Types.ObjectId(replyTo) : null;
+    const messageContent = (sanitizedContent || '').trim() || (pollMeta ? pollMeta.question : (attachment?.fileName ? attachment.fileName : 'Message'));
+
     const newMessage = await ChatMessage.create({
       roomId: groupId,
       senderId: senderObjId,
       senderName: resolvedSenderName,
       clientMsgId: clientMsgId || undefined,
-      content: sanitizedContent || (pollMeta ? pollMeta.question : (attachment?.fileName || '')),
-      replyTo: replyTo || null,
+      content: messageContent,
+      replyTo: cleanReplyTo,
       type: msgType,
       msgType: 'human',
       priority: priority === 'urgent' ? 'urgent' : 'normal',
@@ -628,8 +636,8 @@ const postGroupMessage = async (req, res) => {
 
     res.json({ success: true, data: populatedMessage });
   } catch (error) {
-    console.error('Error in postGroupMessage endpoint:', error);
-    res.status(500).json({ success: false, message: 'Failed to send message', error: error.message });
+    console.error('[postGroupMessage ERROR]:', error.message, error.stack);
+    res.status(500).json({ success: false, message: 'Failed to send message: ' + error.message, error: error.message });
   }
 };
 
@@ -854,6 +862,12 @@ const searchMessages = async (req, res) => {
     const userStrId = rawUserId ? String(rawUserId) : null;
     const userMembers = [userObjId, userStrId].filter(Boolean);
 
+    const isClient = req.user && (
+      req.user.role === 'client' ||
+      req.user.userType === 'client' ||
+      req.headers['x-user-type'] === 'client'
+    );
+
     const isSuperOrAdmin = req.user && (
       req.user.role === 'admin' ||
       req.user.role === 'super_admin' ||
@@ -863,20 +877,28 @@ const searchMessages = async (req, res) => {
     );
 
     let roomQuery = { isArchived: { $ne: true } };
-    if (!isSuperOrAdmin) {
+
+    if (isClient) {
+      if (userMembers.length === 0) {
+        return res.status(200).json({ success: true, results: [] });
+      }
+      roomQuery.members = { $in: userMembers };
+      roomQuery.isInternalOnly = { $ne: true };
+    } else if (isSuperOrAdmin) {
       if (userMembers.length > 0) {
         roomQuery.$or = [
-          { members: { $in: userMembers } },
-          { createdBy: { $in: userMembers } },
-          { isSystemGroup: true },
-          { type: 'group' }
+          { type: { $ne: 'direct' } },
+          { members: { $in: userMembers } }
         ];
       } else {
-        roomQuery.$or = [
-          { isSystemGroup: true },
-          { type: 'group' }
-        ];
+        roomQuery.type = { $ne: 'direct' };
       }
+    } else if (userMembers.length > 0) {
+      // Standard users ONLY search messages in channels where they are an explicit member
+      roomQuery.members = { $in: userMembers };
+    } else {
+      // Unauthenticated / unidentifiable callers see NO messages
+      return res.status(200).json({ success: true, results: [] });
     }
 
     const accessibleRooms = await ChatRoom.find(roomQuery).select('_id name title type').lean();
@@ -1177,6 +1199,13 @@ const broadcastVersionUpdate = async (req, res) => {
 const deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
+    if (!messageId || !mongoose.Types.ObjectId.isValid(messageId)) {
+      if (typeof messageId === 'string' && messageId.startsWith('temp_')) {
+        return res.json({ success: true, message: 'Temporary message dismissed' });
+      }
+      return res.status(400).json({ success: false, message: 'Invalid message ID' });
+    }
+
     const userId = req.user ? (req.user._id || req.user.id) : null;
     const userRole = (req.user?.role || '').toLowerCase();
     const isMasterAdmin =
@@ -1250,8 +1279,8 @@ const deleteMessage = async (req, res) => {
       data: { messageId: message._id, roomId: message.roomId }
     });
   } catch (error) {
-    console.error('Error deleting message:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete message', error: error.message });
+    console.error('[deleteMessage ERROR]:', error.message, error.stack);
+    res.status(500).json({ success: false, message: 'Failed to delete message: ' + error.message, error: error.message });
   }
 };
 

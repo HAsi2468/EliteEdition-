@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const config = require('../config/config');
 const { user: User, ChatRoom } = require('../db/models');
 
@@ -150,8 +151,8 @@ const requireAdmin = (req, res, next) => {
 const requireGroupAccess = async (req, res, next) => {
   try {
     const groupId = req.params.groupId || req.body.groupId || req.query.groupId;
-    if (!groupId) {
-      return res.status(400).json({ success: false, message: 'Group ID is required' });
+    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing Group ID' });
     }
 
     const room = await ChatRoom.findById(groupId).lean();
