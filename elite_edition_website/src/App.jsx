@@ -37,6 +37,7 @@ const ReturnsManager = lazy(() => import('./components/ReturnsManager'));
 const ScanAndPackScreen = lazy(() => import('./components/ScanAndPackScreen'));
 const DesignerModule = lazy(() => import('./components/DesignerModule'));
 const DesignerScreen = lazy(() => import('./components/DesignerScreen'));
+const LedgerReconciliationPanel = lazy(() => import('./components/LedgerReconciliationPanel'));
 
 import EliteModalDialog from './components/EliteModalDialog';
 import { triggerEliteAlert, triggerEliteConfirm } from './services/dialogService';
@@ -144,9 +145,6 @@ export const ROUTE_ALIASES = {
   'invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
   'invoice': { tab: 'ee_invoices', dept: 'elite_edition' },
   'ee_invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
-  'ledger-reconciliation': { tab: 'ee_invoices', dept: 'elite_edition' },
-  'ledger_reconciliation': { tab: 'ee_invoices', dept: 'elite_edition' },
-  'reconciliation': { tab: 'ee_invoices', dept: 'elite_edition' },
   'jobcards': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcard': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
@@ -2101,7 +2099,7 @@ export default function App() {
               );
             })()}
 
-            {(hasCommunicationAccess || hasTaskAccess) && (
+            {(hasCommunicationAccess || hasTaskAccess || true) && (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', borderLeft: '1px solid #e2e8f0', paddingLeft: '8px' }}>
                 {hasCommunicationAccess && (
                   <button
@@ -2142,6 +2140,20 @@ export default function App() {
                     <span className="hidden sm:inline">Tasks</span>
                   </button>
                 )}
+
+                <button
+                  onClick={() => {
+                    setActiveTab('reconciliation');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`dept-switcher-btn comm-btn ${activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? 'active' : ''}`}
+                  title="Universal AI Ledger & Statement Reconciler"
+                  type="button"
+                  style={{ minHeight: '30px', height: '30px', padding: '0 8px', fontSize: '0.74rem', gap: '4px' }}
+                >
+                  <Scale size={13} style={{ flexShrink: 0 }} />
+                  <span className="hidden sm:inline">Reconciliation</span>
+                </button>
               </div>
             )}
           </div>
@@ -2586,6 +2598,17 @@ export default function App() {
                     <span>Tasks</span>
                   </button>
                 )}
+
+                <button
+                  onClick={() => {
+                    setActiveTab('reconciliation');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`mobile-drawer-item ${activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? 'active' : ''}`}
+                >
+                  <Scale size={14} style={{ marginRight: '6px', display: 'inline-block', verticalAlign: 'middle' }} />
+                  <span>Reconciliation</span>
+                </button>
               </div>
             </div>
 
@@ -3019,9 +3042,6 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_invoices')) &&
                       renderNavItem('ee_invoices', 'Finance', Receipt, null, 'Finance')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_invoices')) &&
-                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
-                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_complaints')) &&
                       renderNavItem('ee_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
                     }
@@ -3041,9 +3061,6 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_invoices')) &&
                       renderNavItem('ef_invoices', 'Finance', Receipt, null, 'Finance')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_invoices')) &&
-                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
-                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_complaints')) &&
                       renderNavItem('ef_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
                     }
@@ -3062,9 +3079,6 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_invoices')) &&
                       renderNavItem('so_invoices', 'Finance', Receipt, null, 'Finance')
-                    }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_invoices')) &&
-                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_complaints')) &&
                       renderNavItem('so_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
@@ -3114,9 +3128,6 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
                       renderNavItem('jobcards_billing', 'Finance', Receipt, null, 'Finance')
-                    }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
-                      renderNavItem('ledger-reconciliation', 'Reconciliation', Scale, null, 'Reconciliation')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) &&
                       renderNavItem('jobcards_costing', 'Costing', TrendingUp, null, 'Costing')
@@ -3337,8 +3348,8 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Elite Edition" />
           ) : activeTab === 'ee_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Edition" />
-          ) : activeTab === 'ee_invoices' || activeTab === 'ledger-reconciliation' || activeTab === 'reconciliation' ? (
-            <EliteBillingDepartment companyEntity="Elite Edition" initialTab={activeTab === 'ledger-reconciliation' || activeTab === 'reconciliation' ? 'reconciliation' : null} />
+          ) : activeTab === 'ee_invoices' ? (
+            <EliteBillingDepartment companyEntity="Elite Edition" />
           ) : activeTab === 'ef_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'ef_settings' ? (
@@ -3382,6 +3393,8 @@ export default function App() {
             <MyntraHub />
           ) : activeTab === 'designer_screen' || activeTab === 'designer_module' || activeTab === 'designer' ? (
             <DesignerScreen currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} onNavigate={(t) => setActiveTab(t)} />
+          ) : activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? (
+            <LedgerReconciliationPanel />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
           ) : activeTab === 'no-access' ? (

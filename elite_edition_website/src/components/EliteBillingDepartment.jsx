@@ -197,30 +197,8 @@ export default function EliteBillingDepartment({
     if (initialTab && initialTab !== 'costing') {
       return initialTab;
     }
-    const hash = window.location.hash.toLowerCase();
-    if (hash.includes('ledger-reconciliation') || hash.includes('reconciliation')) {
-      return 'reconciliation';
-    }
     return isCorporateEntity ? 'invoices' : 'challans';
   });
-
-  useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
-
-  useEffect(() => {
-    const handleHash = () => {
-      const h = window.location.hash.toLowerCase();
-      if (h.includes('ledger-reconciliation') || h.includes('reconciliation')) {
-        setActiveTab('reconciliation');
-      }
-    };
-    handleHash();
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
     totalInvoices: 0,
@@ -3871,7 +3849,6 @@ export default function EliteBillingDepartment({
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
             { id: 'purchase', label: 'Purchases' },
             { id: 'gst', label: 'GST Summary' },
-            { id: 'reconciliation', label: 'Ledger Reconciliation' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
             { id: 'expense', label: 'Expenses & Ledger' },
             { id: 'customers', label: `Customers (${customers.length})` },
@@ -6219,15 +6196,6 @@ export default function EliteBillingDepartment({
             loadData();
             fetchPurchases();
           }}
-        />
-      )}
-
-      {/* ── 3-WAY LEDGER RECONCILIATION & GROK FORENSIC AUDIT ─────────────── */}
-      {activeTab === 'reconciliation' && (
-        <LedgerReconciliationPanel
-          companyEntity={companyEntity}
-          customers={customers}
-          vendors={vendorsList}
         />
       )}
 

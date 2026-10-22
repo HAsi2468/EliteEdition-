@@ -9,7 +9,8 @@ import {
   GripVertical,
   ChevronLeft,
   ChevronRight,
-  Zap
+  Zap,
+  Scale
 } from 'lucide-react';
 import './EnterpriseHUDThemeController.css';
 import ErgonomicsPopover from './ErgonomicsPopover';
@@ -291,6 +292,7 @@ export function EnterpriseHUDThemeController({
 
   const isCommActive = activeTab === 'communication' || activeTab === 'workspace';
   const isTaskActive = activeTab === 'task_management';
+  const isReconcileActive = activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation';
 
   const effectiveCollapsed = isDocked ? false : isCollapsed;
 
@@ -396,6 +398,25 @@ export function EnterpriseHUDThemeController({
               <CheckSquare size={13} style={{ color: isTaskActive ? '#16a34a' : '#64748b' }} />
               <span style={{ fontWeight: 700 }}>Tasks</span>
             </button>
+          )}
+
+          {/* Button 4: Universal AI Reconciliation */}
+          {isAuthenticated && (
+            <>
+              <div className="dock-divider" />
+              <button
+                type="button"
+                className={`dock-action-btn dock-btn-task ${isReconcileActive ? 'active' : ''}`}
+                onClick={handleItemClick(() => {
+                  onNavigateTab('reconciliation');
+                })}
+                title="Universal AI Ledger & Statement Reconciler"
+                aria-label="Reconciliation"
+              >
+                <Scale size={13} style={{ color: isReconcileActive ? '#2563eb' : '#64748b' }} />
+                <span style={{ fontWeight: 700 }}>Reconcile</span>
+              </button>
+            </>
           )}
 
           {/* Collapse to Single Circular Button Toggle */}

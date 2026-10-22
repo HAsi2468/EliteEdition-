@@ -94,29 +94,29 @@ async function parseStatement(req, res) {
 async function runReconciliation(req, res) {
   try {
     const {
-      partyType = 'customer',
-      partyName,
+      partyType = 'general',
+      partyName = 'General Reconciliation',
       partyId,
       statementItems = [],
+      erpItems = [],
       statementOpeningBalance = 0,
       statementClosingBalance = 0,
       startDate,
       endDate
     } = req.body;
 
-    if (!partyName) {
-      return res.status(400).json({ success: false, message: 'partyName is required' });
+    // 1. Use provided book entries directly or fetch from ERP if partyId provided
+    let erpTransactions = Array.isArray(erpItems) && erpItems.length > 0 ? erpItems : [];
+    if (erpTransactions.length === 0 && partyId) {
+      erpTransactions = await ledgerReconciliationService.fetchErpTransactions({
+        partyType,
+        partyName,
+        partyId,
+        startDate,
+        endDate,
+        companyEntity: req.user?.companyEntity
+      });
     }
-
-    // 1. Fetch internal ERP transactions
-    const erpTransactions = await ledgerReconciliationService.fetchErpTransactions({
-      partyType,
-      partyName,
-      partyId,
-      startDate,
-      endDate,
-      companyEntity: req.user?.companyEntity
-    });
 
     // 2. Run matching engine
     const matchResults = ledgerReconciliationService.reconcileTransactions(
