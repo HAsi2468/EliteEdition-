@@ -2439,7 +2439,7 @@ function ImageField({ label, name, form, onChange, index, value, placeholder = "
 }
 
 // ─── JOB CARD FORM MODAL ─────────────────────────────────────────────────────
-function JobCardForm({ card, onSave, onClose, department }) {
+function JobCardForm({ card, onSave, onClose, department, currentUser }) {
   const [form, setForm] = useState(card ? { ...card } : { ...BLANK });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -2782,9 +2782,9 @@ function JobCardForm({ card, onSave, onClose, department }) {
         await api.createJobCard(payload);
         triggerPushNotification('✨ Job Card Created', `Job Card #${form.jobNo} created successfully!`, 'success');
         const isTestRecord = (
-          currentUser?.role === 'qa-automation' ||
-          currentUser?.companyId === 'TEST_COMPANY' ||
-          currentUser?.companyId === 'SANDBOX' ||
+          activeUser?.role === 'qa-automation' ||
+          activeUser?.companyId === 'TEST_COMPANY' ||
+          activeUser?.companyId === 'SANDBOX' ||
           payload?.isSandbox === true ||
           /^TEST[-_]/i.test(form.jobNo || form.designName || form.designNo || '') ||
           /^QA[-_]/i.test(form.jobNo || form.designName || form.designNo || '')
@@ -4994,7 +4994,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
       {/* Modals */}
       {showForm && (
-        <JobCardForm card={formCard} onSave={onSaved} onClose={()=>setShowForm(false)} department={department}/>
+        <JobCardForm card={formCard} onSave={onSaved} onClose={()=>setShowForm(false)} department={department} currentUser={currentUser}/>
       )}
       {previewCard && (
         <ErrorBoundary>
