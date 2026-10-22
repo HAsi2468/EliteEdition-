@@ -317,7 +317,7 @@ Return JSON:
  * Interactive Financial Copilot Query
  */
 async function copilotChat({ query, conversationHistory = [], erpContext = {} }) {
-  const systemPrompt = `You are Grok Financial Copilot, an AI accounting advisor embedded inside Elite Edition ERP.
+  const systemPrompt = `You are Elite AI Financial Copilot, an AI accounting advisor embedded inside Elite Edition ERP.
 You assist accountants, managers, and directors with ledger reconciliation, GST matching, customer receivables, vendor payables, and bank reconciliation.
 Context:
 ${JSON.stringify(erpContext, null, 2)}
