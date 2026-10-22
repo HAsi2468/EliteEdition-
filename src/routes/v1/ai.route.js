@@ -499,6 +499,8 @@ Provide a concise, professional 2-sentence shop-floor advisory on machine settin
     console.error('Error in /v1/ai/calculate-measurement:', err);
     return res.status(500).json({ error: 'Failed to calculate measurements: ' + err.message });
   }
+});
+
 // POST /v1/ai/orchestrator - Operational ERP Orchestrator Agent
 router.post('/orchestrator', requireAuth, orchestratorController.handlePrompt);
 
