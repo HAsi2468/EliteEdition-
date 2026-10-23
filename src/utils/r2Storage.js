@@ -46,9 +46,10 @@ function isR2Configured() {
  * @param {string} params.fileName - Target file name
  * @param {string} params.mimeType - MIME content type (e.g. image/jpeg)
  * @param {string} [params.folder='designs'] - Subfolder inside bucket
+ * @param {string} [params.originalName] - Original filename in any language (Gujarati, Hindi, Chinese, etc.)
  * @returns {Promise<string>} Public URL of uploaded object
  */
-async function uploadToR2({ buffer, fileName, mimeType, folder = 'designs' }) {
+async function uploadToR2({ buffer, fileName, mimeType, folder = 'designs', originalName = null }) {
   const client = getR2Client();
   if (!client || !config.r2.bucketName) {
     throw new Error('Cloudflare R2 is not fully configured in environment variables');
@@ -58,11 +59,15 @@ async function uploadToR2({ buffer, fileName, mimeType, folder = 'designs' }) {
   const cleanFileName = fileName.replace(/^\/+/g, '');
   const key = cleanFolder ? `${cleanFolder}/${cleanFileName}` : cleanFileName;
 
+  const displayName = (originalName || cleanFileName).replace(/["\r\n]/g, '_');
+  const asciiFallback = displayName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '');
+
   const command = new PutObjectCommand({
     Bucket: config.r2.bucketName,
     Key: key,
     Body: buffer,
     ContentType: mimeType || 'application/octet-stream',
+    ContentDisposition: `inline; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(displayName)}`,
   });
 
   await client.send(command);
@@ -72,7 +77,7 @@ async function uploadToR2({ buffer, fileName, mimeType, folder = 'designs' }) {
     publicBase = `https://${config.r2.bucketName}.${config.r2.accountId}.r2.cloudflarestorage.com`;
   }
 
-  const finalUrl = `${publicBase}/${key}`;
+  const finalUrl = `${publicBase}/${encodeURI(key)}`;
   logger.info(`[Cloudflare R2] Successfully uploaded ${key} -> ${finalUrl}`);
   return finalUrl;
 }

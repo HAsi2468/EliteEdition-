@@ -3,6 +3,7 @@ const { ChatRoom, ChatMessage, user: User } = require('../db/models');
 const { syncCommunicationGroups } = require('../utils/syncCommunicationGroups');
 const { publishActivity } = require('../utils/activityEvent');
 const { sanitizeChatMessage, validateAttachment } = require('../utils/sanitizeChat');
+const { decodeUnicodeFileName } = require('../utils/unicodeFileHelper');
 const webPushService = require('../services/webPush.service');
 const { dispatchChatMessage } = require('./chatController');
 
@@ -455,8 +456,11 @@ const postGroupMessage = async (req, res) => {
       }
     }
 
-    // Attachment security validation (block executables and oversized files)
-    if (attachment) {
+    // Attachment security validation & multi-language Unicode decoding
+    if (attachment && typeof attachment === 'object') {
+      if (attachment.fileName) attachment.fileName = decodeUnicodeFileName(attachment.fileName);
+      if (attachment.originalName) attachment.originalName = decodeUnicodeFileName(attachment.originalName);
+      if (attachment.name) attachment.name = decodeUnicodeFileName(attachment.name);
       const attachCheck = validateAttachment(attachment);
       if (!attachCheck.valid) {
         return res.status(400).json({ success: false, message: attachCheck.error });

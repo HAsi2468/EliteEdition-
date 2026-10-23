@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { isR2Configured, uploadToR2 } = require('../../utils/r2Storage');
+const { decodeUnicodeFileName, sanitizeUnicodeKeyName } = require('../../utils/unicodeFileHelper');
 
 const router = express.Router();
 
@@ -100,6 +101,7 @@ function verifyFileSignature(buffer, ext) {
 }
 
 const fileFilter = (req, file, cb) => {
+  file.originalname = decodeUnicodeFileName(file.originalname);
   let ext = path.extname(file.originalname || '').toLowerCase();
   const mime = (file.mimetype || '').toLowerCase();
 
@@ -215,7 +217,11 @@ router.post('/', (req, res, next) => {
     return res.status(400).json({ error: 'No image or attachment file provided' });
   }
 
-  let fileExt = path.extname(req.file.originalname || '').toLowerCase();
+  // Multi-language Unicode filename decode (Gujarati, Hindi, Arabic, Chinese, etc.)
+  const cleanOriginalName = decodeUnicodeFileName(req.file.originalname);
+  req.file.originalname = cleanOriginalName;
+
+  let fileExt = path.extname(cleanOriginalName || '').toLowerCase();
   const fileMime = (req.file.mimetype || '').toLowerCase();
   if (!fileExt || fileExt === '.') {
     fileExt = MIME_TO_EXT[fileMime] || '.jpg';
@@ -250,13 +256,14 @@ router.post('/', (req, res, next) => {
     try {
       let ext = fileExt;
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const rawBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const rawBase = sanitizeUnicodeKeyName(path.basename(cleanOriginalName, ext));
       const filename = `${rawBase || 'file'}-${uniqueSuffix}${ext}`;
 
       // Upload file to R2 under specified folder (e.g. "Complaints/Digital_Print" or "designs" or "sample_reference")
       const r2Url = await uploadToR2({
         buffer: req.file.buffer,
         fileName: filename,
+        originalName: cleanOriginalName,
         mimeType: req.file.mimetype || 'image/jpeg',
         folder: folder
       });
@@ -266,6 +273,7 @@ router.post('/', (req, res, next) => {
         await uploadToR2({
           buffer: req.file.buffer,
           fileName: `${designName}${ext}`,
+          originalName: `${designName}${ext}`,
           mimeType: req.file.mimetype || 'image/jpeg',
           folder: 'designs'
         }).catch(err => console.warn('[R2] Failed to save designName copy:', err.message));
@@ -276,8 +284,8 @@ router.post('/', (req, res, next) => {
         fileUrl: r2Url,
         previewUrl: null,
         filename,
-        fileName: req.file.originalname || filename,
-        originalName: req.file.originalname || filename,
+        fileName: cleanOriginalName,
+        originalName: cleanOriginalName,
         fileSize: req.file.size,
         folder
       });
@@ -295,8 +303,8 @@ router.post('/', (req, res, next) => {
           url: fileUrl,
           fileUrl,
           filename: fallbackFilename,
-          fileName: req.file.originalname || fallbackFilename,
-          originalName: req.file.originalname || fallbackFilename,
+          fileName: cleanOriginalName,
+          originalName: cleanOriginalName,
           fileSize: req.file.size,
           folder,
           warning: 'Saved locally as R2 fallback'
@@ -323,8 +331,8 @@ router.post('/', (req, res, next) => {
     url: fileUrl,
     fileUrl,
     filename: req.file.filename,
-    fileName: req.file.originalname || req.file.filename,
-    originalName: req.file.originalname || req.file.filename,
+    fileName: cleanOriginalName,
+    originalName: cleanOriginalName,
     fileSize: req.file.size,
     folder
   });

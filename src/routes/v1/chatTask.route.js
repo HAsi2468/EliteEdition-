@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 
 const { isR2Configured, uploadToR2, getPresignedR2UploadUrl } = require('../../utils/r2Storage');
+const { decodeUnicodeFileName, sanitizeUnicodeKeyName } = require('../../utils/unicodeFileHelper');
 const communicationController = require('../../controllers/communication.controller');
 
 // Ensure uploads dir exists
@@ -67,7 +68,11 @@ router.post('/upload', (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const fileExt = path.extname(req.file.originalname || '').toLowerCase();
+    // Full multi-language / Unicode support (Gujarati, Hindi, Arabic, Chinese, Emoji, Mac UTF-8)
+    const cleanOriginalName = decodeUnicodeFileName(req.file.originalname);
+    req.file.originalname = cleanOriginalName;
+
+    const fileExt = path.extname(cleanOriginalName || '').toLowerCase();
     const fileMime = (req.file.mimetype || '').toLowerCase();
     if (fileExt === '.tif' || fileExt === '.tiff' || fileMime === 'image/tiff' || fileMime === 'image/tif') {
       return res.status(400).json({
@@ -85,13 +90,14 @@ router.post('/upload', (req, res, next) => {
         return res.status(400).json({ success: false, message: 'Unable to read upload payload data' });
       }
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const ext = path.extname(req.file.originalname) || '.bin';
-      const rawBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const ext = path.extname(cleanOriginalName) || '.bin';
+      const rawBase = sanitizeUnicodeKeyName(path.basename(cleanOriginalName, ext));
       const fileName = `${rawBase || 'file'}-${uniqueSuffix}${ext}`;
       
       const r2Url = await uploadToR2({
         buffer: fileBuffer,
         fileName,
+        originalName: cleanOriginalName,
         mimeType: req.file.mimetype,
         folder: targetFolder
       });
@@ -104,7 +110,9 @@ router.post('/upload', (req, res, next) => {
       return res.json({
         success: true,
         fileUrl: r2Url,
-        fileName: req.file.originalname,
+        url: r2Url,
+        fileName: cleanOriginalName,
+        originalName: cleanOriginalName,
         fileSize: req.file.size,
         fileType: req.file.mimetype,
         folder: targetFolder
@@ -114,11 +122,13 @@ router.post('/upload', (req, res, next) => {
     // Fallback local file URL
     const host = req.get('host');
     const protocol = req.protocol;
-    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
-    res.json({ 
+    const fileUrl = `${protocol}://${host}/uploads/${encodeURI(req.file.filename)}`;
+    return res.json({ 
       success: true, 
       fileUrl,
-      fileName: req.file.originalname,
+      url: fileUrl,
+      fileName: cleanOriginalName,
+      originalName: cleanOriginalName,
       fileSize: req.file.size,
       fileType: req.file.mimetype,
       folder: targetFolder
