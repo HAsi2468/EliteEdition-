@@ -173,14 +173,15 @@ const getNextNumber = async (req, res) => {
   try {
     const { companyEntity } = req.query;
     const filter = companyEntity ? { companyEntity } : {};
-    const prefixMap = {
-      'Elite Edition': 'EE-COMP-',
-      'Elite Fabtex': 'EF-COMP-',
-      'Elite Stitching': 'ES-COMP-',
-      'Elite Online': 'EO-COMP-',
-      'Elite Digital Print': 'EDP-COMP-'
-    };
-    const prefix = prefixMap[companyEntity] || 'COMP-';
+    const norm = String(companyEntity || '').trim().toLowerCase();
+    let prefix = 'COMP-';
+    if (norm.includes('edition') || norm === 'ee') prefix = 'EE-COMP-';
+    else if (norm.includes('ethno') || norm === 'ew') prefix = 'EW-COMP-';
+    else if (norm.includes('fabtex') || norm === 'ef') prefix = 'EF-COMP-';
+    else if (norm.includes('sobise') || norm === 'so') prefix = 'SO-COMP-';
+    else if (norm.includes('stitching') || norm === 'es') prefix = 'ES-COMP-';
+    else if (norm.includes('online') || norm === 'eo') prefix = 'EO-COMP-';
+    else if (norm.includes('print') || norm === 'edp') prefix = 'EDP-COMP-';
     const complaints = await db.Complaint.find(filter, { complaintNo: 1 }).lean();
     let maxNo = 1000;
 

@@ -553,6 +553,7 @@ const saveLedgerSettings = async (req, res) => {
 
 // Helper to generate a guaranteed unique expense voucher number
 async function generateUniqueVoucherNo(companyEntity = 'Elite Digital Print') {
+  const normEntity = normalizeBusinessUnit(companyEntity);
   const prefixMap = {
     'Sobise': 'SO-EXP-',
     'Elite Edition': 'EE-EXP-',
@@ -562,14 +563,20 @@ async function generateUniqueVoucherNo(companyEntity = 'Elite Digital Print') {
     'Ethno wear': 'EW-EXP-',
     'Elite Digital Print': 'EDP-EXP-'
   };
-  const prefix = prefixMap[companyEntity] || 'EDP-EXP-';
+  const prefix = prefixMap[normEntity] || prefixMap[companyEntity] || 'EDP-EXP-';
+  const prefixRegex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)`, 'i');
 
-  const expenses = await db.Expense.find({}, { voucherNo: 1 }).lean();
+  const expenses = await db.Expense.find({
+    $or: [
+      { companyEntity: normEntity },
+      { voucherNo: { $regex: `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, $options: 'i' } }
+    ]
+  }, { voucherNo: 1 }).lean();
   let maxNo = 1000;
 
   expenses.forEach(e => {
     if (!e.voucherNo) return;
-    const match = String(e.voucherNo).match(/(\d+)$/);
+    const match = String(e.voucherNo).match(prefixRegex);
     if (match) {
       const num = parseInt(match[1], 10);
       if (!isNaN(num) && num > maxNo) maxNo = num;

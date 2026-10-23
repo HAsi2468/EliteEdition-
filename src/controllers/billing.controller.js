@@ -3453,14 +3453,25 @@ const getPurchases = async (req, res) => {
 const getPurchasePrefix = (entity = 'Elite Digital Prints') => {
   const norm = String(entity || '').trim().toLowerCase();
   if (norm.includes('ethno') || norm === 'ew') return 'EWP-';
+  if (norm.includes('edition') || norm === 'ee') return 'EEP-';
+  if (norm.includes('fabtex') || norm === 'ef') return 'EFP-';
+  if (norm.includes('sobise') || norm === 'so') return 'SOP-';
+  if (norm.includes('stitching') || norm === 'es') return 'ESP-';
+  if (norm.includes('online') || norm === 'eo') return 'EOP-';
   return 'DP-';
+};
+
+const getPurchaseRegex = (prefix) => {
+  if (prefix === 'DP-') return /^DP[-_]?(\d+)/i;
+  const clean = prefix.replace('-', '');
+  return new RegExp(`^${clean}[-_]?(\\d+)`, 'i');
 };
 
 const getNextPurchaseNo = async (req, res) => {
   try {
     const { companyEntity = 'Elite Digital Prints' } = req.query;
     const prefix = getPurchasePrefix(companyEntity);
-    const regex = prefix === 'EWP-' ? /^EW[-_]?P[-_]?(\d+)/i : /^DP[-_]?(\d+)/i;
+    const regex = getPurchaseRegex(prefix);
 
     const purchases = await BillingPurchase.find({
       $or: [
@@ -3493,7 +3504,7 @@ const createPurchase = async (req, res) => {
     const purchaseData = { ...req.body };
     if (!purchaseData.purchaseNo || !purchaseData.purchaseNo.trim()) {
       const prefix = getPurchasePrefix(purchaseData.companyEntity);
-      const regex = prefix === 'EWP-' ? /^EW[-_]?P[-_]?(\d+)/i : /^DP[-_]?(\d+)/i;
+      const regex = getPurchaseRegex(prefix);
 
       const purchases = await BillingPurchase.find({
         $or: [
