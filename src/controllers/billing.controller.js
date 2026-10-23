@@ -3246,28 +3246,32 @@ const getCompanySettings = async (req, res) => {
       const masterConfig = (await PrintConfig.findOne({ isConfig: true }).lean()) || {};
       let compName = companyEntity.toUpperCase();
       let prefix = 'EE-2627-';
+      let startNo = 1;
+      let isEE = companyEntity === 'Elite Edition';
+
       if (companyEntity === 'Sobise') {
         prefix = 'SO-2627-';
       } else if (companyEntity === 'Elite Fabtex') {
         prefix = 'EF-2627-';
       } else if (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') {
         prefix = 'EDP/26-27/';
+        startNo = 223;
       }
       config = await PrintConfig.create({
         companyEntity,
-        companyName: masterConfig.companyName || compName,
+        companyName: isEE ? 'ELITE EDITION' : (masterConfig.companyName || compName),
         invoicePrefix: prefix,
-        startingInvoiceNo: 223,
-        companyGstin: masterConfig.companyGstin || '',
-        companyAddress: masterConfig.companyAddress || '',
-        companyPhone: masterConfig.companyPhone || '',
-        companyEmail: masterConfig.companyEmail || '',
+        startingInvoiceNo: startNo,
+        companyGstin: isEE ? '24BSWPA7682P1ZS' : (masterConfig.companyGstin || ''),
+        companyAddress: isEE ? '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat - 395010' : (masterConfig.companyAddress || ''),
+        companyPhone: isEE ? '+91 76006 65058' : (masterConfig.companyPhone || ''),
+        companyEmail: isEE ? 'INFO.ELITEEDITION@GMAIL.COM' : (masterConfig.companyEmail || ''),
         companyLogo: masterConfig.companyLogo || '',
-        companyState: masterConfig.companyState || 'Gujarat',
-        companyStateCode: masterConfig.companyStateCode || '24',
-        companyBankName: masterConfig.companyBankName || '',
-        companyAccountNo: masterConfig.companyAccountNo || '',
-        companyIfscCode: masterConfig.companyIfscCode || '',
+        companyState: isEE ? 'Gujarat' : (masterConfig.companyState || 'Gujarat'),
+        companyStateCode: isEE ? '24' : (masterConfig.companyStateCode || '24'),
+        companyBankName: isEE ? 'KOTAK MAHINDRA BANK' : (masterConfig.companyBankName || ''),
+        companyAccountNo: isEE ? '9909866667' : (masterConfig.companyAccountNo || ''),
+        companyIfscCode: isEE ? 'KKBK0000883' : (masterConfig.companyIfscCode || ''),
         companyTerms: masterConfig.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
         categories: masterConfig.categories || ['Cotton', 'Polyester', 'Silk'],
         paperTypes: masterConfig.paperTypes || ['A++', 'A+', 'A'],
