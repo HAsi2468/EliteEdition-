@@ -655,6 +655,21 @@ const postGroupMessage = async (req, res) => {
 
     res.json({ success: true, data: populatedMessage });
   } catch (error) {
+    if (error.code === 11000 && clientMsgId) {
+      try {
+        const existing = await ChatMessage.findOne({ roomId: groupId, clientMsgId })
+          .populate('senderId', 'name username email role')
+          .populate('readBy', 'name username email')
+          .populate({ path: 'reactions.user', select: 'name username email' })
+          .populate({ path: 'replyTo', populate: { path: 'senderId', select: 'name username email' } })
+          .populate('mentions', 'name username email');
+        if (existing) {
+          return res.json({ success: true, data: existing, idempotent: true });
+        }
+      } catch (findErr) {
+        console.warn('[postGroupMessage Idempotency fallback find error]:', findErr.message);
+      }
+    }
     console.error('[postGroupMessage ERROR]:', error.message, error.stack);
     res.status(500).json({ success: false, message: 'Failed to send message: ' + error.message, error: error.message });
   }

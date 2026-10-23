@@ -256,7 +256,7 @@ chatRoomSchema.index({ isArchived: 1, updatedAt: -1 });
 chatMessageSchema.index({ roomId: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, msgType: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, senderId: 1, readBy: 1 });
-chatMessageSchema.index({ roomId: 1, clientMsgId: 1 }, { sparse: true });
+chatMessageSchema.index({ roomId: 1, clientMsgId: 1 }, { unique: true, sparse: true });
 chatMessageSchema.index({ senderId: 1 });
 chatMessageSchema.index({ content: 'text' });
 

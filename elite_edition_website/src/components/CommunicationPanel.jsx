@@ -898,6 +898,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     const handleEscapeDismiss = (e) => {
       if (e.key === 'Escape') {
+        if (showEmojiPicker) {
+          e.preventDefault();
+          setShowEmojiPicker(false);
+          return;
+        }
         if (mentionQuery !== null) {
           e.preventDefault();
           setMentionQuery(null);
@@ -932,7 +937,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     window.addEventListener('keydown', handleEscapeDismiss);
     return () => window.removeEventListener('keydown', handleEscapeDismiss);
   }, [
-    mentionQuery, activeMsgMenuId, deleteTargetMsg,
+    showEmojiPicker, mentionQuery, activeMsgMenuId, deleteTargetMsg,
     showMobileActionMenu, showMobileHeaderMenu, showDesktopHeaderMenu,
     showNewDmModal, showCreateGroupModal, showMembersModal, showShareModal,
     showGalleryModal, showPollModal, showForwardModal, showClearAllModal,
@@ -1658,9 +1663,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         if (activeGroup?._id) {
           const chatNotice = `📋 *Task Created:* "${task.title}"\n🎯 Assigned to: ${assigneeNames}\n⚡ Priority: ${task.priority.toUpperCase()} | Due: ${task.dueDate ? task.dueDate.split('T')[0] : 'N/A'}`;
           try {
+            const clientMsgId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
             await api.sendCommunicationMessage(activeGroup._id, {
               roomId: activeGroup._id,
               senderId: myId,
+              clientMsgId,
               content: chatNotice,
               priority: task.priority === 'urgent' ? 'urgent' : 'normal'
             });
@@ -2234,8 +2241,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     if (isSocketConnected || !activeGroup?._id) return;
     const fallbackPollInterval = setInterval(() => {
+      // S3 FIX: Do not poll if user has scrolled up reading past history (>120px from bottom)
+      if (!isNearBottomRef.current) return;
       if (activeGroupIdRef.current) {
-        fetchGroupMessages(activeGroupIdRef.current, msgFilter, false);
+        pollLatestGroupMessages(activeGroupIdRef.current, msgFilter);
       }
     }, 10000);
     return () => clearInterval(fallbackPollInterval);
@@ -2551,6 +2560,38 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (!activeGroupIdRef.current || String(activeGroupIdRef.current) === String(groupId)) {
         setLoadingMessages(false);
       }
+    }
+  };
+
+  const pollLatestGroupMessages = async (groupId, filter) => {
+    if (!groupId) return;
+    try {
+      const params = { limit: 50 };
+      if (filter === 'human' || filter === 'system_activity') {
+        params.msgType = filter;
+      }
+      const res = await api.getCommunicationMessages(groupId, params);
+      if (activeGroupIdRef.current && String(activeGroupIdRef.current) !== String(groupId)) {
+        return;
+      }
+      if (res && res.success && res.data) {
+        let incoming = res.data;
+        if (filter === 'urgent') {
+          incoming = incoming.filter((m) => m.priority === 'urgent');
+        } else if (filter === 'media') {
+          incoming = incoming.filter((m) => m.attachment && m.attachment.fileUrl);
+        }
+        // S3 FIX: Monotonically merge incoming messages without wiping loaded older history or resetting pagination
+        setMessages((prev) => mergeMessages(prev, incoming));
+
+        const myId = currentUser?._id || currentUser?.id;
+        if (socket && socket.connected && myId && groupId) {
+          socket.emit('read-room-messages', { roomId: groupId, userId: myId });
+          socket.emit('sync-delivered', { roomId: groupId, userId: myId });
+        }
+      }
+    } catch (err) {
+      // Background poll failure is silent
     }
   };
 
@@ -2882,10 +2923,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const senderId = sender?.id || sender?._id;
     if (!senderId) return;
 
+    const clientMsgId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
     const messageText = `Attached ${audioAttachment.fileName}`;
     const messagePayload = {
       roomId: currentGroup._id,
       senderId,
+      clientMsgId,
       content: messageText,
       priority: isUrgent ? 'urgent' : 'normal',
       attachment: audioAttachment,
@@ -2894,6 +2937,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const tempId = 'temp_' + Date.now();
     const tempMsg = {
       _id: tempId,
+      clientMsgId,
       roomId: currentGroup._id,
       senderId: typeof sender === 'object' ? sender : { _id: senderId, name: 'You' },
       content: messageText,
@@ -2924,10 +2968,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     try {
       const res = await api.sendCommunicationMessage(currentGroup._id, messagePayload);
       if (res && res.success && res.data) {
-        const realMsg = res.data;
+        const realMsg = { ...res.data, isOptimistic: false };
         setMessages((prev) => {
-          const filtered = prev.filter((m) => m._id !== tempId && String(m._id) !== String(realMsg._id));
-          return [...filtered, realMsg];
+          const filtered = prev.filter((m) => m._id !== tempId && m.clientMsgId !== clientMsgId && String(m._id) !== String(realMsg._id));
+          return mergeMessages(filtered, [realMsg]);
         });
         setGroups((prevGroups) => {
           return prevGroups.map((g) => {
@@ -2944,7 +2988,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     } catch (err) {
       console.warn('HTTP post message failed, falling back to socket emit:', err.message);
-      if (socket) {
+      if (socket && socket.connected) {
         socket.emit('send-message', messagePayload);
       }
     }
@@ -3263,8 +3307,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       recordData: item
     };
 
+    const clientMsgId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
     const tempMsg = {
       _id: 'temp_' + Date.now(),
+      clientMsgId,
       roomId: targetRoomId,
       senderId: typeof currentUser === 'object' ? currentUser : { _id: myId, name: 'You' },
       content: cardTitle,
@@ -3284,6 +3330,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const messagePayload = {
       roomId: targetRoomId,
       senderId: myId,
+      clientMsgId,
       content: cardTitle,
       type: 'record-card',
       activityMeta: actMeta,
@@ -3294,14 +3341,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       .then((res) => {
         if (res && res.success && res.data) {
           if (isCurrentRoom) {
-            setMessages((prev) => prev.map((m) => (m._id === tempMsg._id ? res.data : m)));
+            const realMsg = { ...res.data, isOptimistic: false };
+            setMessages((prev) => {
+              const filtered = prev.filter((m) => m._id !== tempMsg._id && m.clientMsgId !== clientMsgId && String(m._id) !== String(realMsg._id));
+              return mergeMessages(filtered, [realMsg]);
+            });
           }
         }
         fetchGroups(false);
       })
       .catch((err) => {
         console.warn('HTTP share record card failed, falling back to socket emit:', err.message);
-        if (socket) {
+        if (socket && socket.connected) {
           socket.emit('send-message', messagePayload);
         }
         fetchGroups(false);
@@ -3685,7 +3736,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         isClosed: false
       };
 
+      const clientMsgId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
       const res = await api.sendCommunicationMessage(activeGroup._id, {
+        clientMsgId,
         type: 'poll',
         content: `📊 Poll: ${pollQuestion.trim()}`,
         pollMeta
@@ -3744,10 +3797,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     isNearBottomRef.current = distanceFromBottom <= 120;
 
     // Only load older messages if container actually overflows and user deliberately scrolled to the top
-    if (loadingMoreMessages || !hasMoreMessages) return;
-    if (el.scrollHeight > el.clientHeight + 60 && el.scrollTop <= 15) {
+    if (loadingOlderRef.current || !hasMoreMessagesRef.current) return;
+    if (el.scrollHeight > el.clientHeight + 60 && el.scrollTop <= 120) {
+      loadingOlderRef.current = true;
       setLoadingMoreMessages(true);
       const scrollHeightBefore = el.scrollHeight;
+      const requestedGroupId = activeGroup._id;
 
       try {
         const oldestRealMsg = messages.find((m) => m && m._id && !m.isOptimistic && !String(m._id).startsWith('temp_'));
@@ -3759,7 +3814,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         }
         if (msgFilter === 'human' || msgFilter === 'system_activity') params.msgType = msgFilter;
 
-        const res = await api.getCommunicationMessages(activeGroup._id, params);
+        const res = await api.getCommunicationMessages(requestedGroupId, params);
+        // RC7 FIX: Drop response if user switched to another room while request was in-flight
+        if (activeGroupIdRef.current && String(activeGroupIdRef.current) !== String(requestedGroupId)) {
+          return;
+        }
+
         if (res && res.success && res.data) {
           const incoming = res.data || [];
           if (incoming.length < 50) {
@@ -3782,6 +3842,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       } catch (err) {
         console.error('Failed to load older messages:', err);
       } finally {
+        loadingOlderRef.current = false;
         setLoadingMoreMessages(false);
       }
     }
@@ -4783,7 +4844,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               )
             ) : (
-              filteredGroups.map((group) => {
+              <>
+                {searchQuery.trim().length >= 2 && filteredGroups.length > 0 && (
+                  <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Contacts &amp; Channels ({filteredGroups.length})
+                    </span>
+                  </div>
+                )}
+                {filteredGroups.map((group) => {
                 const isVirtual = group.isVirtualContact;
                 const isActive = !isVirtual && activeGroup && String(activeGroup._id) === String(group._id);
                 const isDirect = group.type === 'direct';
@@ -4898,8 +4967,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     </div>
                   </div>
                 );
-              })
-            )}
+              })}
+            </>
+          )}
 
             {searchQuery.trim().length >= 2 && (
               <div style={{ marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem' }}>
@@ -5079,20 +5149,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               alignItems: 'center',
                               gap: '5px',
                               textAlign: 'left',
-                              maxWidth: isMobileScreen ? '145px' : '300px',
-                              minWidth: 0
+                              width: '100%',
+                              maxWidth: isMobileScreen ? '100%' : '380px',
+                              minWidth: 0,
+                              overflow: 'hidden'
                             }}
                             title="Click for conversation options"
                           >
                             <h3 style={{
                               margin: 0,
-                              fontSize: isMobileScreen ? '0.92rem' : '1.05rem',
+                              fontSize: isMobileScreen ? '0.96rem' : '1.05rem',
                               fontWeight: 800,
                               color: 'var(--text-primary)',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              maxWidth: '100%'
+                              flex: '1 1 auto',
+                              minWidth: 0
                             }}>
                               {displayName}
                             </h3>
@@ -5104,7 +5177,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             const isOnline = isDirect && colleagueId ? onlineUserIds.has(String(colleagueId)) : false;
                             if (isDirect) {
                               return (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', maxWidth: isMobileScreen ? '145px' : '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', maxWidth: isMobileScreen ? '100%' : '380px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: isOnline ? '#22c55e' : '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
                                   <span style={{ fontSize: '0.72rem', color: isOnline ? '#10b981' : 'var(--text-muted, #64748b)', fontWeight: 600 }}>
                                     {isOnline ? 'Online' : 'Offline'}
@@ -5128,7 +5201,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   alignItems: 'center',
                                   gap: '5px',
                                   marginTop: '2px',
-                                  maxWidth: isMobileScreen ? '145px' : '300px',
+                                  maxWidth: isMobileScreen ? '100%' : '380px',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
@@ -5146,38 +5219,42 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       </div>
 
                       {/* Right: Media Folder, Phone, Video, and More Options Buttons (Phoenix 1:1) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '4px' : '8px', flexShrink: 0 }}>
-                        {/* Shared Media & Docs Drawer Button */}
-                        <button
-                          type="button"
-                          className="phoenix-action-btn-neutral"
-                          style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
-                          onClick={() => setShowGalleryModal(true)}
-                          title="Shared Media, Docs & Files"
-                        >
-                          <Folder size={isMobileScreen ? 14 : 16} color="var(--text-primary)" />
-                        </button>
-                        {/* Phone Call Button */}
-                        <button
-                          type="button"
-                          className="phoenix-action-btn-blue"
-                          style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
-                          onClick={() => startCall('voice')}
-                          title="Start HD Voice Call"
-                        >
-                          <Phone size={isMobileScreen ? 14 : 16} />
-                        </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '6px' : '8px', flexShrink: 0 }}>
+                        {!isMobileScreen && (
+                          <>
+                            {/* Shared Media & Docs Drawer Button */}
+                            <button
+                              type="button"
+                              className="phoenix-action-btn-neutral"
+                              style={{ width: 36, height: 36 }}
+                              onClick={() => setShowGalleryModal(true)}
+                              title="Shared Media, Docs & Files"
+                            >
+                              <Folder size={16} color="var(--text-primary)" />
+                            </button>
+                            {/* Phone Call Button */}
+                            <button
+                              type="button"
+                              className="phoenix-action-btn-blue"
+                              style={{ width: 36, height: 36 }}
+                              onClick={() => startCall('voice')}
+                              title="Start HD Voice Call"
+                            >
+                              <Phone size={16} />
+                            </button>
 
-                        {/* Video Call Button */}
-                        <button
-                          type="button"
-                          className="phoenix-action-btn-blue"
-                          style={{ width: isMobileScreen ? 32 : 36, height: isMobileScreen ? 32 : 36 }}
-                          onClick={() => startCall('video')}
-                          title="Start HD Video Call"
-                        >
-                          <Video size={isMobileScreen ? 14 : 16} />
-                        </button>
+                            {/* Video Call Button */}
+                            <button
+                              type="button"
+                              className="phoenix-action-btn-blue"
+                              style={{ width: 36, height: 36 }}
+                              onClick={() => startCall('video')}
+                              title="Start HD Video Call"
+                            >
+                              <Video size={16} />
+                            </button>
+                          </>
+                        )}
 
                         {/* ERP Operations Copilot Quick Trigger */}
                         <button
@@ -5488,9 +5565,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 )}
                 {loadingMoreMessages && (
-                  <div style={{ textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                    <RefreshCw size={14} className="spin-loader" />
+                  <div style={{
+                    position: 'sticky',
+                    top: 8,
+                    zIndex: 20,
+                    margin: '0 auto',
+                    width: 'fit-content',
+                    background: 'rgba(255, 255, 255, 0.94)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid var(--border-light, #e2e8f0)',
+                    borderRadius: '20px',
+                    padding: '4px 14px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    color: 'var(--text-primary, #0f172a)',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <RefreshCw size={13} className="spin-loader" color="#2563eb" />
                     <span>Loading older messages...</span>
+                  </div>
+                )}
+
+                {!hasMoreMessages && messages.length > 0 && !loadingMessages && (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '1.25rem 0.5rem 0.65rem',
+                    color: 'var(--text-muted, #94a3b8)',
+                    fontSize: '0.72rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', width: '40px' }} />
+                    <span style={{ fontWeight: 600 }}>Start of conversation</span>
+                    <span style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', width: '40px' }} />
                   </div>
                 )}
 
@@ -7075,6 +7187,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   style={{ display: 'none' }}
                   onChange={handleFileUpload}
                   accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.md,.markdown,.json,audio/*"
+                  multiple
                 />
 
                 {/* @mention Suggestion Dropdown */}
@@ -7441,13 +7554,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         value={inputMessage}
                         onPaste={handlePasteClipboard}
                         onKeyDown={(e) => {
-                          if (mentionQuery !== null) {
-                            if (e.key === 'Escape') {
+                          if (e.key === 'Escape') {
+                            if (showEmojiPicker) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowEmojiPicker(false);
+                              return;
+                            }
+                            if (mentionQuery !== null) {
                               e.preventDefault();
                               e.stopPropagation();
                               setMentionQuery(null);
                               return;
                             }
+                          }
+                          if (mentionQuery !== null) {
                             if (mentionCandidates.length > 0) {
                               if (e.key === 'ArrowDown') {
                                 e.preventDefault();
