@@ -193,6 +193,7 @@ export const normalizeCompanyEntity = (raw) => {
   if (/^elite\s*fabtex/i.test(s) || /^ef$/i.test(s) || s === 'elite_fabtex') return 'Elite Fabtex';
   if (/^sobise/i.test(s) || /^so$/i.test(s)) return 'Sobise';
   if (/^elite\s*online/i.test(s) || /^eon$/i.test(s) || s === 'elite_online') return 'Elite Online';
+  if (/^ethno\s*wear/i.test(s) || /^ew$/i.test(s) || s === 'ethno_wear') return 'Ethno wear';
   return s;
 };
 
@@ -203,6 +204,7 @@ export const getDefaultInvoicePrefix = (comp) => {
   if (c === 'Sobise') return 'SO-2627-0001';
   if (c === 'Elite Stitching') return 'ES-2627-0001';
   if (c === 'Elite Online') return 'EO-2627-0001';
+  if (c === 'Ethno wear') return 'EW-2627-0001';
   return 'EDP/26-27/1001';
 };
 
@@ -214,9 +216,9 @@ export default function EliteBillingDepartment({
 }) {
   const companyEntity = normalizeCompanyEntity(
     propCompanyEntity || 
-    (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : 'Elite Digital Prints')
+    (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : department === 'ethno_wear' ? 'Ethno wear' : 'Elite Digital Prints')
   );
-  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online'].includes(companyEntity);
+  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear'].includes(companyEntity);
   const isStitchingEntity = department === 'stitching' || companyEntity === 'Elite Stitching';
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -2926,7 +2928,7 @@ export default function EliteBillingDepartment({
     terms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.'
   }));
 
-  const isCorporateInvoice = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online'].includes(invoiceForm.issuingCompany || companyEntity);
+  const isCorporateInvoice = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear'].includes(invoiceForm.issuingCompany || companyEntity);
 
   // Synchronize invoice issuingCompany & next invoice number whenever active companyEntity changes
   useEffect(() => {
@@ -4568,6 +4570,7 @@ export default function EliteBillingDepartment({
                 <option value="Sobise">🏢 Sobise</option>
                 <option value="Elite Stitching">🏢 Elite Stitching</option>
                 <option value="Elite Online">🏢 Elite Online</option>
+                <option value="Ethno wear">🏢 Ethno wear</option>
               </select>
             </div>
             <div>
@@ -7949,12 +7952,35 @@ export default function EliteBillingDepartment({
                 onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}
                 style={inputStyle}
               >
-                <option value="Raw Materials">Raw Materials (Inventory)</option>
-                <option value="Printing Services">Printing Services</option>
-                <option value="Operating Expenses">Operating Expenses</option>
-                <option value="Capital Assets">Capital Assets (Plant & Machinery / IT)</option>
-                <option value="Consumables & Spares">Consumables & Spares</option>
-                <option value="Other">Other</option>
+                <optgroup label="Finished Goods & Apparel">
+                  <option value="Ethnic Wear (Sarees, Kurtis, Suits)">Ethnic Wear (Sarees, Kurtis, Suits)</option>
+                  <option value="Readymade Garments & Apparel">Readymade Garments & Apparel</option>
+                  <option value="Finished Fabric & Textiles">Finished Fabric & Textiles</option>
+                  <option value="Trading Goods & Merchandise">Trading Goods & Merchandise</option>
+                </optgroup>
+                <optgroup label="Services & Job Work">
+                  <option value="Printing Services">Digital Printing Services</option>
+                  <option value="Stitching & Tailoring Services">Stitching & Tailoring Services</option>
+                  <option value="Embroidery & Handwork Services">Embroidery & Handwork Services</option>
+                  <option value="Dyeing & Bleaching Services">Dyeing & Bleaching Services</option>
+                  <option value="Design & Sampling Services">Design & Sampling Services</option>
+                  <option value="Job Work Charges">Job Work Charges</option>
+                </optgroup>
+                <optgroup label="Raw Materials & Packaging">
+                  <option value="Raw Materials">Raw Materials (Inventory)</option>
+                  <option value="Grey Fabric / Raw Cloth">Grey Fabric / Raw Cloth</option>
+                  <option value="Yarns & Threads">Yarns & Threads</option>
+                  <option value="Printing Papers & Inks">Printing Papers & Inks</option>
+                  <option value="Trims, Laces & Accessories">Trims, Laces & Accessories</option>
+                  <option value="Packing Materials & Boxes">Packing Materials & Boxes</option>
+                </optgroup>
+                <optgroup label="Operations & Capital Assets">
+                  <option value="Operating Expenses">Operating Expenses</option>
+                  <option value="Capital Assets">Capital Assets (Plant & Machinery / IT)</option>
+                  <option value="Consumables & Spares">Consumables & Spares</option>
+                  <option value="Logistics & Freight Charges">Logistics & Freight Charges</option>
+                  <option value="Other">Other</option>
+                </optgroup>
               </select>
             </div>
 

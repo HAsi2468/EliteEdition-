@@ -59,7 +59,7 @@ async function createUser(req) {
     password: hashedPassword,
     role,
     isMainAdmin: Boolean(isMainAdmin),
-    allowedCompanies: Array.isArray(allowedCompanies) ? allowedCompanies : ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise'],
+    allowedCompanies: Array.isArray(allowedCompanies) ? allowedCompanies : ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex', 'Sobise', 'Ethno wear'],
     permissions: permissions || [],
     department: department || 'General',
     canManageTasks: canManageTasks !== undefined ? Boolean(canManageTasks) : true,

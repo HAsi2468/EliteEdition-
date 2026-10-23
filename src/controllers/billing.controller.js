@@ -75,6 +75,13 @@ function buildCompanyFilter(companyEntity) {
         { invoiceNo: { $regex: '^EO', $options: 'i' } }
       ]
     };
+  } else if (ce === 'Ethno wear' || ce === 'ethno_wear' || ce === 'EW') {
+    return {
+      $or: [
+        { companyEntity: 'Ethno wear' },
+        { invoiceNo: { $regex: '^EW', $options: 'i' } }
+      ]
+    };
   } else {
     // Elite Digital Print / Digital Print / Default
     return {
@@ -125,6 +132,13 @@ function buildPurchaseCompanyFilter(companyEntity) {
       $or: [
         { companyEntity: 'Elite Online' },
         { purchaseNo: { $regex: '^EO', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Ethno wear' || ce === 'ethno_wear' || ce === 'EW') {
+    return {
+      $or: [
+        { companyEntity: 'Ethno wear' },
+        { purchaseNo: { $regex: '^EW', $options: 'i' } }
       ]
     };
   } else if (ce === 'edp' || ce === 'Elite Digital Prints' || ce === 'Elite Digital Print') {
@@ -412,6 +426,9 @@ const getNextInvoiceNo = async (req, res) => {
       defaultStartSeq = 1;
     } else if (companyEntity === 'Elite Online') {
       defaultPrefix = 'EO-2627-';
+      defaultStartSeq = 1;
+    } else if (companyEntity === 'Ethno wear' || companyEntity === 'ethno_wear') {
+      defaultPrefix = 'EW-2627-';
       defaultStartSeq = 1;
     }
 

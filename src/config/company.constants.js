@@ -46,6 +46,13 @@ const COMPANIES = [
     type: 'Fashion & Corporate Entity',
     aliases: ['sobise', 'so', 'sobise entity'],
   },
+  {
+    id: 'ethno_wear',
+    code: 'EW',
+    name: 'Ethno wear',
+    type: 'Ethnic Wear & Apparel Brand',
+    aliases: ['ethno_wear', 'ew', 'ethno wear', 'ethnowear', 'ethno'],
+  },
 ];
 
 const COMPANY_IDS = COMPANIES.map((c) => c.id);

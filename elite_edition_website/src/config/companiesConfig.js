@@ -93,6 +93,21 @@ export const COMPANIES = [
     gradient: 'linear-gradient(135deg, #f43f5e, #be123c)',
     description: 'Company workspace for Sobise finance, complaints & settings.',
     aliases: ['sobise', 'so', 'sobise entity']
+  },
+  {
+    id: 'ethno_wear',
+    code: 'EW',
+    name: 'Ethno wear',
+    fullName: 'Ethno wear',
+    shortName: 'Ethno wear',
+    type: 'Ethnic Wear & Apparel Brand',
+    iconName: 'Sparkles',
+    defaultTab: 'ew_invoices',
+    badgeColor: '#ec4899',
+    iconColor: '#ec4899',
+    gradient: 'linear-gradient(135deg, #ec4899, #be185d)',
+    description: 'Company workspace for Ethno wear finance, invoices & billing.',
+    aliases: ['ethno_wear', 'ew', 'ethno wear', 'ethnowear', 'ethno']
   }
 ];
 

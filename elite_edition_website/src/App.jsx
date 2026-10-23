@@ -145,6 +145,8 @@ export const ROUTE_ALIASES = {
   'invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
   'invoice': { tab: 'ee_invoices', dept: 'elite_edition' },
   'ee_invoices': { tab: 'ee_invoices', dept: 'elite_edition' },
+  'ew_invoices': { tab: 'ew_invoices', dept: 'ethno_wear' },
+  'ethno_wear': { tab: 'ew_invoices', dept: 'ethno_wear' },
   'jobcards': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcard': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
@@ -740,6 +742,7 @@ export default function App() {
   const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses'];
   const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses'];
   const SOBISE_PERMISSIONS = ['so_dashboard', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses'];
+  const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_complaints', 'ew_settings', 'ew_expenses'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'es_dashboard', 'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
@@ -803,6 +806,13 @@ export default function App() {
           return l === 'so' || l === 'sobise';
         });
       }
+      // Match EW / Ethno wear
+      if (target === 'ew' || target === 'ethno wear' || target === 'ethno_wear') {
+        return currentUser.allowedCompanies.some(c => {
+          const l = String(c).toLowerCase().trim();
+          return l === 'ew' || l === 'ethno wear' || l === 'ethno_wear';
+        });
+      }
       return currentUser.allowedCompanies.some(c => String(c).toLowerCase().trim() === target);
     }
     return false;
@@ -814,6 +824,7 @@ export default function App() {
   const hasEliteEditionAccess = isSuperOrAdmin || isCompanyAllowed('elite_edition');
   const hasEliteFabtexAccess = isSuperOrAdmin || isCompanyAllowed('elite_fabtex');
   const hasSobiseAccess = isSuperOrAdmin || isCompanyAllowed('sobise');
+  const hasEthnoWearAccess = isSuperOrAdmin || isCompanyAllowed('ethno_wear');
 
   const hasCommunicationAccess = !currentUser || isSuperOrAdmin || 
     Boolean(currentUser?.canBroadcastChat) || 
@@ -856,6 +867,12 @@ export default function App() {
     return allowed[0] || 'so_dashboard';
   };
 
+  const getFirstEWTab = () => {
+    if (!currentUser || isSuperOrAdmin) return 'ew_invoices';
+    const allowed = ETHNO_WEAR_PERMISSIONS.filter(t => currentUser.permissions?.includes(t));
+    return allowed.includes('ew_invoices') ? 'ew_invoices' : (allowed[0] || 'ew_invoices');
+  };
+
   const getFirstStitchingTab = () => {
     if (!currentUser || isSuperOrAdmin) return 'jobcards_list';
     const perms = currentUser.permissions || [];
@@ -881,6 +898,8 @@ export default function App() {
       setActiveDepartment('elite_fabtex');
     } else if (activeTab.startsWith('so_')) {
       setActiveDepartment('sobise');
+    } else if (activeTab.startsWith('ew_')) {
+      setActiveDepartment('ethno_wear');
     } else if (activeTab.startsWith('eo_') || ELITE_ONLINE_PERMISSIONS.includes(activeTab)) {
       setActiveDepartment('elite_online');
     }
@@ -920,6 +939,7 @@ export default function App() {
     if (isCompanyAllowed('elite_edition') && hasEliteEditionAccess) allowedDepts.push('elite_edition');
     if (isCompanyAllowed('elite_fabtex') && hasEliteFabtexAccess) allowedDepts.push('elite_fabtex');
     if (isCompanyAllowed('sobise') && hasSobiseAccess) allowedDepts.push('sobise');
+    if (isCompanyAllowed('ethno_wear') && hasEthnoWearAccess) allowedDepts.push('ethno_wear');
 
     if (allowedDepts.length > 0) {
       if (!allowedDepts.includes(activeDepartment)) {
@@ -931,6 +951,7 @@ export default function App() {
           else if (targetDept === 'elite_edition') setActiveTab(getFirstEETab());
           else if (targetDept === 'elite_fabtex') setActiveTab(getFirstEFTab());
           else if (targetDept === 'sobise') setActiveTab(getFirstSOTab());
+          else if (targetDept === 'ethno_wear') setActiveTab(getFirstEWTab());
           else if (targetDept === 'elite_online') setActiveTab(getFirstOnlineTab());
         }
       }
@@ -945,7 +966,7 @@ export default function App() {
         }
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment, hasEliteOnlineAccess, hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasCommunicationAccess, hasTaskAccess, isSuperOrAdmin]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment, hasEliteOnlineAccess, hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasEthnoWearAccess, hasCommunicationAccess, hasTaskAccess, isSuperOrAdmin]);
 
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -977,6 +998,8 @@ export default function App() {
       setActiveTab('ef_dashboard');
     } else if (dept === 'sobise') {
       setActiveTab('so_dashboard');
+    } else if (dept === 'ethno_wear') {
+      setActiveTab('ew_invoices');
     } else if (dept === 'elite_online') {
       const firstTab = getFirstOnlineTab();
       setActiveTab(firstTab);
@@ -1018,6 +1041,7 @@ export default function App() {
       'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
       'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
       'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses',
+      'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses',
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
@@ -1051,6 +1075,9 @@ export default function App() {
     if (activeDepartment === 'sobise' && hasSobiseAccess) {
       if (SOBISE_PERMISSIONS.includes(activeTab) || activeTab.startsWith('so_')) return;
     }
+    if (activeDepartment === 'ethno_wear' && hasEthnoWearAccess) {
+      if (ETHNO_WEAR_PERMISSIONS.includes(activeTab) || activeTab.startsWith('ew_')) return;
+    }
 
     const userPerms = currentUser.permissions || [];
     const isAllowed = userPerms.some(p => {
@@ -1060,6 +1087,7 @@ export default function App() {
       if (activeTab.startsWith('ee_') && hasEliteEditionAccess) return p === activeTab || p === 'ee_dashboard';
       if (activeTab.startsWith('ef_') && hasEliteFabtexAccess) return p === activeTab || p === 'ef_dashboard';
       if (activeTab.startsWith('so_') && hasSobiseAccess) return p === activeTab || p === 'so_dashboard';
+      if (activeTab.startsWith('ew_') && hasEthnoWearAccess) return true;
       if (activeTab.startsWith('es_') && hasStitchingAccess) return true;
       if (activeTab.startsWith('eo_') && hasEliteOnlineAccess) return true;
       if (activeTab === 'catalog' && p === 'inventory') return true;
@@ -1088,6 +1116,8 @@ export default function App() {
         setActiveTab(getFirstEFTab());
       } else if (activeDepartment === 'sobise' && hasSobiseAccess) {
         setActiveTab(getFirstSOTab());
+      } else if (activeDepartment === 'ethno_wear' && hasEthnoWearAccess) {
+        setActiveTab(getFirstEWTab());
       } else if (hasCommunicationAccess) {
         setActiveTab('communication');
       } else if (hasTaskAccess) {
@@ -1098,7 +1128,7 @@ export default function App() {
         setActiveTab('no-access');
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated, activeDepartment, hasCommunicationAccess, hasTaskAccess, hasEliteOnlineAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasDigitalPrintAccess, hasStitchingAccess, isSuperOrAdmin]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated, activeDepartment, hasCommunicationAccess, hasTaskAccess, hasEliteOnlineAccess, hasEliteEditionAccess, hasEliteFabtexAccess, hasSobiseAccess, hasEthnoWearAccess, hasDigitalPrintAccess, hasStitchingAccess, isSuperOrAdmin]);
 
 
   
@@ -2039,6 +2069,7 @@ export default function App() {
                 if (company.id === 'elite_edition' && !hasEliteEditionAccess) return false;
                 if (company.id === 'elite_fabtex' && !hasEliteFabtexAccess) return false;
                 if (company.id === 'sobise' && !hasSobiseAccess) return false;
+                if (company.id === 'ethno_wear' && !hasEthnoWearAccess) return false;
                 return true;
               });
 
@@ -2065,7 +2096,8 @@ export default function App() {
                       EE: 'EE (Elite Edition)',
                       EF: 'EF (Elite Fabtex)',
                       EON: 'EON (Elite Online)',
-                      SO: 'SO (Saree Outlet)'
+                      SO: 'SO (Saree Outlet)',
+                      EW: 'EW (Ethno wear)'
                     };
                     const tooltipText = COMPANY_TOOLTIPS[company.code] || `${company.name} (${company.code})`;
                     return (
@@ -2529,6 +2561,7 @@ export default function App() {
                   if (company.id === 'elite_edition' && !hasEliteEditionAccess) return null;
                   if (company.id === 'elite_fabtex' && !hasEliteFabtexAccess) return null;
                   if (company.id === 'sobise' && !hasSobiseAccess) return null;
+                  if (company.id === 'ethno_wear' && !hasEthnoWearAccess) return null;
 
                   const isCurrent = activeDepartment === company.id;
                   return (
@@ -2994,6 +3027,7 @@ export default function App() {
               if (hasEliteEditionAccess) allowedCompanyDepts.push('elite_edition');
               if (hasEliteFabtexAccess) allowedCompanyDepts.push('elite_fabtex');
               if (hasSobiseAccess) allowedCompanyDepts.push('sobise');
+              if (hasEthnoWearAccess) allowedCompanyDepts.push('ethno_wear');
 
               if (['workspace', 'communication', 'task_management'].includes(activeTab) || allowedCompanyDepts.length === 0) {
                 return (
@@ -3002,6 +3036,25 @@ export default function App() {
                     {hasCommunicationAccess && renderNavItem('communication', 'Communication', MessageSquare, null, 'Chat')}
                     {hasTaskAccess && renderNavItem('task_management', 'Tasks', CheckSquare, null, 'Tasks')}
                   </div>
+                );
+              }
+
+              if (activeDepartment === 'ethno_wear' && hasEthnoWearAccess) {
+                return (
+                  <>
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_invoices')) &&
+                      renderNavItem('ew_invoices', 'Finance', Receipt, null, 'Finance')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_dashboard')) &&
+                      renderNavItem('ew_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_complaints')) &&
+                      renderNavItem('ew_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_settings')) &&
+                      renderNavItem('ew_settings', 'Settings', Settings, null, 'Settings')
+                    }
+                  </>
                 );
               }
 
@@ -3348,6 +3401,16 @@ export default function App() {
             <DigitalPrintExpenseModule companyEntity="Sobise" />
           ) : activeTab === 'so_invoices' ? (
             <EliteBillingDepartment companyEntity="Sobise" />
+          ) : activeTab === 'ew_dashboard' ? (
+            <CompanyDedicatedDashboard companyEntity="Ethno wear" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'ew_settings' ? (
+            <CompanySettingsPanel companyEntity="Ethno wear" />
+          ) : activeTab === 'ew_complaints' ? (
+            <DigitalPrintComplainModule companyEntity="Ethno wear" />
+          ) : activeTab === 'ew_expenses' ? (
+            <DigitalPrintExpenseModule companyEntity="Ethno wear" />
+          ) : activeTab === 'ew_invoices' ? (
+            <EliteBillingDepartment companyEntity="Ethno wear" department="ethno_wear" />
           ) : activeTab === 'es_dashboard' ? (
             <GarmentJobCardDashboard />
           ) : activeTab === 'es_settings' || activeTab === 'jobcards_stitching_settings' ? (
@@ -3387,6 +3450,8 @@ export default function App() {
                 You do not have permission to view this screen. Please contact your system administrator.
               </p>
             </div>
+          ) : activeDepartment === 'ethno_wear' && hasEthnoWearAccess ? (
+            <EliteBillingDepartment companyEntity="Ethno wear" department="ethno_wear" />
           ) : activeDepartment === 'elite_edition' && hasEliteEditionAccess ? (
             <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeDepartment === 'elite_fabtex' && hasEliteFabtexAccess ? (
@@ -3721,6 +3786,7 @@ export default function App() {
                 if (company.id === 'elite_edition' && !hasEliteEditionAccess) return null;
                 if (company.id === 'elite_fabtex' && !hasEliteFabtexAccess) return null;
                 if (company.id === 'sobise' && !hasSobiseAccess) return null;
+                if (company.id === 'ethno_wear' && !hasEthnoWearAccess) return null;
 
                 const isActive = activeDepartment === company.id && activeTab !== 'workspace';
                 const CompIcon = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : company.iconName === 'Layers' ? Layers : Building;

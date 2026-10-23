@@ -11,6 +11,7 @@ const normalizeBusinessUnit = (bu) => {
   if (u === 'EF' || u === 'ELITE FABTEX') return 'Elite Fabtex';
   if (u === 'SO' || u === 'SOBISE') return 'Sobise';
   if (u === 'EON' || u === 'ELITE ONLINE') return 'Elite Online';
+  if (u === 'EW' || u === 'ETHNO WEAR' || u === 'ETHNO_WEAR' || u === 'ETHNOWEAR') return 'Ethno wear';
   return bu;
 };
 
@@ -22,6 +23,7 @@ const getBusinessUnitCode = (bu) => {
   if (norm === 'Elite Fabtex') return 'EF';
   if (norm === 'Sobise') return 'SO';
   if (norm === 'Elite Online') return 'EON';
+  if (norm === 'Ethno wear') return 'EW';
   return 'EDP';
 };
 
@@ -41,6 +43,9 @@ const buildExpenseCompFilter = (companyEntity) => {
   }
   if (norm === 'Elite Online') {
     return { companyEntity: 'Elite Online' };
+  }
+  if (norm === 'Ethno wear') {
+    return { companyEntity: 'Ethno wear' };
   }
   return {
     $or: [
@@ -554,6 +559,7 @@ async function generateUniqueVoucherNo(companyEntity = 'Elite Digital Print') {
     'Elite Fabtex': 'EF-EXP-',
     'Elite Stitching': 'ES-EXP-',
     'Elite Online': 'EO-EXP-',
+    'Ethno wear': 'EW-EXP-',
     'Elite Digital Print': 'EDP-EXP-'
   };
   const prefix = prefixMap[companyEntity] || 'EDP-EXP-';

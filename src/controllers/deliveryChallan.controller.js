@@ -12,6 +12,7 @@ const getCompanyPrefix = (entity = 'Sobise') => {
   if (norm.includes('sobise')) return 'SO-';
   if (norm.includes('fabtex')) return 'EF-';
   if (norm.includes('edition')) return 'EE-';
+  if (norm.includes('ethno')) return 'EW-';
   return 'DC-';
 };
 
