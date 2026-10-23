@@ -385,7 +385,8 @@ export default function LedgerReconciliationPanel() {
       }
     } catch (err) {
       console.error('Forensic audit error:', err);
-      alert('Elite AI audit encountered an error.');
+      const msg = err.response?.data?.message || err.message || 'Elite AI audit encountered an error.';
+      alert(msg);
     } finally {
       setAuditing(false);
     }
@@ -1338,6 +1339,13 @@ export default function LedgerReconciliationPanel() {
               <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e40af', marginBottom: '4px' }}>EXECUTIVE AUDIT SUMMARY</div>
               <p style={{ margin: 0, fontSize: '0.84rem', color: '#1e293b', lineHeight: 1.5 }}>{auditReport.auditSummary}</p>
             </div>
+
+            {auditReport.quotaWarning && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.65rem 0.9rem', fontSize: '0.76rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertTriangle size={15} color="#d97706" style={{ flexShrink: 0 }} />
+                <span>{auditReport.quotaWarning}</span>
+              </div>
+            )}
 
             {auditReport.rootCauses?.length > 0 && (
               <div>
