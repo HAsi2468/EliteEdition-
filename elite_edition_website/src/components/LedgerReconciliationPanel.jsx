@@ -1078,20 +1078,48 @@ export default function LedgerReconciliationPanel() {
                 borderRadius: '12px',
                 padding: '0.95rem 1.25rem',
                 display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.75rem',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem',
                 boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)'
               }}
             >
-              <Sparkles size={20} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#047857', letterSpacing: '0.04em' }}>
-                  ELITE AI PROMPT ANALYSIS &amp; VERDICT
-                </div>
-                <div style={{ fontSize: '0.85rem', color: '#064e3b', marginTop: '3px', lineHeight: 1.45, fontWeight: 600 }}>
-                  {reconciliationResult.aiDirectVerdict}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1, minWidth: '280px' }}>
+                <Sparkles size={20} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#047857', letterSpacing: '0.04em' }}>
+                    ELITE AI PROMPT ANALYSIS &amp; VERDICT
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#064e3b', marginTop: '3px', lineHeight: 1.45, fontWeight: 600 }}>
+                    {reconciliationResult.aiDirectVerdict}
+                  </div>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                style={{
+                  background: '#059669',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '0.55rem 1rem',
+                  borderRadius: '8px',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(5, 150, 105, 0.35)',
+                  flexShrink: 0
+                }}
+              >
+                <Download size={15} />
+                <span>Download .xlsx Report</span>
+              </button>
             </div>
           )}
           {/* KPI Summary Cards */}
