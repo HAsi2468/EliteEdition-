@@ -62,7 +62,7 @@ export default function LedgerReconciliationPanel() {
 
   // ── AI Prompt Directive State ─────────────────────────────────────────────
   const [reconciliationPrompt, setReconciliationPrompt] = useState(
-    'Match entries by voucher number and date (±15 days). Identify all missing invoices, rate differences, and payment deductions.'
+    'muje ye dono ledger reconcilation karke do'
   );
 
   // ── Reconciliation Results ────────────────────────────────────────────────
@@ -942,6 +942,7 @@ export default function LedgerReconciliationPanel() {
           {/* Quick preset directives */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
             {[
+              { label: '⚡ Auto Reconcile', text: 'muje ye dono ledger reconcilation karke do', bg: '#f5f3ff', border: '#ddd6fe', color: '#6d28d9' },
               { label: '🎯 Exact Match', text: 'Match strictly by voucher number and exact amounts.', bg: '#f0fdf4', border: '#bbf7d0', color: '#166534' },
               { label: '📅 Date Flexible (±15 Days)', text: 'Match by voucher with ±15 days date tolerance window.', bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' },
               { label: '🔍 Find Missing Bills', text: 'Identify and list all bills present in Elite Files but missing from Party statement.', bg: '#faf5ff', border: '#e9d5ff', color: '#7e22ce' },
@@ -982,7 +983,7 @@ export default function LedgerReconciliationPanel() {
                 }
               }}
               rows={3}
-              placeholder="Write custom prompt (e.g. 'Match entries by voucher number and date within 15 days, highlight bills in Elite Files missing from Party statement, flag any debit/credit mismatches...')"
+              placeholder="Write custom prompt (e.g. 'muje ye dono ledger reconcilation karke do')"
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
