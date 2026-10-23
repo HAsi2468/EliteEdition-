@@ -93,7 +93,7 @@ export function EnterpriseHUDThemeController({
 
     // Default: Clean top-right under header, with safe margin from right edge
     return {
-      x: Math.max(12, window.innerWidth - 290),
+      x: Math.max(12, window.innerWidth - 350),
       y: 68
     };
   });
@@ -369,7 +369,7 @@ export function EnterpriseHUDThemeController({
               title="Inter-Department Communication & Team Chat"
               aria-label="Communication"
             >
-              <MessageSquare size={13} style={{ color: isCommActive ? '#2563eb' : '#64748b' }} />
+              <MessageSquare size={13} style={{ color: isCommActive ? '#ffffff' : '#2563eb' }} />
               <span style={{ fontWeight: 700 }}>Chat</span>
               {chatUnreadCount > 0 && (
                 <span className="dock-unread-badge">
@@ -395,7 +395,7 @@ export function EnterpriseHUDThemeController({
               title="Task Management & Staff Workloads"
               aria-label="Tasks"
             >
-              <CheckSquare size={13} style={{ color: isTaskActive ? '#16a34a' : '#64748b' }} />
+              <CheckSquare size={13} style={{ color: isTaskActive ? '#ffffff' : '#16a34a' }} />
               <span style={{ fontWeight: 700 }}>Tasks</span>
             </button>
           )}
@@ -413,7 +413,7 @@ export function EnterpriseHUDThemeController({
                 title="Universal AI Ledger & Statement Reconciler"
                 aria-label="Reconciliation"
               >
-                <Scale size={13} style={{ color: isReconcileActive ? '#2563eb' : '#64748b' }} />
+                <Scale size={13} style={{ color: isReconcileActive ? '#ffffff' : '#64748b' }} />
                 <span style={{ fontWeight: 700 }}>Reconcile</span>
               </button>
             </>

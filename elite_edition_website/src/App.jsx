@@ -2140,20 +2140,6 @@ export default function App() {
                     <span className="hidden sm:inline">Tasks</span>
                   </button>
                 )}
-
-                <button
-                  onClick={() => {
-                    setActiveTab('reconciliation');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`dept-switcher-btn comm-btn ${activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation' ? 'active' : ''}`}
-                  title="Universal AI Ledger & Statement Reconciler"
-                  type="button"
-                  style={{ minHeight: '30px', height: '30px', padding: '0 8px', fontSize: '0.74rem', gap: '4px' }}
-                >
-                  <Scale size={13} style={{ flexShrink: 0 }} />
-                  <span className="hidden sm:inline">Reconciliation</span>
-                </button>
               </div>
             )}
           </div>
@@ -2433,20 +2419,6 @@ export default function App() {
 
               {/* Permanently Docked Rotating Smart Tips Pill */}
               <QuickTipPill activeTab={activeTab} />
-
-              {/* Permanently Docked Enterprise Shortcut Pill: UI Scale, Chat & Tasks */}
-              <EnterpriseHUDThemeController 
-                isDocked={true}
-                activeTab={activeTab}
-                onNavigateTab={(tab) => {
-                  setActiveTab(tab);
-                  setMobileMenuOpen(false);
-                }}
-                hasCommunicationAccess={hasCommunicationAccess}
-                hasTaskAccess={hasTaskAccess}
-                chatUnreadCount={chatUnreadCount}
-                isAuthenticated={isAuthenticated}
-              />
 
               <button
                 onClick={() => {
@@ -3983,6 +3955,19 @@ export default function App() {
 
       {/* Guided Feature Tour Controller */}
       <GuidedTourController />
+
+      {/* Enterprise Floating Action Dock: UI Scale, Communication, Tasks & AI Reconcile */}
+      <EnterpriseHUDThemeController 
+        activeTab={activeTab}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setMobileMenuOpen(false);
+        }}
+        hasCommunicationAccess={hasCommunicationAccess}
+        hasTaskAccess={hasTaskAccess}
+        chatUnreadCount={chatUnreadCount}
+        isAuthenticated={isAuthenticated}
+      />
 
       {/* Undo Toast Container */}
       <UndoToastContainer />
