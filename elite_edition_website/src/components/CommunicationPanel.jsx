@@ -5528,67 +5528,75 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </div>
               )}
 
-              {/* Messages & Activity Stream Container */}
-              <div
-                ref={chatScrollRef}
-                onScroll={handleChatScroll}
-                onClick={() => setActiveMsgMenuId(null)}
-                onDragEnter={handleChatDragEnter}
-                onDragOver={handleChatDragOver}
-                onDragLeave={handleChatDragLeave}
-                onDrop={handleChatDrop}
-                onPaste={handlePasteClipboard}
-                className="phoenix-chat-stream"
-                style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}
-              >
-                {/* Drag and Drop Visual Dropzone Overlay */}
-                {isChatDragging && (
-                  <div style={{
-                    position: 'absolute',
-                    inset: '8px',
-                    background: 'rgba(37, 99, 235, 0.12)',
-                    border: '2px dashed #2563eb',
-                    borderRadius: '12px',
-                    backdropFilter: 'blur(3px)',
-                    zIndex: 50,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    pointerEvents: 'none'
-                  }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
-                      <Paperclip size={24} />
-                    </div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e40af' }}>Drop file here to attach</div>
-                    <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 600 }}>PDFs, Screenshots, Images, Excel, Word & Audio files supported</div>
-                  </div>
-                )}
+              {/* Messages & Activity Stream Container Wrapper */}
+              <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                {/* Floating Loading Indicator Outside List Content Flow (Prevents 36px jump) */}
                 {loadingMoreMessages && (
-                  <div style={{
-                    position: 'sticky',
-                    top: 8,
-                    zIndex: 20,
-                    margin: '0 auto',
-                    width: 'fit-content',
-                    background: 'rgba(255, 255, 255, 0.94)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid var(--border-light, #e2e8f0)',
-                    borderRadius: '20px',
-                    padding: '4px 14px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    color: 'var(--text-primary, #0f172a)',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 10,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      zIndex: 35,
+                      pointerEvents: 'none',
+                      background: 'rgba(255, 255, 255, 0.96)',
+                      backdropFilter: 'blur(8px)',
+                      border: '1px solid var(--border-light, #cbd5e1)',
+                      borderRadius: '20px',
+                      padding: '5px 16px',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                      color: 'var(--text-primary, #0f172a)',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      animation: 'fadeIn 0.15s ease'
+                    }}
+                  >
                     <RefreshCw size={13} className="spin-loader" color="#2563eb" />
                     <span>Loading older messages...</span>
                   </div>
                 )}
+
+                {/* Messages & Activity Stream Container */}
+                <div
+                  ref={chatScrollRef}
+                  onScroll={handleChatScroll}
+                  onClick={() => setActiveMsgMenuId(null)}
+                  onDragEnter={handleChatDragEnter}
+                  onDragOver={handleChatDragOver}
+                  onDragLeave={handleChatDragLeave}
+                  onDrop={handleChatDrop}
+                  onPaste={handlePasteClipboard}
+                  className="phoenix-chat-stream"
+                  style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}
+                >
+                  {/* Drag and Drop Visual Dropzone Overlay */}
+                  {isChatDragging && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: '8px',
+                      background: 'rgba(37, 99, 235, 0.12)',
+                      border: '2px dashed #2563eb',
+                      borderRadius: '12px',
+                      backdropFilter: 'blur(3px)',
+                      zIndex: 50,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      pointerEvents: 'none'
+                    }}>
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
+                        <Paperclip size={24} />
+                      </div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e40af' }}>Drop file here to attach</div>
+                      <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 600 }}>PDFs, Screenshots, Images, Excel, Word & Audio files supported</div>
+                    </div>
+                  )}
 
                 {!hasMoreMessages && messages.length > 0 && !loadingMessages && (
                   <div style={{
@@ -6919,6 +6927,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </ErrorBoundary>
                 <div ref={chatBottomRef} />
               </div>
+            </div>
 
               {/* Real-time Typing Indicator Wave */}
               {typingUsers.length > 0 && (
