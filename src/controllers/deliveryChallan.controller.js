@@ -9,10 +9,10 @@ const PDFDocument = require('pdfkit');
 // Helper to determine prefix based on companyEntity
 const getCompanyPrefix = (entity = 'Sobise') => {
   const norm = String(entity || '').trim().toLowerCase();
+  if (norm.includes('ethno') || norm === 'ew') return 'EWC-';
   if (norm.includes('sobise')) return 'SO-';
   if (norm.includes('fabtex')) return 'EF-';
   if (norm.includes('edition')) return 'EE-';
-  if (norm.includes('ethno')) return 'EW-';
   return 'DC-';
 };
 
@@ -21,6 +21,7 @@ const getNextChallanNo = async (req, res) => {
   try {
     const companyEntity = req.query.companyEntity || 'Sobise';
     const prefix = getCompanyPrefix(companyEntity);
+    const isEthno = prefix === 'EWC-';
 
     // Find the latest challan with this prefix or companyEntity
     const last = await DeliveryChallan.findOne({
@@ -32,17 +33,17 @@ const getNextChallanNo = async (req, res) => {
       .sort({ challanSeq: -1, createdAt: -1 })
       .lean();
 
-    let nextSeq = 1000; // Starting baseline sequence per user requirement (SO-1000)
+    let nextSeq = isEthno ? 1 : 1000;
     if (last && last.challanSeq) {
-      nextSeq = Math.max(last.challanSeq + 1, 1000);
+      nextSeq = Math.max(last.challanSeq + 1, isEthno ? 1 : 1000);
     } else if (last && last.challanNo) {
       const match = String(last.challanNo).match(/\d+/);
       if (match) {
-        nextSeq = Math.max(parseInt(match[0], 10) + 1, 1000);
+        nextSeq = Math.max(parseInt(match[0], 10) + 1, isEthno ? 1 : 1000);
       }
     }
 
-    const nextNo = `${prefix}${nextSeq}`;
+    const nextNo = isEthno ? `${prefix}${String(nextSeq).padStart(2, '0')}` : `${prefix}${nextSeq}`;
     res.json({ success: true, nextNo, nextSeq, prefix });
   } catch (error) {
     logger.error('deliveryChallan.getNextChallanNo error: %o', error);
@@ -188,6 +189,7 @@ const createChallan = async (req, res) => {
     const body = { ...req.body };
     const companyEntity = body.companyEntity || 'Sobise';
     const prefix = getCompanyPrefix(companyEntity);
+    const isEthno = prefix === 'EWC-';
 
     // Auto-generate sequential challan number if not explicitly set
     if (!body.challanNo || !body.challanSeq) {
@@ -200,19 +202,19 @@ const createChallan = async (req, res) => {
         .sort({ challanSeq: -1, createdAt: -1 })
         .lean();
 
-      let nextSeq = 1000;
+      let nextSeq = isEthno ? 1 : 1000;
       if (last && last.challanSeq) {
-        nextSeq = Math.max(last.challanSeq + 1, 1000);
+        nextSeq = Math.max(last.challanSeq + 1, isEthno ? 1 : 1000);
       } else if (last && last.challanNo) {
         const match = String(last.challanNo).match(/\d+/);
-        if (match) nextSeq = Math.max(parseInt(match[0], 10) + 1, 1000);
+        if (match) nextSeq = Math.max(parseInt(match[0], 10) + 1, isEthno ? 1 : 1000);
       }
 
       body.challanSeq = nextSeq;
-      body.challanNo = `${prefix}${nextSeq}`;
+      body.challanNo = isEthno ? `${prefix}${String(nextSeq).padStart(2, '0')}` : `${prefix}${nextSeq}`;
     } else {
       const match = String(body.challanNo).match(/\d+/);
-      body.challanSeq = match ? parseInt(match[0], 10) : 1000;
+      body.challanSeq = match ? parseInt(match[0], 10) : (isEthno ? 1 : 1000);
     }
 
     body.challanPrefix = prefix;

@@ -316,11 +316,15 @@ export default function EliteBillingDepartment({
     return false;
   });
 
-  const computeNextPurchaseNo = (list = purchases) => {
+  const computeNextPurchaseNo = (list = purchases, forEntity = (purchaseForm?.companyEntity || companyEntity)) => {
+    const norm = String(forEntity || '').trim().toLowerCase();
+    const isEthno = norm.includes('ethno') || norm === 'ew';
+    const prefix = isEthno ? 'EWP-' : 'DP-';
+    const regex = isEthno ? /^EW[-_]?P[-_]?(\d+)/i : /^DP[-_]?(\d+)/i;
     let maxNum = 0;
     (list || []).forEach(p => {
       if (p && p.purchaseNo) {
-        const match = String(p.purchaseNo).trim().match(/^DP[-_]?(\d+)/i);
+        const match = String(p.purchaseNo).trim().match(regex);
         if (match) {
           const num = parseInt(match[1], 10);
           if (num > maxNum) maxNum = num;
@@ -328,7 +332,7 @@ export default function EliteBillingDepartment({
       }
     });
     const nextSeq = maxNum + 1;
-    return `DP-${String(nextSeq).padStart(2, '0')}`;
+    return `${prefix}${String(nextSeq).padStart(2, '0')}`;
   };
 
   const createEmptyPurchaseItem = () => ({
@@ -6029,7 +6033,7 @@ export default function EliteBillingDepartment({
               <button
                 onClick={async () => {
                   setEditingPurchaseId(null);
-                  let nextNo = computeNextPurchaseNo(purchases);
+                  let nextNo = computeNextPurchaseNo(purchases, companyEntity);
                   try {
                     const res = await api.getNextPurchaseNo(companyEntity);
                     if (res && res.purchaseNo) {
@@ -6401,7 +6405,7 @@ export default function EliteBillingDepartment({
                     <button
                       type="button"
                       onClick={() => {
-                        const nextNo = computeNextPurchaseNo(purchases);
+                        const nextNo = computeNextPurchaseNo(purchases, companyEntity);
                         setPurchaseForm(f => ({ ...f, purchaseNo: nextNo }));
                       }}
                       style={{
@@ -6413,9 +6417,9 @@ export default function EliteBillingDepartment({
                         cursor: 'pointer',
                         padding: 0
                       }}
-                      title="Auto-generate next DP series purchase number"
+                      title={`Auto-generate next ${companyEntity === 'Ethno wear' ? 'EWP' : 'DP'} series purchase number`}
                     >
-                      ⚡ Auto DP Number
+                      ⚡ Auto {companyEntity === 'Ethno wear' ? 'EWP' : 'DP'} Number
                     </button>
                   </div>
                   <input
@@ -6425,7 +6429,7 @@ export default function EliteBillingDepartment({
                     value={purchaseForm.purchaseNo}
                     onChange={e => setPurchaseForm(f => ({ ...f, purchaseNo: e.target.value }))}
                     style={{ ...inputStyle, fontWeight: 700, letterSpacing: '0.02em', color: '#4f46e5' }}
-                    placeholder="e.g. DP-01, DP-02"
+                    placeholder={companyEntity === 'Ethno wear' ? "e.g. EWP-01, EWP-02" : "e.g. DP-01, DP-02"}
                   />
                 </div>
 

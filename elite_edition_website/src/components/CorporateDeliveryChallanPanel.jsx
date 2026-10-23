@@ -99,6 +99,7 @@ export default function CorporateDeliveryChallanPanel({
 
   const getThemeColor = () => {
     const norm = String(companyEntity || '').toLowerCase();
+    if (norm.includes('ethno') || norm === 'ew') return '#ec4899'; // Ethno wear Pink
     if (norm.includes('sobise')) return '#e11d48'; // Sobise Rose
     if (norm.includes('fabtex')) return '#f59e0b'; // Fabtex Amber
     if (norm.includes('edition')) return '#8b5cf6'; // Edition Purple
@@ -153,8 +154,10 @@ export default function CorporateDeliveryChallanPanel({
   // Open New Challan Modal
   const handleOpenCreate = async () => {
     try {
+      const isEthno = String(companyEntity || '').toLowerCase().includes('ethno');
+      const defaultNo = isEthno ? 'EWC-01' : (String(companyEntity || '').toLowerCase().includes('fabtex') ? 'EF-1000' : String(companyEntity || '').toLowerCase().includes('edition') ? 'EE-1000' : 'SO-1000');
       const nextRes = await api.getNextDeliveryChallanNo(companyEntity);
-      const nextNo = nextRes?.nextNo || 'SO-1000';
+      const nextNo = nextRes?.nextNo || defaultNo;
 
       setEditingChallan(null);
       setForm({
@@ -631,7 +634,7 @@ export default function CorporateDeliveryChallanPanel({
                     </div>
                     <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>No Delivery Challans Found</div>
                     <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 16px' }}>
-                      Create your first dispatch delivery challan for {companyEntity} (e.g. SO-1000).
+                      Create your first dispatch delivery challan for {companyEntity} (e.g. {companyEntity === 'Ethno wear' ? 'EWC-01' : 'SO-1000'}).
                     </p>
                     <button
                       onClick={handleOpenCreate}

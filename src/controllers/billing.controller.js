@@ -3428,16 +3428,29 @@ const getPurchases = async (req, res) => {
   }
 };
 
+const getPurchasePrefix = (entity = 'Elite Digital Prints') => {
+  const norm = String(entity || '').trim().toLowerCase();
+  if (norm.includes('ethno') || norm === 'ew') return 'EWP-';
+  return 'DP-';
+};
+
 const getNextPurchaseNo = async (req, res) => {
   try {
     const { companyEntity = 'Elite Digital Prints' } = req.query;
-    const purchases = await BillingPurchase.find({}, 'purchaseNo').lean();
+    const prefix = getPurchasePrefix(companyEntity);
+    const regex = prefix === 'EWP-' ? /^EW[-_]?P[-_]?(\d+)/i : /^DP[-_]?(\d+)/i;
+
+    const purchases = await BillingPurchase.find({
+      $or: [
+        { companyEntity },
+        { purchaseNo: { $regex: `^${prefix}`, $options: 'i' } }
+      ]
+    }, 'purchaseNo').lean();
     let maxNum = 0;
-    const prefix = 'DP-';
 
     purchases.forEach(p => {
       if (p.purchaseNo) {
-        const match = String(p.purchaseNo).trim().match(/^DP[-_]?(\d+)/i);
+        const match = String(p.purchaseNo).trim().match(regex);
         if (match) {
           const num = parseInt(match[1], 10);
           if (num > maxNum) maxNum = num;
@@ -3457,18 +3470,26 @@ const createPurchase = async (req, res) => {
   try {
     const purchaseData = { ...req.body };
     if (!purchaseData.purchaseNo || !purchaseData.purchaseNo.trim()) {
-      const purchases = await BillingPurchase.find({}, 'purchaseNo').lean();
+      const prefix = getPurchasePrefix(purchaseData.companyEntity);
+      const regex = prefix === 'EWP-' ? /^EW[-_]?P[-_]?(\d+)/i : /^DP[-_]?(\d+)/i;
+
+      const purchases = await BillingPurchase.find({
+        $or: [
+          { companyEntity: purchaseData.companyEntity },
+          { purchaseNo: { $regex: `^${prefix}`, $options: 'i' } }
+        ]
+      }, 'purchaseNo').lean();
       let maxNum = 0;
       purchases.forEach(p => {
         if (p.purchaseNo) {
-          const match = String(p.purchaseNo).trim().match(/^DP[-_]?(\d+)/i);
+          const match = String(p.purchaseNo).trim().match(regex);
           if (match) {
             const num = parseInt(match[1], 10);
             if (num > maxNum) maxNum = num;
           }
         }
       });
-      purchaseData.purchaseNo = `DP-${String(maxNum + 1).padStart(2, '0')}`;
+      purchaseData.purchaseNo = `${prefix}${String(maxNum + 1).padStart(2, '0')}`;
     }
     if (purchaseData.date) {
       purchaseData.date = new Date(purchaseData.date);
