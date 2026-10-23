@@ -296,16 +296,16 @@ export default function LedgerReconciliationPanel() {
       let t1 = stmt1Transactions;
       let t2 = stmt2Transactions;
 
-      // If Elite Files not yet parsed, auto-parse now
+      // Parallelize AI statement extraction so both files parse simultaneously in half the time
+      const parseTasks = [];
       if (!t1.length && (stmt1Base64 || stmt1Text.trim())) {
-        const parsed1 = await parseStmt1WithData();
-        if (Array.isArray(parsed1)) t1 = parsed1;
+        parseTasks.push(parseStmt1WithData().then((res) => { if (Array.isArray(res)) t1 = res; }));
       }
-
-      // If Party / Other File not yet parsed, auto-parse now
       if (!t2.length && (stmt2Base64 || stmt2Text.trim())) {
-        const parsed2 = await parseStmt2WithData();
-        if (Array.isArray(parsed2)) t2 = parsed2;
+        parseTasks.push(parseStmt2WithData().then((res) => { if (Array.isArray(res)) t2 = res; }));
+      }
+      if (parseTasks.length > 0) {
+        await Promise.all(parseTasks);
       }
 
       if (!t1.length && !t2.length) {

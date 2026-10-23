@@ -52,8 +52,48 @@ async function chatCompletion({
   }
 }
 
+const FormData = require('form-data');
+
 /**
- * Universal Statement Parser via Grok Vision / Text
+ * Upload raw file directly to xAI Files API
+ */
+async function uploadFileToXAI(buffer, filename = 'statement.pdf') {
+  try {
+    const form = new FormData();
+    form.append('purpose', 'assistants');
+    form.append('file', buffer, { filename });
+
+    const res = await axios.post(`${XAI_BASE_URL}/files`, form, {
+      headers: {
+        Authorization: `Bearer ${XAI_API_KEY}`,
+        ...form.getHeaders()
+      },
+      timeout: 60000
+    });
+    return res.data?.id;
+  } catch (err) {
+    logger.error('Failed to upload file to xAI:', err.response?.data || err.message);
+    throw new Error(`xAI File Upload Error: ${err.message}`);
+  }
+}
+
+/**
+ * Delete temporary file from xAI Files API
+ */
+async function deleteFileFromXAI(fileId) {
+  if (!fileId) return;
+  try {
+    await axios.delete(`${XAI_BASE_URL}/files/${fileId}`, {
+      headers: { Authorization: `Bearer ${XAI_API_KEY}` },
+      timeout: 10000
+    });
+  } catch (err) {
+    logger.warn('Failed to delete temporary file from xAI:', err.message);
+  }
+}
+
+/**
+ * Universal Statement Parser via Grok Native PDF / Vision / Text
  * Extracts tabular date, voucher, description, debit, credit, balance
  */
 async function parseStatementDocument({ rawText, imageBase64, partyType, partyName }) {
@@ -90,6 +130,7 @@ CRITICAL RULES:
 
   let textToParse = rawText ? String(rawText).trim() : '';
   let validImageForVision = null;
+  let directXaiFileId = null;
 
   if (imageBase64 && typeof imageBase64 === 'string') {
     const isPdf = imageBase64.startsWith('data:application/pdf') ||
@@ -101,9 +142,11 @@ CRITICAL RULES:
                     imageBase64.substring(0, 50).includes('UEsDB');
 
     if (isPdf) {
+      const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+      const pdfBuffer = Buffer.from(cleanBase64, 'base64');
+
+      // 1. Ultra-fast text stream extraction via pdf-parse (~90ms)
       try {
-        const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
-        const pdfBuffer = Buffer.from(cleanBase64, 'base64');
         const pdfModule = require('pdf-parse');
         let pdfText = '';
         if (typeof pdfModule === 'function') {
@@ -111,17 +154,26 @@ CRITICAL RULES:
           pdfText = pdfData?.text || '';
         } else if (pdfModule && pdfModule.PDFParse) {
           const parser = new pdfModule.PDFParse({ data: pdfBuffer });
+          await parser.load();
           const res = await parser.getText();
           pdfText = res?.text || '';
           await parser.destroy();
         }
-        if (pdfText && pdfText.trim().length > 10) {
+        if (pdfText && pdfText.trim().length > 30) {
           textToParse = (textToParse ? textToParse + '\n\n' : '') + pdfText;
-        } else {
-          logger.warn('Uploaded PDF contained no extractable text stream.');
         }
       } catch (pdfErr) {
-        logger.error('Error extracting text from PDF with pdf-parse:', pdfErr);
+        logger.warn('Local pdf-parse extraction skipped:', pdfErr.message);
+      }
+
+      // 2. If no text stream was found (scanned PDF / photo), upload directly to xAI Files API
+      if (!textToParse || textToParse.length < 30) {
+        try {
+          logger.info('PDF has no text stream; uploading directly to xAI Files API for native Grok processing...');
+          directXaiFileId = await uploadFileToXAI(pdfBuffer, 'statement.pdf');
+        } catch (uploadErr) {
+          logger.error('Failed to upload PDF directly to xAI Files API:', uploadErr.message);
+        }
       }
     } else if (isExcel) {
       try {
@@ -148,41 +200,89 @@ CRITICAL RULES:
     }
   }
 
-  const messages = [{ role: 'system', content: systemPrompt }];
-  let selectedModel = FAST_MODEL;
-
-  if (validImageForVision && (!textToParse || textToParse.length < 30)) {
-    selectedModel = FAST_MODEL;
-    messages.push({
-      role: 'user',
-      content: [
-        { type: 'text', text: `Please parse this ledger statement image for ${partyType || 'party'}: ${partyName || 'Unknown'}. Extract all transactions accurately.` },
-        { type: 'image_url', image_url: { url: validImageForVision } }
-      ]
-    });
-  } else {
-    if (!textToParse) {
-      throw new Error('Unable to extract readable text or supported image from the uploaded statement file.');
-    }
-    messages.push({
-      role: 'user',
-      content: `Here is the statement document content for ${partyType || 'party'}: ${partyName || 'Unknown'}:\n\n${textToParse}\n\nParse into the required JSON structure.`
-    });
-  }
-
-  const result = await chatCompletion({
-    messages,
-    model: selectedModel,
-    temperature: 0.1,
-    responseFormat: { type: 'json_object' }
-  });
-
   try {
-    const cleaned = result.content.trim().replace(/^```json/i, '').replace(/```$/i, '').trim();
-    return JSON.parse(cleaned);
-  } catch (e) {
-    logger.error('Failed to parse Grok JSON output:', result.content);
-    throw new Error('AI failed to produce structured statement JSON');
+    let resultJson = null;
+
+    // Case A: Direct PDF file uploaded to xAI
+    if (directXaiFileId) {
+      const response = await axios.post(`${XAI_BASE_URL}/responses`, {
+        model: 'grok-4.7',
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: systemPrompt + '\n\nOutput strictly valid JSON only.' },
+              { type: 'input_file', file_id: directXaiFileId }
+            ]
+          }
+        ]
+      }, {
+        headers: {
+          Authorization: `Bearer ${XAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 90000
+      });
+
+      const messageOutput = response.data?.output?.find(o => o.type === 'message')?.content;
+      const rawOutputText = messageOutput?.[0]?.text || '';
+      const cleaned = rawOutputText.trim().replace(/^```json/i, '').replace(/```$/i, '').trim();
+      resultJson = JSON.parse(cleaned);
+    }
+    // Case B: Vision for image
+    else if (validImageForVision && (!textToParse || textToParse.length < 30)) {
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: `Please parse this ledger statement image for ${partyType || 'party'}: ${partyName || 'Unknown'}. Extract all transactions accurately.` },
+            { type: 'image_url', image_url: { url: validImageForVision } }
+          ]
+        }
+      ];
+
+      const result = await chatCompletion({
+        messages,
+        model: FAST_MODEL,
+        temperature: 0.1,
+        responseFormat: { type: 'json_object' }
+      });
+      const cleaned = result.content.trim().replace(/^```json/i, '').replace(/```$/i, '').trim();
+      resultJson = JSON.parse(cleaned);
+    }
+    // Case C: Extracted text stream (fastest, ~10-20s)
+    else {
+      if (!textToParse) {
+        throw new Error('Unable to extract readable text or supported image from the uploaded statement file.');
+      }
+
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: `Here is the statement document content for ${partyType || 'party'}: ${partyName || 'Unknown'}:\n\n${textToParse}\n\nParse into the required JSON structure.`
+        }
+      ];
+
+      const result = await chatCompletion({
+        messages,
+        model: FAST_MODEL,
+        temperature: 0.1,
+        responseFormat: { type: 'json_object' }
+      });
+      const cleaned = result.content.trim().replace(/^```json/i, '').replace(/```$/i, '').trim();
+      resultJson = JSON.parse(cleaned);
+    }
+
+    return resultJson;
+  } catch (err) {
+    logger.error('Failed to parse statement document via Grok:', err.message);
+    throw new Error(`AI statement parsing error: ${err.message}`);
+  } finally {
+    if (directXaiFileId) {
+      deleteFileFromXAI(directXaiFileId).catch(() => {});
+    }
   }
 }
 
