@@ -184,13 +184,39 @@ const PRESET_OPTIONS = [
 ];
 
 
+export const normalizeCompanyEntity = (raw) => {
+  if (!raw) return 'Elite Edition';
+  const s = String(raw).trim();
+  if (/^elite\s*digital\s*print/i.test(s) || /^edp$/i.test(s) || s === 'digital_print') return 'Elite Digital Prints';
+  if (/^elite\s*stitch/i.test(s) || /^es$/i.test(s) || s === 'stitching') return 'Elite Stitching';
+  if (/^elite\s*edition/i.test(s) || /^ee$/i.test(s) || s === 'elite_edition') return 'Elite Edition';
+  if (/^elite\s*fabtex/i.test(s) || /^ef$/i.test(s) || s === 'elite_fabtex') return 'Elite Fabtex';
+  if (/^sobise/i.test(s) || /^so$/i.test(s)) return 'Sobise';
+  if (/^elite\s*online/i.test(s) || /^eon$/i.test(s) || s === 'elite_online') return 'Elite Online';
+  return s;
+};
+
+export const getDefaultInvoicePrefix = (comp) => {
+  const c = normalizeCompanyEntity(comp);
+  if (c === 'Elite Edition') return 'EE-2627-0001';
+  if (c === 'Elite Fabtex') return 'EF-2627-0001';
+  if (c === 'Sobise') return 'SO-2627-0001';
+  if (c === 'Elite Stitching') return 'ES-2627-0001';
+  if (c === 'Elite Online') return 'EO-2627-0001';
+  return 'EDP/26-27/1001';
+};
+
 export default function EliteBillingDepartment({ 
   initialChallanData = null, 
   department = 'digital_print', 
-  companyEntity = (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : 'Elite Digital Prints'), 
+  companyEntity: propCompanyEntity, 
   initialTab = null 
 }) {
-  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex'].includes(companyEntity);
+  const companyEntity = normalizeCompanyEntity(
+    propCompanyEntity || 
+    (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : 'Elite Digital Prints')
+  );
+  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online'].includes(companyEntity);
   const isStitchingEntity = department === 'stitching' || companyEntity === 'Elite Stitching';
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -2861,8 +2887,8 @@ export default function EliteBillingDepartment({
   // ── INVOICE EDITOR STATE (myBillBook style) ──────────────────────────────
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
   const [invoiceForm, setInvoiceForm] = useState(() => ({
-    issuingCompany: companyEntity || 'Elite Edition',
-    invoiceNo: '',
+    issuingCompany: companyEntity,
+    invoiceNo: getDefaultInvoicePrefix(companyEntity),
     invoiceSeq: 1001,
     ourChallanNo: '',
     invoiceDate: new Date().toISOString().split('T')[0],
@@ -2896,11 +2922,32 @@ export default function EliteBillingDepartment({
     discountValue: 0,
     taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
     paidAmount: 0,
-    notes: `Thank you for doing business with ${companyEntity || 'Elite Edition'}!`,
+    notes: `Thank you for doing business with ${companyEntity}!`,
     terms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.'
   }));
 
-  const isCorporateInvoice = ['Sobise', 'Elite Edition', 'Elite Fabtex'].includes(invoiceForm.issuingCompany || companyEntity);
+  const isCorporateInvoice = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online'].includes(invoiceForm.issuingCompany || companyEntity);
+
+  // Synchronize invoice issuingCompany & next invoice number whenever active companyEntity changes
+  useEffect(() => {
+    if (!editingInvoiceId) {
+      setInvoiceForm(f => ({
+        ...f,
+        issuingCompany: companyEntity,
+        notes: `Thank you for doing business with ${companyEntity}!`
+      }));
+      api.getNextInvoiceNo(companyEntity).then(nextRes => {
+        if (nextRes?.invoiceNo) {
+          setInvoiceForm(f => ({
+            ...f,
+            issuingCompany: companyEntity,
+            invoiceNo: nextRes.invoiceNo,
+            invoiceSeq: nextRes.nextSeq || 1001
+          }));
+        }
+      }).catch(() => {});
+    }
+  }, [companyEntity, editingInvoiceId]);
 
   // ── Debounced Search to Prevent Request Flooding ───────────────────────────
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -3120,9 +3167,9 @@ export default function EliteBillingDepartment({
         const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
 
         setInvoiceForm({
-          issuingCompany: companyEntity || 'Elite Edition',
-          invoiceNo: nextRes.invoiceNo || (isCorporateEntity ? 'EE-2627-0001' : 'EDP/26-27/1001'),
-          invoiceSeq: nextRes.nextSeq || 1001,
+          issuingCompany: companyEntity,
+          invoiceNo: nextRes?.invoiceNo || getDefaultInvoicePrefix(companyEntity),
+          invoiceSeq: nextRes?.nextSeq || 1001,
           invoiceDate: new Date().toISOString().split('T')[0],
           dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
           customer: customers[0] ? { ...customers[0] } : {
@@ -3145,7 +3192,7 @@ export default function EliteBillingDepartment({
           discountValue: 0,
           taxType: 'CGST_SGST',
           paidAmount: 0,
-          notes: `Thank you for doing business with ${companyEntity || 'Elite Edition'}!`,
+          notes: `Thank you for doing business with ${companyEntity}!`,
           terms: termsStr
         });
         setActiveTab('create');
@@ -4492,10 +4539,14 @@ export default function EliteBillingDepartment({
             <div>
               <label style={{ ...labelStyle, color: '#7c3aed', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
               <select
-                value={invoiceForm.issuingCompany || companyEntity || 'Elite Edition'}
+                value={invoiceForm.issuingCompany || companyEntity}
                 onChange={e => {
-                  const selected = e.target.value;
-                  setInvoiceForm(f => ({ ...f, issuingCompany: selected }));
+                  const selected = normalizeCompanyEntity(e.target.value);
+                  setInvoiceForm(f => ({
+                    ...f,
+                    issuingCompany: selected,
+                    notes: `Thank you for doing business with ${selected}!`
+                  }));
                   api.getNextInvoiceNo(selected).then(nextRes => {
                     if (nextRes?.invoiceNo) {
                       setInvoiceForm(f => ({ ...f, invoiceNo: nextRes.invoiceNo, invoiceSeq: nextRes.nextSeq }));
@@ -4516,6 +4567,7 @@ export default function EliteBillingDepartment({
                 <option value="Elite Fabtex">🏢 Elite Fabtex</option>
                 <option value="Sobise">🏢 Sobise</option>
                 <option value="Elite Stitching">🏢 Elite Stitching</option>
+                <option value="Elite Online">🏢 Elite Online</option>
               </select>
             </div>
             <div>

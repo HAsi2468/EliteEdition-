@@ -61,11 +61,25 @@ function buildCompanyFilter(companyEntity) {
         { invoiceNo: { $regex: '^SO', $options: 'i' } }
       ]
     };
+  } else if (ce === 'Elite Stitching') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Stitching' },
+        { invoiceNo: { $regex: '^ES', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Elite Online') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Online' },
+        { invoiceNo: { $regex: '^EO', $options: 'i' } }
+      ]
+    };
   } else {
     // Elite Digital Print / Digital Print / Default
     return {
       $or: [
-        { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints', 'Elite Online'] } },
+        { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
         { companyEntity: { $exists: false } },
         { companyEntity: null },
         { companyEntity: '' },
@@ -99,10 +113,24 @@ function buildPurchaseCompanyFilter(companyEntity) {
         { purchaseNo: { $regex: '^SO', $options: 'i' } }
       ]
     };
+  } else if (ce === 'Elite Stitching') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Stitching' },
+        { purchaseNo: { $regex: '^ES', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Elite Online') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Online' },
+        { purchaseNo: { $regex: '^EO', $options: 'i' } }
+      ]
+    };
   } else if (ce === 'edp' || ce === 'Elite Digital Prints' || ce === 'Elite Digital Print') {
     return {
       $or: [
-        { companyEntity: { $in: ['Elite Digital Prints', 'Elite Digital Print', 'Elite Online', 'edp'] } },
+        { companyEntity: { $in: ['Elite Digital Prints', 'Elite Digital Print', 'edp'] } },
         { companyEntity: { $exists: false } },
         { companyEntity: null },
         { companyEntity: '' }
@@ -378,6 +406,12 @@ const getNextInvoiceNo = async (req, res) => {
       defaultStartSeq = 1;
     } else if (companyEntity === 'Sobise') {
       defaultPrefix = 'SO-2627-';
+      defaultStartSeq = 1;
+    } else if (companyEntity === 'Elite Stitching') {
+      defaultPrefix = 'ES-2627-';
+      defaultStartSeq = 1;
+    } else if (companyEntity === 'Elite Online') {
+      defaultPrefix = 'EO-2627-';
       defaultStartSeq = 1;
     }
 

@@ -4037,7 +4037,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       ) : effectiveSubTab === 'costing' || effectiveSubTab === 'costing_pl' ? (
         <DigitalPrintCostingScreen companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
       ) : effectiveSubTab === 'billing' || effectiveSubTab === 'billing_digital' || effectiveSubTab === 'billing_elite' ? (
-        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
+        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Prints"} />
       ) : effectiveSubTab === 'billing_fabtex' ? (
         <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Fabtex" />
       ) : effectiveSubTab === 'billing_sobise' ? (

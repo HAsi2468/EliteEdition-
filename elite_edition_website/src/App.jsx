@@ -3076,6 +3076,9 @@ export default function App() {
                       renderNavItem('jobcards_stitching_challan', 'Challan', Database, null, 'Challan')
                     }
                     {renderNavItem('es_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('es_invoices') || currentUser.permissions?.includes('stitching_invoices')) &&
+                      renderNavItem('es_invoices', 'Finance', Receipt, null, 'Finance')
+                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings') || currentUser.permissions?.includes('es_settings')) &&
                       renderNavItem('es_settings', 'Settings', Settings, null, 'Settings')
                     }
@@ -3162,6 +3165,9 @@ export default function App() {
                   }
                   {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) &&
                     renderNavItem('myntra', 'Myntra Integrations', ShoppingBag, null, 'Myntra')
+                  }
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_invoices')) &&
+                    renderNavItem('eo_invoices', 'Finance', Receipt, null, 'Finance')
                   }
                   {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) &&
                     renderNavItem('eo_settings', 'Settings', Settings, null, 'Settings')
@@ -3353,10 +3359,14 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Elite Stitching" />
           ) : activeTab === 'es_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Stitching" />
+          ) : activeTab === 'es_invoices' ? (
+            <EliteBillingDepartment companyEntity="Elite Stitching" department="stitching" />
           ) : activeTab === 'eo_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Online" />
           ) : activeTab === 'eo_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Online" />
+          ) : activeTab === 'eo_invoices' ? (
+            <EliteBillingDepartment companyEntity="Elite Online" department="elite_online" />
           ) : activeTab === 'expense_dashboard' || activeTab === 'expense_create' || activeTab === 'expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Digital Print" autoOpenCreate={activeTab === 'expense_create'} />
           ) : activeTab === 'unicommerce' ? (
