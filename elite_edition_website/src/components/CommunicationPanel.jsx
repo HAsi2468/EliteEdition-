@@ -8,6 +8,7 @@ import JobCardPdfModal from './JobCardPdfModal';
 import ErrorBoundary from './common/ErrorBoundary';
 import ToolResultDispatcher from './cards/ToolResultDispatcher';
 import ChatContainer from './cards/ChatContainer';
+import EmojiPickerPopover from './EmojiPickerPopover';
 import { useFileUpload } from '../hooks/useFileUpload';
 import '../styles/communication.css';
 import {
@@ -7479,62 +7480,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               <Smile size={16} />
                             </button>
 
-                            {showEmojiPicker && (
-                              <>
-                                <div
-                                  style={{ position: 'fixed', inset: 0, zIndex: 99990 }}
-                                  onClick={() => setShowEmojiPicker(false)}
-                                />
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    bottom: '100%',
-                                    left: 0,
-                                    marginBottom: '8px',
-                                    background: '#ffffff',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '12px',
-                                    boxShadow: '0 10px 25px rgba(0,0,0,0.18)',
-                                    zIndex: 99995,
-                                    padding: '8px',
-                                    width: '280px',
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(7, 1fr)',
-                                    gap: '4px',
-                                    animation: 'fadeIn 0.15s ease'
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {[
-                                    '😊', '😂', '👍', '❤️', '🔥', '🎉', '👏',
-                                    '🙏', '✨', '🚀', '💯', '🤝', '✅', '❌',
-                                    '⚠️', '💡', '📦', '📄', '📞', '💬', '⏳',
-                                    '🎯', '😎', '🤩', '🤔', '😴', '🤐', '🙋‍♂️'
-                                  ].map((emo) => (
-                                    <button
-                                      key={emo}
-                                      type="button"
-                                      onClick={() => {
-                                        setInputMessage((prev) => prev + emo);
-                                        if (chatTextareaRef.current) chatTextareaRef.current.focus();
-                                      }}
-                                      style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        fontSize: '1.25rem',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        borderRadius: '6px',
-                                        textAlign: 'center'
-                                      }}
-                                      title={emo}
-                                    >
-                                      {emo}
-                                    </button>
-                                  ))}
-                                </div>
-                              </>
-                            )}
+                            <EmojiPickerPopover
+                              isOpen={showEmojiPicker}
+                              onClose={() => setShowEmojiPicker(false)}
+                              onSelectEmoji={(emo) => {
+                                setInputMessage((prev) => prev + emo);
+                                if (chatTextareaRef.current) chatTextareaRef.current.focus();
+                              }}
+                            />
                           </div>
                         </>
                       )}
