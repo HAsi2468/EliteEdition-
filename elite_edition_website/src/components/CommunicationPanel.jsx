@@ -5718,13 +5718,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           top: 4,
                           zIndex: 10,
                           display: 'flex',
+                          alignItems: 'center',
                           justifyContent: 'center',
+                          alignSelf: 'center',
+                          textAlign: 'center',
                           padding: '6px 0',
                           pointerEvents: 'none',
-                          width: '100%'
+                          width: '100%',
+                          maxWidth: '100%',
+                          left: 0,
+                          right: 0,
+                          margin: '0 auto'
                         }}
                       >
-                        <span className="phoenix-date-badge">
+                        <span className="phoenix-date-badge" style={{ margin: '0 auto', textAlign: 'center' }}>
                           {group.dateHeader}
                         </span>
                       </div>

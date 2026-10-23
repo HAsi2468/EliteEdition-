@@ -336,16 +336,25 @@
   top: 4px !important;
   z-index: 10 !important;
   display: flex !important;
+  align-items: center !important;
   justify-content: center !important;
+  text-align: center !important;
+  align-self: center !important;
   padding: 6px 0 !important;
   pointer-events: none !important;
   width: 100% !important;
+  max-width: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin: 0 auto !important;
 }
 
 .phoenix-date-badge {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  align-self: center !important;
+  text-align: center !important;
   background: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
