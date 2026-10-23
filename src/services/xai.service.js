@@ -1,12 +1,82 @@
 const axios = require('axios');
 const logger = require('../config/logger');
 
+// Polyfills for pdf-parse v2 DOMMatrix/ImageData/Path2D in Node.js
+if (!global.DOMMatrix) global.DOMMatrix = class {};
+if (!global.ImageData) global.ImageData = class {};
+if (!global.Path2D) global.Path2D = class {};
+
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_BASE_URL = 'https://api.x.ai/v1';
 
 // Preferred models verified against xAI active endpoints
 const FAST_MODEL = 'grok-4.20-0309-non-reasoning';
 const REASONING_MODEL = 'grok-4.20-0309-reasoning';
+
+/**
+ * Extract raw text or image from base64/file input
+ */
+async function extractFileTextOrVision(base64, rawText, fileName = 'File') {
+  let text = rawText ? String(rawText).trim() : '';
+  let imageBase64 = null;
+
+  if (base64 && typeof base64 === 'string') {
+    const isPdf = base64.startsWith('data:application/pdf') ||
+                  base64.includes('application/pdf') ||
+                  base64.substring(0, 50).includes('JVBERi0');
+    const isExcel = base64.includes('spreadsheet') ||
+                    base64.includes('excel') ||
+                    base64.substring(0, 50).includes('UEsDB');
+
+    if (isPdf) {
+      try {
+        const cleanBase64 = base64.replace(/^data:[^;]+;base64,/, '');
+        const pdfBuffer = Buffer.from(cleanBase64, 'base64');
+        const pdfModule = require('pdf-parse');
+        if (pdfModule && pdfModule.PDFParse) {
+          const parser = new pdfModule.PDFParse({ data: pdfBuffer });
+          await parser.load();
+          const parsed = await parser.getText();
+          if (parsed?.text && parsed.text.trim().length > 20) {
+            text = (text ? text + '\n\n' : '') + parsed.text.trim();
+          }
+          await parser.destroy();
+        } else if (typeof pdfModule === 'function') {
+          const parsed = await pdfModule(pdfBuffer);
+          if (parsed?.text && parsed.text.trim().length > 20) {
+            text = (text ? text + '\n\n' : '') + parsed.text.trim();
+          }
+        }
+      } catch (err) {
+        logger.warn(`PDF parse error for ${fileName}:`, err.message);
+      }
+    } else if (isExcel) {
+      try {
+        const ExcelJS = require('exceljs');
+        const cleanBase64 = base64.replace(/^data:[^;]+;base64,/, '');
+        const excelBuffer = Buffer.from(cleanBase64, 'base64');
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(excelBuffer);
+        let extractedExcelText = '';
+        workbook.eachSheet((worksheet) => {
+          worksheet.eachRow((row) => {
+            const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
+            extractedExcelText += vals.map(v => (v !== null && v !== undefined ? (typeof v === 'object' && v.text ? v.text : String(v)) : '')).join(' | ') + '\n';
+          });
+        });
+        if (extractedExcelText.trim().length > 10) {
+          text = (text ? text + '\n\n' : '') + extractedExcelText;
+        }
+      } catch (err) {
+        logger.warn(`Excel extraction error for ${fileName}:`, err.message);
+      }
+    } else if (base64.startsWith('data:image/')) {
+      imageBase64 = base64;
+    }
+  }
+
+  return { text, imageBase64 };
+}
 
 /**
  * Send chat completion to xAI Grok API
@@ -616,12 +686,214 @@ Please add credits at https://grok.com/?_s=usage to enable continuous deep gener
   }
 }
 
+/**
+ * Direct AI Bot Ledger Reconciliation
+ * Sends both files and user prompt directly to Grok Bot API
+ */
+async function aiDirectReconcileBothLedgers({
+  file1Base64,
+  file1Text = '',
+  file1Name = 'Elite Files',
+  file2Base64,
+  file2Text = '',
+  file2Name = 'Party / Vendor File',
+  userPrompt = 'muje ye dono ledger reconcilation karke do',
+  toleranceDays = 15,
+  toleranceAmount = 2.0
+}) {
+  logger.info(`Starting direct Grok Bot reconciliation: "${file1Name}" vs "${file2Name}" with prompt: "${userPrompt}"`);
+
+  // 1. Extract content of both files in parallel
+  const [f1, f2] = await Promise.all([
+    extractFileTextOrVision(file1Base64, file1Text, file1Name),
+    extractFileTextOrVision(file2Base64, file2Text, file2Name)
+  ]);
+
+  const f1Content = f1.text || 'File 1 content uploaded as image/document.';
+  const f2Content = f2.text || 'File 2 content uploaded as image/document.';
+
+  const systemPrompt = `You are an elite Chartered Accountant, Senior Forensic Auditor, and Financial Reconciler specializing in Indian Business Ledgers (Tally, Busy, GST, Debit/Credit cross-matching).
+
+You are given the complete text/data of TWO LEDGERS (File 1: ${file1Name} and File 2: ${file2Name}).
+The user has provided this reconciliation directive: "${userPrompt || 'muje ye dono ledger reconcilation karke do'}".
+
+ACCOUNTING RECONCILIATION RULES:
+1. Cross-matching rule: An entry Debited in File 1 (e.g. Sales / Invoices) corresponds to a Credit in File 2 (Purchase). An entry Credited in File 1 (e.g. Receipt / Payment) corresponds to a Debit in File 2 (Payment made / Bank).
+2. Match entries by Voucher / Invoice number and amount. Allow reasonable date differences (±${toleranceDays || 15} days).
+3. If voucher numbers differ or are missing, match by exact or near amount and narration.
+4. Amount difference: If vouchers match but amount differs (e.g., TDS, roundoff, price difference), classify as "discrepantItems" with difference and reason.
+5. Entries present only in File 1 -> "unmatchedErpItems".
+6. Entries present only in File 2 -> "unmatchedStatementItems".
+7. Extract all individual transactions into "stmt1Transactions" and "stmt2Transactions" with date, voucherNo, narration, debit, credit.
+8. Answer the user's prompt directly in "aiDirectVerdict" with a clear, professional, natural Hinglish/English explanation stating closing balances, net variance, matched count, missing bills, and clear action items.
+
+You MUST return a strictly valid JSON object matching this schema:
+{
+  "summary": {
+    "partyName": "${file1Name} vs ${file2Name}",
+    "partyType": "general",
+    "file1Party": "Name extracted from File 1",
+    "file2Party": "Name extracted from File 2",
+    "erpOpeningBalance": 0.0,
+    "erpClosingBalance": 0.0,
+    "erpTransactionsCount": 0,
+    "statementOpeningBalance": 0.0,
+    "statementClosingBalance": 0.0,
+    "statementTransactionsCount": 0,
+    "variance": 0.0,
+    "matchedCount": 0,
+    "probableCount": 0,
+    "discrepantCount": 0,
+    "unmatchedStatementCount": 0,
+    "unmatchedErpCount": 0
+  },
+  "stmt1Transactions": [
+    { "date": "YYYY-MM-DD", "voucherNo": "...", "narration": "...", "debit": 0.0, "credit": 0.0 }
+  ],
+  "stmt2Transactions": [
+    { "date": "YYYY-MM-DD", "voucherNo": "...", "narration": "...", "debit": 0.0, "credit": 0.0 }
+  ],
+  "matchedItems": [
+    {
+      "date": "YYYY-MM-DD",
+      "voucherNo": "...",
+      "narration": "...",
+      "erpDate": "...",
+      "erpVoucherNo": "...",
+      "erpNarration": "...",
+      "erpAmount": 0.0,
+      "statementAmount": 0.0,
+      "difference": 0.0,
+      "status": "MATCHED",
+      "notes": "Matched"
+    }
+  ],
+  "probableItems": [
+    {
+      "date": "YYYY-MM-DD",
+      "voucherNo": "...",
+      "narration": "...",
+      "erpAmount": 0.0,
+      "statementAmount": 0.0,
+      "difference": 0.0,
+      "status": "PROBABLE",
+      "notes": "..."
+    }
+  ],
+  "discrepantItems": [
+    {
+      "date": "YYYY-MM-DD",
+      "voucherNo": "...",
+      "narration": "...",
+      "erpAmount": 0.0,
+      "statementAmount": 0.0,
+      "difference": 0.0,
+      "status": "AMOUNT_DIFF",
+      "reason": "..."
+    }
+  ],
+  "unmatchedStatementItems": [
+    {
+      "date": "YYYY-MM-DD",
+      "voucherNo": "...",
+      "narration": "...",
+      "amount": 0.0,
+      "debit": 0.0,
+      "credit": 0.0,
+      "status": "UNMATCHED",
+      "notes": "Present only in ${file2Name}"
+    }
+  ],
+  "unmatchedErpItems": [
+    {
+      "date": "YYYY-MM-DD",
+      "voucherNo": "...",
+      "narration": "...",
+      "amount": 0.0,
+      "debit": 0.0,
+      "credit": 0.0,
+      "status": "UNMATCHED",
+      "notes": "Present only in ${file1Name}"
+    }
+  ],
+  "aiDirectVerdict": "Detailed natural language verdict addressing '${userPrompt}'",
+  "auditReport": {
+    "auditSummary": "...",
+    "rootCauses": [
+      { "title": "...", "description": "...", "impactAmount": 0.0 }
+    ],
+    "recommendedActions": [
+      { "action": "...", "targetAmount": 0.0, "instruction": "..." }
+    ]
+  }
+}`;
+
+  const userMessageContent = [];
+  const userText = `User Reconciliation Directive: "${userPrompt || 'muje ye dono ledger reconcilation karke do'}"
+
+=== FILE 1: ${file1Name} ===
+${f1Content.substring(0, 35000)}
+
+=== FILE 2: ${file2Name} ===
+${f2Content.substring(0, 35000)}`;
+
+  if (f1.imageBase64 && !f1.text) {
+    userMessageContent.push({ type: 'image_url', image_url: { url: f1.imageBase64 } });
+  }
+  if (f2.imageBase64 && !f2.text) {
+    userMessageContent.push({ type: 'image_url', image_url: { url: f2.imageBase64 } });
+  }
+  userMessageContent.push({ type: 'text', text: userText });
+
+  try {
+    const result = await chatCompletion({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessageContent.length === 1 ? userText : userMessageContent }
+      ],
+      model: FAST_MODEL,
+      temperature: 0.1,
+      responseFormat: { type: 'json_object' }
+    });
+
+    const cleaned = result.content.trim().replace(/^```json/i, '').replace(/```$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    parsed.success = true;
+    if (!parsed.summary) {
+      parsed.summary = {
+        partyName: `${file1Name} vs ${file2Name}`,
+        partyType: 'general',
+        erpClosingBalance: 0,
+        statementClosingBalance: 0,
+        variance: 0,
+        matchedCount: parsed.matchedItems?.length || 0,
+        probableCount: parsed.probableItems?.length || 0,
+        discrepantCount: parsed.discrepantItems?.length || 0,
+        unmatchedStatementCount: parsed.unmatchedStatementItems?.length || 0,
+        unmatchedErpCount: parsed.unmatchedErpItems?.length || 0
+      };
+    }
+    parsed.summary.matchedCount = parsed.matchedItems?.length || parsed.summary.matchedCount || 0;
+    parsed.summary.probableCount = parsed.probableItems?.length || parsed.summary.probableCount || 0;
+    parsed.summary.discrepantCount = parsed.discrepantItems?.length || parsed.summary.discrepantCount || 0;
+    parsed.summary.unmatchedStatementCount = parsed.unmatchedStatementItems?.length || parsed.summary.unmatchedStatementCount || 0;
+    parsed.summary.unmatchedErpCount = parsed.unmatchedErpItems?.length || parsed.summary.unmatchedErpCount || 0;
+
+    return parsed;
+  } catch (err) {
+    logger.error('Error during direct Grok bot reconciliation:', err.message);
+    throw err;
+  }
+}
+
 module.exports = {
   chatCompletion,
   parseStatementDocument,
   investigateDiscrepancies,
   generateSettlementNotice,
   copilotChat,
+  aiDirectReconcileBothLedgers,
   FAST_MODEL,
   REASONING_MODEL
 };

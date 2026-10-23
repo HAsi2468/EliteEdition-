@@ -443,11 +443,33 @@ async function reconcileDirectFiles({
   stmt2Transactions = [],
   stmt1OpeningBal = 0,
   stmt2OpeningBal = 0,
-  userPrompt = '',
-  toleranceDays = 20,
+  userPrompt = 'muje ye dono ledger reconcilation karke do',
+  toleranceDays = 15,
   toleranceAmount = 2.0
 }) {
-  logger.info(`Starting direct 2-file reconciliation: "${file1Name}" vs "${file2Name}"`);
+  logger.info(`Starting direct 2-file reconciliation: "${file1Name}" vs "${file2Name}" with prompt: "${userPrompt}"`);
+
+  // Direct AI Bot Reconciliation: Send both files & prompt straight to Grok Bot API
+  if ((file1Base64 || file1Text) && (file2Base64 || file2Text)) {
+    try {
+      const aiResult = await xaiService.aiDirectReconcileBothLedgers({
+        file1Base64,
+        file1Text,
+        file1Name,
+        file2Base64,
+        file2Text,
+        file2Name,
+        userPrompt,
+        toleranceDays,
+        toleranceAmount
+      });
+      if (aiResult && aiResult.success) {
+        return aiResult;
+      }
+    } catch (botErr) {
+      logger.warn('Direct AI bot call failed, falling back to local reconciliation engine:', botErr.message);
+    }
+  }
 
   // 1. Parallel extraction if transactions are not already provided
   const parsePromises = [];

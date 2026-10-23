@@ -287,13 +287,36 @@ export default function LedgerReconciliationPanel() {
     ]);
   };
 
+  // Helper to read file as Base64 string
+  const readFileAsBase64 = (file) => {
+    return new Promise((resolve) => {
+      if (!file) return resolve('');
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result || '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Run Direct AI Reconciliation (Sends both files + prompt directly to Bot API)
   const handleRunReconciliation = async () => {
     if (isReconcilingRef.current) return;
 
+    // Resolve base64 for both files if not yet loaded
+    let b64_1 = stmt1Base64;
+    if (!b64_1 && stmt1File) {
+      b64_1 = await readFileAsBase64(stmt1File);
+      if (b64_1) setStmt1Base64(b64_1);
+    }
+    let b64_2 = stmt2Base64;
+    if (!b64_2 && stmt2File) {
+      b64_2 = await readFileAsBase64(stmt2File);
+      if (b64_2) setStmt2Base64(b64_2);
+    }
+
     // Check if user has provided both File 1 and File 2
-    const hasStmt1 = !!stmt1File || !!stmt1Base64 || !!stmt1Text.trim() || (Array.isArray(stmt1Transactions) && stmt1Transactions.length > 0);
-    const hasStmt2 = !!stmt2File || !!stmt2Base64 || !!stmt2Text.trim() || (Array.isArray(stmt2Transactions) && stmt2Transactions.length > 0);
+    const hasStmt1 = !!stmt1File || !!b64_1 || !!stmt1Text.trim() || (Array.isArray(stmt1Transactions) && stmt1Transactions.length > 0);
+    const hasStmt2 = !!stmt2File || !!b64_2 || !!stmt2Text.trim() || (Array.isArray(stmt2Transactions) && stmt2Transactions.length > 0);
 
     if (!hasStmt1 || !hasStmt2) {
       alert('Please upload or select both files: Elite File (File 1) and Party / Vendor File (File 2) before reconciling.');
@@ -305,16 +328,16 @@ export default function LedgerReconciliationPanel() {
     try {
       // Parse custom prompt directives if present
       const daysMatch = reconciliationPrompt ? reconciliationPrompt.match(/(\d+)\s*days?/i) : null;
-      const toleranceDays = daysMatch ? Number(daysMatch[1]) : 20;
+      const toleranceDays = daysMatch ? Number(daysMatch[1]) : 15;
 
       const amtMatch = reconciliationPrompt ? reconciliationPrompt.match(/(?:₹|rs\.?|tolerance|diff)\s*(\d+(?:\.\d+)?)/i) : null;
       const toleranceAmount = amtMatch ? Number(amtMatch[1]) : 2.0;
 
       const payload = {
-        file1Base64: stmt1Base64,
+        file1Base64: b64_1,
         file1Text: stmt1Text,
         file1Name: stmt1Name || stmt1File?.name || 'Elite Files',
-        file2Base64: stmt2Base64,
+        file2Base64: b64_2,
         file2Text: stmt2Text,
         file2Name: stmt2Name || stmt2File?.name || 'Party / Vendor File',
         stmt1Transactions,
@@ -323,7 +346,7 @@ export default function LedgerReconciliationPanel() {
         stmt2OpeningBal,
         toleranceDays,
         toleranceAmount,
-        userPrompt: reconciliationPrompt
+        userPrompt: reconciliationPrompt || 'muje ye dono ledger reconcilation karke do'
       };
 
       const res = await api.reconcileDirectFiles(payload);
@@ -588,6 +611,10 @@ export default function LedgerReconciliationPanel() {
 
     return list;
   }, [reconciliationResult, activeFilterTab, matrixSearch]);
+
+  const hasInput1 = !!stmt1File || !!stmt1Base64 || !!stmt1Text.trim() || stmt1Transactions.length > 0;
+  const hasInput2 = !!stmt2File || !!stmt2Base64 || !!stmt2Text.trim() || stmt2Transactions.length > 0;
+  const canRunReconciliation = hasInput1 && hasInput2;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem', color: '#0f172a' }}>
@@ -1006,18 +1033,18 @@ export default function LedgerReconciliationPanel() {
           {/* Prominent Run Button */}
           <button
             onClick={handleRunReconciliation}
-            disabled={reconciling || (!stmt1File && !stmt1Base64 && !stmt1Text.trim() && !stmt1Transactions.length && !stmt2File && !stmt2Base64 && !stmt2Text.trim() && !stmt2Transactions.length)}
+            disabled={reconciling || !canRunReconciliation}
             style={{
               padding: '0.85rem 2rem',
               borderRadius: '12px',
               border: 'none',
-              background: reconciling || (!stmt1File && !stmt1Base64 && !stmt1Text.trim() && !stmt1Transactions.length && !stmt2File && !stmt2Base64 && !stmt2Text.trim() && !stmt2Transactions.length)
+              background: reconciling || !canRunReconciliation
                 ? '#94a3b8'
                 : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
               color: '#ffffff',
               fontWeight: 800,
               fontSize: '0.96rem',
-              cursor: reconciling || (!stmt1File && !stmt1Base64 && !stmt1Text.trim() && !stmt1Transactions.length && !stmt2File && !stmt2Base64 && !stmt2Text.trim() && !stmt2Transactions.length) ? 'not-allowed' : 'pointer',
+              cursor: reconciling || !canRunReconciliation ? 'not-allowed' : 'pointer',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
