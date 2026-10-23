@@ -39,7 +39,9 @@ function numToWords(amount) {
 // Helper for flexible company entity queries
 function buildCompanyFilter(companyEntity) {
   if (!companyEntity) return {};
-  const ce = String(companyEntity).trim();
+  let ce = String(companyEntity).trim();
+  if (ce === '[object Object]') return {};
+
   if (ce === 'Elite Edition') {
     return {
       $or: [
@@ -82,8 +84,13 @@ function buildCompanyFilter(companyEntity) {
         { invoiceNo: { $regex: '^EW', $options: 'i' } }
       ]
     };
-  } else {
-    // Elite Digital Print / Digital Print / Default
+  } else if (
+    ce === 'Elite Digital Print' ||
+    ce === 'Elite Digital Prints' ||
+    ce === 'edp' ||
+    ce === 'digital_print'
+  ) {
+    // Elite Digital Print / Digital Print
     return {
       $or: [
         { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
@@ -93,12 +100,18 @@ function buildCompanyFilter(companyEntity) {
         { invoiceNo: { $regex: '^EDP', $options: 'i' } }
       ]
     };
+  } else {
+    // Exact match for any other company entity to prevent leaking other company data
+    return {
+      companyEntity: ce
+    };
   }
 }
 
 function buildPurchaseCompanyFilter(companyEntity) {
   if (!companyEntity) return {};
   const ce = String(companyEntity).trim();
+  if (ce === '[object Object]') return {};
   if (ce === 'Elite Edition') {
     return {
       $or: [
@@ -157,11 +170,14 @@ function buildPurchaseCompanyFilter(companyEntity) {
 // ── 1. DASHBOARD STATS ────────────────────────────────────────────────────────
 const getBillingDashboardStats = async (req, res) => {
   try {
-    const { companyEntity } = req.query;
+    let { companyEntity } = req.query;
+    if (companyEntity === '[object Object]') {
+      companyEntity = '';
+    }
     const filter = buildCompanyFilter(companyEntity);
     const now = new Date();
 
-    const [totalInvoices, statsAgg] = await Promise.all([
+    const [totalInvoices, statsAgg, recentInvoices] = await Promise.all([
       BillingInvoice.countDocuments(filter),
       BillingInvoice.aggregate([
         { $match: filter },
@@ -197,7 +213,12 @@ const getBillingDashboardStats = async (req, res) => {
             }
           }
         }
-      ])
+      ]),
+      BillingInvoice.find(filter)
+        .sort({ invoiceDate: -1, createdAt: -1 })
+        .limit(10)
+        .populate('customer', 'name businessName phone gstNo')
+        .lean()
     ]);
 
     const s = (statsAgg && statsAgg[0]) ? statsAgg[0] : {};
@@ -219,7 +240,8 @@ const getBillingDashboardStats = async (req, res) => {
         paidCount: s.paidCount || 0,
         unpaidCount: s.unpaidCount || 0,
         partiallyPaidCount: s.partiallyPaidCount || 0,
-        overdueCount: s.overdueCount || 0
+        overdueCount: s.overdueCount || 0,
+        recentInvoices: recentInvoices || []
       }
     });
   } catch (error) {

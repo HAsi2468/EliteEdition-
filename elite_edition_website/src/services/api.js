@@ -2129,7 +2129,10 @@ export const api = {
 
   // ── Billing & Invoicing Department ───────────────────────────────────────
   async getBillingDashboardStats(companyEntity = 'Elite Online') {
-    return request(`/billing/dashboard-stats?companyEntity=${encodeURIComponent(companyEntity)}`);
+    const entity = typeof companyEntity === 'object' && companyEntity !== null
+      ? (companyEntity.companyEntity || 'Elite Online')
+      : companyEntity;
+    return request(`/billing/dashboard-stats?companyEntity=${encodeURIComponent(entity || 'Elite Online')}`);
   },
 
   async getBillingInvoices(params = {}) {

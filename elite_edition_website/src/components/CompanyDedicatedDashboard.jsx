@@ -53,7 +53,19 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
     setLoading(true);
     try {
       // 1. Fetch Billing Stats
-      const billingRes = await api.getBillingDashboardStats({ companyEntity });
+      const billingRes = await api.getBillingDashboardStats(companyEntity);
+      let recent = [];
+      try {
+        const invRes = await api.getBillingInvoices({ companyEntity, limit: 10 });
+        if (invRes && invRes.success && Array.isArray(invRes.data)) {
+          recent = invRes.data;
+        } else if (Array.isArray(invRes)) {
+          recent = invRes;
+        }
+      } catch (e) {
+        console.warn('Failed to load recent invoices:', e);
+      }
+
       if (billingRes && billingRes.success) {
         setStats({
           totalRevenue: billingRes.data?.totalRevenue || 0,
@@ -63,7 +75,9 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
           paidCount: billingRes.data?.paidCount || 0,
           unpaidCount: billingRes.data?.unpaidCount || 0,
           partiallyPaidCount: billingRes.data?.partiallyPaidCount || 0,
-          recentInvoices: billingRes.data?.recentInvoices || []
+          recentInvoices: (billingRes.data?.recentInvoices && billingRes.data.recentInvoices.length > 0)
+            ? billingRes.data.recentInvoices
+            : recent
         });
       }
 
@@ -118,6 +132,13 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
 
   const netProfitOrMargin = (stats.totalRevenue || 0) - (expenseStats.totalOut || 0);
 
+  const getInvoicesTab = (entity) => {
+    if (entity === 'Sobise') return 'so_invoices';
+    if (entity === 'Elite Fabtex') return 'ef_invoices';
+    if (entity === 'Ethno wear' || entity === 'ethno_wear' || entity === 'EW') return 'ew_invoices';
+    return 'ee_invoices';
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
       {/* 👑 Top Header Banner */}
@@ -143,7 +164,7 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button
-            onClick={() => onNavigate && onNavigate(companyEntity === 'Sobise' ? 'so_invoices' : companyEntity === 'Elite Fabtex' ? 'ef_invoices' : 'ee_invoices')}
+            onClick={() => onNavigate && onNavigate(getInvoicesTab(companyEntity))}
             className="btn-primary"
             style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
           >
@@ -273,7 +294,7 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
             </h3>
           </div>
           <button
-            onClick={() => onNavigate && onNavigate(companyEntity === 'Sobise' ? 'so_invoices' : companyEntity === 'Elite Fabtex' ? 'ef_invoices' : 'ee_invoices')}
+            onClick={() => onNavigate && onNavigate(getInvoicesTab(companyEntity))}
             style={{ background: 'none', border: 'none', color: accentColor, fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
             View All Invoices <ChevronRight size={14} />
