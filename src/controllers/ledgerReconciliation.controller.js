@@ -105,8 +105,34 @@ async function runReconciliation(req, res) {
       endDate,
       toleranceDays = 20,
       toleranceAmount = 1.0,
-      userPrompt = ''
+      userPrompt = '',
+      file1Base64,
+      file1Text,
+      file1Name,
+      file2Base64,
+      file2Text,
+      file2Name
     } = req.body;
+
+    // If direct files were passed, execute direct 2-file reconciliation
+    if ((file1Base64 || file1Text) && (file2Base64 || file2Text) && (!erpItems.length || !statementItems.length)) {
+      const directResult = await ledgerReconciliationService.reconcileDirectFiles({
+        file1Base64,
+        file1Text,
+        file1Name,
+        file2Base64,
+        file2Text,
+        file2Name,
+        stmt1Transactions: erpItems,
+        stmt2Transactions: statementItems,
+        stmt1OpeningBal: statementOpeningBalance,
+        stmt2OpeningBal: statementClosingBalance,
+        userPrompt,
+        toleranceDays,
+        toleranceAmount
+      });
+      return res.status(200).json(directResult);
+    }
 
     // 1. Use provided book entries directly or fetch from ERP if partyId provided
     let erpTransactions = Array.isArray(erpItems) && erpItems.length > 0 ? erpItems : [];
@@ -298,14 +324,61 @@ async function getSessionsHistory(req, res) {
   }
 }
 
+/**
+ * Direct 2-File AI Reconciliation Endpoint
+ * Accepts File 1 (Elite Files) + File 2 (Party / Other File) + user prompt
+ */
+async function reconcileDirectFiles(req, res) {
+  try {
+    const {
+      file1Base64,
+      file1Text,
+      file1Name = 'Elite Files',
+      file2Base64,
+      file2Text,
+      file2Name = 'Party / Vendor File',
+      stmt1Transactions = [],
+      stmt2Transactions = [],
+      stmt1OpeningBal = 0,
+      stmt2OpeningBal = 0,
+      userPrompt = '',
+      toleranceDays = 20,
+      toleranceAmount = 2.0
+    } = req.body;
+
+    const result = await ledgerReconciliationService.reconcileDirectFiles({
+      file1Base64,
+      file1Text,
+      file1Name,
+      file2Base64,
+      file2Text,
+      file2Name,
+      stmt1Transactions,
+      stmt2Transactions,
+      stmt1OpeningBal,
+      stmt2OpeningBal,
+      userPrompt,
+      toleranceDays,
+      toleranceAmount
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    logger.error('Error executing direct 2-file reconciliation:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   getParties,
   getErpLedger,
   parseStatement,
   runReconciliation,
+  reconcileDirectFiles,
   aiAuditDiscrepancies,
   generateSettlementNotice,
   copilotChat,
   saveSession,
   getSessionsHistory
 };
+

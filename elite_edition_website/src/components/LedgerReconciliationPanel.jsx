@@ -198,9 +198,11 @@ export default function LedgerReconciliationPanel() {
     const file = e.target.files?.[0];
     if (!file) return;
     setStmt1File(file);
+    if (!stmt1Name || stmt1Name === 'Elite Statement / ERP Ledger' || stmt1Name.includes('Statement 1')) {
+      setStmt1Name(file.name.replace(/\.[^/.]+$/, ''));
+    }
 
-    // If Excel or CSV, extract text and rows immediately via SheetJS
-    let localCsv = '';
+    // If Excel or CSV, extract text preview via SheetJS
     if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
       const reader = new FileReader();
       reader.onload = (ev) => {
@@ -209,7 +211,7 @@ export default function LedgerReconciliationPanel() {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          localCsv = XLSX.utils.sheet_to_csv(worksheet);
+          const localCsv = XLSX.utils.sheet_to_csv(worksheet);
           setStmt1Text(localCsv);
         } catch (err) {
           console.warn('SheetJS preview extraction error:', err);
@@ -222,8 +224,6 @@ export default function LedgerReconciliationPanel() {
     reader.onload = (ev) => {
       const b64 = ev.target.result;
       setStmt1Base64(b64);
-      // Auto-trigger Grok extraction on upload
-      parseStmt1WithData(b64, localCsv);
     };
     reader.readAsDataURL(file);
   };
@@ -233,9 +233,11 @@ export default function LedgerReconciliationPanel() {
     const file = e.target.files?.[0];
     if (!file) return;
     setStmt2File(file);
+    if (!stmt2Name || stmt2Name === 'Party / Vendor OR Other file' || stmt2Name.includes('Statement 2')) {
+      setStmt2Name(file.name.replace(/\.[^/.]+$/, ''));
+    }
 
-    // If Excel or CSV, extract text and rows immediately via SheetJS
-    let localCsv = '';
+    // If Excel or CSV, extract text preview via SheetJS
     if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
       const reader = new FileReader();
       reader.onload = (ev) => {
@@ -244,7 +246,7 @@ export default function LedgerReconciliationPanel() {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          localCsv = XLSX.utils.sheet_to_csv(worksheet);
+          const localCsv = XLSX.utils.sheet_to_csv(worksheet);
           setStmt2Text(localCsv);
         } catch (err) {
           console.warn('SheetJS preview extraction error:', err);
@@ -257,16 +259,14 @@ export default function LedgerReconciliationPanel() {
     reader.onload = (ev) => {
       const b64 = ev.target.result;
       setStmt2Base64(b64);
-      // Auto-trigger Grok extraction on upload
-      parseStmt2WithData(b64, localCsv);
     };
     reader.readAsDataURL(file);
   };
 
-  // Parse Statement 1 via Grok AI button
+  // Parse Statement 1 via Grok AI button (optional preview)
   const handleParseStmt1 = () => parseStmt1WithData();
 
-  // Parse Statement 2 via Grok AI button
+  // Parse Statement 2 via Grok AI button (optional preview)
   const handleParseStmt2 = () => parseStmt2WithData();
 
   // Add Manual Row to Statement 1
@@ -287,40 +287,22 @@ export default function LedgerReconciliationPanel() {
     ]);
   };
 
-  // Run AI 3-Way Reconciliation
+  // Run Direct AI Reconciliation (Sends both files + prompt directly to Bot API)
   const handleRunReconciliation = async () => {
     if (isReconcilingRef.current) return;
+
+    // Check if user has provided both File 1 and File 2
+    const hasStmt1 = !!stmt1File || !!stmt1Base64 || !!stmt1Text.trim() || (Array.isArray(stmt1Transactions) && stmt1Transactions.length > 0);
+    const hasStmt2 = !!stmt2File || !!stmt2Base64 || !!stmt2Text.trim() || (Array.isArray(stmt2Transactions) && stmt2Transactions.length > 0);
+
+    if (!hasStmt1 || !hasStmt2) {
+      alert('Please upload or select both files: Elite File (File 1) and Party / Vendor File (File 2) before reconciling.');
+      return;
+    }
+
     isReconcilingRef.current = true;
     setReconciling(true);
     try {
-      let t1 = stmt1Transactions;
-      let t2 = stmt2Transactions;
-
-      // Parallelize AI statement extraction so both files parse simultaneously in half the time
-      const parseTasks = [];
-      if (!t1.length && (stmt1Base64 || stmt1Text.trim())) {
-        parseTasks.push(parseStmt1WithData().then((res) => { if (Array.isArray(res)) t1 = res; }));
-      }
-      if (!t2.length && (stmt2Base64 || stmt2Text.trim())) {
-        parseTasks.push(parseStmt2WithData().then((res) => { if (Array.isArray(res)) t2 = res; }));
-      }
-      if (parseTasks.length > 0) {
-        await Promise.all(parseTasks);
-      }
-
-      if (!t1.length && !t2.length) {
-        alert('Please upload or paste data for Elite Files and Party / Other File before reconciling.');
-        return;
-      }
-
-      const totalDebit1 = t1.reduce((acc, t) => acc + (Number(t.debit) || 0), 0);
-      const totalCredit1 = t1.reduce((acc, t) => acc + (Number(t.credit) || 0), 0);
-      const netBal1 = Number(stmt1OpeningBal || 0) + (totalDebit1 - totalCredit1);
-
-      const totalDebit2 = t2.reduce((acc, t) => acc + (Number(t.debit) || 0), 0);
-      const totalCredit2 = t2.reduce((acc, t) => acc + (Number(t.credit) || 0), 0);
-      const netBal2 = Number(stmt2OpeningBal || 0) + (totalDebit2 - totalCredit2);
-
       // Parse custom prompt directives if present
       const daysMatch = reconciliationPrompt ? reconciliationPrompt.match(/(\d+)\s*days?/i) : null;
       const toleranceDays = daysMatch ? Number(daysMatch[1]) : 20;
@@ -329,22 +311,38 @@ export default function LedgerReconciliationPanel() {
       const toleranceAmount = amtMatch ? Number(amtMatch[1]) : 2.0;
 
       const payload = {
-        partyType: 'general',
-        partyName: `${stmt1Name} vs ${stmt2Name}`,
-        statementItems: t2, // Counterparty
-        erpItems: t1, // Internal / Elite Files
-        statementOpeningBalance: stmt2OpeningBal,
-        statementClosingBalance: netBal2,
-        erpOpeningBalance: stmt1OpeningBal,
-        erpClosingBalance: netBal1,
+        file1Base64: stmt1Base64,
+        file1Text: stmt1Text,
+        file1Name: stmt1Name || stmt1File?.name || 'Elite Files',
+        file2Base64: stmt2Base64,
+        file2Text: stmt2Text,
+        file2Name: stmt2Name || stmt2File?.name || 'Party / Vendor File',
+        stmt1Transactions,
+        stmt2Transactions,
+        stmt1OpeningBal,
+        stmt2OpeningBal,
         toleranceDays,
         toleranceAmount,
         userPrompt: reconciliationPrompt
       };
 
-      const res = await api.runReconciliationMatching(payload);
+      const res = await api.reconcileDirectFiles(payload);
       if (res?.success) {
+        // Automatically populate extracted transactions into the grids
+        if (Array.isArray(res.stmt1Transactions) && res.stmt1Transactions.length > 0) {
+          setStmt1Transactions(res.stmt1Transactions);
+        }
+        if (Array.isArray(res.stmt2Transactions) && res.stmt2Transactions.length > 0) {
+          setStmt2Transactions(res.stmt2Transactions);
+        }
+        if (res.stmt1OpeningBal !== undefined) setStmt1OpeningBal(Number(res.stmt1OpeningBal) || 0);
+        if (res.stmt2OpeningBal !== undefined) setStmt2OpeningBal(Number(res.stmt2OpeningBal) || 0);
+
         setReconciliationResult(res);
+
+        if (res.auditReport) {
+          setAuditReport(res.auditReport);
+        }
       } else {
         alert(res?.message || 'Reconciliation failed.');
       }
@@ -1006,18 +1004,18 @@ export default function LedgerReconciliationPanel() {
           {/* Prominent Run Button */}
           <button
             onClick={handleRunReconciliation}
-            disabled={reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim())}
+            disabled={reconciling || (!stmt1File && !stmt1Base64 && !stmt1Text.trim() && !stmt1Transactions.length && !stmt2File && !stmt2Base64 && !stmt2Text.trim() && !stmt2Transactions.length)}
             style={{
               padding: '0.85rem 2rem',
               borderRadius: '12px',
               border: 'none',
-              background: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim())
+              background: reconciling || (!stmt1File && !stmt1Base64 && !stmt1Text.trim() && !stmt1Transactions.length && !stmt2File && !stmt2Base64 && !stmt2Text.trim() && !stmt2Transactions.length)
                 ? '#94a3b8'
                 : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
               color: '#ffffff',
               fontWeight: 800,
               fontSize: '0.96rem',
-              cursor: reconciling || (!stmt1Transactions.length && !stmt1Base64 && !stmt1Text.trim() && !stmt2Transactions.length && !stmt2Base64 && !stmt2Text.trim()) ? 'not-allowed' : 'pointer',
+              cursor: reconciling || (!stmt1File && !stmt1Base64 && !stmt1Text.trim() && !stmt1Transactions.length && !stmt2File && !stmt2Base64 && !stmt2Text.trim() && !stmt2Transactions.length) ? 'not-allowed' : 'pointer',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -1042,6 +1040,31 @@ export default function LedgerReconciliationPanel() {
       {/* ── RECONCILIATION RESULTS DASHBOARD ────────────────────────────────── */}
       {reconciliationResult && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* AI Direct Prompt Verdict Banner */}
+          {reconciliationResult.aiDirectVerdict && (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                border: '1.5px solid #a7f3d0',
+                borderRadius: '12px',
+                padding: '0.95rem 1.25rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.75rem',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)'
+              }}
+            >
+              <Sparkles size={20} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#047857', letterSpacing: '0.04em' }}>
+                  ELITE AI PROMPT ANALYSIS &amp; VERDICT
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#064e3b', marginTop: '3px', lineHeight: 1.45, fontWeight: 600 }}>
+                  {reconciliationResult.aiDirectVerdict}
+                </div>
+              </div>
+            </div>
+          )}
           {/* KPI Summary Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
             {/* Book 1 Balance */}

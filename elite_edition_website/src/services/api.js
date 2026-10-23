@@ -3373,6 +3373,13 @@ export const api = {
     });
   },
 
+  async reconcileDirectFiles(payload) {
+    return request('/ledger-reconciliation/reconcile-direct', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
   async runGrokForensicAudit(payload) {
     return request('/ledger-reconciliation/ai-audit', {
       method: 'POST',

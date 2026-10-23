@@ -426,8 +426,166 @@ function reconcileTransactions(statementItems = [], erpItems = [], partyType = '
   };
 }
 
+/**
+ * Direct 2-File AI Reconciliation with optional user prompt
+ * Accepts File 1 (Elite Files) + File 2 (Party File) + custom user prompt
+ * Automatically extracts data directly via Grok / PDF parser in parallel,
+ * performs mathematical matching, and evaluates user prompt directives.
+ */
+async function reconcileDirectFiles({
+  file1Base64,
+  file1Text = '',
+  file1Name = 'Elite Files',
+  file2Base64,
+  file2Text = '',
+  file2Name = 'Party / Vendor File',
+  stmt1Transactions = [],
+  stmt2Transactions = [],
+  stmt1OpeningBal = 0,
+  stmt2OpeningBal = 0,
+  userPrompt = '',
+  toleranceDays = 20,
+  toleranceAmount = 2.0
+}) {
+  logger.info(`Starting direct 2-file reconciliation: "${file1Name}" vs "${file2Name}"`);
+
+  // 1. Parallel extraction if transactions are not already provided
+  const parsePromises = [];
+
+  // File 1 (Elite Files)
+  if (Array.isArray(stmt1Transactions) && stmt1Transactions.length > 0) {
+    parsePromises.push(Promise.resolve({
+      transactions: stmt1Transactions,
+      openingBalance: Number(stmt1OpeningBal) || 0
+    }));
+  } else if (file1Base64 || file1Text.trim()) {
+    parsePromises.push(
+      xaiService.parseStatementDocument({
+        rawText: file1Text,
+        imageBase64: file1Base64,
+        partyType: 'general',
+        partyName: file1Name
+      }).catch(err => {
+        logger.error(`Error parsing File 1 (${file1Name}):`, err);
+        return { transactions: [], openingBalance: 0 };
+      })
+    );
+  } else {
+    parsePromises.push(Promise.resolve({ transactions: [], openingBalance: 0 }));
+  }
+
+  // File 2 (Party / Counterparty File)
+  if (Array.isArray(stmt2Transactions) && stmt2Transactions.length > 0) {
+    parsePromises.push(Promise.resolve({
+      transactions: stmt2Transactions,
+      openingBalance: Number(stmt2OpeningBal) || 0
+    }));
+  } else if (file2Base64 || file2Text.trim()) {
+    parsePromises.push(
+      xaiService.parseStatementDocument({
+        rawText: file2Text,
+        imageBase64: file2Base64,
+        partyType: 'general',
+        partyName: file2Name
+      }).catch(err => {
+        logger.error(`Error parsing File 2 (${file2Name}):`, err);
+        return { transactions: [], openingBalance: 0 };
+      })
+    );
+  } else {
+    parsePromises.push(Promise.resolve({ transactions: [], openingBalance: 0 }));
+  }
+
+  const [res1, res2] = await Promise.all(parsePromises);
+
+  const t1 = res1?.transactions || [];
+  const t2 = res2?.transactions || [];
+  const op1 = Number(res1?.openingBalance ?? stmt1OpeningBal) || 0;
+  const op2 = Number(res2?.openingBalance ?? stmt2OpeningBal) || 0;
+
+  // 2. Parse prompt tolerances if specified
+  let effectiveTolDays = toleranceDays;
+  let effectiveTolAmt = toleranceAmount;
+  if (userPrompt) {
+    const daysMatch = userPrompt.match(/(\d+)\s*days?/i);
+    if (daysMatch) effectiveTolDays = Number(daysMatch[1]);
+    const amtMatch = userPrompt.match(/(?:₹|rs\.?|tolerance|diff)\s*(\d+(?:\.\d+)?)/i);
+    if (amtMatch) effectiveTolAmt = Number(amtMatch[1]);
+  }
+
+  // 3. Mathematical reconciliation matching
+  const matchResults = reconcileTransactions(t2, t1, 'general', {
+    toleranceDays: effectiveTolDays,
+    toleranceAmount: effectiveTolAmt,
+    userPrompt
+  });
+
+  const totalDebit1 = t1.reduce((acc, t) => acc + (Number(t.debit) || 0), 0);
+  const totalCredit1 = t1.reduce((acc, t) => acc + (Number(t.credit) || 0), 0);
+  const closing1 = op1 + (totalDebit1 - totalCredit1);
+
+  const totalDebit2 = t2.reduce((acc, t) => acc + (Number(t.debit) || 0), 0);
+  const totalCredit2 = t2.reduce((acc, t) => acc + (Number(t.credit) || 0), 0);
+  const closing2 = op2 + (totalDebit2 - totalCredit2);
+
+  const variance = closing1 - closing2;
+
+  // 4. If prompt provided or discrepancy exists, call Grok for deep audit insights
+  let auditReport = null;
+  if (userPrompt || matchResults.discrepantItems.length > 0 || Math.abs(variance) > 0.01) {
+    try {
+      auditReport = await xaiService.investigateDiscrepancies({
+        partyName: `${file1Name} vs ${file2Name}`,
+        partyType: 'general',
+        erpClosingBalance: closing1,
+        statementClosingBalance: closing2,
+        variance,
+        unmatchedStatementItems: matchResults.unmatchedStatementItems.slice(0, 50),
+        unmatchedErpItems: matchResults.unmatchedErpItems.slice(0, 50),
+        discrepantItems: matchResults.discrepantItems.slice(0, 50),
+        userPrompt
+      });
+    } catch (auditErr) {
+      logger.warn('AI audit skipped or failed:', auditErr.message);
+    }
+  }
+
+  return {
+    success: true,
+    summary: {
+      partyName: `${file1Name} vs ${file2Name}`,
+      partyType: 'general',
+      erpTransactionsCount: t1.length,
+      statementTransactionsCount: t2.length,
+      erpOpeningBalance: op1,
+      erpClosingBalance: closing1,
+      statementOpeningBalance: op2,
+      statementClosingBalance: closing2,
+      variance,
+      matchedCount: matchResults.matchedItems.length,
+      probableCount: matchResults.probableItems.length,
+      discrepantCount: matchResults.discrepantItems.length,
+      unmatchedStatementCount: matchResults.unmatchedStatementItems.length,
+      unmatchedErpCount: matchResults.unmatchedErpItems.length,
+      userPromptApplied: !!userPrompt
+    },
+    matchedItems: matchResults.matchedItems,
+    probableItems: matchResults.probableItems,
+    discrepantItems: matchResults.discrepantItems,
+    unmatchedStatementItems: matchResults.unmatchedStatementItems,
+    unmatchedErpItems: matchResults.unmatchedErpItems,
+    stmt1Transactions: t1,
+    stmt2Transactions: t2,
+    stmt1OpeningBal: op1,
+    stmt2OpeningBal: op2,
+    auditReport,
+    aiDirectVerdict: auditReport?.auditSummary || `Reconciliation complete: ${matchResults.matchedItems.length} matched, ${matchResults.unmatchedStatementItems.length + matchResults.unmatchedErpItems.length} unmatched entries.`
+  };
+}
+
 module.exports = {
   getPartiesList,
   fetchErpTransactions,
-  reconcileTransactions
+  reconcileTransactions,
+  reconcileDirectFiles
 };
