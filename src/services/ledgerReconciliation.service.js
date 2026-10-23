@@ -449,81 +449,66 @@ async function reconcileDirectFiles({
 }) {
   logger.info(`Starting direct 2-file reconciliation: "${file1Name}" vs "${file2Name}" with prompt: "${userPrompt}"`);
 
-  // Direct AI Bot Reconciliation: Send both files & prompt straight to Grok Bot API
-  if ((file1Base64 || file1Text) && (file2Base64 || file2Text)) {
-    try {
-      const aiResult = await xaiService.aiDirectReconcileBothLedgers({
-        file1Base64,
-        file1Text,
-        file1Name,
-        file2Base64,
-        file2Text,
-        file2Name,
-        userPrompt,
-        toleranceDays,
-        toleranceAmount
-      });
-      if (aiResult && aiResult.success) {
-        return aiResult;
+  // 1. Extract content from both files in parallel (PDF/Excel text stream extraction takes < 500ms)
+  let t1 = Array.isArray(stmt1Transactions) && stmt1Transactions.length > 0 ? stmt1Transactions : [];
+  let t2 = Array.isArray(stmt2Transactions) && stmt2Transactions.length > 0 ? stmt2Transactions : [];
+  let op1 = Number(stmt1OpeningBal) || 0;
+  let op2 = Number(stmt2OpeningBal) || 0;
+
+  let f1Text = file1Text || '';
+  let f2Text = file2Text || '';
+
+  if (t1.length === 0 && (file1Base64 || file1Text)) {
+    const f1Extracted = await xaiService.extractFileTextOrVision(file1Base64, file1Text, file1Name);
+    f1Text = f1Extracted.text || '';
+    if (f1Text.trim().length > 30) {
+      const h1 = xaiService.parseTextStreamHeuristic(f1Text, file1Name);
+      if (h1 && h1.transactions && h1.transactions.length > 2) {
+        t1 = h1.transactions;
+        if (h1.openingBalance) op1 = h1.openingBalance;
       }
-    } catch (botErr) {
-      logger.warn('Direct AI bot call failed, falling back to local reconciliation engine:', botErr.message);
+    }
+    if (t1.length === 0) {
+      try {
+        const parsed1 = await xaiService.parseStatementDocument({
+          rawText: f1Text,
+          imageBase64: file1Base64,
+          partyType: 'general',
+          partyName: file1Name
+        });
+        t1 = parsed1.transactions || [];
+        if (parsed1.openingBalance) op1 = parsed1.openingBalance;
+      } catch (err) {
+        logger.error(`Error parsing File 1 (${file1Name}):`, err);
+      }
     }
   }
 
-  // 1. Parallel extraction if transactions are not already provided
-  const parsePromises = [];
-
-  // File 1 (Elite Files)
-  if (Array.isArray(stmt1Transactions) && stmt1Transactions.length > 0) {
-    parsePromises.push(Promise.resolve({
-      transactions: stmt1Transactions,
-      openingBalance: Number(stmt1OpeningBal) || 0
-    }));
-  } else if (file1Base64 || file1Text.trim()) {
-    parsePromises.push(
-      xaiService.parseStatementDocument({
-        rawText: file1Text,
-        imageBase64: file1Base64,
-        partyType: 'general',
-        partyName: file1Name
-      }).catch(err => {
-        logger.error(`Error parsing File 1 (${file1Name}):`, err);
-        return { transactions: [], openingBalance: 0 };
-      })
-    );
-  } else {
-    parsePromises.push(Promise.resolve({ transactions: [], openingBalance: 0 }));
-  }
-
-  // File 2 (Party / Counterparty File)
-  if (Array.isArray(stmt2Transactions) && stmt2Transactions.length > 0) {
-    parsePromises.push(Promise.resolve({
-      transactions: stmt2Transactions,
-      openingBalance: Number(stmt2OpeningBal) || 0
-    }));
-  } else if (file2Base64 || file2Text.trim()) {
-    parsePromises.push(
-      xaiService.parseStatementDocument({
-        rawText: file2Text,
-        imageBase64: file2Base64,
-        partyType: 'general',
-        partyName: file2Name
-      }).catch(err => {
+  if (t2.length === 0 && (file2Base64 || file2Text)) {
+    const f2Extracted = await xaiService.extractFileTextOrVision(file2Base64, file2Text, file2Name);
+    f2Text = f2Extracted.text || '';
+    if (f2Text.trim().length > 30) {
+      const h2 = xaiService.parseTextStreamHeuristic(f2Text, file2Name);
+      if (h2 && h2.transactions && h2.transactions.length > 2) {
+        t2 = h2.transactions;
+        if (h2.openingBalance) op2 = h2.openingBalance;
+      }
+    }
+    if (t2.length === 0) {
+      try {
+        const parsed2 = await xaiService.parseStatementDocument({
+          rawText: f2Text,
+          imageBase64: file2Base64,
+          partyType: 'general',
+          partyName: file2Name
+        });
+        t2 = parsed2.transactions || [];
+        if (parsed2.openingBalance) op2 = parsed2.openingBalance;
+      } catch (err) {
         logger.error(`Error parsing File 2 (${file2Name}):`, err);
-        return { transactions: [], openingBalance: 0 };
-      })
-    );
-  } else {
-    parsePromises.push(Promise.resolve({ transactions: [], openingBalance: 0 }));
+      }
+    }
   }
-
-  const [res1, res2] = await Promise.all(parsePromises);
-
-  const t1 = res1?.transactions || [];
-  const t2 = res2?.transactions || [];
-  const op1 = Number(res1?.openingBalance ?? stmt1OpeningBal) || 0;
-  const op2 = Number(res2?.openingBalance ?? stmt2OpeningBal) || 0;
 
   // 2. Parse prompt tolerances if specified
   let effectiveTolDays = toleranceDays;

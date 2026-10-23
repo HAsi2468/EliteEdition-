@@ -105,7 +105,7 @@ async function chatCompletion({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${XAI_API_KEY}`
       },
-      timeout: 60000
+      timeout: 180000
     });
 
     const choice = response.data?.choices?.[0];
@@ -889,6 +889,8 @@ ${f2Content.substring(0, 35000)}`;
 
 module.exports = {
   chatCompletion,
+  extractFileTextOrVision,
+  parseTextStreamHeuristic,
   parseStatementDocument,
   investigateDiscrepancies,
   generateSettlementNotice,
