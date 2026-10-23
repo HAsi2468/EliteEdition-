@@ -2860,7 +2860,8 @@ export default function EliteBillingDepartment({
 
   // ── INVOICE EDITOR STATE (myBillBook style) ──────────────────────────────
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
-  const [invoiceForm, setInvoiceForm] = useState({
+  const [invoiceForm, setInvoiceForm] = useState(() => ({
+    issuingCompany: companyEntity || 'Elite Edition',
     invoiceNo: '',
     invoiceSeq: 1001,
     ourChallanNo: '',
@@ -2878,7 +2879,9 @@ export default function EliteBillingDepartment({
       state: 'Gujarat',
       stateCode: '24'
     },
-    items: [
+    items: isCorporateEntity ? [
+      { itemName: '', hsnCode: '', qty: 1, unit: 'Pcs', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
+    ] : [
       { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', ourChallanNo: '', imageUrl: '', totalAmount: 4500 }
     ],
     isButterPaperUsed: false,
@@ -2893,9 +2896,11 @@ export default function EliteBillingDepartment({
     discountValue: 0,
     taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
     paidAmount: 0,
-    notes: 'Thank you for doing business with Elite Digital Prints!',
+    notes: `Thank you for doing business with ${companyEntity || 'Elite Edition'}!`,
     terms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.'
-  });
+  }));
+
+  const isCorporateInvoice = ['Sobise', 'Elite Edition', 'Elite Fabtex'].includes(invoiceForm.issuingCompany || companyEntity);
 
   // ── Debounced Search to Prevent Request Flooding ───────────────────────────
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -3115,16 +3120,20 @@ export default function EliteBillingDepartment({
         const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
 
         setInvoiceForm({
-          invoiceNo: nextRes.invoiceNo || 'EDP/26-27/1001',
+          issuingCompany: companyEntity || 'Elite Edition',
+          invoiceNo: nextRes.invoiceNo || (isCorporateEntity ? 'EE-2627-0001' : 'EDP/26-27/1001'),
           invoiceSeq: nextRes.nextSeq || 1001,
           invoiceDate: new Date().toISOString().split('T')[0],
           dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
           customer: customers[0] ? { ...customers[0] } : {
             customerId: '', name: 'Walk-in Client', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
           },
-          items: [
-            { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, totalAmount: 4500 }
+          items: isCorporateEntity ? [
+            { itemName: '', hsnCode: '', qty: 1, unit: 'Pcs', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
+          ] : [
+            { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, butterPaper: false, totalAmount: 4500 }
           ],
+          isButterPaperUsed: false,
           enableRoundOff: true,
           enableTds: true,
           tdsSection: '194C',
@@ -3136,7 +3145,7 @@ export default function EliteBillingDepartment({
           discountValue: 0,
           taxType: 'CGST_SGST',
           paidAmount: 0,
-          notes: 'Thank you for doing business with Elite Digital Prints!',
+          notes: `Thank you for doing business with ${companyEntity || 'Elite Edition'}!`,
           terms: termsStr
         });
         setActiveTab('create');
@@ -3330,7 +3339,26 @@ export default function EliteBillingDepartment({
       ...prev,
       items: [
         ...prev.items,
-        { itemName: '', hsnCode: '998821', qty: 1, unit: 'Meters', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
+        isCorporateEntity ? {
+          itemName: '',
+          hsnCode: '',
+          qty: 1,
+          unit: 'Pcs',
+          unitPrice: 0,
+          discountPct: 0,
+          taxRate: 5,
+          totalAmount: 0
+        } : {
+          itemName: '',
+          hsnCode: '998821',
+          qty: 1,
+          unit: 'Meters',
+          unitPrice: 0,
+          discountPct: 0,
+          taxRate: 5,
+          butterPaper: false,
+          totalAmount: 0
+        }
       ]
     }));
   };
@@ -3551,7 +3579,7 @@ export default function EliteBillingDepartment({
       const { manualRoundOff, manualTdsAmount, _tdsPreset, ...formRest } = invoiceForm;
       const payload = {
         ...formRest,
-        companyEntity: companyEntity || 'Elite Digital Print',
+        companyEntity: invoiceForm.issuingCompany || companyEntity || 'Elite Edition',
         items: calculatedInvoice.items,
         subtotal: calculatedInvoice.subtotal,
         discountTotal: calculatedInvoice.discountTotal,
@@ -4462,20 +4490,32 @@ export default function EliteBillingDepartment({
           {/* Core Metadata */}
           <div id="inv-sec-meta" data-form-section="true" data-section-title="Metadata & Taxes" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={{ ...labelStyle, color: '#60a5fa', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
+              <label style={{ ...labelStyle, color: '#7c3aed', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
               <select
-                value="Elite Digital Print"
-                disabled
+                value={invoiceForm.issuingCompany || companyEntity || 'Elite Edition'}
+                onChange={e => {
+                  const selected = e.target.value;
+                  setInvoiceForm(f => ({ ...f, issuingCompany: selected }));
+                  api.getNextInvoiceNo(selected).then(nextRes => {
+                    if (nextRes?.invoiceNo) {
+                      setInvoiceForm(f => ({ ...f, invoiceNo: nextRes.invoiceNo, invoiceSeq: nextRes.nextSeq }));
+                    }
+                  }).catch(() => {});
+                }}
                 style={{
                   ...inputStyle,
                   fontWeight: '800',
-                  color: '#60a5fa',
-                  background: 'rgba(96, 165, 250, 0.12)',
-                  border: '1px solid rgba(96, 165, 250, 0.4)',
-                  cursor: 'not-allowed'
+                  color: '#7c3aed',
+                  background: 'rgba(124, 58, 237, 0.08)',
+                  border: '1px solid rgba(124, 58, 237, 0.4)',
+                  cursor: 'pointer'
                 }}
               >
-                <option value="Elite Digital Print">🏢 Elite Digital Print</option>
+                <option value="Elite Edition">🏢 Elite Edition</option>
+                <option value="Elite Digital Prints">🏢 Elite Digital Prints</option>
+                <option value="Elite Fabtex">🏢 Elite Fabtex</option>
+                <option value="Sobise">🏢 Sobise</option>
+                <option value="Elite Stitching">🏢 Elite Stitching</option>
               </select>
             </div>
             <div>
@@ -4493,7 +4533,7 @@ export default function EliteBillingDepartment({
                 type="text"
                 value={invoiceForm.ourChallanNo || ''}
                 onChange={e => setInvoiceForm(f => ({ ...f, ourChallanNo: e.target.value }))}
-                placeholder="e.g. EDP-101"
+                placeholder={isCorporateInvoice ? "e.g. EE/DC/001" : "e.g. EDP-101"}
                 style={inputStyle}
               />
             </div>
@@ -4599,43 +4639,47 @@ export default function EliteBillingDepartment({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>📦 Invoice Line Items</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', cursor: 'pointer', background: 'rgba(251,191,36,0.12)', padding: '0.3rem 0.65rem', borderRadius: '5px', border: '1px solid rgba(251,191,36,0.3)' }}>
-                  <input
-                    type="checkbox"
-                    checked={invoiceForm.items.length > 0 && invoiceForm.items.every(it => it.butterPaper)}
-                    ref={el => { if (el) el.indeterminate = invoiceForm.items.some(it => it.butterPaper) && !invoiceForm.items.every(it => it.butterPaper); }}
-                    onChange={e => {
-                      const checked = e.target.checked;
-                      setInvoiceForm(f => ({
-                        ...f,
-                        isButterPaperUsed: checked,
-                        items: f.items.map(item => ({ ...item, butterPaper: checked }))
-                      }));
-                    }}
-                  />
-                  🧈 Butter Paper Used (+ ₹3/m Rate)
-                </label>
+                {!isCorporateInvoice && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', cursor: 'pointer', background: 'rgba(251,191,36,0.12)', padding: '0.3rem 0.65rem', borderRadius: '5px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                    <input
+                      type="checkbox"
+                      checked={invoiceForm.items.length > 0 && invoiceForm.items.every(it => it.butterPaper)}
+                      ref={el => { if (el) el.indeterminate = invoiceForm.items.some(it => it.butterPaper) && !invoiceForm.items.every(it => it.butterPaper); }}
+                      onChange={e => {
+                        const checked = e.target.checked;
+                        setInvoiceForm(f => ({
+                          ...f,
+                          isButterPaperUsed: checked,
+                          items: f.items.map(item => ({ ...item, butterPaper: checked }))
+                        }));
+                      }}
+                    />
+                    🧈 Butter Paper Used (+ ₹3/m Rate)
+                  </label>
+                )}
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={handleResyncMetersFromChallans}
-                    className="btn-secondary"
-                    style={{
-                      padding: '0.35rem 0.8rem',
-                      fontSize: '0.75rem',
-                      color: '#38bdf8',
-                      borderColor: 'rgba(56, 189, 248, 0.4)',
-                      background: 'rgba(56, 189, 248, 0.12)',
-                      fontWeight: 700,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.3rem'
-                    }}
-                    title="Fetch latest metres, fabric name & job details from linked Delivery Challan(s)"
-                  >
-                    <RefreshCw size={13} /> 🔄 Re-sync Fabric & Meters
-                  </button>
-                  <button type="button" id="invoice-add-item-btn" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
+                  {!isCorporateInvoice && (
+                    <button
+                      type="button"
+                      onClick={handleResyncMetersFromChallans}
+                      className="btn-secondary"
+                      style={{
+                        padding: '0.35rem 0.8rem',
+                        fontSize: '0.75rem',
+                        color: '#38bdf8',
+                        borderColor: 'rgba(56, 189, 248, 0.4)',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem'
+                      }}
+                      title="Fetch latest metres, fabric name & job details from linked Delivery Challan(s)"
+                    >
+                      <RefreshCw size={13} /> 🔄 Re-sync Fabric & Meters
+                    </button>
+                  )}
+                  <button type="button" id="invoice-add-item-btn" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     <Plus size={13} /> Add Item Row
                   </button>
                 </div>
@@ -4644,7 +4688,7 @@ export default function EliteBillingDepartment({
 
             {/* Invoice Line Items Table with aligned heights and generous column widths */}
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1060px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: isCorporateInvoice ? '960px' : '1060px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-light, #cbd5e1)', fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <th style={{ padding: '0.5rem 0.4rem', minWidth: '290px' }}>Item Description & Details</th>
@@ -4652,7 +4696,9 @@ export default function EliteBillingDepartment({
                     <th style={{ padding: '0.5rem 0.4rem', width: '95px', minWidth: '95px' }}>Qty</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '105px', minWidth: '105px' }}>Unit</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '105px', minWidth: '105px' }}>Price (₹)</th>
-                    <th style={{ padding: '0.5rem 0.4rem', width: '80px', minWidth: '80px', textAlign: 'center' }}>🧈 Butter</th>
+                    {!isCorporateInvoice && (
+                      <th style={{ padding: '0.5rem 0.4rem', width: '80px', minWidth: '80px', textAlign: 'center' }}>🧈 Butter</th>
+                    )}
                     <th style={{ padding: '0.5rem 0.4rem', width: '75px', minWidth: '75px' }}>Disc %</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '90px', minWidth: '90px' }}>GST %</th>
                     <th style={{ padding: '0.5rem 0.4rem', width: '120px', minWidth: '120px', textAlign: 'right' }}>Total (₹)</th>
@@ -4715,68 +4761,95 @@ export default function EliteBillingDepartment({
                               </div>
                             )}
 
-                            {/* Sub-inputs: Job No, Lot No, Party Challan, Our Challan, Image URL with clear tags */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', marginTop: '1px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Job</span>
-                                <input
-                                  type="text"
-                                  value={it.jobNo || ''}
-                                  onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
-                                  placeholder="Job No"
-                                  title="Job Card No"
-                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '65px', color: '#0f172a', background: 'transparent' }}
-                                />
+                            {/* Sub-inputs: General Note / Ref for Corporate entities, or Job No, Lot No, Party Challan for Digital Prints */}
+                            {isCorporateInvoice ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', marginTop: '1px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden', flex: '1 1 200px' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Note/Desc</span>
+                                  <input
+                                    type="text"
+                                    value={it.description || ''}
+                                    onChange={e => handleItemChange(idx, 'description', e.target.value)}
+                                    placeholder="Optional description / details..."
+                                    title="Item Description / Note"
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#0f172a', background: 'transparent' }}
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Ref / Challan</span>
+                                  <input
+                                    type="text"
+                                    value={it.ourChallanNo || ''}
+                                    onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
+                                    placeholder="e.g. DC-01"
+                                    title="Challan or Reference No"
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                  />
+                                </div>
                               </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', marginTop: '1px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Job</span>
+                                  <input
+                                    type="text"
+                                    value={it.jobNo || ''}
+                                    onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
+                                    placeholder="Job No"
+                                    title="Job Card No"
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '65px', color: '#0f172a', background: 'transparent' }}
+                                  />
+                                </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Lot</span>
-                                <input
-                                  type="text"
-                                  value={it.lotNo || ''}
-                                  onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
-                                  placeholder="Lot No"
-                                  title="Lot No"
-                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '60px', color: '#0f172a', background: 'transparent' }}
-                                />
-                              </div>
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Lot</span>
+                                  <input
+                                    type="text"
+                                    value={it.lotNo || ''}
+                                    onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
+                                    placeholder="Lot No"
+                                    title="Lot No"
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '60px', color: '#0f172a', background: 'transparent' }}
+                                  />
+                                </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Party Ch.</span>
-                                <input
-                                  type="text"
-                                  value={it.partyChallan || ''}
-                                  onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
-                                  placeholder="Party Challan"
-                                  title="Party / Vendor Challan"
-                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
-                                />
-                              </div>
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Party Ch.</span>
+                                  <input
+                                    type="text"
+                                    value={it.partyChallan || ''}
+                                    onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
+                                    placeholder="Party Challan"
+                                    title="Party / Vendor Challan"
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                  />
+                                </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
-                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Our Ch.</span>
-                                <input
-                                  type="text"
-                                  value={it.ourChallanNo || ''}
-                                  onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
-                                  placeholder="Delivery Ch."
-                                  title="Our Delivery Challan No"
-                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
-                                />
-                              </div>
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Our Ch.</span>
+                                  <input
+                                    type="text"
+                                    value={it.ourChallanNo || ''}
+                                    onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
+                                    placeholder="Delivery Ch."
+                                    title="Our Delivery Challan No"
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', fontWeight: 700, padding: '2px 5px', width: '85px', color: '#0f172a', background: 'transparent' }}
+                                  />
+                                </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden', flex: '1 1 110px' }}>
-                                <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Design URL</span>
-                                <input
-                                  type="text"
-                                  value={it.imageUrl || ''}
-                                  onChange={e => handleItemChange(idx, 'imageUrl', e.target.value)}
-                                  placeholder="Paste design link..."
-                                  title={it.imageUrl || 'Design Image URL'}
-                                  style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#0f172a', background: 'transparent' }}
-                                />
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden', flex: '1 1 110px' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '2px 5px', borderRight: '1px solid #cbd5e1', userSelect: 'none' }}>Design URL</span>
+                                  <input
+                                    type="text"
+                                    value={it.imageUrl || ''}
+                                    onChange={e => handleItemChange(idx, 'imageUrl', e.target.value)}
+                                    placeholder="Paste design link..."
+                                    title={it.imageUrl || 'Design Image URL'}
+                                    style={{ border: 'none', outline: 'none', fontSize: '0.74rem', padding: '2px 5px', width: '100%', color: '#0f172a', background: 'transparent' }}
+                                  />
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         </td>
                         <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
@@ -4838,60 +4911,62 @@ export default function EliteBillingDepartment({
                             placeholder="0.00"
                             style={{ ...rowInputStyle, textAlign: 'right' }}
                           />
-                          {it.butterPaper && (
+                          {!isCorporateInvoice && it.butterPaper && (
                             <span style={{ fontSize: '0.66rem', color: '#d97706', fontWeight: 800, display: 'block', textAlign: 'right', marginTop: '2px' }}>
                               Eff: ₹{(parseFloat(it.unitPrice || 0) + 3).toFixed(2)}
                             </span>
                           )}
                         </td>
-                        {/* Per-item Butter Paper Toggle - Perfectly in-line horizontally */}
-                        <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'center' }}>
-                          <div style={{
-                            height: '36px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: it.butterPaper ? 'rgba(251, 191, 36, 0.12)' : 'rgba(241, 245, 249, 0.7)',
-                            border: `1px solid ${it.butterPaper ? '#f59e0b' : 'var(--border-light, #cbd5e1)'}`,
-                            borderRadius: '6px',
-                            padding: '0 4px',
-                            boxSizing: 'border-box'
-                          }}>
-                            <label
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                cursor: 'pointer',
-                                margin: 0,
-                                userSelect: 'none'
-                              }}
-                              title="Toggle Butter Paper (+₹3/m)"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={!!it.butterPaper}
-                                onChange={e => {
-                                  const checked = e.target.checked;
-                                  setInvoiceForm(f => ({
-                                    ...f,
-                                    items: f.items.map((item, i) => i === idx ? { ...item, butterPaper: checked } : item)
-                                  }));
-                                }}
+                        {/* Per-item Butter Paper Toggle - Only for Digital Prints */}
+                        {!isCorporateInvoice && (
+                          <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'center' }}>
+                            <div style={{
+                              height: '36px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: it.butterPaper ? 'rgba(251, 191, 36, 0.12)' : 'rgba(241, 245, 249, 0.7)',
+                              border: `1px solid ${it.butterPaper ? '#f59e0b' : 'var(--border-light, #cbd5e1)'}`,
+                              borderRadius: '6px',
+                              padding: '0 4px',
+                              boxSizing: 'border-box'
+                            }}>
+                              <label
                                 style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
                                   cursor: 'pointer',
-                                  width: '16px',
-                                  height: '16px',
-                                  accentColor: '#d97706',
-                                  margin: 0
+                                  margin: 0,
+                                  userSelect: 'none'
                                 }}
-                              />
-                              <span style={{ fontSize: '0.68rem', color: it.butterPaper ? '#b45309' : '#64748b', fontWeight: 800 }}>
-                                {it.butterPaper ? '+₹3' : 'No'}
-                              </span>
-                            </label>
-                          </div>
-                        </td>
+                                title="Toggle Butter Paper (+₹3/m)"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={!!it.butterPaper}
+                                  onChange={e => {
+                                    const checked = e.target.checked;
+                                    setInvoiceForm(f => ({
+                                      ...f,
+                                      items: f.items.map((item, i) => i === idx ? { ...item, butterPaper: checked } : item)
+                                    }));
+                                  }}
+                                  style={{
+                                    cursor: 'pointer',
+                                    width: '16px',
+                                    height: '16px',
+                                    accentColor: '#d97706',
+                                    margin: 0
+                                  }}
+                                />
+                                <span style={{ fontSize: '0.68rem', color: it.butterPaper ? '#b45309' : '#64748b', fontWeight: 800 }}>
+                                  {it.butterPaper ? '+₹3' : 'No'}
+                                </span>
+                              </label>
+                            </div>
+                          </td>
+                        )}
                         <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
                           <input
                             type="number"
