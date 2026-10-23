@@ -2651,8 +2651,10 @@ export const api = {
     });
   },
 
-  async searchCommunicationMessages(query, limit = 20) {
-    return request(`/communication/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+  async searchCommunicationMessages(query, limit = 20, page = 1, before = null) {
+    let url = `/communication/search?q=${encodeURIComponent(query)}&limit=${limit}&page=${page}`;
+    if (before) url += `&before=${encodeURIComponent(before)}`;
+    return request(url);
   },
 
   async getCommunicationMembers(groupId) {

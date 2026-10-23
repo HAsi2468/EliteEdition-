@@ -81,14 +81,16 @@ const getGroups = async (req, res) => {
     }
 
     let rooms = await ChatRoom.find(query)
-      .populate('members', 'name username email role permissions department')
-      .sort({ updatedAt: -1 });
+      .populate('members', 'name username email avatarUrl')
+      .sort({ updatedAt: -1 })
+      .lean();
 
     if (rooms.length === 0) {
       await syncCommunicationGroups();
       rooms = await ChatRoom.find(query)
-        .populate('members', 'name username email role permissions department')
-        .sort({ updatedAt: -1 });
+        .populate('members', 'name username email avatarUrl')
+        .sort({ updatedAt: -1 })
+        .lean();
     }
 
     // Fetch unread count & latest message snippet for each room using fast batch aggregation
@@ -104,17 +106,32 @@ const getGroups = async (req, res) => {
         {
           $group: {
             _id: '$roomId',
-            lastMsg: { $first: '$$ROOT' }
+            lastMsg: {
+              $first: {
+                _id: '$_id',
+                roomId: '$roomId',
+                content: '$content',
+                type: '$type',
+                senderId: '$senderId',
+                senderName: '$senderName',
+                msgType: '$msgType',
+                priority: '$priority',
+                createdAt: '$createdAt',
+                isDeleted: '$isDeleted',
+                attachment: '$attachment'
+              }
+            }
           }
         }
       ]);
 
       if (latestAgg.length > 0) {
         const msgsToPopulate = latestAgg.map((x) => x.lastMsg);
-        await ChatMessage.populate(msgsToPopulate, { path: 'senderId', select: 'name username email' });
+        await ChatMessage.populate(msgsToPopulate, { path: 'senderId', select: 'name username email avatarUrl' });
         latestAgg.forEach((x) => {
           if (x.lastMsg && x.lastMsg.isDeleted) {
             x.lastMsg.content = 'This message was deleted';
+            x.lastMsg.attachment = null;
           }
           lastMsgMap[String(x._id)] = x.lastMsg;
         });
@@ -151,10 +168,11 @@ const getGroups = async (req, res) => {
     }
 
     const roomsWithMeta = rooms.map((room) => {
-      const roomObj = room.toObject();
-      roomObj.lastMessage = lastMsgMap[String(room._id)] || null;
-      roomObj.unreadCount = unreadMap[String(room._id)] || 0;
-      return roomObj;
+      return {
+        ...room,
+        lastMessage: lastMsgMap[String(room._id)] || null,
+        unreadCount: unreadMap[String(room._id)] || 0
+      };
     });
 
     // WhatsApp-Style Recency Sort:
@@ -890,9 +908,9 @@ const createOrGetDirectRoom = async (req, res) => {
  */
 const searchMessages = async (req, res) => {
   try {
-    const { q, limit = 20 } = req.query;
+    const { q, limit = 20, page = 1, before } = req.query;
     if (!q || !q.trim()) {
-      return res.status(200).json({ success: true, results: [] });
+      return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
     }
 
     const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.query.userId);
@@ -918,7 +936,7 @@ const searchMessages = async (req, res) => {
 
     if (isClient) {
       if (userMembers.length === 0) {
-        return res.status(200).json({ success: true, results: [] });
+        return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
       }
       roomQuery.members = { $in: userMembers };
       roomQuery.isInternalOnly = { $ne: true };
@@ -936,17 +954,19 @@ const searchMessages = async (req, res) => {
       roomQuery.members = { $in: userMembers };
     } else {
       // Unauthenticated / unidentifiable callers see NO messages
-      return res.status(200).json({ success: true, results: [] });
+      return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
     }
 
     const accessibleRooms = await ChatRoom.find(roomQuery).select('_id name title type').lean();
     const accessibleRoomIds = accessibleRooms.map(r => r._id);
 
     if (accessibleRoomIds.length === 0) {
-      return res.status(200).json({ success: true, results: [] });
+      return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
     }
 
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(parseInt(limit, 10) || 20, 50);
+    const skip = (pageNum - 1) * limitNum;
     const trimmed = q.trim();
     const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -962,17 +982,35 @@ const searchMessages = async (req, res) => {
       ]
     };
 
+    if (before) {
+      const beforeDate = new Date(before);
+      if (!isNaN(beforeDate.getTime())) {
+        query.createdAt = { $lt: beforeDate };
+      }
+    }
+
+    const total = await ChatMessage.countDocuments(query);
     const results = await ChatMessage.find(query)
       .populate('senderId', 'name username email avatarUrl')
       .populate('roomId', 'name title type')
       .sort({ createdAt: -1 })
+      .skip(skip)
       .limit(limitNum)
       .lean();
 
-    return res.status(200).json({ success: true, results: results || [] });
+    const hasMore = skip + (results ? results.length : 0) < total;
+
+    return res.status(200).json({
+      success: true,
+      results: results || [],
+      page: pageNum,
+      limit: limitNum,
+      total,
+      hasMore
+    });
   } catch (error) {
     console.error('Error searching messages:', error);
-    return res.status(200).json({ success: true, results: [], error: error.message });
+    return res.status(200).json({ success: true, results: [], total: 0, hasMore: false, error: error.message });
   }
 };
 
@@ -1284,12 +1322,16 @@ const deleteMessage = async (req, res) => {
       }
     }
 
-    // Soft delete the message in MongoDB
+    // Soft delete the message in MongoDB & purge edit history/attachments
     message.isDeleted = true;
     message.deletedBy = userId;
     message.deletedAt = new Date();
     message.content = 'This message was deleted';
     message.attachment = null;
+    message.isEdited = false;
+    message.editedAt = null;
+    message.editHistory = [];
+    message.reactions = [];
     await message.save();
 
     // If this was the room's latest message, update room.lastMessage to previous non-deleted message
