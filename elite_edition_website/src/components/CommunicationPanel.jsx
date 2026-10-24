@@ -843,6 +843,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const hasMoreMessagesRef = useRef(true);
   const chatScrollRef = useRef(null);
   const fetchAbortControllerRef = useRef(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [unreadBelowCount, setUnreadBelowCount] = useState(0);
 
   // Admin Clear All Data Modal State
   const [showClearAllModal, setShowClearAllModal] = useState(false);
@@ -1812,6 +1814,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     const handleReceiveMessage = (msg) => {
       const currentActiveId = activeGroupIdRef.current;
       if (currentActiveId && String(msg.roomId) === String(currentActiveId)) {
+        if (!isNearBottomRef.current) {
+          setShowScrollBottom(true);
+          setUnreadBelowCount((c) => c + 1);
+        }
         setMessages((prev) => {
           // Filter out matching optimistic placeholder if real message arrives
           const filtered = prev.filter((m) => !(m.isOptimistic && ((m.clientMsgId && msg.clientMsgId && m.clientMsgId === msg.clientMsgId) || m.content === msg.content || String(m._id) === String(msg._id))));
@@ -2335,6 +2341,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   }, [socket, activeGroup?._id, msgFilter]);
 
   const scrollToChatBottom = useCallback((smooth = false) => {
+    setShowScrollBottom(false);
+    setUnreadBelowCount(0);
+    isNearBottomRef.current = true;
     if (chatScrollRef.current) {
       if (smooth) {
         chatScrollRef.current.scrollTo({
@@ -2349,6 +2358,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const handleSelectGroup = (targetGroup) => {
     if (!targetGroup) return;
+    setShowScrollBottom(false);
+    setUnreadBelowCount(0);
     if (activeGroup?._id && inputMessage) {
       setRoomDrafts((prev) => ({
         ...prev,
@@ -2414,6 +2425,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     if (activeGroup?._id) {
       isNearBottomRef.current = true;
+      setShowScrollBottom(false);
+      setUnreadBelowCount(0);
       if (chatScrollRef.current) {
         chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
       }
@@ -3802,7 +3815,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     // Track user distance from bottom to preserve pinned status on incoming messages
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    isNearBottomRef.current = distanceFromBottom <= 120;
+    const isAtBottom = distanceFromBottom <= 140;
+    isNearBottomRef.current = isAtBottom;
+    setShowScrollBottom(!isAtBottom);
+    if (isAtBottom) {
+      setUnreadBelowCount(0);
+    }
 
     // Only load older messages if container actually overflows and user deliberately scrolled to the top
     if (loadingOlderRef.current || !hasMoreMessagesRef.current) return;
@@ -3979,6 +3997,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       });
     });
     isNearBottomRef.current = true;
+    setShowScrollBottom(false);
+    setUnreadBelowCount(0);
     requestAnimationFrame(() => {
       if (chatScrollRef.current) {
         chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
@@ -6941,6 +6961,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 </ErrorBoundary>
                 <div ref={chatBottomRef} />
               </div>
+
+              {/* Floating Scroll-to-Bottom Down Button */}
+              {showScrollBottom && (
+                <button
+                  type="button"
+                  onClick={() => scrollToChatBottom(true)}
+                  className="phoenix-scroll-bottom-btn"
+                  title="Scroll to bottom"
+                  aria-label="Scroll to bottom"
+                >
+                  <ChevronDown size={20} strokeWidth={2.5} />
+                  {unreadBelowCount > 0 && (
+                    <span className="phoenix-scroll-bottom-badge">
+                      {unreadBelowCount > 99 ? '99+' : unreadBelowCount}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
 
               {/* Real-time Typing Indicator Wave */}

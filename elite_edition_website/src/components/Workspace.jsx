@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../services/api';
-import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2, Paperclip, Mic, Pin, Trash2, Edit2, Settings, Volume2 } from 'lucide-react';
+import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2, Paperclip, Mic, Pin, Trash2, Edit2, Settings, Volume2, ChevronDown } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 
@@ -49,6 +49,7 @@ const Workspace = ({ currentUser }) => {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   // Advanced Voice, Edit, Pin, Settings States
   const [isRecording, setIsRecording] = useState(false);
@@ -271,6 +272,7 @@ const Workspace = ({ currentUser }) => {
 
     // Reset typing status on channel switch
     setTypingUsers({});
+    setShowScrollBottom(false);
 
     const loadMessages = async () => {
       try {
@@ -605,6 +607,7 @@ const Workspace = ({ currentUser }) => {
   }, [activeTimerTaskId]);
 
   const scrollToBottom = () => {
+    setShowScrollBottom(false);
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
@@ -738,6 +741,8 @@ const Workspace = ({ currentUser }) => {
 
   const handleScroll = async (e) => {
     const el = e.target;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollBottom(distanceFromBottom > 140);
     if (el.scrollTop === 0 && hasMoreMessages && !isLoadingMore && messages.length > 0) {
       setIsLoadingMore(true);
       const oldestMsgId = messages[0]._id;
@@ -3092,6 +3097,20 @@ const Workspace = ({ currentUser }) => {
 
                     <div ref={messagesEndRef} />
                   </div>
+
+                  {/* Floating Scroll to Bottom Down Button */}
+                  {showScrollBottom && (
+                    <button
+                      type="button"
+                      onClick={scrollToBottom}
+                      className="phoenix-scroll-bottom-btn"
+                      title="Scroll to bottom"
+                      aria-label="Scroll to bottom"
+                      style={{ bottom: '86px' }}
+                    >
+                      <ChevronDown size={20} strokeWidth={2.5} />
+                    </button>
+                  )}
 
                   {/* Input Bar */}
                   <div style={wsStyles.inputArea}>
