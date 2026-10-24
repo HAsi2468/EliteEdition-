@@ -209,6 +209,9 @@ export function EnterpriseHUDThemeController({
     // Don't drag if target is inside popover panel
     if (e.target.closest('.hud-popover-panel')) return;
 
+    // Check if target is a clickable button/icon
+    const isInteractiveBtn = Boolean(e.target.closest('button, .dock-action-btn, .dock-circle-fab-btn, .dock-btn-collapse'));
+
     isDraggingRef.current = true;
     hasMovedRef.current = false;
     dragStartRef.current = {
@@ -218,20 +221,25 @@ export function EnterpriseHUDThemeController({
       dockY: position.y
     };
 
+    const isTouch = e.pointerType === 'touch' || (typeof window !== 'undefined' && window.innerWidth < 768);
+    // On touch screens, finger taps have 10-18px wobble. Don't treat taps as drags.
+    const dragThreshold = isTouch ? (isInteractiveBtn ? 22 : 12) : (isInteractiveBtn ? 10 : 5);
+
     const onPointerMove = (moveEvent) => {
       if (!isDraggingRef.current) return;
       const deltaX = moveEvent.clientX - dragStartRef.current.mouseX;
       const deltaY = moveEvent.clientY - dragStartRef.current.mouseY;
 
-      if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
+      if (Math.abs(deltaX) > dragThreshold || Math.abs(deltaY) > dragThreshold) {
         hasMovedRef.current = true;
         setIsDragging(true);
       }
 
-      const nextX = dragStartRef.current.dockX + deltaX;
-      const nextY = dragStartRef.current.dockY + deltaY;
-
-      setPosition(getClampedCoordinates(nextX, nextY));
+      if (hasMovedRef.current) {
+        const nextX = dragStartRef.current.dockX + deltaX;
+        const nextY = dragStartRef.current.dockY + deltaY;
+        setPosition(getClampedCoordinates(nextX, nextY));
+      }
     };
 
     const onPointerUp = () => {
