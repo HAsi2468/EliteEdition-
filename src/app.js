@@ -582,6 +582,11 @@ app.use('/verify/challan', require('./routes/v1/challanVerification.route'));
 app.use('/verify/jobcard', require('./routes/v1/jobCardVerification.route'));
 app.use('/verify/invoice', require('./routes/v1/invoiceVerification.route'));
 
+// Lightweight universal health ping handler for load balancers & monitoring
+app.get(['/api/v1/ping', '/v1/ping', '/ping'], (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: Date.now() });
+});
+
 // send back a 404 error for any unknown api request
 app.use(['/v1', '/api/v1'], (req, res, next) => {
 	next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
