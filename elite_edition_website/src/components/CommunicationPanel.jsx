@@ -10177,7 +10177,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
                 color: '#ffffff'
               }}
             >
@@ -10248,10 +10248,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   fontSize: '0.82rem',
                   fontWeight: activeSettingsTab === 'profile' ? 700 : 600,
                   cursor: 'pointer',
-                  background: activeSettingsTab === 'profile' ? '#0d9488' : 'transparent',
+                  background: activeSettingsTab === 'profile' ? '#2563eb' : 'transparent',
                   color: activeSettingsTab === 'profile' ? '#ffffff' : 'var(--text-secondary, #64748b)',
                   transition: 'all 0.15s ease',
-                  boxShadow: activeSettingsTab === 'profile' ? '0 2px 8px rgba(13,148,136,0.3)' : 'none'
+                  boxShadow: activeSettingsTab === 'profile' ? '0 2px 8px rgba(37,99,235,0.3)' : 'none'
                 }}
               >
                 👤 Profile
@@ -10266,10 +10266,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   fontSize: '0.82rem',
                   fontWeight: activeSettingsTab === 'preferences' ? 700 : 600,
                   cursor: 'pointer',
-                  background: activeSettingsTab === 'preferences' ? '#0d9488' : 'transparent',
+                  background: activeSettingsTab === 'preferences' ? '#2563eb' : 'transparent',
                   color: activeSettingsTab === 'preferences' ? '#ffffff' : 'var(--text-secondary, #64748b)',
                   transition: 'all 0.15s ease',
-                  boxShadow: activeSettingsTab === 'preferences' ? '0 2px 8px rgba(13,148,136,0.3)' : 'none'
+                  boxShadow: activeSettingsTab === 'preferences' ? '0 2px 8px rgba(37,99,235,0.3)' : 'none'
                 }}
               >
                 ⚙️ Preferences
@@ -10290,14 +10290,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           borderRadius: '50%',
                           background: userProfileForm.avatarUrl
                             ? 'transparent'
-                            : 'linear-gradient(135deg, #0d9488 0%, #2563eb 100%)',
+                            : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '2rem',
                           fontWeight: 800,
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                          boxShadow: '0 8px 24px rgba(37,99,235,0.2)',
                           border: '3px solid var(--bg-card, #ffffff)',
                           overflow: 'hidden'
                         }}
@@ -10322,13 +10322,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           width: 30,
                           height: 30,
                           borderRadius: '50%',
-                          background: '#0d9488',
+                          background: '#2563eb',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                          boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
                           border: '2px solid #ffffff',
                           transition: 'transform 0.15s ease'
                         }}
@@ -10394,7 +10394,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         padding: '9px 12px',
                         borderRadius: '10px',
                         border: '1px solid var(--border-light, #cbd5e1)',
-                        background: 'var(--bg-main, #f8fafc)',
+                        background: 'var(--bg-input, #f8fafc)',
                         color: 'var(--text-primary, #0f172a)',
                         fontSize: '0.88rem',
                         fontWeight: 600,
@@ -10423,7 +10423,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         padding: '9px 12px',
                         borderRadius: '10px',
                         border: '1px solid var(--border-light, #cbd5e1)',
-                        background: 'var(--bg-main, #f8fafc)',
+                        background: 'var(--bg-input, #f8fafc)',
                         color: 'var(--text-primary, #0f172a)',
                         fontSize: '0.86rem',
                         outline: 'none',
@@ -10447,14 +10447,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           type="button"
                           onClick={() => setUserProfileForm({ ...userProfileForm, about: chip })}
                           style={{
-                            padding: '3px 8px',
+                            padding: '3px 9px',
                             borderRadius: '14px',
-                            border: '1px solid var(--border-light, #e2e8f0)',
-                            background: userProfileForm.about === chip ? 'rgba(13,148,136,0.12)' : 'var(--bg-card, #ffffff)',
-                            color: userProfileForm.about === chip ? '#0d9488' : 'var(--text-secondary, #64748b)',
+                            border: userProfileForm.about === chip ? '1px solid rgba(37,99,235,0.4)' : '1px solid var(--border-light, #e2e8f0)',
+                            background: userProfileForm.about === chip ? 'rgba(37,99,235,0.12)' : 'var(--bg-card, #ffffff)',
+                            color: userProfileForm.about === chip ? '#1d4ed8' : 'var(--text-secondary, #64748b)',
                             fontSize: '0.72rem',
                             fontWeight: userProfileForm.about === chip ? 700 : 500,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
                           }}
                         >
                           {chip}
@@ -10480,7 +10481,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           padding: '8px 12px',
                           borderRadius: '10px',
                           border: '1px solid var(--border-light, #cbd5e1)',
-                          background: 'var(--bg-main, #f8fafc)',
+                          background: 'var(--bg-input, #f8fafc)',
                           color: 'var(--text-primary, #0f172a)',
                           fontSize: '0.84rem',
                           outline: 'none',
@@ -10526,8 +10527,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   {/* Sound Toggle */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '12px', background: 'var(--bg-main, #f8fafc)', border: '1px solid var(--border-light, #e2e8f0)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: 34, height: 34, borderRadius: '8px', background: chatSoundMuted ? '#fee2e2' : '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {chatSoundMuted ? <VolumeX size={18} color="#ef4444" /> : <Volume2 size={18} color="#16a34a" />}
+                      <div style={{ width: 34, height: 34, borderRadius: '8px', background: chatSoundMuted ? '#fee2e2' : '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {chatSoundMuted ? <VolumeX size={18} color="#ef4444" /> : <Volume2 size={18} color="#2563eb" />}
                       </div>
                       <div>
                         <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Chat Notification Chime</div>
@@ -10545,7 +10546,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         padding: '6px 14px',
                         borderRadius: '20px',
                         border: 'none',
-                        background: chatSoundMuted ? '#ef4444' : '#10b981',
+                        background: chatSoundMuted ? '#ef4444' : '#2563eb',
                         color: '#ffffff',
                         fontSize: '0.76rem',
                         fontWeight: 700,
@@ -10631,12 +10632,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   padding: '8px 22px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                  background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
                   color: '#ffffff',
                   fontSize: '0.84rem',
                   fontWeight: 700,
                   cursor: savingProfile ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(13,148,136,0.35)',
+                  boxShadow: '0 4px 14px rgba(37,99,235,0.35)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
@@ -10700,7 +10701,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                background: 'linear-gradient(135deg, #b45309 0%, #d97706 100%)',
+                background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
                 color: '#ffffff'
               }}
             >
@@ -10762,14 +10763,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       borderRadius: '50%',
                       background: groupSettingsForm.avatarUrl
                         ? 'transparent'
-                        : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                       color: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: '1.8rem',
                       fontWeight: 800,
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                      boxShadow: '0 8px 24px rgba(37,99,235,0.2)',
                       border: '3px solid var(--bg-card, #ffffff)',
                       overflow: 'hidden'
                     }}
@@ -10793,13 +10794,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       width: 28,
                       height: 28,
                       borderRadius: '50%',
-                      background: '#d97706',
+                      background: '#2563eb',
                       color: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                      boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
                       border: '2px solid #ffffff'
                     }}
                     title="Upload Group Photo"
@@ -10864,7 +10865,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     padding: '9px 12px',
                     borderRadius: '10px',
                     border: '1px solid var(--border-light, #cbd5e1)',
-                    background: 'var(--bg-main, #f8fafc)',
+                    background: 'var(--bg-input, #f8fafc)',
                     color: 'var(--text-primary, #0f172a)',
                     fontSize: '0.88rem',
                     fontWeight: 600,
@@ -10890,7 +10891,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     padding: '9px 12px',
                     borderRadius: '10px',
                     border: '1px solid var(--border-light, #cbd5e1)',
-                    background: 'var(--bg-main, #f8fafc)',
+                    background: 'var(--bg-input, #f8fafc)',
                     color: 'var(--text-primary, #0f172a)',
                     fontSize: '0.86rem',
                     outline: 'none',
@@ -10913,7 +10914,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     padding: '9px 12px',
                     borderRadius: '10px',
                     border: '1px solid var(--border-light, #cbd5e1)',
-                    background: 'var(--bg-main, #f8fafc)',
+                    background: 'var(--bg-input, #f8fafc)',
                     color: 'var(--text-primary, #0f172a)',
                     fontSize: '0.86rem',
                     fontWeight: 600,
@@ -10935,13 +10936,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   justifyContent: 'space-between',
                   padding: '10px 14px',
                   borderRadius: '12px',
-                  background: 'rgba(245,158,11,0.08)',
-                  border: '1px solid rgba(245,158,11,0.2)'
+                  background: 'rgba(37,99,235,0.06)',
+                  border: '1px solid rgba(37,99,235,0.18)'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={16} color="#d97706" />
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e' }}>
+                  <Users size={16} color="#2563eb" />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e40af' }}>
                     {activeGroup?.members?.length || 0} Members in Group
                   </span>
                 </div>
@@ -10954,7 +10955,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#d97706',
+                    color: '#2563eb',
                     fontSize: '0.78rem',
                     fontWeight: 800,
                     cursor: 'pointer'
@@ -11001,12 +11002,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   padding: '8px 22px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #b45309 0%, #d97706 100%)',
+                  background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
                   color: '#ffffff',
                   fontSize: '0.84rem',
                   fontWeight: 700,
                   cursor: savingGroupSettings ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
+                  boxShadow: '0 4px 14px rgba(37,99,235,0.35)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
