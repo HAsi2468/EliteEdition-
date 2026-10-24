@@ -2,40 +2,82 @@ const mongoose = require('mongoose');
 const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
 const logger = require('../config/logger');
 
-// Canonical list of sister companies & aliases
+// Canonical list of sister companies & aliases (Strict matching: NO loose substrings)
 const SISTER_COMPANIES = [
   {
     canonical: 'Ethno wear',
-    aliases: ['ethno wear', 'ethnowear', 'ethno', 'ew', 'ethno wear pvt', 'ethno wear surat']
+    fullAliases: ['ethno wear', 'ethnowear', 'ethno wear pvt ltd', 'ethno wear surat', 'ethno wear private limited'],
+    exactCodes: ['ew']
   },
   {
     canonical: 'Sobise',
-    aliases: ['sobise', 'so', 'sobise enterprise', 'sobise fashion']
+    fullAliases: ['sobise', 'sobise enterprise', 'sobise enterprises', 'sobise fashion', 'sobise creation', 'sobise surat'],
+    exactCodes: ['so']
   },
   {
     canonical: 'Elite Edition',
-    aliases: ['elite edition', 'edition', 'ee', 'elite edition surat']
+    fullAliases: ['elite edition', 'elite edition surat', 'elite edition pvt ltd', 'elite edition private limited', 'elite edition apparel'],
+    exactCodes: ['ee']
   },
   {
     canonical: 'Elite Fabtex',
-    aliases: ['elite fabtex', 'fabtex', 'efb', 'ef']
+    fullAliases: ['elite fabtex', 'elite fabtex surat', 'fabtex surat'],
+    exactCodes: ['ef', 'efb']
   },
   {
     canonical: 'Elite Stitching',
-    aliases: ['elite stitching', 'stitching', 'stitching unit', 'elite stitching unit', 'est', 'es']
+    fullAliases: ['elite stitching', 'elite stitching unit', 'elite stitching surat'],
+    exactCodes: ['es', 'est']
   },
   {
     canonical: 'Elite Digital Print',
-    aliases: ['elite digital print', 'elite digital prints', 'digital print', 'digital prints', 'edp']
+    fullAliases: ['elite digital print', 'elite digital prints', 'elite digital print surat'],
+    exactCodes: ['edp']
   },
   {
     canonical: 'Elite Online',
-    aliases: ['elite online', 'eon']
+    fullAliases: ['elite online', 'elite online surat'],
+    exactCodes: ['eon', 'eo']
   }
 ];
 
 /**
+ * Check if a raw material is a digital print consumable (ink, paper, etc.)
+ */
+function isDigitalPrintConsumable(name) {
+  if (!name || typeof name !== 'string') return false;
+  const n = name.toLowerCase().trim();
+  return (
+    n.includes('ink') ||
+    n.includes('printdot') ||
+    n.includes('grando') ||
+    n.includes('sublimation') ||
+    n.includes('butter paper') ||
+    n.includes('butterpaper') ||
+    n.includes('cmyk') ||
+    n.includes('cyan') ||
+    n.includes('magenta') ||
+    n.includes('yellow') ||
+    n.includes('black (k)') ||
+    n.includes('cleaning solution')
+  );
+}
+
+/**
+ * Check if a company is a garment manufacturing / retail company (not digital printing)
+ */
+function isGarmentCompany(company) {
+  if (!company) return true;
+  const c = String(company).toLowerCase();
+  return !c.includes('digital print') && c !== 'edp';
+}
+
+/**
  * Normalize any company name into its canonical sister company name (or null if not sister company)
+ * STRICT RULES:
+ * 1. Exact match against canonical name
+ * 2. Exact match against short code ('ew', 'so', 'ee', etc.) - NEVER partial or substring!
+ * 3. Exact or whole-phrase match against fullAliases - NEVER arbitrary partial substrings!
  */
 function normalizeSisterCompany(name) {
   if (!name || typeof name !== 'string') return null;
@@ -43,10 +85,20 @@ function normalizeSisterCompany(name) {
   if (!clean) return null;
 
   for (const item of SISTER_COMPANIES) {
-    if (clean === item.canonical.toLowerCase()) return item.canonical;
-    for (const alias of item.aliases) {
-      if (clean === alias || clean.startsWith(alias + ' ') || clean.endsWith(' ' + alias) || clean.includes(alias)) {
-        return item.canonical;
+    // 1. Exact match against canonical
+    if (clean === item.canonical.toLowerCase()) {
+      return item.canonical;
+    }
+    // 2. Strict exact match for 2-3 letter codes (NEVER substring/includes)
+    if (item.exactCodes && item.exactCodes.includes(clean)) {
+      return item.canonical;
+    }
+    // 3. Strict full phrase matching (must be exact match, or clean starts with / ends with the full phrase)
+    if (item.fullAliases) {
+      for (const alias of item.fullAliases) {
+        if (clean === alias || clean.startsWith(alias + ' ') || clean.endsWith(' ' + alias)) {
+          return item.canonical;
+        }
       }
     }
   }
@@ -84,7 +136,7 @@ async function syncInvoiceToSisterRawMaterial(invoice) {
     const targetSister = getSisterCompanyFromParty(invoice.customer, sourceCompany);
 
     if (!targetSister) {
-      // If customer is not a sister company, check if previous sister transactions exist and remove them
+      // If customer is not a sister company, clean up any previous accidental sister records
       await RawMaterialTransaction.deleteMany({
         sourceDocId: invoice._id,
         sourceDocType: 'INVOICE',
@@ -120,6 +172,15 @@ async function syncInvoiceToSisterRawMaterial(invoice) {
       if (qty <= 0) continue;
 
       const materialName = it.fabricName || it.fabric || it.itemName || 'Fabric Material';
+
+      // CRITICAL GUARD: Garment companies NEVER receive ink or sublimation paper!
+      if (isGarmentCompany(targetSister) && isDigitalPrintConsumable(materialName)) {
+        logger.info(
+          `[SisterCompanySync] Ignored digital consumable "${materialName}" from invoice #${invoice.invoiceNo} for garment entity "${targetSister}"`
+        );
+        continue;
+      }
+
       docsToCreate.push({
         companyEntity: targetSister,
         type: 'INWARD',
@@ -202,6 +263,15 @@ async function syncDeliveryChallanToSisterRawMaterial(challan) {
       if (qty <= 0) continue;
 
       const materialName = it.itemName || it.description || 'Dispatched Material';
+
+      // CRITICAL GUARD: Garment companies NEVER receive ink or sublimation paper!
+      if (isGarmentCompany(targetSister) && isDigitalPrintConsumable(materialName)) {
+        logger.info(
+          `[SisterCompanySync] Ignored digital consumable "${materialName}" from delivery challan #${challan.challanNo} for garment entity "${targetSister}"`
+        );
+        continue;
+      }
+
       docsToCreate.push({
         companyEntity: targetSister,
         type: 'INWARD',

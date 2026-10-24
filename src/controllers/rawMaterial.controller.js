@@ -201,7 +201,11 @@ const buildRawCompFilter = (companyEntity) => {
       ]
     };
   }
-  return { companyEntity: norm };
+  // Garment companies: strict companyEntity isolation and block any digital print consumables
+  return {
+    companyEntity: norm,
+    materialName: { $not: /(ink|sublimation|butter\s*paper|butterpaper|grando|printdot|cmyk)/i }
+  };
 };
 
 // Get all transactions
