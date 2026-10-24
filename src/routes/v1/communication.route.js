@@ -24,12 +24,26 @@ router.post('/groups/:groupId/members', requireGroupAccess, communicationControl
 
 // 4. Message Actions & DMs
 router.post('/activity', communicationController.postActivityEvent);
+router.get('/messages', communicationController.searchMessages);
+router.get('/search', communicationController.searchMessages);
+router.get('/', communicationController.searchMessages);
+
+// Reactions & Pin (supporting both path param and body param styles)
+router.post('/messages/:messageId/reactions', communicationController.toggleReaction);
+router.post('/messages/:messageId/react', communicationController.toggleReaction);
+router.post('/messages/:messageId/pin', communicationController.togglePinMessage);
+router.post('/reactions', communicationController.toggleReaction);
+router.post('/react', communicationController.toggleReaction);
+router.post('/pin', communicationController.togglePinMessage);
+router.post('/:messageId/reactions', communicationController.toggleReaction);
+router.post('/:messageId/react', communicationController.toggleReaction);
+router.post('/:messageId/pin', communicationController.togglePinMessage);
+
 router.post('/messages/:messageId/acknowledge', communicationController.acknowledgeMessage);
 router.post('/messages/:messageId/poll-vote', communicationController.votePollMessage);
 router.post('/messages/:messageId/forward', communicationController.forwardMessage);
 router.patch('/messages/:messageId', communicationController.editMessage);
 router.delete('/messages/:messageId', communicationController.deleteMessage);
-router.get('/search', communicationController.searchMessages);
 router.get('/users', communicationController.getUsersForDM);
 router.post('/direct', communicationController.createOrGetDirectRoom);
 

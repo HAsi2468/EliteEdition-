@@ -269,10 +269,28 @@ const getGroupMessages = async (req, res) => {
       query.msgType = 'system_activity';
     }
 
+    // Filter by search query if provided (supports ?search=, ?q=, or ?query=)
+    const searchTerm = (req.query.search || req.query.q || req.query.query || '').trim();
+    if (searchTerm) {
+      const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchCondition = [
+        { content: { $regex: escaped, $options: 'i' } },
+        { 'attachment.fileName': { $regex: escaped, $options: 'i' } }
+      ];
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: searchCondition }];
+        delete query.$or;
+      } else {
+        query.$or = searchCondition;
+      }
+    }
+
     const [total, messages] = await Promise.all([
       ChatMessage.countDocuments(query),
       ChatMessage.find(query)
         .populate('senderId', 'name username email role')
+        .populate('mentions', 'name username email')
+        .populate('pinnedBy', 'name username email')
         .populate('pollMeta.options.votes', 'name username email')
         .populate({
           path: 'reactions.user',
@@ -372,74 +390,100 @@ const votePollMessage = async (req, res) => {
 };
 
 /**
- * Forward an existing message to another chat room
+ * Forward an existing message to another chat room (or multiple rooms)
  */
 const forwardMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { targetRoomId } = req.body;
+    const { targetRoomId, roomIds } = req.body;
     const rawSenderId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.senderId || req.body.userId);
 
-    if (!targetRoomId || !rawSenderId) {
-      return res.status(400).json({ success: false, message: 'Target room ID and sender ID are required' });
+    const targetRoomList = Array.isArray(roomIds) && roomIds.length > 0
+      ? roomIds
+      : (targetRoomId ? [targetRoomId] : []);
+
+    if (targetRoomList.length === 0 || !rawSenderId) {
+      return res.status(400).json({ success: false, message: 'Target room ID (or roomIds) and sender ID are required' });
     }
 
-    const origMessage = await ChatMessage.findById(messageId).populate('senderId', 'name username');
+    const origMessage = await ChatMessage.findById(messageId)
+      .select('content type attachment pollMeta activityMeta recordMentions senderId roomId')
+      .populate('senderId', 'name username')
+      .lean();
+
     if (!origMessage) {
       return res.status(404).json({ success: false, message: 'Original message not found' });
     }
 
-    const origRoom = await ChatRoom.findById(origMessage.roomId);
-
-    // Monotonic room sequence increment for target room
-    const updatedTargetRoom = await ChatRoom.findByIdAndUpdate(
-      targetRoomId,
-      { $inc: { lastSeq: 1 }, updatedAt: new Date() },
-      { new: true }
-    );
-    const roomSeq = updatedTargetRoom?.lastSeq || 1;
-
-    const forwardedMsg = await ChatMessage.create({
-      roomId: targetRoomId,
-      roomSeq,
-      senderId: rawSenderId,
-      content: origMessage.content,
-      type: origMessage.type,
-      msgType: 'human',
-      attachment: origMessage.attachment || undefined,
-      pollMeta: origMessage.pollMeta || undefined,
-      activityMeta: origMessage.activityMeta || undefined,
-      recordMentions: origMessage.recordMentions || undefined,
-      forwardedFrom: {
-        senderName: origMessage.senderId ? (origMessage.senderId.name || origMessage.senderId.username) : 'Staff',
-        originalRoomName: origRoom ? origRoom.name : 'Channel'
-      },
-      readBy: [rawSenderId]
-    });
-
-    if (updatedTargetRoom) {
-      updatedTargetRoom.lastMessage = forwardedMsg;
-      await updatedTargetRoom.save();
+    let origRoomName = 'Channel';
+    if (origMessage.roomId) {
+      const origRoom = await ChatRoom.findById(origMessage.roomId).select('name').lean();
+      if (origRoom) origRoomName = origRoom.name;
     }
 
-    const populatedMsg = await ChatMessage.findById(forwardedMsg._id)
-      .populate('senderId', 'name username email role')
-      .populate('readBy', 'name username email');
+    const senderName = origMessage.senderId
+      ? (origMessage.senderId.name || origMessage.senderId.username)
+      : 'Staff';
 
+    const forwardedMessages = [];
     const io = req.app.get('io') || req.app.get('socketio') || global.io;
-    if (io) {
-      let broadcast = io.to(String(targetRoomId));
-      const targetRoom = await ChatRoom.findById(targetRoomId);
-      if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {
-        targetRoom.members.forEach((m) => {
-          const mIdStr = getMemberIdString(m);
-          if (mIdStr) broadcast = broadcast.to(`user_${mIdStr}`);
-        });
-      }
-      broadcast.emit('receive-message', populatedMsg);
-    }
 
-    res.json({ success: true, data: populatedMsg });
+    await Promise.all(targetRoomList.map(async (tRoomId) => {
+      if (!tRoomId || !mongoose.Types.ObjectId.isValid(tRoomId)) return;
+
+      const updatedTargetRoom = await ChatRoom.findByIdAndUpdate(
+        tRoomId,
+        { $inc: { lastSeq: 1 }, updatedAt: new Date() },
+        { new: true, select: 'name members lastSeq' }
+      ).lean();
+
+      const roomSeq = updatedTargetRoom?.lastSeq || 1;
+
+      const newForwardedMsg = await ChatMessage.create({
+        roomId: tRoomId,
+        roomSeq,
+        senderId: rawSenderId,
+        content: origMessage.content,
+        type: origMessage.type || 'text',
+        msgType: 'human',
+        attachment: origMessage.attachment || undefined,
+        pollMeta: origMessage.pollMeta || undefined,
+        activityMeta: origMessage.activityMeta || undefined,
+        recordMentions: origMessage.recordMentions || undefined,
+        forwardedFrom: {
+          senderName,
+          originalRoomName: origRoomName
+        },
+        readBy: [rawSenderId],
+        createdAt: new Date()
+      });
+
+      // Atomic update for lastMessage to avoid full room save
+      await ChatRoom.findByIdAndUpdate(tRoomId, {
+        $set: { lastMessage: newForwardedMsg._id, updatedAt: new Date() }
+      });
+
+      const populatedMsg = await ChatMessage.findById(newForwardedMsg._id)
+        .populate('senderId', 'name username email role')
+        .populate('readBy', 'name username email')
+        .lean();
+
+      forwardedMessages.push(populatedMsg);
+
+      if (io && updatedTargetRoom) {
+        let broadcast = io.to(String(tRoomId));
+        if (Array.isArray(updatedTargetRoom.members)) {
+          updatedTargetRoom.members.forEach((m) => {
+            const mIdStr = getMemberIdString(m);
+            if (mIdStr) broadcast = broadcast.to(`user_${mIdStr}`);
+          });
+        }
+        broadcast.emit('receive-message', populatedMsg);
+      }
+    }));
+
+    const responseData = targetRoomList.length === 1 ? forwardedMessages[0] : forwardedMessages;
+    return res.json({ success: true, data: responseData });
   } catch (error) {
     console.error('Error forwarding message:', error);
     res.status(500).json({ success: false, message: 'Failed to forward message', error: error.message });
@@ -556,13 +600,13 @@ const postGroupMessage = async (req, res) => {
     // Sanitize content against Stored XSS and malicious script injection (trimmed)
     const sanitizedContent = sanitizeChatMessage(trimmedContent || '').trim();
 
-    // Parse user mentions (supports explicit mentionedUserIds, full names e.g. @QA Automation Bot, @usernames, and @all / @everyone)
+    // Parse user mentions (supports explicit mentionedUserIds, @first_name, @full_name, @username, and @all / @everyone)
     let mentions = Array.isArray(inMentionedUserIds) ? [...inMentionedUserIds] : [];
     const isMentionAll = /\b@(all|everyone)\b/i.test(sanitizedContent) || mentions.includes('ALL_MEMBERS');
     if (isMentionAll && targetRoom && Array.isArray(targetRoom.members)) {
       targetRoom.members.forEach((m) => {
         const mIdStr = String(typeof m === 'object' ? (m._id || m.id) : m);
-        if (mIdStr && mIdStr !== strSender && !mentions.includes(mIdStr)) {
+        if (mIdStr && !mentions.includes(mIdStr)) {
           mentions.push(mIdStr);
         }
       });
@@ -572,19 +616,36 @@ const postGroupMessage = async (req, res) => {
     if (sanitizedContent) {
       try {
         const usersInDb = await User.find({}).select('_id name username').lean();
+        const mentionTokens = (sanitizedContent.match(/@([a-zA-Z0-9_.-]+)/g) || []).map(t => t.slice(1).toLowerCase());
+
         usersInDb.forEach((u) => {
           const uIdStr = String(u._id);
-          if (u.name && sanitizedContent.toLowerCase().includes(`@${u.name.toLowerCase()}`)) {
-            if (!mentions.includes(uIdStr)) mentions.push(uIdStr);
-          } else if (u.username && sanitizedContent.toLowerCase().includes(`@${u.username.toLowerCase()}`)) {
-            if (!mentions.includes(uIdStr)) mentions.push(uIdStr);
+          const fullName = (u.name || '').toLowerCase().trim();
+          const firstName = fullName.split(/\s+/)[0] || '';
+          const username = (u.username || '').toLowerCase().trim();
+
+          const isMatch = mentionTokens.some(token => (
+            (firstName && token === firstName) ||
+            (username && token === username) ||
+            (fullName && token === fullName)
+          )) ||
+          (fullName && sanitizedContent.toLowerCase().includes(`@${fullName}`)) ||
+          (firstName && new RegExp(`@${firstName}\\b`, 'i').test(sanitizedContent)) ||
+          (username && new RegExp(`@${username}\\b`, 'i').test(sanitizedContent));
+
+          if (isMatch && !mentions.includes(uIdStr)) {
+            mentions.push(uIdStr);
           }
         });
       } catch (err) {
         console.warn('[postGroupMessage mention resolution error]:', err.message);
       }
-      mentions = Array.from(new Set(mentions)).filter((id) => id !== 'ALL_MEMBERS' && id !== strSender);
+      mentions = Array.from(new Set(mentions)).filter((id) => id !== 'ALL_MEMBERS');
     }
+
+    const mentionObjectIds = mentions
+      .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
 
     // Parse record mentions
     const recordMentions = inRecordMentions || [];
@@ -625,7 +686,7 @@ const postGroupMessage = async (req, res) => {
       pollMeta: pollMeta || undefined,
       activityMeta: activityMeta || undefined,
       recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
-      mentions: mentions.length > 0 ? mentions : undefined,
+      mentions: mentionObjectIds,
       readBy: [senderObjId],
       createdAt: new Date(),
       roomSeq
@@ -937,14 +998,12 @@ const createOrGetDirectRoom = async (req, res) => {
 };
 
 /**
- * Search message content across accessible rooms
+ * Search message content across accessible rooms or fetch latest
  */
 const searchMessages = async (req, res) => {
   try {
-    const { q, limit = 20, page = 1, before } = req.query;
-    if (!q || !q.trim()) {
-      return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
-    }
+    const rawSearch = (req.query.search || req.query.q || req.query.query || '').trim();
+    const { limit = 20, page = 1, before, roomId, groupId } = req.query;
 
     const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.query.userId);
     const userObjId = rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : null;
@@ -969,7 +1028,7 @@ const searchMessages = async (req, res) => {
 
     if (isClient) {
       if (userMembers.length === 0) {
-        return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
+        return res.status(200).json({ success: true, results: [], data: [], page: 1, limit: 20, total: 0, hasMore: false });
       }
       roomQuery.members = { $in: userMembers };
       roomQuery.isInternalOnly = { $ne: true };
@@ -983,37 +1042,41 @@ const searchMessages = async (req, res) => {
         roomQuery.type = { $ne: 'direct' };
       }
     } else if (userMembers.length > 0) {
-      // Standard users ONLY search messages in channels where they are an explicit member
       roomQuery.members = { $in: userMembers };
     } else {
-      // Unauthenticated / unidentifiable callers see NO messages
-      return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
+      return res.status(200).json({ success: true, results: [], data: [], page: 1, limit: 20, total: 0, hasMore: false });
+    }
+
+    const targetRoomId = roomId || groupId;
+    if (targetRoomId && mongoose.Types.ObjectId.isValid(targetRoomId)) {
+      roomQuery._id = new mongoose.Types.ObjectId(targetRoomId);
     }
 
     const accessibleRooms = await ChatRoom.find(roomQuery).select('_id name title type').lean();
     const accessibleRoomIds = accessibleRooms.map(r => r._id);
 
     if (accessibleRoomIds.length === 0) {
-      return res.status(200).json({ success: true, results: [], page: 1, limit: 20, total: 0, hasMore: false });
+      return res.status(200).json({ success: true, results: [], data: [], page: 1, limit: 20, total: 0, hasMore: false });
     }
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-    const limitNum = Math.min(parseInt(limit, 10) || 20, 50);
+    const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
     const skip = (pageNum - 1) * limitNum;
-    const trimmed = q.trim();
-    const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Query messages by case-insensitive regex search (matching content or attachment file names)
     const query = {
       roomId: { $in: accessibleRoomIds },
-      isDeleted: { $ne: true },
-      $or: [
+      isDeleted: { $ne: true }
+    };
+
+    if (rawSearch) {
+      const escapedQuery = rawSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
         { content: { $regex: escapedQuery, $options: 'i' } },
         { 'attachment.fileName': { $regex: escapedQuery, $options: 'i' } },
         { 'attachment.originalName': { $regex: escapedQuery, $options: 'i' } },
         { 'attachment.name': { $regex: escapedQuery, $options: 'i' } }
-      ]
-    };
+      ];
+    }
 
     if (before) {
       const beforeDate = new Date(before);
@@ -1024,8 +1087,14 @@ const searchMessages = async (req, res) => {
 
     const total = await ChatMessage.countDocuments(query);
     const results = await ChatMessage.find(query)
-      .populate('senderId', 'name username email avatarUrl')
+      .populate('senderId', 'name username email avatarUrl role')
       .populate('roomId', 'name title type')
+      .populate('mentions', 'name username email')
+      .populate('pinnedBy', 'name username email')
+      .populate({
+        path: 'reactions.user',
+        select: 'name username email'
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -1036,6 +1105,7 @@ const searchMessages = async (req, res) => {
     return res.status(200).json({
       success: true,
       results: results || [],
+      data: results || [],
       page: pageNum,
       limit: limitNum,
       total,
@@ -1043,7 +1113,135 @@ const searchMessages = async (req, res) => {
     });
   } catch (error) {
     console.error('Error searching messages:', error);
-    return res.status(200).json({ success: true, results: [], total: 0, hasMore: false, error: error.message });
+    return res.status(200).json({ success: true, results: [], data: [], total: 0, hasMore: false, error: error.message });
+  }
+};
+
+/**
+ * Toggle reaction (emoji) on a chat message
+ */
+const toggleReaction = async (req, res) => {
+  try {
+    const messageId = req.params.messageId || req.body.messageId;
+    const emoji = (req.body.emoji || req.body.reaction || '').trim();
+    const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.userId || req.body.senderId);
+
+    if (!messageId || !mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing message ID' });
+    }
+    if (!emoji) {
+      return res.status(400).json({ success: false, message: 'Emoji is required' });
+    }
+    if (!rawUserId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const userIdStr = String(rawUserId);
+    const userObjId = mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : rawUserId;
+
+    const message = await ChatMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    message.reactions = message.reactions || [];
+    const existingIndex = message.reactions.findIndex(
+      (r) => r.emoji === emoji && String(r.user?._id || r.user) === userIdStr
+    );
+
+    let action = 'added';
+    if (existingIndex > -1) {
+      message.reactions.splice(existingIndex, 1);
+      action = 'removed';
+    } else {
+      message.reactions.push({ emoji, user: userObjId });
+    }
+
+    await message.save();
+
+    const populatedMsg = await ChatMessage.findById(message._id)
+      .populate('reactions.user', 'name username email')
+      .populate('senderId', 'name username email role')
+      .lean();
+
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    if (io && message.roomId) {
+      io.to(String(message.roomId)).emit('message-reaction-updated', {
+        messageId: String(message._id),
+        roomId: String(message.roomId),
+        reactions: populatedMsg.reactions,
+        action,
+        emoji,
+        userId: userIdStr
+      });
+      io.to(String(message.roomId)).emit('receive-reaction', {
+        messageId: String(message._id),
+        reactions: populatedMsg.reactions
+      });
+    }
+
+    return res.json({
+      success: true,
+      action,
+      data: populatedMsg.reactions,
+      reactions: populatedMsg.reactions,
+      message: populatedMsg
+    });
+  } catch (error) {
+    console.error('Error in toggleReaction:', error);
+    res.status(500).json({ success: false, message: 'Failed to update reaction', error: error.message });
+  }
+};
+
+/**
+ * Toggle pin state on a chat message
+ */
+const togglePinMessage = async (req, res) => {
+  try {
+    const messageId = req.params.messageId || req.body.messageId;
+    const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.userId || req.body.senderId);
+
+    if (!messageId || !mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing message ID' });
+    }
+
+    const message = await ChatMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    const newPinnedState = !message.isPinned;
+    message.isPinned = newPinnedState;
+    message.pinnedBy = newPinnedState ? (mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : rawUserId) : null;
+    message.pinnedAt = newPinnedState ? new Date() : null;
+
+    await message.save();
+
+    const populatedMsg = await ChatMessage.findById(message._id)
+      .populate('senderId', 'name username email role')
+      .populate('pinnedBy', 'name username email')
+      .lean();
+
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    if (io && message.roomId) {
+      io.to(String(message.roomId)).emit('message-pinned-updated', {
+        messageId: String(message._id),
+        roomId: String(message.roomId),
+        isPinned: newPinnedState,
+        pinnedBy: message.pinnedBy,
+        pinnedAt: message.pinnedAt
+      });
+    }
+
+    return res.json({
+      success: true,
+      isPinned: newPinnedState,
+      data: populatedMsg,
+      message: populatedMsg
+    });
+  } catch (error) {
+    console.error('Error in togglePinMessage:', error);
+    res.status(500).json({ success: false, message: 'Failed to update pinned state', error: error.message });
   }
 };
 
@@ -1640,6 +1838,8 @@ module.exports = {
   deleteMessage,
   editMessage,
   searchMessages,
+  toggleReaction,
+  togglePinMessage,
   markGroupAsRead,
   purgeOrphanChatFiles,
   forceReloadAllUsers,
