@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
