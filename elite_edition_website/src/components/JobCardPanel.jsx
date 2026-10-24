@@ -29,6 +29,7 @@ import JobCardStatusDashboard from './JobCardStatusDashboard';
 import DigitalPrintOperationsDashboard from './DigitalPrintOperationsDashboard';
 import StatusPill from './common/StatusPill';
 import JobStageProgressBar from './common/JobStageProgressBar';
+import { JobCardSkeletonGrid } from './common/Skeletons';
 import { SmartActionGroup, SmartIconButton } from './common/SmartActionGroup';
 import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
 import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
@@ -2774,12 +2775,15 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
     if (!payload.orderChatRoomId) delete payload.orderChatRoomId;
 
     try {
+      let savedResult = null;
       if (card?._id || card?.id) {
         const targetId = card._id || card.id;
-        await api.updateJobCard(targetId, payload);
+        const res = await api.updateJobCard(targetId, payload);
+        savedResult = (res && res.data) ? res.data : { ...card, ...payload, _id: targetId };
         triggerPushNotification('📝 Job Card Updated', `Job Card #${form.jobNo} saved successfully.`, 'info');
       } else {
-        await api.createJobCard(payload);
+        const res = await api.createJobCard(payload);
+        savedResult = (res && res.data) ? res.data : { ...payload, _id: 'card_' + Date.now() };
         triggerPushNotification('✨ Job Card Created', `Job Card #${form.jobNo} created successfully!`, 'success');
         const isTestRecord = (
           activeUser?.role === 'qa-automation' ||
@@ -2793,7 +2797,7 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
           dispatchScreenGroupEvent('jobcards', 'New Job Card Created 🚀', `Job Card #${form.jobNo} for ${form.party || 'Customer'} was created and dispatched to Job Cards Group.`, 'jobcards_list');
         }
       }
-      onSave();
+      onSave(savedResult);
     } catch (err) {
       console.error('Save Job Card error:', err);
       const msg = err.message || 'Failed to save job card. Please check server logs or network.';
@@ -3874,12 +3878,21 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       type: 'danger'
     });
     if (!confirmed) return;
+
+    // OPTIMISTIC UI: Instant 0ms visual removal from screen
+    const previousCards = [...cards];
+    setCards(prev => prev.filter(c => String(c._id || c.id) !== String(id)));
+    setTotal(prev => Math.max(0, prev - 1));
+
     try {
       await api.deleteJobCard(id);
       triggerPushNotification('🗑️ Job Card Deleted', `Job Card #${jobNo} removed.`, 'warning');
       triggerGlobalDataRefresh('jobcards');
-      fetchCards();
+      fetchCards(true); // silent background synchronization
     } catch (err) {
+      // Rollback on failure
+      setCards(previousCards);
+      setTotal(prev => prev + 1);
       triggerEliteAlert('Delete Failed', err.message || 'Failed to delete.', 'error');
     }
   };
@@ -4008,10 +4021,22 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
     setShowForm(true);
   };
   const openEdit = (c) => { setFormCard(c); setShowForm(true); };
-  const onSaved  = () => {
+  const onSaved = (savedCard) => {
     setShowForm(false);
+    if (savedCard) {
+      // OPTIMISTIC UI: Instant 0ms visual injection/update in memory
+      const targetId = String(savedCard._id || savedCard.id || '');
+      setCards(prev => {
+        const prevArr = Array.isArray(prev) ? prev : [];
+        const exists = prevArr.some(c => String(c._id || c.id) === targetId);
+        if (exists) {
+          return prevArr.map(c => (String(c._id || c.id) === targetId ? { ...c, ...savedCard } : c));
+        }
+        return [savedCard, ...prevArr];
+      });
+    }
     triggerGlobalDataRefresh('jobcards');
-    fetchCards();
+    fetchCards(true); // silent background synchronization
   };
 
   const MACHINE_COLOR = { GRANDO:'#3b82f6', PRINTDOT:'#ef4444' };
@@ -4245,41 +4270,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
 
       {/* Cards Grid / Skeleton Loading */}
       {loading && cards.length === 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem', width: '100%' }}>
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div
-              key={i}
-              className="glass-panel"
-              style={{
-                padding: '1.25rem',
-                borderRadius: '16px',
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.85rem'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ width: '90px', height: '24px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
-                <div style={{ width: '80px', height: '20px', background: '#f1f5f9', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                <div style={{ width: '64px', height: '64px', background: '#f1f5f9', borderRadius: '10px', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ width: '70%', height: '14px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
-                  <div style={{ width: '50%', height: '12px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
-                  <div style={{ width: '40%', height: '12px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
-                </div>
-              </div>
-              <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '3px', animation: 'pulse 1.5s infinite', marginTop: '4px' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid #f8fafc' }}>
-                <div style={{ width: '60px', height: '12px', background: '#f1f5f9', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
-                <div style={{ width: '100px', height: '28px', background: '#f1f5f9', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
-              </div>
-            </div>
-          ))}
-        </div>
+        <JobCardSkeletonGrid count={8} />
       ) : cards.length === 0 ? (
         <div className="glass-panel" style={{ padding:'3rem', textAlign:'center' }}>
           <FileText size={48} color="var(--text-muted)" style={{ opacity:0.4 }}/>

@@ -10,6 +10,7 @@ import ToolResultDispatcher from './cards/ToolResultDispatcher';
 import ChatContainer from './cards/ChatContainer';
 import EmojiPickerPopover from './EmojiPickerPopover';
 import { useFileUpload } from '../hooks/useFileUpload';
+import { ChatStreamSkeleton } from './common/Skeletons';
 import '../styles/communication.css';
 import {
   MessageSquare,
@@ -5871,12 +5872,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   }
 
                   if (loadingMessages) {
-                    return (
-                      <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                        <RefreshCw size={20} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
-                        <div>Loading stream history...</div>
-                      </div>
-                    );
+                    return <ChatStreamSkeleton count={5} />;
                   }
 
                   if (streamHistoryError) {

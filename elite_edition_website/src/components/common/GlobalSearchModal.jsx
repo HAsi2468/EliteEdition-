@@ -27,6 +27,7 @@ import {
 import { api } from '../../services/api';
 import { triggerAIMeasurementModal } from './AIMeasurementAgentModal';
 import { AVAILABLE_SCREENS } from '../../config/screensConfig';
+import { TableSkeleton } from './Skeletons';
 
 /**
  * Intelligent Fuzzy Matching Algorithm
@@ -629,9 +630,12 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectResult, activeCompa
         {/* Results Container */}
         <div style={{ overflowY: 'auto', flex: 1, padding: '4px 0' }}>
           {loading && (
-            <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
-              <RefreshCw size={14} className="spin-loader" />
-              <span>Querying ERP database...</span>
+            <div style={{ padding: '12px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
+                <Sparkles size={14} color="#3b82f6" />
+                <span>Searching ERP records...</span>
+              </div>
+              <TableSkeleton rows={3} cols={2} />
             </div>
           )}
 
