@@ -2167,8 +2167,39 @@ const syncFusingFromDelivery = async (req, res) => {
   }
 };
 
+const getJobCardAuditTrail = async (req, res) => {
+  try {
+    const param = req.params.id;
+    let card = null;
+    if (mongoose.Types.ObjectId.isValid(param)) {
+      card = await db.JobCard.findById(param).select('_id jobNo auditTrail created_date_time createdBy createdByName modified_date_time updatedBy updatedByName').lean();
+    }
+    if (!card) {
+      card = await db.JobCard.findOne({
+        $or: [{ jobNo: param }, { jobNo: `JOB NO.- ${param}` }, { jobNo: String(param).replace('JOB NO.- ', '') }]
+      }).select('_id jobNo auditTrail created_date_time createdBy createdByName modified_date_time updatedBy updatedByName').lean();
+    }
+    if (!card) {
+      return res.status(404).json({ success: false, error: 'Job Card not found' });
+    }
+
+    res.json({
+      success: true,
+      jobNo: card.jobNo,
+      createdAt: card.created_date_time,
+      createdBy: card.createdByName || card.createdBy,
+      updatedAt: card.modified_date_time,
+      updatedBy: card.updatedByName || card.updatedBy,
+      auditTrail: Array.isArray(card.auditTrail) ? card.auditTrail : []
+    });
+  } catch (err) {
+    logger.error('getJobCardAuditTrail error: %o', err);
+    res.status(500).json({ success: false, error: 'Failed to retrieve audit trail' });
+  }
+};
+
 module.exports = {
-  getAllJobCards, getJobCard, createJobCard, createClientBulkOrder, updateJobCard,
+  getAllJobCards, getJobCard, getJobCardAuditTrail, createJobCard, createClientBulkOrder, updateJobCard,
   deleteJobCard, calcExpTimeEndpoint, getNextJobCardNumber, downloadJobCardPdf,
   downloadBulkJobCardsPdf, calculatePrintCost, updateProductionStage, updateProofingStatus,
   syncFusingFromDelivery

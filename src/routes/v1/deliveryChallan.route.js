@@ -10,6 +10,7 @@ router.get('/next-no', deliveryChallanController.getNextChallanNo);
 router.get('/', deliveryChallanController.getChallans);
 router.post('/', deliveryChallanController.createChallan);
 router.get('/:id', deliveryChallanController.getChallanById);
+router.get('/:id/audit-trail', deliveryChallanController.getChallanAuditTrail);
 router.put('/:id', deliveryChallanController.updateChallan);
 router.delete('/:id', deliveryChallanController.deleteChallan);
 

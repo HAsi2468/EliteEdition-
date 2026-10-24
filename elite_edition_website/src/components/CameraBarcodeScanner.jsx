@@ -36,8 +36,11 @@ export default function CameraBarcodeScanner({
   const [currentCameraIdx, setCurrentCameraIdx] = useState(0);
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorchSupport, setHasTorchSupport] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [continuousMode, setContinuousMode] = useState(true);
+  const [batchCount, setBatchCount] = useState(0);
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const recentBatchCodesRef = useRef(new Map());
 
   const html5QrcodeRef = useRef(null);
   const isStartingRef = useRef(false);
@@ -104,11 +107,21 @@ export default function CameraBarcodeScanner({
           const cleanText = (decodedText || '').trim();
           if (!cleanText) return;
 
-          // Throttle identical scans within 800ms
-          if (cleanText === lastCodeRef.current && now - lastScanTimeRef.current < 800) {
+          // Warehouse Continuous Scan: Check for duplicate scan in active session
+          const lastSeen = recentBatchCodesRef.current.get(cleanText);
+          if (lastSeen && (now - lastSeen < 12000)) {
+            try {
+              if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate([150, 70, 150]);
+              }
+            } catch (_) {}
+            playErrorBeep();
+            setDuplicateWarning(`⚠️ Duplicate SKU: ${cleanText} already scanned in this batch!`);
+            setTimeout(() => setDuplicateWarning(null), 3000);
             return;
           }
 
+          recentBatchCodesRef.current.set(cleanText, now);
           lastScanTimeRef.current = now;
           lastCodeRef.current = cleanText;
 
@@ -121,6 +134,8 @@ export default function CameraBarcodeScanner({
 
           if (isMounted) {
             setLastScannedCode(cleanText);
+            setBatchCount(prev => prev + 1);
+            setDuplicateWarning(null);
             playSuccessBeep();
             if (onScanRef.current) {
               onScanRef.current(cleanText);
@@ -381,6 +396,81 @@ export default function CameraBarcodeScanner({
               <div className="barcode-laser-beam" />
             )}
           </>
+        )}
+      </div>
+
+      {/* Duplicate Alert Banner */}
+      {duplicateWarning && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.45rem 0.85rem',
+          background: 'rgba(234, 88, 12, 0.95)',
+          color: '#ffffff',
+          fontWeight: 700,
+          fontSize: '0.78rem',
+          borderTop: '2px solid #ea580c',
+          animation: 'fadeIn 0.15s ease'
+        }}>
+          <span>{duplicateWarning}</span>
+          <button
+            type="button"
+            onClick={() => setDuplicateWarning(null)}
+            style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Warehouse Continuous Mode Toolbar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0.35rem 0.85rem',
+        background: '#0a0f1d',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        fontSize: '0.72rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: 'rgba(16, 185, 129, 0.15)',
+            border: '1px solid #10b981',
+            color: '#10b981',
+            borderRadius: '999px',
+            padding: '2px 8px',
+            fontWeight: 700
+          }}>
+            ⚡ Continuous Mode: ON
+          </span>
+          <span style={{ color: '#94a3b8', fontWeight: 600 }}>
+            Batch: <strong style={{ color: '#38bdf8' }}>{batchCount}</strong> scanned
+          </span>
+        </div>
+        {batchCount > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              recentBatchCodesRef.current.clear();
+              setBatchCount(0);
+              setDuplicateWarning(null);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '0.68rem',
+              textDecoration: 'underline'
+            }}
+          >
+            Reset Batch
+          </button>
         )}
       </div>
 

@@ -21,6 +21,7 @@ router.post('/client-bulk-order', ctrl.createClientBulkOrder);
 router.route('/')
   .get(ctrl.getAllJobCards)
   .post(productionVarianceMiddleware, ctrl.createJobCard);
+router.get('/:id/audit-trail', verifyRecordOwnership('JobCard', 'party'), ctrl.getJobCardAuditTrail);
 router.route('/:id')
   .get(verifyRecordOwnership('JobCard', 'party'), ctrl.getJobCard)
   .put(verifyRecordOwnership('JobCard', 'party'), productionVarianceMiddleware, ctrl.updateJobCard)

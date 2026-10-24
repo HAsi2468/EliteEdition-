@@ -76,7 +76,18 @@ const deliveryChallanSchema = new mongoose.Schema(
       type: String, 
       default: '1. Goods dispatched in sound condition.\n2. Receiver acknowledgment required on delivery.\n3. Subject to local jurisdiction only.' 
     },
-    createdBy: { type: String, default: 'Admin' }
+    createdBy: { type: String, default: 'Admin' },
+    auditTrail: [
+      {
+        performedBy: { type: String, default: '' },
+        performedByName: { type: String, default: '' },
+        performedById: { type: String, default: '' },
+        action: { type: String, default: 'UPDATE' },
+        timestamp: { type: Date, default: Date.now },
+        details: { type: String, default: '' },
+        changesSummary: { type: String, default: '' }
+      }
+    ]
   },
   {
     timestamps: true

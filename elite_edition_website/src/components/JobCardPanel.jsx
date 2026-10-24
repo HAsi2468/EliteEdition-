@@ -4,10 +4,14 @@ import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
   AlertCircle, Cpu, X, Save, Eye, Image, Image as ImageIcon, LayoutGrid, List, Send, Download, Receipt, Loader, User,
-  Building2, Scissors, SlidersHorizontal, ZoomIn, Layers, ShieldCheck, Truck, Flame, Sparkles, ExternalLink, Activity
+  Building2, Scissors, SlidersHorizontal, ZoomIn, Layers, ShieldCheck, Truck, Flame, Sparkles, ExternalLink, Activity,
+  History
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import ErrorBoundary from './common/ErrorBoundary';
+import DocumentPresence from './common/DocumentPresence';
+import AuditTrailModal from './common/AuditTrailModal';
+import { socketManager } from '../services/socketManager';
 import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
@@ -2444,6 +2448,7 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
   const [form, setForm] = useState(card ? { ...card } : { ...BLANK });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showAuditModal, setShowAuditModal] = useState(false);
 
   // Autofill from Design Catalogue states
   const [designsList, setDesignsList] = useState([]);
@@ -2830,7 +2835,40 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
                 <p style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginTop:1 }}>Elite Digital Prints</p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="btn-icon"><X size={16}/></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {card && (card._id || card.id) && (
+                <button
+                  type="button"
+                  onClick={() => setShowAuditModal(true)}
+                  className="btn-secondary"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="View field-by-field revision history"
+                >
+                  <History size={13} />
+                  <span>Audit Trail</span>
+                </button>
+              )}
+              <button type="button" onClick={onClose} className="btn-icon"><X size={16}/></button>
+            </div>
+          </div>
+
+          {/* Collaborative Document Presence Bar */}
+          <div style={{ padding: '4px 1.5rem', background: 'rgba(0,0,0,0.1)' }}>
+            <DocumentPresence
+              socket={socketManager.socket}
+              docType="JobCard"
+              docId={card?._id || card?.id || 'new'}
+              currentUser={currentUser}
+              isEditing={true}
+            />
           </div>
 
           {/* Scrollable body */}
@@ -3370,6 +3408,15 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
           </button>
         </div>
       </form>
+
+      {showAuditModal && (
+        <AuditTrailModal
+          entityType="JobCard"
+          entityId={card?._id || card?.id}
+          entityTitle={`Job Card #${form.jobNo || card?.jobNo}`}
+          onClose={() => setShowAuditModal(false)}
+        />
+      )}
 
       {showAiModal && (
         <AIMeasurementAgentModal

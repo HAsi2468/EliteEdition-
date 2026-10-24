@@ -106,6 +106,7 @@ import SystemMaintenanceLockScreen from './components/SystemMaintenanceLockScree
 import { useSocket } from './contexts/SocketContext';
 import { socketManager } from './services/socketManager';
 import GlobalSearchModal from './components/common/GlobalSearchModal';
+import OfflineSyncBadge from './components/common/OfflineSyncBadge';
 import AIMeasurementAgentModal from './components/common/AIMeasurementAgentModal';
 import MobileBottomNav from './components/common/MobileBottomNav';
 import UndoToastContainer from './components/common/UndoToast';
@@ -2190,6 +2191,7 @@ export default function App() {
         <div style={styles.headerRight} className="header-right-wrap">
           {isMobile ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+              <OfflineSyncBadge />
               <button
                 type="button"
                 onClick={() => setShowGlobalSearch(true)}
@@ -2386,6 +2388,7 @@ export default function App() {
             </div>
           ) : (
             <>
+              <OfflineSyncBadge />
               <button
                 type="button"
                 onClick={() => setShowGlobalSearch(true)}

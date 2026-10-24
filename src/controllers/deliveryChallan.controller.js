@@ -248,18 +248,50 @@ const createChallan = async (req, res) => {
 // ── PUT /delivery-challans/:id ────────────────────────────────────────────────
 const updateChallan = async (req, res) => {
   try {
+    const existing = await DeliveryChallan.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Delivery Challan not found' });
+    }
+
     const body = { ...req.body };
     const computed = calculateChallanTotals(body);
     Object.assign(body, computed);
+
+    const editorName = req.user?.name || req.body.updatedBy || req.headers['x-user-name'] || 'Staff User';
+    const editorId = req.user?._id || req.body.updatedById || req.headers['x-user-id'] || '';
+
+    // Track field-by-field diffs for Audit Trail
+    const changesArr = [];
+    const fieldsToTrack = [
+      ['partyName', 'Party Name'],
+      ['companyEntity', 'Company Entity'],
+      ['status', 'Status'],
+      ['totalQty', 'Total Qty'],
+      ['grandTotal', 'Grand Total'],
+      ['notes', 'Notes']
+    ];
+    fieldsToTrack.forEach(([field, label]) => {
+      if (body[field] !== undefined && String(body[field]).trim() !== String(existing[field] || '').trim()) {
+        changesArr.push(`${label}: '${existing[field] || 'None'}' ➔ '${body[field]}'`);
+      }
+    });
+
+    const auditEntry = {
+      performedBy: editorName,
+      performedByName: editorName,
+      performedById: String(editorId),
+      action: 'UPDATE',
+      timestamp: new Date(),
+      details: changesArr.length > 0 ? `Changed: ${changesArr.join('; ')}` : 'Delivery Challan updated',
+      changesSummary: changesArr.join('; ')
+    };
+
+    body.auditTrail = Array.isArray(existing.auditTrail) ? [...existing.auditTrail, auditEntry] : [auditEntry];
 
     const updated = await DeliveryChallan.findByIdAndUpdate(req.params.id, body, {
       new: true,
       runValidators: true
     });
-
-    if (!updated) {
-      return res.status(404).json({ success: false, error: 'Delivery Challan not found' });
-    }
 
     // Auto-sync updated challan to Sister Company's Raw Material Inward
     try {
@@ -573,10 +605,33 @@ const downloadChallanPdf = async (req, res) => {
   }
 };
 
+const getChallanAuditTrail = async (req, res) => {
+  try {
+    const challan = await DeliveryChallan.findById(req.params.id)
+      .select('_id challanNo auditTrail createdAt createdBy updatedAt')
+      .lean();
+    if (!challan) {
+      return res.status(404).json({ success: false, error: 'Delivery Challan not found' });
+    }
+    res.json({
+      success: true,
+      challanNo: challan.challanNo,
+      createdAt: challan.createdAt,
+      createdBy: challan.createdBy,
+      updatedAt: challan.updatedAt,
+      auditTrail: Array.isArray(challan.auditTrail) ? challan.auditTrail : []
+    });
+  } catch (error) {
+    logger.error('deliveryChallan.getChallanAuditTrail error: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   getNextChallanNo,
   getChallans,
   getChallanById,
+  getChallanAuditTrail,
   createChallan,
   updateChallan,
   deleteChallan,

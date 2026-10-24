@@ -17,6 +17,32 @@ const getMemberIdString = (m) => {
 };
 
 const activeUsers = new Map(); // socket.id -> userId
+const documentRoomsMap = new Map(); // roomKey -> Map(socket.id -> { user, action, joinedAt })
+
+function broadcastDocumentPresence(io, roomKey, docType, docId) {
+  const roomUsers = documentRoomsMap.get(roomKey);
+  const viewers = [];
+  if (roomUsers) {
+    const userMap = new Map();
+    for (const entry of roomUsers.values()) {
+      if (entry && entry.user && entry.user.id) {
+        const uid = String(entry.user.id);
+        const existing = userMap.get(uid);
+        if (!existing || entry.action === 'editing') {
+          userMap.set(uid, {
+            ...entry.user,
+            id: uid,
+            action: entry.action,
+            joinedAt: entry.joinedAt
+          });
+        }
+      }
+    }
+    viewers.push(...userMap.values());
+  }
+  io.to(roomKey).emit('document:presence_update', { docType, docId, viewers });
+}
+
 const getOnlineUserIds = () => {
   return Array.from(new Set(activeUsers.values()));
 };
@@ -234,6 +260,55 @@ const setupSockets = (io) => {
       } else {
         console.warn(`[Socket Security] Denied company switch: ${socket.id} -> ${canonical}`);
       }
+    });
+
+    // ── Collaborative Document Presence (Job Cards, Challans, Invoices) ──
+    socket.on('document:join', ({ docType, docId, action = 'viewing' }) => {
+      if (!docType || !docId) return;
+      const roomKey = `doc:${docType}:${docId}`;
+      socket.join(roomKey);
+
+      if (!documentRoomsMap.has(roomKey)) {
+        documentRoomsMap.set(roomKey, new Map());
+      }
+      documentRoomsMap.get(roomKey).set(socket.id, {
+        user: {
+          id: socket.userId,
+          name: socket.user?.name || socket.user?.username || 'Staff Member',
+          role: socket.user?.role || 'Staff',
+          email: socket.user?.email,
+          avatar: socket.user?.avatar
+        },
+        action: action === 'editing' ? 'editing' : 'viewing',
+        joinedAt: Date.now()
+      });
+
+      broadcastDocumentPresence(io, roomKey, docType, docId);
+    });
+
+    socket.on('document:action', ({ docType, docId, action }) => {
+      if (!docType || !docId) return;
+      const roomKey = `doc:${docType}:${docId}`;
+      const roomUsers = documentRoomsMap.get(roomKey);
+      if (roomUsers && roomUsers.has(socket.id)) {
+        const entry = roomUsers.get(socket.id);
+        entry.action = action === 'editing' ? 'editing' : 'viewing';
+        broadcastDocumentPresence(io, roomKey, docType, docId);
+      }
+    });
+
+    socket.on('document:leave', ({ docType, docId }) => {
+      if (!docType || !docId) return;
+      const roomKey = `doc:${docType}:${docId}`;
+      socket.leave(roomKey);
+      const roomUsers = documentRoomsMap.get(roomKey);
+      if (roomUsers) {
+        roomUsers.delete(socket.id);
+        if (roomUsers.size === 0) {
+          documentRoomsMap.delete(roomKey);
+        }
+      }
+      broadcastDocumentPresence(io, roomKey, docType, docId);
     });
 
     // 4. Client reconnection resync handler (requests missed events & messages)
@@ -1381,6 +1456,20 @@ const setupSockets = (io) => {
         }
         io.emit('presence-change', { userId: disconnectedUid, isOnline: false });
         io.emit('presence-sync', getOnlineUserIds());
+      }
+
+      // Clean up collaborative document presence for this socket
+      for (const [roomKey, roomUsers] of documentRoomsMap.entries()) {
+        if (roomUsers.has(socket.id)) {
+          roomUsers.delete(socket.id);
+          const parts = roomKey.split(':');
+          const docType = parts[1];
+          const docId = parts[2];
+          if (roomUsers.size === 0) {
+            documentRoomsMap.delete(roomKey);
+          }
+          broadcastDocumentPresence(io, roomKey, docType, docId);
+        }
       }
     });
   });
