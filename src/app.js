@@ -168,10 +168,10 @@ app.use(fieldLevelSanitizer);
 
 
 
-// limit repeated failed requests to auth endpoints & apply global API rate limiter in production
+// Strict Brute-Force Rate Limiting for authentication & global API protection
+app.use(['/v1/auth', '/api/v1/auth', '/v1/clients/login', '/api/v1/clients/login'], authLimiter);
 if (config.env === 'production') {
-	app.use('/v1/auth', authLimiter);
-	app.use('/v1', apiLimiter);
+	app.use(['/v1', '/api/v1'], apiLimiter);
 }
 // Serve static uploads for Chat Image Mocks
 const path = require('path');

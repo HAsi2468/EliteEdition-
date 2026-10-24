@@ -12,6 +12,8 @@ const requireAuth = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
+    } else if (req.cookies && (req.cookies.accessToken || req.cookies.token)) {
+      token = req.cookies.accessToken || req.cookies.token;
     } else if (req.query && req.query.token) {
       token = req.query.token;
     }
@@ -20,13 +22,15 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         code: 'UNAUTHORIZED',
-        message: 'Authentication required. Please provide a valid Bearer token.'
+        message: 'Authentication required. Please provide a valid session cookie or Bearer token.'
       });
     }
 
     let decoded;
     try {
-      decoded = jwt.verify(token, config.jwt.secret || process.env.JWT_SECRET);
+      decoded = jwt.verify(token, config.jwt.secret || process.env.JWT_SECRET, {
+        algorithms: ['HS256']
+      });
     } catch (err) {
       return res.status(401).json({
         success: false,

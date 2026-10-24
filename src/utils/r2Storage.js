@@ -266,8 +266,17 @@ async function deleteR2Folder(folder) {
   return items.length;
 }
 
+function getR2PublicUrl() {
+  let publicBase = (config.r2 && config.r2.publicUrl ? config.r2.publicUrl : '').trim().replace(/\/+$/, '');
+  if (!publicBase && config.r2 && config.r2.bucketName && config.r2.accountId) {
+    publicBase = `https://${config.r2.bucketName}.${config.r2.accountId}.r2.cloudflarestorage.com`;
+  }
+  return publicBase;
+}
+
 module.exports = {
   isR2Configured,
+  getR2PublicUrl,
   uploadToR2,
   getPresignedR2UploadUrl,
   initiateMultipartR2Upload,

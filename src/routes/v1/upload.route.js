@@ -145,6 +145,63 @@ const upload = multer({
 });
 
 /**
+ * Validates a target URL against SSRF attacks (blocks AWS IMDS, loopback, private RFC-1918 IPs, file://, etc.)
+ */
+function isSafeImageUrl(targetUrl) {
+  if (!targetUrl || typeof targetUrl !== 'string') return false;
+  const trimmed = targetUrl.trim();
+
+  // Allow safe relative paths to local uploads
+  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+    if (trimmed.includes('..') || trimmed.includes('\\')) return false;
+    return true;
+  }
+
+  // Parse URL strictly
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch (e) {
+    return false;
+  }
+
+  // Strict HTTPS protocol enforcement (blocks file://, gopher://, http://, data://, etc.)
+  if (parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block localhost, IP literals, AWS IMDS, and loopbacks
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === '::1' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    /^169\.254\./.test(hostname) || // AWS IMDS Link-Local
+    /^10\./.test(hostname) ||        // RFC-1918 Private Class A
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) || // RFC-1918 Private Class B
+    /^192\.168\./.test(hostname) ||  // RFC-1918 Private Class C
+    /^127\./.test(hostname) ||       // Loopbacks
+    /^0\./.test(hostname) ||
+    /^\d+\.\d+\.\d+\.\d+$/.test(hostname) // Block all raw IP addresses
+  ) {
+    return false;
+  }
+
+  // Allowlist of trusted domain patterns (Cloudflare R2, AWS S3, Elite Edition ERP domains)
+  const isAllowedDomain =
+    hostname.endsWith('.r2.dev') ||
+    hostname.endsWith('.cloudflarestorage.com') ||
+    hostname.endsWith('eliteedition.in') ||
+    hostname.endsWith('.amazonaws.com');
+
+  return isAllowedDomain;
+}
+
+/**
  * GET /v1/upload/preview
  * Converts TIFF (.tif/.tiff) or large images into web-compatible JPEG on the fly using Sharp.
  * Allows browsers (Chrome/Firefox/Safari) to display TIFF artwork thumbnails and lightbox previews.
@@ -157,6 +214,14 @@ router.get('/preview', async (req, res) => {
     }
 
     const targetUrl = rawUrl.trim();
+
+    // SSRF Guard Check: Validate URL safety before attempting any network requests
+    if (!isSafeImageUrl(targetUrl)) {
+      return res.status(403).json({
+        error: 'Forbidden: Access to requested URL host or protocol is blocked by SSRF security policies.'
+      });
+    }
+
     let imageBuffer = null;
 
     // 1. If local file path
@@ -168,12 +233,15 @@ router.get('/preview', async (req, res) => {
       }
     }
 
-    // 2. If remote URL (e.g. Cloudflare R2 CDN or external)
+    // 2. If remote URL (Cloudflare R2 CDN or verified HTTPS domain)
     if (!imageBuffer) {
       if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
         // Assume R2 key if just a filename or relative path
         const { getR2PublicUrl } = require('../../utils/r2Storage');
         const remoteUrl = `${getR2PublicUrl()}/${targetUrl.replace(/^\/+/, '')}`;
+        if (!isSafeImageUrl(remoteUrl)) {
+          return res.status(403).json({ error: 'Forbidden: Invalid R2 object URL target.' });
+        }
         const resp = await axios.get(remoteUrl, {
           responseType: 'arraybuffer',
           timeout: 15000,

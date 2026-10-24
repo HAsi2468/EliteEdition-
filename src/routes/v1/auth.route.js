@@ -15,15 +15,17 @@ router.get('/csrf-token', csrfManager.handshakeHandler);
 router.post('/csrf-token', csrfManager.handshakeHandler);
 
 
+const { authLimiter } = require('../../middlewares/rateLimiter');
+
 // Existing routes
 router.post(
   '/register',
   validate(authValidation.register),
   authController.register
 );
-router.post('/login', validate(authValidation.login), authController.login);
-router.post('/refresh-tokens', authController.refreshTokens);
-router.post('/refresh', authController.refreshTokens);
+router.post('/login', authLimiter, validate(authValidation.login), authController.login);
+router.post('/refresh-tokens', authLimiter, authController.refreshTokens);
+router.post('/refresh', authLimiter, authController.refreshTokens);
 router.post('/logout', authController.logout);
 router.post(
   '/forgot-password',

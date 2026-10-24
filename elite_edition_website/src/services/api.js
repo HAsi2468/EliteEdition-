@@ -20,6 +20,11 @@ export const setBaseUrl = (url) => {
   localStorage.setItem('elite_api_base_url', cleaned);
 };
 
+// In-Memory Token Store: Keeps JWTs out of window.localStorage to block XSS token exfiltration
+let inMemoryAccessToken = null;
+export const setInMemoryToken = (t) => { inMemoryAccessToken = t; };
+export const getInMemoryToken = () => inMemoryAccessToken;
+
 // CSRF Token Resolver & Injector for State-Changing Requests (Phase 3)
 let inMemoryCsrfToken = null;
 let csrfRefreshPromise = null;
@@ -111,7 +116,7 @@ const request = async (path, options = {}) => {
   while (attempt <= maxRetries) {
     attempt++;
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
+    const token = inMemoryAccessToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('elite_auth_token') : null);
 
     // Note: Do not prematurely block on navigator.onLine if retrying; browsers frequently report
     // false negatives on wake-from-sleep or WiFi reconnect handoffs. Let fetch attempt or retry handle it.
@@ -281,12 +286,13 @@ export const api = {
     });
     if (data.tokens) {
       if (data.tokens.access && data.tokens.access.token) {
-        localStorage.setItem('elite_auth_token', data.tokens.access.token);
-        localStorage.setItem('token', data.tokens.access.token);
+        inMemoryAccessToken = data.tokens.access.token;
       }
-      if (data.tokens.refresh && data.tokens.refresh.token) {
-        localStorage.setItem('elite_refresh_token', data.tokens.refresh.token);
-      }
+      // Purge sensitive JWT tokens from localStorage to prevent XSS credential exfiltration.
+      // Authentication is now backed by HttpOnly cookies (withCredentials: true).
+      localStorage.removeItem('elite_auth_token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('elite_refresh_token');
       if (data.user) {
         localStorage.setItem('elite_user', JSON.stringify(data.user));
       }
@@ -302,12 +308,14 @@ export const api = {
   },
 
   logout() {
+    inMemoryAccessToken = null;
     localStorage.removeItem('elite_auth_token');
     localStorage.removeItem('token');
     localStorage.removeItem('elite_refresh_token');
     localStorage.removeItem('elite_user');
     localStorage.removeItem('elite_is_client');
     localStorage.removeItem('elite_client_data');
+    request('/auth/logout', { method: 'POST' }).catch(() => {});
     try {
       import('../utils/crossTabSync').then(m => m.broadcastCrossTab('AUTH_LOGOUT'));
     } catch (_) {}
@@ -386,7 +394,7 @@ export const api = {
   },
 
   isAuthenticated() {
-    return !!localStorage.getItem('elite_auth_token');
+    return Boolean(inMemoryAccessToken || (typeof localStorage !== 'undefined' && (localStorage.getItem('elite_user') || localStorage.getItem('elite_auth_token'))));
   },
 
   // Users Management
@@ -3075,8 +3083,11 @@ export const api = {
     if (res && res.success) {
       const token = res.tokens?.access?.token || res.token;
       if (token) {
-        localStorage.setItem('elite_auth_token', token);
+        inMemoryAccessToken = token;
       }
+      localStorage.removeItem('elite_auth_token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('elite_refresh_token');
       const user = res.user || { ...res.client, role: 'Client', isClient: true };
       localStorage.setItem('elite_user', JSON.stringify(user));
       localStorage.setItem('elite_is_client', 'true');

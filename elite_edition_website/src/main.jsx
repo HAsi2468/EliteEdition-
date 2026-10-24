@@ -8,9 +8,13 @@ import { RootErrorBoundary } from './components/RootErrorBoundary'
 import { installGlobalDialogInterceptors } from './services/dialogService.js'
 import { setupGlobalCrashListeners } from './utils/globalCrashListeners'
 import { initERPTelemetry } from './telemetry/deviceTelemetry'
+import axios from 'axios'
 import './services/telemetryService.ts'
 import { initCrossTabSync } from './utils/crossTabSync'
 import { enforceGlobalDDMMYYYYFormat } from './utils/dateUtils'
+
+// Enforce withCredentials: true globally across all HTTP network clients
+axios.defaults.withCredentials = true;
 
 // Initialize device & hardware telemetry, enterprise dialog, global error and cross-tab sync listeners
 initERPTelemetry()

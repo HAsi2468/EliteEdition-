@@ -12,6 +12,7 @@
  */
 
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { setInMemoryToken } from './api';
 
 export interface TokenRefreshResponse {
   tokens?: {
@@ -148,13 +149,12 @@ export class SilentAuthInterceptor {
       throw new Error('Refresh response missing access token');
     }
 
-    // Persist new access token in storage
+    // Persist new access token in in-memory session and purge localStorage tokens
+    setInMemoryToken(newAccessToken);
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('elite_auth_token', newAccessToken);
-      localStorage.setItem('token', newAccessToken);
-      if (data.tokens?.refresh?.token) {
-        localStorage.setItem('elite_refresh_token', data.tokens.refresh.token);
-      }
+      localStorage.removeItem('elite_auth_token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('elite_refresh_token');
     }
 
     return newAccessToken;

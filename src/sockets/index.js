@@ -28,9 +28,17 @@ const setupSockets = (io) => {
   // Authenticate socket connections & enforce strict company isolation
   io.use(async (socket, next) => {
     try {
+      let cookieToken = null;
+      if (socket.handshake.headers?.cookie) {
+        const match = socket.handshake.headers.cookie.match(/(?:^|;\s*)(?:accessToken|token|elite_auth_token)=([^;]+)/);
+        if (match) {
+          cookieToken = decodeURIComponent(match[1]);
+        }
+      }
       const raw = socket.handshake.auth?.token ||
                     socket.handshake.query?.token ||
-                    (socket.handshake.headers.authorization && socket.handshake.headers.authorization.replace(/^Bearer\s+/i, ''));
+                    (socket.handshake.headers.authorization && socket.handshake.headers.authorization.replace(/^Bearer\s+/i, '')) ||
+                    cookieToken;
 
       if (!raw) {
         return next(new Error('unauthorized'));

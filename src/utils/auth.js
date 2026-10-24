@@ -5,14 +5,17 @@ const config = require('../config/config');
 function generateToken(data, expiresMs, secret = config.jwt.secret) {
 	const token = jwt.sign(
 		{ exp: Math.floor(expiresMs / 1000), ...data },
-		secret
+		secret,
+		{ algorithm: 'HS256' }
 	);
 	return token;
 }
 
 async function verifyToken(token) {
 	try {
-		const payload = jwt.verify(token, config.jwt.secret);
+		const payload = jwt.verify(token, config.jwt.secret, {
+			algorithms: ['HS256']
+		});
 		return payload;
 	} catch (err) {
 		throw new Error(`Invalid token: ${err}`);
@@ -20,7 +23,7 @@ async function verifyToken(token) {
 }
 
 async function encryptData(string) {
-	const salt = await bycrypt.genSalt(10);
+	const salt = await bycrypt.genSalt(12);
 	const hashedString = await bycrypt.hash(string, salt);
 	return hashedString;
 }

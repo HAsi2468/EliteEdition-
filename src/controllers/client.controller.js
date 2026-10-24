@@ -1,5 +1,6 @@
 const Client = require('../db/models/client.model');
 const tokenService = require('../services/token.service');
+const { setAuthCookies, clearAuthCookies } = require('./auth.controller');
 
 /**
  * Get all clients with search and filter
@@ -243,6 +244,7 @@ const clientLogin = async (req, res) => {
     const client = await Client.findOne({ $or: mobileQueries });
 
     if (!client) {
+      clearAuthCookies(res);
       return res.status(401).json({
         success: false,
         message: 'No client account found with this mobile number. Please check your number or contact support.'
@@ -250,6 +252,7 @@ const clientLogin = async (req, res) => {
     }
 
     if (client.status === 'Inactive') {
+      clearAuthCookies(res);
       return res.status(403).json({
         success: false,
         message: 'Your client account is currently marked inactive. Please contact Elite Edition administration.'
@@ -257,6 +260,7 @@ const clientLogin = async (req, res) => {
     }
 
     if (String(client.password).trim() !== String(password).trim()) {
+      clearAuthCookies(res);
       return res.status(401).json({
         success: false,
         message: 'Incorrect password. Please verify your password and try again.'
@@ -267,6 +271,7 @@ const clientLogin = async (req, res) => {
     let tokens = null;
     try {
       tokens = await tokenService.generateAuthTokens({ userId: client.id || client._id });
+      setAuthCookies(res, tokens);
     } catch (tokenErr) {
       console.warn('Could not generate JWT tokens for client:', tokenErr.message);
     }

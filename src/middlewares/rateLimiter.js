@@ -2,39 +2,37 @@ const rateLimit = require('express-rate-limit');
 
 const authLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 100, // Generous limit for login attempts (100 per 15 min)
+	max: 5, // Strict brute-force shield: 5 failed attempts per 15 min window
 	skipSuccessfulRequests: true,
+	standardHeaders: true,
+	legacyHeaders: false,
 	skip: (req) => {
 		// Never rate-limit lightweight heartbeat pings or health probes
-		if (req.path === '/ping' || req.path === '/ping/' || req.url.includes('/ping')) {
+		if (req.path === '/ping' || req.path === '/ping/' || req.url.includes('/ping') || req.path.includes('/csrf-token')) {
 			return true;
 		}
 		return false;
 	},
 	message: {
 		code: 429,
-		message: 'Too many auth attempts from this IP, please try again after 15 minutes.',
+		error: 'Too many failed login attempts. Access is temporarily locked from this IP for 15 minutes to protect against brute-force attacks.',
 	},
 });
 
 const apiLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 100000, // Maximum ceiling (100,000 requests per 15 min) for flawless ERP performance
+	max: 3000, // 3,000 requests per 15 min ceiling for ERP operations
+	standardHeaders: true,
+	legacyHeaders: false,
 	skip: (req) => {
-		// Completely skip rate limiting for authenticated ERP staff or internal health checks
-		if (req.headers && req.headers.authorization) {
-			return true;
-		}
-		if (req.path === '/' || req.path === '/health') {
+		if (req.path === '/' || req.path === '/health' || req.path === '/api/health' || req.path === '/v1/health') {
 			return true;
 		}
 		return false;
 	},
-	standardHeaders: true,
-	legacyHeaders: false,
 	message: {
 		code: 429,
-		message: 'Too many requests from this IP, please try again later.',
+		error: 'Too many requests from this IP, please try again later.',
 	},
 });
 
