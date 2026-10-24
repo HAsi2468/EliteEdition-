@@ -74,6 +74,29 @@ const rawMaterialTransactionSchema = new mongoose.Schema(
     metersPerRoll: {
       type: Number,
     },
+    // Garment Industry Specifications
+    category: {
+      type: String,
+      trim: true,
+      default: 'Fabric',
+      index: true,
+    },
+    shade: {
+      type: String,
+      trim: true,
+    },
+    hsnCode: {
+      type: String,
+      trim: true,
+    },
+    location: {
+      type: String,
+      trim: true,
+    },
+    reorderLevel: {
+      type: Number,
+      default: 0,
+    },
     // Sister Company Inward & Verification Workflow
     isSisterTransfer: {
       type: Boolean,

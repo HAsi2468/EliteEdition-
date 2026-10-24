@@ -22,25 +22,88 @@ const getSelectedCanSize = (currentVal, options) => {
   return match || currentVal;
 };
 
+export const GARMENT_RAW_CATEGORIES = [
+  'All',
+  'Fabric',
+  'Trims & Thread',
+  'Buttons & Fasteners',
+  'Elastics & Laces',
+  'Interlining & Fusing',
+  'Labels & Tags',
+  'Packing Material',
+  'Other'
+];
+
+export const RAW_MATERIAL_UNITS = [
+  'Meters',
+  'Pieces (Pcs)',
+  'Cones / Spools',
+  'Gross (144 pcs)',
+  'Rolls',
+  'Kgs',
+  'Liters',
+  'Boxes',
+  'Packets',
+  'Sets'
+];
+
 export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print', initialTab = null } = {}) {
   const isDigitalPrint = /^elite\s*digital\s*print/i.test(companyEntity) || companyEntity === 'digital_print';
   const [activeTab, setActiveTab] = useState(() => {
     if (initialTab) return initialTab;
-    return isDigitalPrint ? 'dashboard' : 'sister_inward';
+    return 'dashboard';
   });
   const currentUser = api.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
   const [stock, setStock] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [materialsList, setMaterialsList] = useState(() => (
-    isDigitalPrint
-      ? ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink']
-      : ['Fabric Material', 'Grey Fabric', 'Finished Goods', 'Stitching Accessories', 'Packaging Material']
-  ));
+  const [materialsList, setMaterialsList] = useState(() => {
+    if (isDigitalPrint) {
+      return ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'];
+    }
+    const storageKey = `elite_custom_materials_${String(companyEntity || '').toLowerCase().replace(/\s+/g, '_')}`;
+    let saved = [];
+    try {
+      saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    } catch (e) {}
+    const defaultGarment = [
+      'Viscose Rayon Fabric',
+      'Cotton Fabric',
+      'Georgette Fabric',
+      'Polyester Sewing Thread',
+      'Buttons & Fasteners',
+      'Zippers & Sliders',
+      'Knitted / Woven Elastic',
+      'Laces & Borders',
+      'Fusing / Interlining',
+      'Brand Labels & Tags',
+      'Packaging Material'
+    ];
+    return [...new Set([...defaultGarment, ...saved])];
+  });
   const [vendorsList, setVendorsList] = useState([]);
   const [partiesList, setPartiesList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // ── Garment Category & Add New Material State ──
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [stockSearchQuery, setStockSearchQuery] = useState('');
+  const [isNewMaterialModalOpen, setIsNewMaterialModalOpen] = useState(false);
+  const [newMaterialSubmitting, setNewMaterialSubmitting] = useState(false);
+  const [newMaterialForm, setNewMaterialForm] = useState({
+    materialName: '',
+    category: 'Fabric',
+    unit: 'Meters',
+    shade: '',
+    panna: '',
+    hsnCode: '',
+    location: '',
+    initialQty: '',
+    unitRate: '',
+    reorderLevel: '10',
+    notes: ''
+  });
 
   // ── Sister Company Inward & Verification State ──
   const [sisterTransfers, setSisterTransfers] = useState([]);
@@ -852,6 +915,75 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     setOutwardForm(prev => ({ ...prev, qty: '' }));
   };
 
+  // ── Create New Garment Raw Material Catalog Entry ──
+  const handleCreateNewMaterial = async (e) => {
+    e.preventDefault();
+    if (!newMaterialForm.materialName || !newMaterialForm.materialName.trim()) {
+      alert('Please enter a valid raw material name');
+      return;
+    }
+    setNewMaterialSubmitting(true);
+    try {
+      const matName = newMaterialForm.materialName.trim();
+      const initQty = parseFloat(newMaterialForm.initialQty) || 0;
+      const rate = parseFloat(newMaterialForm.unitRate) || 0;
+      const reorder = parseFloat(newMaterialForm.reorderLevel) || 10;
+
+      const payload = {
+        companyEntity: companyEntity || 'Elite Edition',
+        materialName: matName,
+        category: newMaterialForm.category || 'Fabric',
+        unit: newMaterialForm.unit || 'Meters',
+        shade: newMaterialForm.shade ? newMaterialForm.shade.trim() : '',
+        panna: newMaterialForm.panna ? String(newMaterialForm.panna).trim() : '',
+        hsnCode: newMaterialForm.hsnCode ? newMaterialForm.hsnCode.trim() : '',
+        location: newMaterialForm.location ? newMaterialForm.location.trim() : '',
+        reorderLevel: reorder,
+        quantity: initQty,
+        unitPrice: rate,
+        totalAmount: initQty * rate,
+        vendor: 'Opening Stock / Direct Entry',
+        challanNo: 'OPENING-STOCK',
+        billDate: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split('T')[0],
+        remarks: newMaterialForm.notes || 'Opening stock & material catalog initialization'
+      };
+
+      await api.createRawMaterialInward(payload);
+
+      // Persist in custom materials cache
+      const storageKey = `elite_custom_materials_${String(companyEntity || '').toLowerCase().replace(/\s+/g, '_')}`;
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        if (!saved.includes(matName)) {
+          saved.push(matName);
+          localStorage.setItem(storageKey, JSON.stringify(saved));
+        }
+      } catch (err) {}
+
+      setMaterialsList(prev => [...new Set([...prev, matName])]);
+      setIsNewMaterialModalOpen(false);
+      setNewMaterialForm({
+        materialName: '',
+        category: 'Fabric',
+        unit: 'Meters',
+        shade: '',
+        panna: '',
+        hsnCode: '',
+        location: '',
+        initialQty: '',
+        unitRate: '',
+        reorderLevel: '10',
+        notes: ''
+      });
+      await fetchData();
+    } catch (err) {
+      alert('Failed to add raw material: ' + (err.message || 'Server error'));
+    } finally {
+      setNewMaterialSubmitting(false);
+    }
+  };
+
   const handleInwardSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -1160,7 +1292,45 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     return true;
   });
 
-  const filteredStock = stock.filter(item => matchesMaterialType(item.materialName, stockMaterialType));
+  const filteredStock = stock.filter(item => {
+    // 1. Material dropdown filter
+    if (stockMaterialType && stockMaterialType !== 'All' && !matchesMaterialType(item.materialName, stockMaterialType)) {
+      return false;
+    }
+    // 2. Garment Category filter
+    if (categoryFilter && categoryFilter !== 'All') {
+      const itemCat = String(item.category || '').toLowerCase();
+      const filterCat = String(categoryFilter).toLowerCase();
+      if (filterCat === 'fabric') {
+        if (!itemCat.includes('fabric')) return false;
+      } else if (filterCat === 'trims & thread') {
+        if (!itemCat.includes('trim') && !itemCat.includes('thread')) return false;
+      } else if (filterCat === 'buttons & fasteners') {
+        if (!itemCat.includes('button') && !itemCat.includes('fastener')) return false;
+      } else if (filterCat === 'elastics & laces') {
+        if (!itemCat.includes('elastic') && !itemCat.includes('lace')) return false;
+      } else if (filterCat === 'interlining & fusing') {
+        if (!itemCat.includes('interlining') && !itemCat.includes('fusing')) return false;
+      } else if (filterCat === 'labels & tags') {
+        if (!itemCat.includes('label') && !itemCat.includes('tag')) return false;
+      } else if (filterCat === 'packing material') {
+        if (!itemCat.includes('pack')) return false;
+      } else if (itemCat !== filterCat) {
+        return false;
+      }
+    }
+    // 3. Search query filter
+    if (stockSearchQuery && stockSearchQuery.trim()) {
+      const q = stockSearchQuery.toLowerCase().trim();
+      const matchesName = String(item.materialName || '').toLowerCase().includes(q);
+      const matchesCat = String(item.category || '').toLowerCase().includes(q);
+      const matchesShade = String(item.shade || '').toLowerCase().includes(q);
+      const matchesLoc = String(item.location || '').toLowerCase().includes(q);
+      const matchesHsn = String(item.hsnCode || '').toLowerCase().includes(q);
+      if (!matchesName && !matchesCat && !matchesShade && !matchesLoc && !matchesHsn) return false;
+    }
+    return true;
+  });
 
   const renderMaterialCell = (t) => {
     const nameLower = (t.materialName || '').toLowerCase();
@@ -1388,33 +1558,16 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Layers size={20} /> Current Raw Material Stock
-              </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.25rem', fontWeight: 800 }}>
+                  <Layers size={22} color="var(--primary)" /> Raw Materials Stock Overview
+                </h2>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {companyEntity} · Garment Industry Materials Catalog & Inventory Tracking
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                {/* Material Type / Category Filter */}
-                <select
-                  style={{ ...inputStyle, width: '180px', fontWeight: 700 }}
-                  value={stockMaterialType}
-                  onChange={e => setStockMaterialType(e.target.value)}
-                >
-                  <option value="All">All Material Types</option>
-                  {isDigitalPrint && (
-                    <>
-                      <option value="Ink">All Inks (Grando / Printdot)</option>
-                      <option value="Paper">All Papers (Sublimation / Butter)</option>
-                      <option value="Sublimation Paper">Sublimation Paper</option>
-                      <option value="Butter Paper">Butter Paper</option>
-                      <option value="Grando Ink">Grando Ink</option>
-                      <option value="Printdot Ink">Printdot Ink</option>
-                    </>
-                  )}
-                  {materialsList.filter(m => !['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'].includes(m)).map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-
                 {/* Standard ERP DateRangePicker */}
                 <DateRangePicker
                   preset={stockPreset}
@@ -1431,24 +1584,146 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   }}
                 />
 
-                <button onClick={() => { setEditingTransaction(null); setIsInwardOpen(true); handleInwardTabChange(isDigitalPrint ? 'Sublimation Paper' : (materialsList[0] || 'Fabric Material')); setInwardItems([]); }} className="btn-primary" style={{ gap: '0.4rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsNewMaterialModalOpen(true)}
+                  className="btn-primary"
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    gap: '0.4rem',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                  }}
+                  title="Add new raw material definition for this company"
+                >
+                  <Plus size={16} /> Add Raw Material
+                </button>
+                <button
+                  onClick={() => { setEditingTransaction(null); setIsInwardOpen(true); handleInwardTabChange(isDigitalPrint ? 'Sublimation Paper' : (materialsList[0] || 'Fabric Material')); setInwardItems([]); }}
+                  className="btn-primary"
+                  style={{ gap: '0.4rem' }}
+                >
                   <ArrowDownToLine size={16} /> Stock Inward
                 </button>
-                <button onClick={() => { setIsOutwardOpen(true); handleOutwardTabChange(isDigitalPrint ? 'Sublimation Paper' : (materialsList[0] || 'Fabric Material')); setOutwardItems([]); }} className="btn-secondary" style={{ gap: '0.4rem' }}>
+                <button
+                  onClick={() => { setIsOutwardOpen(true); handleOutwardTabChange(isDigitalPrint ? 'Sublimation Paper' : (materialsList[0] || 'Fabric Material')); setOutwardItems([]); }}
+                  className="btn-secondary"
+                  style={{ gap: '0.4rem' }}
+                >
                   <ArrowUpFromLine size={16} /> Stock Outward
                 </button>
               </div>
             </div>
 
             {/* Summary Bar */}
-            {stock.length > 0 && (
-              <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Items Configured</span><br /><strong>{materialsList.length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Active Stock Profiles</span><br /><strong>{filteredStock.length} / {stock.length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Inward Transactions</span><br /><strong style={{ color: 'var(--success)' }}>{stockFilteredTx.filter(t => t.type === 'INWARD').length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Outward Transactions</span><br /><strong style={{ color: 'var(--danger)' }}>{stockFilteredTx.filter(t => t.type === 'OUTWARD').length}</strong></div>
+            <div style={{ marginBottom: '1.25rem', padding: '0.9rem 1.25rem', background: 'rgba(255,255,255,0.04)', borderRadius: '10px', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Company Entity</span><br /><strong style={{ color: 'var(--primary)' }}>{companyEntity}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Catalog Items</span><br /><strong>{materialsList.length}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Active Stock Profiles</span><br /><strong>{filteredStock.length} / {stock.length}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Inward Transactions</span><br /><strong style={{ color: 'var(--success)' }}>{stockFilteredTx.filter(t => t.type === 'INWARD').length}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Outward Transactions</span><br /><strong style={{ color: 'var(--danger)' }}>{stockFilteredTx.filter(t => t.type === 'OUTWARD').length}</strong></div>
+              {sisterStats.pendingCount > 0 && (
+                <div style={{ marginLeft: 'auto' }}>
+                  <button
+                    onClick={() => setActiveTab('sister_inward')}
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      color: '#f59e0b',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <AlertTriangle size={15} />
+                    <span>{sisterStats.pendingCount} Sister Transfers Pending Check</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Garment Category Filter Pills & Instant Search */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                {(isDigitalPrint ? ['All', 'Fabric', 'Paper', 'Inks & Consumables', 'Other'] : GARMENT_RAW_CATEGORIES).map(cat => {
+                  const isSelected = categoryFilter === cat;
+                  const count = cat === 'All'
+                    ? stock.length
+                    : stock.filter(s => {
+                        const sc = String(s.category || '').toLowerCase();
+                        const tc = cat.toLowerCase();
+                        if (tc === 'fabric') return sc.includes('fabric');
+                        if (tc === 'trims & thread') return sc.includes('trim') || sc.includes('thread');
+                        if (tc === 'buttons & fasteners') return sc.includes('button') || sc.includes('fastener');
+                        if (tc === 'elastics & laces') return sc.includes('elastic') || sc.includes('lace');
+                        if (tc === 'interlining & fusing') return sc.includes('interlining') || sc.includes('fusing');
+                        if (tc === 'labels & tags') return sc.includes('label') || sc.includes('tag');
+                        if (tc === 'packing material') return sc.includes('pack');
+                        if (tc === 'paper') return sc.includes('paper');
+                        if (tc === 'inks & consumables') return sc.includes('ink') || sc.includes('consumable');
+                        return sc === tc;
+                      }).length;
+
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat)}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: isSelected ? 700 : 500,
+                        borderRadius: '20px',
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light, #e2e8f0)',
+                        background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                        color: isSelected ? 'var(--primary)' : 'var(--text-light)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>{cat}</span>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        background: isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
+                        color: isSelected ? '#fff' : 'var(--text-muted)',
+                        padding: '1px 6px',
+                        borderRadius: '10px'
+                      }}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
+
+              <div style={{ position: 'relative', width: '260px' }}>
+                <input
+                  style={{ ...inputStyle, paddingLeft: '2.1rem', height: '36px', fontSize: '0.82rem' }}
+                  placeholder="Search material, shade, HSN..."
+                  value={stockSearchQuery}
+                  onChange={e => setStockSearchQuery(e.target.value)}
+                />
+                <Search size={15} style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                {stockSearchQuery && (
+                  <button
+                    onClick={() => setStockSearchQuery('')}
+                    style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* ─── STOCK OVERVIEW: PROPER UI TABLE VIEW ─── */}
             {(() => {
@@ -1978,31 +2253,47 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                     </div>
                   )}
 
-                  {/* 4. FABRIC & RAW MATERIALS TABLE */}
+                  {/* 4. GARMENT RAW MATERIALS & FABRICS TABLE */}
                   {showOther && (
                     otherItems.length > 0 ? (
                       <div style={tableCardStyle}>
                         <div style={tableHeaderBarStyle}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <Layers size={18} />
                             </div>
                             <div>
                               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {isDigitalPrint ? 'Other Raw Materials' : 'Fabric & Raw Material Inventory'}
+                                {isDigitalPrint ? 'Other Raw Materials' : `${companyEntity} Raw Material Catalog & Stock`}
                               </h3>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                {isDigitalPrint ? 'Additional configured accessories & raw materials' : `${companyEntity} active fabric stock, rolls & inward materials`}
+                                {isDigitalPrint ? 'Additional configured accessories & raw materials' : `Active stock of fabrics, trims, buttons, elastics, labels & packing materials`}
                               </span>
                             </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsNewMaterialModalOpen(true)}
+                            className="btn-primary"
+                            style={{
+                              fontSize: '0.78rem',
+                              padding: '5px 12px',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              gap: '4px'
+                            }}
+                          >
+                            <Plus size={14} /> + Add Material
+                          </button>
                         </div>
 
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
                             <thead>
                               <tr>
-                                <th style={thStyle}>Material / Fabric Name</th>
+                                <th style={thStyle}>Category</th>
+                                <th style={thStyle}>Material / Item Name & Specs</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>HSN</th>
                                 <th style={{ ...thStyle, textAlign: 'center' }}>Total Inward</th>
                                 <th style={{ ...thStyle, textAlign: 'center' }}>Total Outward</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Available Stock</th>
@@ -2011,62 +2302,126 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                               </tr>
                             </thead>
                             <tbody>
-                              {otherItems.map((item, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                                  <td style={tdStyle}>
-                                    <strong style={{ color: 'var(--text-primary)' }}>{item.materialName}</strong>
-                                  </td>
-                                  <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--success)', fontWeight: 700 }}>
-                                    {item.totalInward || 0} {item.unit || 'Meters'}
-                                  </td>
-                                  <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>
-                                    {item.totalOutward || 0} {item.unit || 'Meters'}
-                                  </td>
-                                  <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                    <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: (item.currentStock || 0) <= 0 ? 'var(--danger)' : 'var(--primary)' }}>
-                                      {item.currentStock || 0}
-                                    </strong>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>{item.unit || 'Meters'}</span>
-                                  </td>
-                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                    {renderStockStatusBadge(item.currentStock || 0)}
-                                  </td>
-                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                      <button 
-                                        onClick={() => handleQuickInward(item.materialName)}
-                                        className="btn-primary" 
-                                        title={`Quick Inward for ${item.materialName}`}
-                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                              {otherItems.map((item, idx) => {
+                                const catBadge = (() => {
+                                  const cat = String(item.category || 'Fabric').toLowerCase();
+                                  if (cat.includes('fabric')) return { bg: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', label: 'Fabric' };
+                                  if (cat.includes('thread') || cat.includes('trim')) return { bg: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', label: 'Trims & Thread' };
+                                  if (cat.includes('button') || cat.includes('fastener')) return { bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', label: 'Buttons & Fasteners' };
+                                  if (cat.includes('elastic') || cat.includes('lace')) return { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', label: 'Elastics & Laces' };
+                                  if (cat.includes('fusing') || cat.includes('interlining')) return { bg: 'rgba(236, 72, 153, 0.12)', color: '#ec4899', label: 'Interlining & Fusing' };
+                                  if (cat.includes('label') || cat.includes('tag')) return { bg: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', label: 'Labels & Tags' };
+                                  if (cat.includes('pack')) return { bg: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', label: 'Packing Material' };
+                                  return { bg: 'rgba(100, 116, 139, 0.12)', color: '#64748b', label: item.category || 'General' };
+                                })();
+
+                                const isLow = (item.currentStock || 0) <= (item.reorderLevel || 10);
+
+                                return (
+                                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                    <td style={tdStyle}>
+                                      <span
+                                        style={{
+                                          fontSize: '0.72rem',
+                                          fontWeight: 700,
+                                          padding: '2px 8px',
+                                          borderRadius: '6px',
+                                          background: catBadge.bg,
+                                          color: catBadge.color,
+                                          whiteSpace: 'nowrap'
+                                        }}
                                       >
-                                        <Plus size={14} />
-                                      </button>
-                                      <button 
-                                        onClick={() => handleQuickOutward(item.materialName)}
-                                        className="btn-secondary" 
-                                        title={`Quick Outward for ${item.materialName}`}
-                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
-                                      >
-                                        <ArrowUpFromLine size={14} />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
+                                        {catBadge.label}
+                                      </span>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <div>
+                                        <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{item.materialName}</strong>
+                                        <div style={{ display: 'flex', gap: '8px', fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '2px', flexWrap: 'wrap' }}>
+                                          {item.shade && <span>Shade: <strong style={{ color: 'var(--text-light)' }}>{item.shade}</strong></span>}
+                                          {item.panna && <span>Width: <strong style={{ color: 'var(--text-light)' }}>{item.panna}</strong></span>}
+                                          {item.location && <span>Loc: <strong style={{ color: 'var(--text-light)' }}>{item.location}</strong></span>}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                      {item.hsnCode || '-'}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--success)', fontWeight: 700 }}>
+                                      {item.totalInward || 0} {item.unit || 'Meters'}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>
+                                      {item.totalOutward || 0} {item.unit || 'Meters'}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                      <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: (item.currentStock || 0) <= 0 ? 'var(--danger)' : isLow ? '#f59e0b' : 'var(--primary)' }}>
+                                        {item.currentStock || 0}
+                                      </strong>
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>{item.unit || 'Meters'}</span>
+                                      {item.reorderLevel && (
+                                        <div style={{ fontSize: '0.68rem', color: isLow ? '#f59e0b' : 'var(--text-muted)' }}>
+                                          Min: {item.reorderLevel}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      {renderStockStatusBadge(item.currentStock || 0)}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                        <button 
+                                          onClick={() => handleQuickInward(item.materialName, '', '', null, { unit: item.unit, category: item.category })}
+                                          className="btn-primary" 
+                                          title={`Quick Inward for ${item.materialName}`}
+                                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                        >
+                                          <Plus size={14} />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleQuickOutward(item.materialName, '', '', null, { unit: item.unit, category: item.category })}
+                                          className="btn-secondary" 
+                                          title={`Quick Outward for ${item.materialName}`}
+                                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                        >
+                                          <ArrowUpFromLine size={14} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
                       </div>
                     ) : (
                       !isDigitalPrint && (
-                        <div style={{ ...tableCardStyle, padding: '2.5rem 1.5rem', textAlign: 'center' }}>
-                          <Layers size={36} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '0.75rem' }} />
-                          <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)', fontSize: '1.05rem' }}>
-                            No Verified Fabric Stock for {companyEntity} Yet
+                        <div style={{ ...tableCardStyle, padding: '3.5rem 1.5rem', textAlign: 'center' }}>
+                          <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                            <Layers size={28} />
+                          </div>
+                          <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)', fontSize: '1.2rem', fontWeight: 800 }}>
+                            No Raw Materials Found for {companyEntity}
                           </h3>
-                          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '520px', marginInline: 'auto', lineHeight: 1.5 }}>
-                            Transfers from sister companies (via Invoices or Delivery Challans) arrive in the <strong>"Sister Inward Check"</strong> tab. Once physically verified and accepted, your active fabric stock will be displayed here.
+                          <p style={{ margin: '0 auto 1.5rem', color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: '520px', lineHeight: 1.5 }}>
+                            Add your fabrics, sewing threads, buttons, elastics, labels, or packing materials using the button below, or verify inbound shipments in <strong>Sister Inward Check</strong>.
                           </p>
+                          <button
+                            type="button"
+                            onClick={() => setIsNewMaterialModalOpen(true)}
+                            className="btn-primary"
+                            style={{
+                              padding: '0.65rem 1.6rem',
+                              fontSize: '0.9rem',
+                              fontWeight: 700,
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              gap: '0.5rem',
+                              boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            <Plus size={18} /> + Add Your First Raw Material
+                          </button>
                         </div>
                       )
                     )
@@ -3636,6 +3991,238 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                 Delete Record
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ADD NEW RAW MATERIAL MODAL ─── */}
+      {isNewMaterialModalOpen && (
+        <div
+          className="modal-overlay modal-backdrop"
+          onClick={() => !newMaterialSubmitting && setIsNewMaterialModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+            overflowY: 'auto'
+          }}
+        >
+          <div
+            className="modal-content glass-panel"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '560px',
+              width: '100%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1.5px solid #bfdbfe',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              padding: '1.75rem',
+              position: 'relative',
+              margin: 'auto'
+            }}
+          >
+            <button
+              onClick={() => setIsNewMaterialModalOpen(false)}
+              disabled={newMaterialSubmitting}
+              style={{ position: 'absolute', top: '1.1rem', right: '1.1rem', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus size={20} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Add New Raw Material
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Company: <strong>{companyEntity}</strong> · Garment Industry Catalog Entry
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateNewMaterial} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Category & Unit */}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '180px' }}>
+                  <label style={labelStyle}>Garment Material Category *</label>
+                  <select
+                    style={{ ...inputStyle, fontWeight: 700 }}
+                    value={newMaterialForm.category}
+                    onChange={e => {
+                      const cat = e.target.value;
+                      let defaultUnit = 'Meters';
+                      if (cat.includes('Thread')) defaultUnit = 'Cones / Spools';
+                      else if (cat.includes('Button')) defaultUnit = 'Pieces (Pcs)';
+                      else if (cat.includes('Elastic')) defaultUnit = 'Meters';
+                      else if (cat.includes('Label')) defaultUnit = 'Pieces (Pcs)';
+                      else if (cat.includes('Pack')) defaultUnit = 'Pieces (Pcs)';
+                      else if (cat.includes('Fusing')) defaultUnit = 'Meters';
+                      setNewMaterialForm(p => ({ ...p, category: cat, unit: defaultUnit }));
+                    }}
+                    required
+                  >
+                    {GARMENT_RAW_CATEGORIES.filter(c => c !== 'All').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                    {isDigitalPrint && <option value="Inks & Consumables">Inks & Consumables</option>}
+                  </select>
+                </div>
+
+                <div style={{ flex: 1, minWidth: '140px' }}>
+                  <label style={labelStyle}>Unit of Measurement *</label>
+                  <select
+                    style={inputStyle}
+                    value={newMaterialForm.unit}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, unit: e.target.value }))}
+                    required
+                  >
+                    {RAW_MATERIAL_UNITS.map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Material Name */}
+              <div>
+                <label style={labelStyle}>Raw Material Name *</label>
+                <input
+                  style={{ ...inputStyle, fontWeight: 600 }}
+                  placeholder="e.g. Viscose Rayon 14kg, 40/2 Thread, 18L Resin Button..."
+                  value={newMaterialForm.materialName}
+                  onChange={e => setNewMaterialForm(p => ({ ...p, materialName: e.target.value }))}
+                  required
+                />
+              </div>
+
+              {/* Shade/Color & Width/Panna */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Shade / Color / Design #</label>
+                  <input
+                    style={inputStyle}
+                    placeholder="e.g. Off-White #01, Black, Navy"
+                    value={newMaterialForm.shade}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, shade: e.target.value }))}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Width / Panna / Size</label>
+                  <input
+                    style={inputStyle}
+                    placeholder="e.g. 44 in, 58 in, 1.25 inch"
+                    value={newMaterialForm.panna}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, panna: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* HSN Code & Warehouse Location */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>HSN Code</label>
+                  <input
+                    style={inputStyle}
+                    placeholder="e.g. 5407, 5208, 9606"
+                    value={newMaterialForm.hsnCode}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, hsnCode: e.target.value }))}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Storage Location / Rack</label>
+                  <input
+                    style={inputStyle}
+                    placeholder="e.g. Rack A-12, Store Bin 3"
+                    value={newMaterialForm.location}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, location: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Opening Stock & Rate & Reorder */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Opening / Initial Qty</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    style={inputStyle}
+                    placeholder="0"
+                    value={newMaterialForm.initialQty}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, initialQty: e.target.value }))}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Est. Unit Rate (₹)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    style={inputStyle}
+                    placeholder="0.00"
+                    value={newMaterialForm.unitRate}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, unitRate: e.target.value }))}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Reorder Min Level</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    style={inputStyle}
+                    placeholder="10"
+                    value={newMaterialForm.reorderLevel}
+                    onChange={e => setNewMaterialForm(p => ({ ...p, reorderLevel: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <label style={labelStyle}>Remarks / Supplier Notes</label>
+                <textarea
+                  style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
+                  placeholder="Optional notes, standard supplier, quality specs..."
+                  value={newMaterialForm.notes}
+                  onChange={e => setNewMaterialForm(p => ({ ...p, notes: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsNewMaterialModalOpen(false)}
+                  disabled={newMaterialSubmitting}
+                  className="btn-secondary"
+                  style={{ padding: '0.6rem 1.25rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={newMaterialSubmitting}
+                  className="btn-primary"
+                  style={{ padding: '0.6rem 1.5rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', fontWeight: 700 }}
+                >
+                  {newMaterialSubmitting ? 'Saving...' : 'Save Raw Material'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

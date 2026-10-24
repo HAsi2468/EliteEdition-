@@ -31,8 +31,11 @@ const createInward = async (req, res) => {
   try {
     const compEntity = req.body.companyEntity || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
-      const docs = req.body.map(item => {
-        const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = item;
+        const {
+          challanNo, vendorName, materialName, qty, unit, date, notes,
+          panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
+          category, shade, hsnCode, location, reorderLevel, unitPrice, totalAmount
+        } = item;
         if (!materialName || qty == null || qty < 0) {
           throw new Error('Material Name and a valid Quantity are required.');
         }
@@ -43,21 +46,32 @@ const createInward = async (req, res) => {
           vendorName,
           materialName,
           qty,
-          unit: unit || 'Rolls',
+          unit: unit || 'Meters',
           date: date ? new Date(date) : new Date(),
           notes,
           panna,
           paperQuality,
           color,
           canSize,
-          metersPerRoll
+          metersPerRoll,
+          category: category || 'Fabric',
+          shade,
+          hsnCode,
+          location,
+          reorderLevel: Number(reorderLevel) || 0,
+          unitPrice: Number(unitPrice) || 0,
+          totalAmount: Number(totalAmount) || 0
         };
       });
       const transactions = await RawMaterialTransaction.insertMany(docs);
       return res.status(201).json({ success: true, data: transactions });
     }
 
-    const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = req.body;
+    const {
+      challanNo, vendorName, materialName, qty, unit, date, notes,
+      panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
+      category, shade, hsnCode, location, reorderLevel, unitPrice, totalAmount
+    } = req.body;
 
     if (!materialName || qty == null || qty < 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity are required.' });
@@ -70,14 +84,21 @@ const createInward = async (req, res) => {
       vendorName,
       materialName,
       qty,
-      unit: unit || 'Rolls',
+      unit: unit || 'Meters',
       date: date ? new Date(date) : new Date(),
       notes,
       panna,
       paperQuality,
       color,
       canSize,
-      metersPerRoll
+      metersPerRoll,
+      category: category || 'Fabric',
+      shade,
+      hsnCode,
+      location,
+      reorderLevel: Number(reorderLevel) || 0,
+      unitPrice: Number(unitPrice) || 0,
+      totalAmount: Number(totalAmount) || 0
     });
 
     await transaction.save();
@@ -94,7 +115,11 @@ const createOutward = async (req, res) => {
     const compEntity = req.body.companyEntity || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
       const docs = req.body.map(item => {
-        const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = item;
+        const {
+          jobNo, partyName, materialName, qty, unit, date, notes,
+          panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
+          category, shade, location
+        } = item;
         if (!materialName || qty == null || qty <= 0) {
           throw new Error('Material Name and a valid Quantity (>0) are required.');
         }
@@ -105,21 +130,28 @@ const createOutward = async (req, res) => {
           partyName,
           materialName,
           qty,
-          unit: unit || 'Rolls',
+          unit: unit || 'Meters',
           date: date ? new Date(date) : new Date(),
           notes,
           panna,
           paperQuality,
           color,
           canSize,
-          metersPerRoll
+          metersPerRoll,
+          category: category || 'Fabric',
+          shade,
+          location
         };
       });
       const transactions = await RawMaterialTransaction.insertMany(docs);
       return res.status(201).json({ success: true, data: transactions });
     }
 
-    const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = req.body;
+    const {
+      jobNo, partyName, materialName, qty, unit, date, notes,
+      panna, paperQuality, color, canSize, metersPerRoll, companyEntity,
+      category, shade, location
+    } = req.body;
 
     if (!materialName || qty == null || qty <= 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity (>0) are required.' });
@@ -132,14 +164,17 @@ const createOutward = async (req, res) => {
       partyName,
       materialName,
       qty,
-      unit: unit || 'Rolls',
+      unit: unit || 'Meters',
       date: date ? new Date(date) : new Date(),
       notes,
       panna,
       paperQuality,
       color,
       canSize,
-      metersPerRoll
+      metersPerRoll,
+      category: category || 'Fabric',
+      shade,
+      location
     });
 
     await transaction.save();
@@ -297,24 +332,39 @@ const getStockOverview = async (req, res) => {
         }
       }
 
-      // Group key: Inks group by normalized brand + color, Papers group by normalized materialName + normPanna
+      const itemCategory = t.category || (
+        isInk ? 'Inks & Consumables' :
+        isPaper ? 'Paper & Films' :
+        /thread|yarn|dori|cord/i.test(matName) ? 'Trims & Thread' :
+        /button|zipper|chain|hook|eyelet|snap/i.test(matName) ? 'Buttons & Fasteners' :
+        /elastic|lace|tape|ribbon|piping/i.test(matName) ? 'Elastics & Laces' :
+        /fusing|interlining|buckram/i.test(matName) ? 'Interlining & Fusing' :
+        /label|tag|barcode|sticker/i.test(matName) ? 'Labels & Tags' :
+        /bag|carton|box|packing|poly/i.test(matName) ? 'Packing Material' : 'Fabric'
+      );
+
+      // Group key: Inks group by brand + color, Papers by materialName + panna, General garment by materialName + unit + panna
       const key = isInk
         ? `${groupMatName}___${groupColor}`
-        : `${groupMatName}___${normPanna}`;
+        : (isPaper ? `${groupMatName}___${normPanna}` : `${groupMatName}___${t.unit || 'Meters'}___${normPanna}`);
 
       if (!map[key]) {
         map[key] = {
           materialName: groupMatName,
+          category: itemCategory,
           panna: normPanna,
           paperQuality: paperGrade,
           color: groupColor,
+          shade: t.shade || groupColor,
+          location: t.location || '',
+          reorderLevel: t.reorderLevel || 0,
           canSize: t.canSize || (isInk ? (groupColor === 'Cleaning Solution' ? 1 : 5) : null),
           metersPerRoll: t.metersPerRoll || (isPaper ? 1000 : null),
           totalInward: 0,
           totalOutward: 0,
           totalInwardMtr: 0,
           totalOutwardMtr: 0,
-          unit: t.unit || (isInk ? 'Liters' : 'Rolls')
+          unit: t.unit || (isInk ? 'Liters' : (isPaper ? 'Rolls' : 'Meters'))
         };
       }
 

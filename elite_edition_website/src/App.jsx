@@ -23,6 +23,7 @@ const TaskManagerPanel = lazy(() => import('./components/TaskManagerPanel'));
 const CompanySettingsPanel = lazy(() => import('./components/CompanySettingsPanel'));
 const DocumentDesignStudio = lazy(() => import('./components/DesignStudio/DocumentDesignStudio'));
 const EliteBillingDepartment = lazy(() => import('./components/EliteBillingDepartment'));
+const RawMaterialsPanel = lazy(() => import('./components/RawMaterialsPanel'));
 const CompanyDevelopmentWorkspace = lazy(() => import('./components/CompanyDevelopmentWorkspace'));
 const DigitalPrintComplainModule = lazy(() => import('./components/DigitalPrintComplainModule'));
 const DigitalPrintExpenseModule = lazy(() => import('./components/DigitalPrintExpenseModule'));
@@ -163,6 +164,14 @@ export const ROUTE_ALIASES = {
   'communication': { tab: 'communication', dept: null },
   'chat': { tab: 'communication', dept: null },
   'workspace': { tab: 'workspace', dept: null },
+  'raw_materials': { tab: 'raw_materials', dept: null },
+  'raw-materials': { tab: 'raw_materials', dept: null },
+  'ee_raw_materials': { tab: 'ee_raw_materials', dept: 'elite_edition' },
+  'ef_raw_materials': { tab: 'ef_raw_materials', dept: 'elite_fabtex' },
+  'so_raw_materials': { tab: 'so_raw_materials', dept: 'sobise' },
+  'ew_raw_materials': { tab: 'ew_raw_materials', dept: 'ethno_wear' },
+  'es_raw_materials': { tab: 'es_raw_materials', dept: 'stitching' },
+  'eo_raw_materials': { tab: 'eo_raw_materials', dept: 'elite_online' },
   'admin': { tab: 'admin', dept: null }
 };
 
@@ -202,6 +211,7 @@ export function getCanonicalHashForTab(tab, queryString = '') {
   else if (tab === 'jobcards_list') alias = 'jobcards';
   else if (tab === 'jobcards_catalogue') alias = 'design';
   else if (tab === 'stock_ledger') alias = 'stock-ledger';
+  else if (tab === 'ee_raw_materials' || tab === 'ew_raw_materials' || tab === 'ef_raw_materials' || tab === 'so_raw_materials' || tab === 'es_raw_materials' || tab === 'eo_raw_materials' || tab === 'raw_materials') alias = 'raw-materials';
   return `#${alias}${queryString}`;
 }
 
@@ -738,15 +748,15 @@ export default function App() {
   };
 
   // Department permission helpers
-  const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'eo_scan_pack', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses', 'eo_settings'];
-  const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses'];
-  const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses'];
-  const SOBISE_PERMISSIONS = ['so_dashboard', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses'];
-  const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_complaints', 'ew_settings', 'ew_expenses'];
+  const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'eo_scan_pack', 'reports', 'unicommerce', 'myntra', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials'];
+  const ELITE_EDITION_PERMISSIONS = ['ee_dashboard', 'ee_invoices', 'ee_complaints', 'ee_settings', 'ee_expenses', 'ee_raw_materials'];
+  const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses', 'ef_raw_materials'];
+  const SOBISE_PERMISSIONS = ['so_dashboard', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses', 'so_raw_materials'];
+  const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_complaints', 'ew_settings', 'ew_expenses', 'ew_raw_materials'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'es_dashboard', 'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
-    'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching', 'es_complaints', 'es_expenses'
+    'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching', 'es_complaints', 'es_expenses', 'es_raw_materials'
   ];
 
   const isSuperOrAdmin = Boolean(
@@ -1038,11 +1048,11 @@ export default function App() {
 
     const ALL_SYSTEM_TABS = [
       'dashboard', 'workspace', 'communication', 'task_management', 'tasks', 'task', 'task-manager', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
-      'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
-      'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
-      'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses',
-      'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses',
-      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings',
+      'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses', 'ee_raw_materials',
+      'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses', 'ef_raw_materials',
+      'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
+      'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
+      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'raw_materials',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
@@ -2633,6 +2643,11 @@ export default function App() {
                         Design Room
                       </button>
                     )}
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('es_raw_materials')) && (
+                      <button onClick={() => { setActiveTab('es_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'es_raw_materials' ? 'active' : ''}`}>
+                        Raw Materials
+                      </button>
+                    )}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) && (
                       <button onClick={() => { setActiveTab('jobcards_stitching_challan'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${(activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') ? 'active' : ''}`}>
                         Challan
@@ -2667,6 +2682,11 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fusing_log') || currentUser.permissions?.includes('jobcards')) && (
                       <button onClick={() => { setActiveTab('jobcards_fusing_log'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_fusing_log' ? 'active' : ''}`}>
                         Fusing Department
+                      </button>
+                    )}
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
+                      <button onClick={() => { setActiveTab('jobcards_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'jobcards_raw_materials' ? 'active' : ''}`}>
+                        Raw Materials
                       </button>
                     )}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
@@ -2758,6 +2778,31 @@ export default function App() {
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
                       <button onClick={() => { setActiveTab('myntra'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'myntra' ? 'active' : ''}`} style={{ color: activeTab === 'myntra' ? '#e11d48' : '#be123c', fontWeight: 600 }}>
                         Myntra Integrations
+                      </button>
+                    )}
+                    {activeDepartment === 'ethno_wear' && (
+                      <button onClick={() => { setActiveTab('ew_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ew_raw_materials' ? 'active' : ''}`}>
+                        Raw Materials
+                      </button>
+                    )}
+                    {activeDepartment === 'elite_edition' && (
+                      <button onClick={() => { setActiveTab('ee_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ee_raw_materials' ? 'active' : ''}`}>
+                        Raw Materials
+                      </button>
+                    )}
+                    {activeDepartment === 'elite_fabtex' && (
+                      <button onClick={() => { setActiveTab('ef_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ef_raw_materials' ? 'active' : ''}`}>
+                        Raw Materials
+                      </button>
+                    )}
+                    {activeDepartment === 'sobise' && (
+                      <button onClick={() => { setActiveTab('so_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'so_raw_materials' ? 'active' : ''}`}>
+                        Raw Materials
+                      </button>
+                    )}
+                    {activeDepartment === 'elite_online' && (
+                      <button onClick={() => { setActiveTab('eo_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'eo_raw_materials' ? 'active' : ''}`}>
+                        Raw Materials
                       </button>
                     )}
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_settings')) && (
@@ -3042,11 +3087,14 @@ export default function App() {
               if (activeDepartment === 'ethno_wear' && hasEthnoWearAccess) {
                 return (
                   <>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_invoices')) &&
-                      renderNavItem('ew_invoices', 'Finance', Receipt, null, 'Finance')
-                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_dashboard')) &&
                       renderNavItem('ew_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_raw_materials')) &&
+                      renderNavItem('ew_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_invoices')) &&
+                      renderNavItem('ew_invoices', 'Finance', Receipt, null, 'Finance')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ew_complaints')) &&
                       renderNavItem('ew_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
@@ -3063,6 +3111,9 @@ export default function App() {
                   <>
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_dashboard')) &&
                       renderNavItem('ee_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_raw_materials')) &&
+                      renderNavItem('ee_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ee_invoices')) &&
                       renderNavItem('ee_invoices', 'Finance', Receipt, null, 'Finance')
@@ -3083,6 +3134,9 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_dashboard')) &&
                       renderNavItem('ef_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
                     }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_raw_materials')) &&
+                      renderNavItem('ef_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
+                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('ef_invoices')) &&
                       renderNavItem('ef_invoices', 'Finance', Receipt, null, 'Finance')
                     }
@@ -3101,6 +3155,9 @@ export default function App() {
                   <>
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_dashboard')) &&
                       renderNavItem('so_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_raw_materials')) &&
+                      renderNavItem('so_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('so_invoices')) &&
                       renderNavItem('so_invoices', 'Finance', Receipt, null, 'Finance')
@@ -3124,6 +3181,9 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('stitching_design')) &&
                       renderNavItem('jobcards_catalogue', 'Design room', BookOpen, null, 'Design')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('es_raw_materials') || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('stitching_fabric')) &&
+                      renderNavItem('es_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) &&
                       renderNavItem('jobcards_stitching_challan', 'Challan', Database, null, 'Challan')
@@ -3218,6 +3278,9 @@ export default function App() {
                   }
                   {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) &&
                     renderNavItem('myntra', 'Myntra Integrations', ShoppingBag, null, 'Myntra')
+                  }
+                  {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_raw_materials')) &&
+                    renderNavItem('eo_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
                   }
                   {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('eo_invoices')) &&
                     renderNavItem('eo_invoices', 'Finance', Receipt, null, 'Finance')
@@ -3379,6 +3442,8 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Elite Edition" />
           ) : activeTab === 'ee_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Edition" />
+          ) : activeTab === 'ee_raw_materials' ? (
+            <RawMaterialsPanel companyEntity="Elite Edition" />
           ) : activeTab === 'ee_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Edition" />
           ) : activeTab === 'ef_dashboard' ? (
@@ -3389,6 +3454,8 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Elite Fabtex" />
           ) : activeTab === 'ef_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Fabtex" />
+          ) : activeTab === 'ef_raw_materials' ? (
+            <RawMaterialsPanel companyEntity="Elite Fabtex" />
           ) : activeTab === 'ef_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Fabtex" />
           ) : activeTab === 'so_dashboard' ? (
@@ -3399,6 +3466,8 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Sobise" />
           ) : activeTab === 'so_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Sobise" />
+          ) : activeTab === 'so_raw_materials' ? (
+            <RawMaterialsPanel companyEntity="Sobise" />
           ) : activeTab === 'so_invoices' ? (
             <EliteBillingDepartment companyEntity="Sobise" />
           ) : activeTab === 'ew_dashboard' ? (
@@ -3409,6 +3478,8 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Ethno wear" />
           ) : activeTab === 'ew_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Ethno wear" />
+          ) : activeTab === 'ew_raw_materials' ? (
+            <RawMaterialsPanel companyEntity="Ethno wear" />
           ) : activeTab === 'ew_invoices' ? (
             <EliteBillingDepartment companyEntity="Ethno wear" department="ethno_wear" />
           ) : activeTab === 'es_dashboard' ? (
@@ -3422,14 +3493,20 @@ export default function App() {
             <DigitalPrintComplainModule companyEntity="Elite Stitching" />
           ) : activeTab === 'es_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Stitching" />
+          ) : activeTab === 'es_raw_materials' ? (
+            <RawMaterialsPanel companyEntity="Elite Stitching" />
           ) : activeTab === 'es_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Stitching" department="stitching" />
           ) : activeTab === 'eo_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Online" />
           ) : activeTab === 'eo_expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Online" />
+          ) : activeTab === 'eo_raw_materials' ? (
+            <RawMaterialsPanel companyEntity="Elite Online" />
           ) : activeTab === 'eo_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Online" department="elite_online" />
+          ) : activeTab === 'raw_materials' ? (
+            <RawMaterialsPanel companyEntity="Elite Digital Print" />
           ) : activeTab === 'expense_dashboard' || activeTab === 'expense_create' || activeTab === 'expenses' ? (
             <DigitalPrintExpenseModule companyEntity="Elite Digital Print" autoOpenCreate={activeTab === 'expense_create'} />
           ) : activeTab === 'unicommerce' ? (
