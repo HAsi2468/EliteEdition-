@@ -501,10 +501,12 @@ router.get('/download', async (req, res) => {
   // If local file path
   if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('/designs/')) {
     const localRel = fileUrl.replace(/^\/(uploads|designs)\//, '');
-    const localPath = path.join(uploadDir, localRel);
-    if (fs.existsSync(localPath)) {
+    const localPath = path.resolve(uploadDir, localRel);
+    // Strict Path Traversal Guard: Ensure resolved path strictly stays within uploadDir
+    if (localPath.startsWith(path.resolve(uploadDir)) && fs.existsSync(localPath)) {
       return res.download(localPath, safeName);
     }
+    return res.status(403).json({ error: 'Forbidden: Access to requested path is blocked.' });
   }
 
   // Strict SSRF guard for remote URLs

@@ -30,6 +30,7 @@ const authIpLimiter = rateLimit({
 	skipSuccessfulRequests: true,
 	standardHeaders: true,
 	legacyHeaders: false,
+	validate: { keyGeneratorIpFallback: false },
 	keyGenerator: (req) => {
 		const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 		return getClientSubnet(ip);
@@ -56,6 +57,7 @@ const authAccountLimiter = rateLimit({
 	skipSuccessfulRequests: true,
 	standardHeaders: true,
 	legacyHeaders: false,
+	validate: { keyGeneratorIpFallback: false },
 	keyGenerator: (req) => {
 		const target = req.body?.email || req.body?.username || req.body?.mobile || req.body?.phone;
 		if (target && typeof target === 'string') {
