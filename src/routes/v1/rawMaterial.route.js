@@ -20,6 +20,10 @@ router.get('/stock', rawMaterialController.getStockOverview);
 // Download raw materials ledger PDF
 router.get('/report/pdf', rawMaterialController.downloadLedgerPdf);
 
+// Sister company inward transfers review & verification
+router.get('/sister-transfers', rawMaterialController.getSisterTransfers);
+router.put('/sister-transfers/:id/verify', rawMaterialController.verifySisterTransfer);
+
 // Update a transaction by ID
 router.put('/:id', rawMaterialController.updateTransaction);
 

@@ -1739,6 +1739,18 @@ export const api = {
     });
   },
 
+  async getSisterTransfers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/raw-materials/sister-transfers${query ? `?${query}` : ''}`);
+  },
+
+  async verifySisterTransfer(id, payload) {
+    return request(`/raw-materials/sister-transfers/${id}/verify`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  },
+
   async downloadRawMaterialLedgerPdf(params = {}) {
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');

@@ -74,6 +74,67 @@ const rawMaterialTransactionSchema = new mongoose.Schema(
     metersPerRoll: {
       type: Number,
     },
+    // Sister Company Inward & Verification Workflow
+    isSisterTransfer: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    sourceCompany: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    sourceDocType: {
+      type: String,
+      enum: ['INVOICE', 'DELIVERY_CHALLAN', 'FABRIC_CHALLAN', 'MANUAL'],
+      default: 'MANUAL',
+    },
+    sourceDocId: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: 'sourceDocModel',
+    },
+    sourceDocModel: {
+      type: String,
+      enum: ['BillingInvoice', 'DeliveryChallan', 'FabricChallan'],
+    },
+    sourceDocNo: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['VERIFIED', 'PENDING_CHECK', 'REJECTED'],
+      default: 'VERIFIED',
+      index: true,
+    },
+    verifiedAt: {
+      type: Date,
+    },
+    verifiedBy: {
+      type: String,
+      trim: true,
+    },
+    verifiedQty: {
+      type: Number,
+    },
+    verificationNotes: {
+      type: String,
+      trim: true,
+    },
+    discrepancyReason: {
+      type: String,
+      trim: true,
+    },
+    unitPrice: {
+      type: Number,
+      default: 0,
+    },
+    totalAmount: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

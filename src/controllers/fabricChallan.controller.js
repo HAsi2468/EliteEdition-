@@ -922,6 +922,14 @@ const createChallan = async (req, res) => {
       await syncJobCardDeliveryTotals(jobNo);
     }
 
+    // Auto-sync Fabric Challan to Sister Company's Raw Material Inward if party is a sister company
+    try {
+      const { syncFabricChallanToSisterRawMaterial } = require('../utils/sisterCompanySync');
+      await syncFabricChallanToSisterRawMaterial(challan);
+    } catch (syncErr) {
+      console.warn('[fabricChallan.createChallan] Sister company sync warning:', syncErr.message);
+    }
+
     res.status(201).json({ success: true, data: challan });
   } catch (error) {
     console.error('Error creating fabric challan:', error);

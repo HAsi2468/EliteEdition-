@@ -151,17 +151,21 @@ const createOutward = async (req, res) => {
 };
 
 const buildRawCompFilter = (companyEntity) => {
-  if (companyEntity === 'Elite Stitching') {
-    return { companyEntity: 'Elite Stitching' };
+  if (!companyEntity || companyEntity === 'all') {
+    return {};
   }
-  return {
-    $or: [
-      { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
-      { companyEntity: { $exists: false } },
-      { companyEntity: null },
-      { companyEntity: '' }
-    ]
-  };
+  const norm = String(companyEntity).trim();
+  if (['Elite Digital Print', 'Elite Digital Prints', 'EDP'].includes(norm)) {
+    return {
+      $or: [
+        { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+        { companyEntity: { $exists: false } },
+        { companyEntity: null },
+        { companyEntity: '' }
+      ]
+    };
+  }
+  return { companyEntity: norm };
 };
 
 // Get all transactions
@@ -217,6 +221,18 @@ const getStockOverview = async (req, res) => {
         }
       }
     }
+
+    // Stock guarantee: Only include verified materials (or legacy records) in active available stock
+    matchStage.$and = matchStage.$and || [];
+    matchStage.$and.push({
+      $or: [
+        { isSisterTransfer: { $ne: true } },
+        { verificationStatus: 'VERIFIED' }
+      ]
+    });
+    matchStage.$and.push({
+      verificationStatus: { $ne: 'REJECTED' }
+    });
 
     const txs = await RawMaterialTransaction.find(matchStage).lean();
     const map = {};
@@ -793,6 +809,152 @@ const updateTransaction = async (req, res) => {
   }
 };
 
+/**
+ * GET /raw-materials/sister-transfers
+ * Fetch incoming transfers from sister companies with status filtering
+ */
+const getSisterTransfers = async (req, res) => {
+  try {
+    const { companyEntity, status, search, dateStart, dateEnd } = req.query;
+    const filter = { isSisterTransfer: true };
+
+    if (companyEntity && companyEntity !== 'all') {
+      const { normalizeSisterCompany } = require('../utils/sisterCompanySync');
+      const canonical = normalizeSisterCompany(companyEntity) || companyEntity;
+      filter.companyEntity = canonical;
+    }
+
+    if (status && status !== 'ALL') {
+      filter.verificationStatus = status;
+    }
+
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      const sRegex = new RegExp(term, 'i');
+      filter.$or = [
+        { challanNo: sRegex },
+        { sourceDocNo: sRegex },
+        { materialName: sRegex },
+        { sourceCompany: sRegex },
+        { notes: sRegex }
+      ];
+    }
+
+    const items = await RawMaterialTransaction.find(filter)
+      .sort({ date: -1, createdAt: -1 })
+      .lean();
+
+    // Stats for badges & counters
+    const baseCompanyFilter = (companyEntity && companyEntity !== 'all')
+      ? { isSisterTransfer: true, companyEntity: filter.companyEntity }
+      : { isSisterTransfer: true };
+
+    const allSisterTxs = await RawMaterialTransaction.find(baseCompanyFilter, 'verificationStatus qty').lean();
+    let totalCount = allSisterTxs.length;
+    let pendingCount = 0;
+    let verifiedCount = 0;
+    let rejectedCount = 0;
+    let pendingQty = 0;
+
+    for (const t of allSisterTxs) {
+      if (t.verificationStatus === 'PENDING_CHECK') {
+        pendingCount++;
+        pendingQty += (t.qty || 0);
+      } else if (t.verificationStatus === 'VERIFIED') {
+        verifiedCount++;
+      } else if (t.verificationStatus === 'REJECTED') {
+        rejectedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: items,
+      stats: {
+        totalCount,
+        pendingCount,
+        verifiedCount,
+        rejectedCount,
+        pendingQty: parseFloat(pendingQty.toFixed(2))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching sister transfers:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * PUT /raw-materials/sister-transfers/:id/verify
+ * Review and verify or reject sister company transfer
+ */
+const verifySisterTransfer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, verifiedQty, verificationNotes, discrepancyReason } = req.body;
+
+    if (!['VERIFY', 'REJECT'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'Action must be either VERIFY or REJECT' });
+    }
+
+    const tx = await RawMaterialTransaction.findById(id);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'Raw material transaction not found' });
+    }
+
+    const userName = req.headers['x-user-name'] || req.user?.name || req.body.verifiedBy || 'Staff';
+
+    if (action === 'VERIFY') {
+      tx.verificationStatus = 'VERIFIED';
+      tx.verifiedAt = new Date();
+      tx.verifiedBy = userName;
+      if (verifiedQty != null && parseFloat(verifiedQty) >= 0) {
+        tx.verifiedQty = parseFloat(verifiedQty);
+        tx.qty = parseFloat(verifiedQty); // Confirmed actual stock quantity
+      }
+      if (verificationNotes) tx.verificationNotes = verificationNotes.trim();
+      tx.discrepancyReason = undefined;
+    } else {
+      tx.verificationStatus = 'REJECTED';
+      tx.verifiedAt = new Date();
+      tx.verifiedBy = userName;
+      tx.discrepancyReason = (discrepancyReason || verificationNotes || 'Rejected during verification check').trim();
+    }
+
+    await tx.save();
+
+    // Broadcast real-time update
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    if (io) {
+      io.emit('sister-transfer-updated', {
+        id: tx._id,
+        companyEntity: tx.companyEntity,
+        status: tx.verificationStatus,
+        data: tx
+      });
+    }
+
+    res.json({
+      success: true,
+      message: action === 'VERIFY' ? 'Inward material verified and added to stock.' : 'Inward material marked as rejected with discrepancy reason.',
+      data: tx
+    });
+  } catch (error) {
+    console.error('Error verifying sister transfer:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -801,5 +963,7 @@ module.exports = {
   deleteTransaction,
   updateTransaction,
   downloadLedgerPdf,
-  importStock
+  importStock,
+  getSisterTransfers,
+  verifySisterTransfer
 };

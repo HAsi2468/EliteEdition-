@@ -4,7 +4,8 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
   Layers, Database, Settings, Trash2, Search, X, FileDown,
   Plus, Edit, ArrowDownToLine, ArrowUpFromLine, RefreshCw, FileSpreadsheet, AlertCircle,
-  FileText, Droplet, Printer, CheckCircle2, ChevronRight, PlusCircle
+  FileText, Droplet, Printer, CheckCircle2, ChevronRight, PlusCircle,
+  ShieldCheck, Check, Clock, AlertTriangle, Building2, Eye, ShieldAlert, CheckCheck, XCircle
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
@@ -21,8 +22,8 @@ const getSelectedCanSize = (currentVal, options) => {
   return match || currentVal;
 };
 
-export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print' } = {}) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print', initialTab = 'dashboard' } = {}) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'dashboard');
   const currentUser = api.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
   const [stock, setStock] = useState([]);
@@ -34,6 +35,26 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   const [partiesList, setPartiesList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // ── Sister Company Inward & Verification State ──
+  const [sisterTransfers, setSisterTransfers] = useState([]);
+  const [sisterStats, setSisterStats] = useState({
+    totalCount: 0,
+    pendingCount: 0,
+    verifiedCount: 0,
+    rejectedCount: 0,
+    pendingQty: 0
+  });
+  const [sisterLoading, setSisterLoading] = useState(false);
+  const [sisterStatusFilter, setSisterStatusFilter] = useState('ALL');
+  const [sisterSearch, setSisterSearch] = useState('');
+  const [selectedSisterTx, setSelectedSisterTx] = useState(null);
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  const [verifyAction, setVerifyAction] = useState('VERIFY'); // 'VERIFY' or 'REJECT'
+  const [verifyQty, setVerifyQty] = useState('');
+  const [verifyNotes, setVerifyNotes] = useState('');
+  const [discrepancyReason, setDiscrepancyReason] = useState('');
+  const [submittingVerify, setSubmittingVerify] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -512,17 +533,83 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       }
 
       // 3. Fetch Stock Overview
-      const stockRes = await api.getRawMaterialStock();
+      const stockRes = await api.getRawMaterialStock({ companyEntity });
       if (stockRes.success) setStock(stockRes.data);
 
       // 4. Fetch Transactions
-      const transRes = await api.getRawMaterialTransactions();
+      const transRes = await api.getRawMaterialTransactions({ companyEntity });
       if (transRes.success) setTransactions(transRes.data);
 
     } catch (err) {
       setError(err.message || 'Failed to load raw materials inventory.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSisterTransfers = useCallback(async () => {
+    try {
+      setSisterLoading(true);
+      const res = await api.getSisterTransfers({
+        companyEntity,
+        status: sisterStatusFilter,
+        search: sisterSearch
+      });
+      if (res && res.success) {
+        setSisterTransfers(res.data || []);
+        if (res.stats) setSisterStats(res.stats);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch sister company transfers:', err);
+    } finally {
+      setSisterLoading(false);
+    }
+  }, [companyEntity, sisterStatusFilter, sisterSearch]);
+
+  useEffect(() => {
+    fetchSisterTransfers();
+  }, [fetchSisterTransfers]);
+
+  const openVerifyModal = (tx, action = 'VERIFY') => {
+    setSelectedSisterTx(tx);
+    setVerifyAction(action);
+    setVerifyQty(tx.verifiedQty != null ? String(tx.verifiedQty) : String(tx.qty || ''));
+    setVerifyNotes(tx.verificationNotes || '');
+    setDiscrepancyReason(tx.discrepancyReason || '');
+    setVerifyModalOpen(true);
+  };
+
+  const handleVerifySubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedSisterTx) return;
+
+    if (verifyAction === 'REJECT' && !discrepancyReason.trim()) {
+      alert('Please enter a discrepancy reason for rejecting this inward material.');
+      return;
+    }
+
+    setSubmittingVerify(true);
+    try {
+      const res = await api.verifySisterTransfer(selectedSisterTx._id, {
+        action: verifyAction,
+        verifiedQty: parseFloat(verifyQty) >= 0 ? parseFloat(verifyQty) : selectedSisterTx.qty,
+        verificationNotes: verifyNotes.trim(),
+        discrepancyReason: discrepancyReason.trim(),
+        verifiedBy: currentUser?.name || currentUser?.username || 'Staff'
+      });
+
+      if (res && res.success) {
+        setVerifyModalOpen(false);
+        setSelectedSisterTx(null);
+        await fetchSisterTransfers();
+        await fetchData();
+      } else {
+        alert(res?.error || 'Failed to update verification status.');
+      }
+    } catch (err) {
+      alert('Verification error: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSubmittingVerify(false);
     }
   };
 
@@ -1207,6 +1294,13 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
   const tabs = [
     { id: 'dashboard', label: 'Stock Overview', icon: Database },
+    {
+      id: 'sister_inward',
+      label: 'Sister Inward Check',
+      icon: ShieldCheck,
+      badge: sisterStats.pendingCount > 0 ? sisterStats.pendingCount : null,
+      badgeColor: '#f59e0b'
+    },
     { id: 'inward', label: 'Inward Register', icon: ArrowDownToLine },
     { id: 'outward', label: 'Outward Register', icon: ArrowUpFromLine },
   ];
@@ -1214,19 +1308,45 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
       {/* Header & Navigation */}
-      <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
-              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
+      <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flex: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          {tabs.map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={isActive ? 'btn-primary' : 'btn-secondary'}
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  position: 'relative'
+                }}
+              >
+                <tab.icon size={16} />
+                <span>{tab.label}</span>
+                {tab.badge != null && (
+                  <span
+                    style={{
+                      background: tab.badgeColor || '#ef4444',
+                      color: '#ffffff',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      marginLeft: '2px',
+                      animation: 'pulse 2s infinite'
+                    }}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <button
           onClick={handleDownloadScreenPdf}
@@ -2072,6 +2192,252 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                         </td>
                       </tr>
                     ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Sister Company Inward Check Tab */}
+        {activeTab === 'sister_inward' && (
+          <div>
+            {/* Header / Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #3b82f6', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Inwards</span>
+                  <Building2 size={16} color="#3b82f6" />
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)' }}>{sisterStats.totalCount}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>From All Sister Companies</div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b', display: 'flex', flexDirection: 'column', gap: '0.35rem', background: sisterStats.pendingCount > 0 ? 'rgba(245, 158, 11, 0.05)' : undefined }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase' }}>Pending Verification</span>
+                  <Clock size={16} color="#d97706" />
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#d97706' }}>{sisterStats.pendingCount}</div>
+                <div style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 700 }}>
+                  {sisterStats.pendingQty} Units Awaiting Inward Check
+                </div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Verified & In Stock</span>
+                  <CheckCheck size={16} color="#10b981" />
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981' }}>{sisterStats.verifiedCount}</div>
+                <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>Active in Raw Material Stock</div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #ef4444', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Discrepancies / Rejected</span>
+                  <AlertTriangle size={16} color="#ef4444" />
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ef4444' }}>{sisterStats.rejectedCount}</div>
+                <div style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>Flagged During Inspection</div>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                {[
+                  { id: 'ALL', label: `All (${sisterStats.totalCount})` },
+                  { id: 'PENDING_CHECK', label: `Pending Check (${sisterStats.pendingCount})` },
+                  { id: 'VERIFIED', label: `Verified (${sisterStats.verifiedCount})` },
+                  { id: 'REJECTED', label: `Rejected (${sisterStats.rejectedCount})` }
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setSisterStatusFilter(f.id)}
+                    className={sisterStatusFilter === f.id ? 'btn-primary' : 'btn-secondary'}
+                    style={{ fontSize: '0.78rem', padding: '0.4rem 0.8rem', borderRadius: '20px' }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1, maxWidth: '400px', justifyContent: 'flex-end' }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+                  <input
+                    style={{ ...inputStyle, paddingLeft: '2rem' }}
+                    placeholder="Search doc #, material, company..."
+                    value={sisterSearch}
+                    onChange={e => setSisterSearch(e.target.value)}
+                  />
+                  <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                </div>
+                <button onClick={fetchSisterTransfers} className="btn-secondary" title="Refresh transfers" style={{ padding: '0.45rem 0.75rem' }}>
+                  <RefreshCw size={15} className={sisterLoading ? 'spin-loader' : ''} />
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="table-responsive" style={{ border: '1px solid var(--border-light)', borderRadius: '10px', overflow: 'hidden' }}>
+              <table className="table" style={{ width: '100%', margin: 0 }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary)', fontSize: '0.78rem' }}>
+                    <th>Date</th>
+                    <th>Sending Sister Company</th>
+                    <th>Document Reference</th>
+                    <th>Material / Fabric</th>
+                    <th style={{ textAlign: 'right' }}>Challan Qty</th>
+                    <th style={{ textAlign: 'right' }}>Confirmed Qty</th>
+                    <th>Status</th>
+                    <th>Inspection & Notes</th>
+                    <th className="text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sisterLoading ? (
+                    <tr>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>
+                        <RefreshCw className="spin-loader" size={24} style={{ margin: '0 auto' }} />
+                        <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading sister company inward transfers...</div>
+                      </td>
+                    </tr>
+                  ) : sisterTransfers.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                        <ShieldCheck size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
+                        <div style={{ fontWeight: 700 }}>No Sister Company Inward Transfers Found</div>
+                        <div style={{ fontSize: '0.78rem', marginTop: '0.2rem' }}>
+                          When another sister company creates an invoice or delivery challan for {companyEntity}, it will automatically appear here for verification.
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    sisterTransfers.map(t => {
+                      const isPending = t.verificationStatus === 'PENDING_CHECK';
+                      const isVerified = t.verificationStatus === 'VERIFIED';
+                      const isRejected = t.verificationStatus === 'REJECTED';
+
+                      return (
+                        <tr key={t._id} style={{ background: isPending ? 'rgba(245, 158, 11, 0.04)' : undefined, fontSize: '0.82rem' }}>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 700 }}>{formatDateDDMMYYYY(t.date)}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: '#e0e7ff', color: '#4338ca', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Building2 size={12} /> {t.sourceCompany || t.vendorName}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                              {t.sourceDocNo || t.challanNo}
+                            </div>
+                            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'var(--border-light)', color: 'var(--text-muted)' }}>
+                              {t.sourceDocType === 'INVOICE' ? 'Tax Invoice' : t.sourceDocType === 'DELIVERY_CHALLAN' ? 'Delivery Challan' : 'Fabric Challan'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 700 }}>{t.materialName}</div>
+                            {t.panna && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.panna} </span>}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 800 }}>
+                            {t.qty} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.unit || 'Rolls'}</span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 800, color: isVerified ? '#10b981' : 'var(--text-muted)' }}>
+                            {t.verifiedQty != null ? `${t.verifiedQty} ${t.unit || 'Rolls'}` : '—'}
+                          </td>
+                          <td>
+                            {isPending && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
+                                Pending Check
+                              </span>
+                            )}
+                            {isVerified && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                <CheckCircle2 size={13} color="#16a34a" />
+                                Verified & in Stock
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#b91c1c', padding: '3px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                <XCircle size={13} color="#ef4444" />
+                                Rejected
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ maxWidth: '200px' }}>
+                            {isVerified && (
+                              <div style={{ fontSize: '0.72rem', color: '#047857' }}>
+                                <div>Checked by: <strong>{t.verifiedBy || 'Staff'}</strong></div>
+                                {t.verificationNotes && <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>"{t.verificationNotes}"</div>}
+                              </div>
+                            )}
+                            {isRejected && (
+                              <div style={{ fontSize: '0.72rem', color: '#dc2626' }}>
+                                <div>Reason: <strong>{t.discrepancyReason}</strong></div>
+                                <div>By: {t.verifiedBy || 'Staff'}</div>
+                              </div>
+                            )}
+                            {isPending && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                Awaiting physical inspection
+                              </span>
+                            )}
+                          </td>
+                          <td className="text-center" style={{ whiteSpace: 'nowrap' }}>
+                            {isPending ? (
+                              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                <button
+                                  onClick={() => openVerifyModal(t, 'VERIFY')}
+                                  className="btn-primary"
+                                  style={{
+                                    padding: '0.3rem 0.7rem',
+                                    fontSize: '0.75rem',
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Check and verify details are correct"
+                                >
+                                  <Check size={13} /> Verify & Accept
+                                </button>
+                                <button
+                                  onClick={() => openVerifyModal(t, 'REJECT')}
+                                  style={{
+                                    padding: '0.3rem 0.6rem',
+                                    fontSize: '0.75rem',
+                                    background: 'none',
+                                    border: '1px solid #ef4444',
+                                    color: '#ef4444',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                  title="Flag discrepancy / reject"
+                                >
+                                  <X size={13} /> Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => openVerifyModal(t, t.verificationStatus)}
+                                className="btn-secondary"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                              >
+                                <Eye size={13} /> View Check
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -2954,6 +3320,229 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   {loading ? 'Submitting...' : outwardItems.length > 0 ? `Save Outward (${outwardItems.length})` : 'Save Outward'}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── SISTER COMPANY INWARD VERIFICATION & INSPECTION MODAL ─── */}
+      {verifyModalOpen && selectedSisterTx && (
+        <div
+          className="modal-overlay modal-backdrop"
+          onClick={() => setVerifyModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            className="modal-content glass-panel"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '520px',
+              width: '100%',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              padding: '1.75rem',
+              position: 'relative',
+              margin: 'auto'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={20} color="#10b981" />
+                  {selectedSisterTx.verificationStatus === 'VERIFIED' ? 'Verified Inward Inspection' : selectedSisterTx.verificationStatus === 'REJECTED' ? 'Rejected Inward Inspection' : 'Verify Sister Company Inward Material'}
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Target Company: <strong>{companyEntity}</strong>
+                </span>
+              </div>
+              <button onClick={() => setVerifyModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Document Details Card */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem', marginBottom: '1.25rem', fontSize: '0.82rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>Sending Sister Company</span>
+                <strong style={{ color: '#4338ca' }}>{selectedSisterTx.sourceCompany || selectedSisterTx.vendorName}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>Document Reference</span>
+                <strong>{selectedSisterTx.sourceDocNo || selectedSisterTx.challanNo}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>Material Name</span>
+                <strong>{selectedSisterTx.materialName}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>Challan / Invoice Qty</span>
+                <strong>{selectedSisterTx.qty} {selectedSisterTx.unit || 'Rolls'}</strong>
+              </div>
+            </div>
+
+            <form onSubmit={handleVerifySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {selectedSisterTx.verificationStatus === 'PENDING_CHECK' ? (
+                <>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setVerifyAction('VERIFY')}
+                      style={{
+                        flex: 1,
+                        padding: '0.5rem',
+                        borderRadius: '8px',
+                        border: verifyAction === 'VERIFY' ? '2px solid #10b981' : '1px solid #cbd5e1',
+                        background: verifyAction === 'VERIFY' ? '#dcfce7' : '#ffffff',
+                        color: verifyAction === 'VERIFY' ? '#15803d' : '#64748b',
+                        fontWeight: 800,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <CheckCircle2 size={16} /> Details Correct (Accept)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVerifyAction('REJECT')}
+                      style={{
+                        flex: 1,
+                        padding: '0.5rem',
+                        borderRadius: '8px',
+                        border: verifyAction === 'REJECT' ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                        background: verifyAction === 'REJECT' ? '#fee2e2' : '#ffffff',
+                        color: verifyAction === 'REJECT' ? '#b91c1c' : '#64748b',
+                        fontWeight: 800,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <XCircle size={16} /> Report Discrepancy (Reject)
+                    </button>
+                  </div>
+
+                  {verifyAction === 'VERIFY' ? (
+                    <>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.3rem' }}>
+                          Confirmed Received Quantity ({selectedSisterTx.unit || 'Rolls'}) *
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          value={verifyQty}
+                          onChange={e => setVerifyQty(e.target.value)}
+                          style={{ ...inputStyle, width: '100%' }}
+                          placeholder={`Expected: ${selectedSisterTx.qty}`}
+                        />
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
+                          Physical measurement check. Upon confirmation, this quantity will become active in {companyEntity}'s raw material stock.
+                        </span>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.3rem' }}>
+                          Verification Notes / Quality Remarks (Optional)
+                        </label>
+                        <textarea
+                          rows="2"
+                          value={verifyNotes}
+                          onChange={e => setVerifyNotes(e.target.value)}
+                          style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
+                          placeholder="e.g. Received in sound condition. Rolls counted and tagged."
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.3rem', color: '#dc2626' }}>
+                        Discrepancy / Rejection Reason *
+                      </label>
+                      <textarea
+                        rows="3"
+                        required
+                        value={discrepancyReason}
+                        onChange={e => setDiscrepancyReason(e.target.value)}
+                        style={{ ...inputStyle, width: '100%', borderColor: '#fca5a5', resize: 'vertical' }}
+                        placeholder="e.g. 10 meters short, damaged rolls, or incorrect fabric quality received."
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setVerifyModalOpen(false)}
+                      className="btn-secondary"
+                      style={{ flex: 1 }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingVerify}
+                      className={verifyAction === 'VERIFY' ? 'btn-primary' : 'btn-danger'}
+                      style={{
+                        flex: 2,
+                        background: verifyAction === 'VERIFY' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ef4444',
+                        border: 'none',
+                        color: '#fff',
+                        fontWeight: 800
+                      }}
+                    >
+                      {submittingVerify
+                        ? 'Saving...'
+                        : verifyAction === 'VERIFY'
+                          ? 'Confirm & Add to Stock'
+                          : 'Reject Inward Material'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ padding: '0.85rem', background: selectedSisterTx.verificationStatus === 'VERIFIED' ? '#f0fdf4' : '#fef2f2', borderRadius: '8px', border: `1px solid ${selectedSisterTx.verificationStatus === 'VERIFIED' ? '#bbf7d0' : '#fecaca'}` }}>
+                    <div style={{ fontWeight: 800, color: selectedSisterTx.verificationStatus === 'VERIFIED' ? '#15803d' : '#b91c1c', marginBottom: '0.4rem' }}>
+                      {selectedSisterTx.verificationStatus === 'VERIFIED' ? '✅ Inward Verification Passed' : '❌ Inward Verification Rejected'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                      <div>Checked By: <strong>{selectedSisterTx.verifiedBy || 'Staff'}</strong></div>
+                      <div>Verified Date: {formatDateDDMMYYYY(selectedSisterTx.verifiedAt || selectedSisterTx.updatedAt)}</div>
+                      {selectedSisterTx.verifiedQty != null && <div>Confirmed Stock Qty: <strong>{selectedSisterTx.verifiedQty} {selectedSisterTx.unit}</strong></div>}
+                      {selectedSisterTx.verificationNotes && <div style={{ marginTop: '0.4rem' }}>Notes: <em>{selectedSisterTx.verificationNotes}</em></div>}
+                      {selectedSisterTx.discrepancyReason && <div style={{ marginTop: '0.4rem', color: '#dc2626' }}>Reason: <strong>{selectedSisterTx.discrepancyReason}</strong></div>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setVerifyModalOpen(false)}
+                    className="btn-secondary"
+                    style={{ width: '100%', marginTop: '0.5rem' }}
+                  >
+                    Close
+                  </button>
+                </>
+              )}
             </form>
           </div>
         </div>

@@ -230,6 +230,14 @@ const createChallan = async (req, res) => {
     const doc = new DeliveryChallan(body);
     await doc.save();
 
+    // Auto-sync to Sister Company's Raw Material Inward if buyer is a sister company
+    try {
+      const { syncDeliveryChallanToSisterRawMaterial } = require('../utils/sisterCompanySync');
+      await syncDeliveryChallanToSisterRawMaterial(doc);
+    } catch (syncErr) {
+      logger.warn('[deliveryChallan.createChallan] Sister company sync warning: %s', syncErr.message);
+    }
+
     res.status(201).json({ success: true, data: doc });
   } catch (error) {
     logger.error('deliveryChallan.createChallan error: %o', error);
@@ -251,6 +259,14 @@ const updateChallan = async (req, res) => {
 
     if (!updated) {
       return res.status(404).json({ success: false, error: 'Delivery Challan not found' });
+    }
+
+    // Auto-sync updated challan to Sister Company's Raw Material Inward
+    try {
+      const { syncDeliveryChallanToSisterRawMaterial } = require('../utils/sisterCompanySync');
+      await syncDeliveryChallanToSisterRawMaterial(updated);
+    } catch (syncErr) {
+      logger.warn('[deliveryChallan.updateChallan] Sister company sync warning: %s', syncErr.message);
     }
 
     res.json({ success: true, data: updated });
@@ -276,6 +292,15 @@ const deleteChallan = async (req, res) => {
     }
 
     await DeliveryChallan.findByIdAndDelete(req.params.id);
+
+    // Clean up sister company inward records for this deleted challan
+    try {
+      const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
+      await RawMaterialTransaction.deleteMany({ sourceDocId: doc._id, sourceDocType: 'DELIVERY_CHALLAN' });
+    } catch (delSyncErr) {
+      logger.warn('[deliveryChallan.deleteChallan] Clean up sister raw materials warning: %s', delSyncErr.message);
+    }
+
     res.json({ success: true, message: `Challan ${doc.challanNo} deleted successfully.` });
   } catch (error) {
     logger.error('deliveryChallan.deleteChallan error: %o', error);

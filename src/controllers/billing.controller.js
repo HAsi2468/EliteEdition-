@@ -747,6 +747,14 @@ const createInvoice = async (req, res) => {
     await syncChallanStatusForInvoice(invoice);
     await syncJobCardsForInvoice(invoice);
 
+    // Auto-sync Invoice to Sister Company's Raw Material Inward if buyer is a sister company
+    try {
+      const { syncInvoiceToSisterRawMaterial } = require('../utils/sisterCompanySync');
+      await syncInvoiceToSisterRawMaterial(invoice);
+    } catch (syncErr) {
+      console.warn('[billing.createInvoice] Sister company raw material sync warning:', syncErr.message);
+    }
+
     res.status(201).json({ success: true, data: invoice });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1098,6 +1106,14 @@ const updateInvoice = async (req, res) => {
     await syncChallanStatusForInvoice(invoice);
     await syncJobCardsForInvoice(invoice);
 
+    // Auto-sync updated Invoice to Sister Company's Raw Material Inward
+    try {
+      const { syncInvoiceToSisterRawMaterial } = require('../utils/sisterCompanySync');
+      await syncInvoiceToSisterRawMaterial(invoice);
+    } catch (syncErr) {
+      console.warn('[billing.updateInvoice] Sister company raw material sync warning:', syncErr.message);
+    }
+
     res.json({ success: true, data: invoice });
   } catch (error) {
     if (error.statusCode === 409 || error.code === 'STALE_RECORD_CONFLICT') {
@@ -1357,6 +1373,14 @@ const deleteInvoice = async (req, res) => {
     await FabricChallan.updateMany(queryInv, { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } });
     await StitchingChallan.updateMany(queryInv, { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } });
     await syncJobCardsForInvoice(invoice);
+
+    // Clean up sister company inward records for this deleted invoice
+    try {
+      const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
+      await RawMaterialTransaction.deleteMany({ sourceDocId: invoice._id, sourceDocType: 'INVOICE' });
+    } catch (delSyncErr) {
+      console.warn('[billing.deleteInvoice] Clean up sister raw materials warning:', delSyncErr.message);
+    }
 
     invalidateInvoicePdfCache(req.params.id);
     res.json({ success: true, message: 'Invoice deleted successfully' });

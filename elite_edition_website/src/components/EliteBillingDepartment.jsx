@@ -9,6 +9,7 @@ import CorporateDeliveryChallanPanel from './CorporateDeliveryChallanPanel';
 import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
 import GstCreditAnalysisPanel from './GstCreditAnalysisPanel';
 import LedgerReconciliationPanel from './LedgerReconciliationPanel';
+import RawMaterialsPanel from './RawMaterialsPanel';
 
 import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
@@ -296,6 +297,9 @@ export default function EliteBillingDepartment({
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('ALL');
   const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
+
+  // ── Sister Company Inward Transfer State ──────────────────────────────────
+  const [sisterPendingCount, setSisterPendingCount] = useState(0);
 
   // ── NON-BLOCKING VALIDATION DOCK & INDUSTRIAL SCANNER HOOKS ────────────────
   const { errors: validationErrors, setErrors: setValidationErrors, clearErrors: clearValidationErrors } = useValidationDock();
@@ -3033,13 +3037,29 @@ export default function EliteBillingDepartment({
     fetchInvoicesAndStats(false);
   }, [debouncedSearch, statusFilter, companyEntity]);
 
+  const fetchSisterPendingCount = useCallback(async () => {
+    try {
+      const res = await api.getSisterTransfers({ companyEntity, status: 'PENDING_CHECK', limit: 1 });
+      if (res && res.stats) {
+        setSisterPendingCount(res.stats.pendingCount || 0);
+      }
+    } catch {
+      // quiet fallback
+    }
+  }, [companyEntity]);
+
+  useEffect(() => {
+    fetchSisterPendingCount();
+  }, [fetchSisterPendingCount]);
+
   useEffect(() => {
     const handleBillingDataRefresh = () => {
       fetchInvoicesAndStats(true);
+      fetchSisterPendingCount();
     };
     window.addEventListener('elite-data-refresh', handleBillingDataRefresh);
     return () => window.removeEventListener('elite-data-refresh', handleBillingDataRefresh);
-  }, [debouncedSearch, statusFilter, companyEntity]);
+  }, [debouncedSearch, statusFilter, companyEntity, fetchSisterPendingCount]);
 
   // Auto-populate Invoice from Challan with Saved Customer Auto-Selection & Multi-Challan Merging
   const loadInvoiceFromChallan = async (chInput) => {
@@ -3929,6 +3949,11 @@ export default function EliteBillingDepartment({
             { id: 'challans', label: isCorporateEntity ? 'Delivery Challan' : department === 'stitching' ? 'Stitching Challan' : 'Challan' },
             { id: 'invoices', label: 'Invoices', count: stats.totalInvoices },
             { id: 'purchase', label: 'Purchases' },
+            { 
+              id: 'raw_materials', 
+              label: sisterPendingCount > 0 ? `Raw Materials (${sisterPendingCount})` : 'Raw Materials & Inward',
+              badge: sisterPendingCount > 0 ? sisterPendingCount : null
+            },
             { id: 'gst', label: 'GST Summary' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? 'Edit Invoice' : 'New Invoice' }] : []),
             { id: 'expense', label: 'Expenses & Ledger' },
@@ -3942,9 +3967,32 @@ export default function EliteBillingDepartment({
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={`ent-tab-btn ${isActive ? 'active' : ''}`}
-                style={{ flexShrink: 0, flex: '0 0 auto', whiteSpace: 'nowrap', minWidth: 'max-content' }}
+                style={{
+                  flexShrink: 0,
+                  flex: '0 0 auto',
+                  whiteSpace: 'nowrap',
+                  minWidth: 'max-content',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
+                }}
               >
                 <span>{t.label}</span>
+                {t.badge && (
+                  <span
+                    style={{
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      padding: '2px 7px',
+                      borderRadius: '999px',
+                      boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)'
+                    }}
+                  >
+                    {t.badge}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -6331,6 +6379,16 @@ export default function EliteBillingDepartment({
             fetchPurchases();
           }}
         />
+      )}
+
+      {/* ── RAW MATERIALS & SISTER TRANSFER VERIFICATION ─────────────────── */}
+      {activeTab === 'raw_materials' && (
+        <div style={{ marginTop: '0.75rem' }}>
+          <RawMaterialsPanel 
+            companyEntity={companyEntity} 
+            initialTab={sisterPendingCount > 0 ? 'sister_inward' : 'dashboard'} 
+          />
+        </div>
       )}
 
       {/* ── NEW / EDIT PURCHASE ENTRY GENERATOR MODAL (MIRRORING INVOICE WITH VENDOR DETAILS) ── */}
