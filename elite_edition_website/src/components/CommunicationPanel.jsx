@@ -5067,8 +5067,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           (displayName || 'D').charAt(0).toUpperCase()
                         )
                       ) : (
-                        g.avatarUrl ? (
-                          <img src={g.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        group.avatarUrl ? (
+                          <img src={group.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                         ) : (
                           <Building2 size={18} color={deptCol} />
                         )
@@ -10942,7 +10942,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Users size={16} color="#d97706" />
                   <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e' }}>
-                    {activeGroup.members?.length || 0} Members in Group
+                    {activeGroup?.members?.length || 0} Members in Group
                   </span>
                 </div>
                 <button
