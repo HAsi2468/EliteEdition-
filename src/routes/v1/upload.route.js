@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { isR2Configured, uploadToR2 } = require('../../utils/r2Storage');
 const { decodeUnicodeFileName, sanitizeUnicodeKeyName } = require('../../utils/unicodeFileHelper');
+const { requireAuth } = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -263,8 +264,8 @@ router.get('/preview', async (req, res) => {
     let imageBuffer = null;
 
     // 1. If local file path
-    if (targetUrl.startsWith('/uploads/') || targetUrl.startsWith('uploads/')) {
-      const cleanPath = targetUrl.replace(/^\/?uploads\//, '');
+    if (targetUrl.startsWith('/uploads/') || targetUrl.startsWith('uploads/') || targetUrl.startsWith('/designs/') || targetUrl.startsWith('designs/')) {
+      const cleanPath = targetUrl.replace(/^\/?(uploads|designs)\//, '');
       const localPath = path.resolve(uploadDir, cleanPath);
       // Ensure path traversal cannot escape uploadDir
       if (localPath.startsWith(path.resolve(uploadDir)) && fs.existsSync(localPath)) {
@@ -329,7 +330,7 @@ router.get('/preview', async (req, res) => {
   }
 });
 
-router.post('/', (req, res, next) => {
+router.post('/', requireAuth, (req, res, next) => {
   upload.any()(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -544,7 +545,7 @@ router.get('/download', async (req, res) => {
  * POST /v1/upload/presign
  * Generates a pre-signed direct upload URL to bypass app server
  */
-router.post('/presign', async (req, res) => {
+router.post('/presign', requireAuth, async (req, res) => {
   const { fileName, fileType, folder = 'designs' } = req.body || {};
   if (!fileName || !fileType) {
     return res.status(400).json({ error: 'fileName and fileType are required' });
@@ -595,7 +596,7 @@ router.post('/presign', async (req, res) => {
  * POST /v1/upload/multipart/initiate
  * Starts an S3/R2 multipart upload for large files (> 10MB)
  */
-router.post('/multipart/initiate', async (req, res) => {
+router.post('/multipart/initiate', requireAuth, async (req, res) => {
   const { fileName, fileType, folder = 'designs' } = req.body || {};
   if (!fileName) {
     return res.status(400).json({ error: 'fileName is required' });
@@ -638,7 +639,7 @@ router.post('/multipart/initiate', async (req, res) => {
  * POST /v1/upload/multipart/part-url
  * Generates a pre-signed URL for an individual part chunk
  */
-router.post('/multipart/part-url', async (req, res) => {
+router.post('/multipart/part-url', requireAuth, async (req, res) => {
   const { key, uploadId, partNumber } = req.body || {};
   if (!key || !uploadId || !partNumber) {
     return res.status(400).json({ error: 'key, uploadId, and partNumber are required' });
@@ -671,7 +672,7 @@ router.post('/multipart/part-url', async (req, res) => {
  * POST /v1/upload/multipart/complete
  * Finalizes multipart upload and returns CDN file URL
  */
-router.post('/multipart/complete', async (req, res) => {
+router.post('/multipart/complete', requireAuth, async (req, res) => {
   const { key, uploadId, parts } = req.body || {};
   if (!key || !uploadId || !Array.isArray(parts)) {
     return res.status(400).json({ error: 'key, uploadId, and parts array are required' });
