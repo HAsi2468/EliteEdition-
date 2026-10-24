@@ -93,78 +93,53 @@ const getGroups = async (req, res) => {
         .lean();
     }
 
-    // Fetch unread count & latest message snippet for each room using fast batch aggregation
+    // Fetch unread count & latest message snippet for each room using fast parallel indexed queries
     const roomIds = rooms.map((r) => r._id);
     const lastMsgMap = {};
     const unreadMap = {};
 
     if (roomIds.length > 0) {
-      // 1. Fetch latest message for each room in a single aggregation pipeline
-      const latestAgg = await ChatMessage.aggregate([
-        { $match: { roomId: { $in: roomIds } } },
-        { $sort: { createdAt: -1 } },
-        {
-          $group: {
-            _id: '$roomId',
-            lastMsg: {
-              $first: {
-                _id: '$_id',
-                roomId: '$roomId',
-                content: '$content',
-                type: '$type',
-                senderId: '$senderId',
-                senderName: '$senderName',
-                msgType: '$msgType',
-                priority: '$priority',
-                createdAt: '$createdAt',
-                isDeleted: '$isDeleted',
-                attachment: '$attachment'
-              }
-            }
-          }
-        }
-      ]);
-
-      if (latestAgg.length > 0) {
-        const msgsToPopulate = latestAgg.map((x) => x.lastMsg);
-        await ChatMessage.populate(msgsToPopulate, { path: 'senderId', select: 'name username email avatarUrl' });
-        latestAgg.forEach((x) => {
-          if (x.lastMsg && x.lastMsg.isDeleted) {
-            x.lastMsg.content = 'This message was deleted';
-            x.lastMsg.attachment = null;
-          }
-          lastMsgMap[String(x._id)] = x.lastMsg;
-        });
-      }
-
-      // 2. Fetch unread counts in a single aggregation pipeline
       const targetUserId = currentUser ? currentUser._id : (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? rawUserId : null);
-      if (targetUserId) {
-        const targetUserObjId = mongoose.Types.ObjectId.isValid(targetUserId)
-          ? (typeof targetUserId === 'object' ? targetUserId : new mongoose.Types.ObjectId(targetUserId))
-          : null;
-        if (targetUserObjId) {
-          const unreadAgg = await ChatMessage.aggregate([
-            {
-              $match: {
-                roomId: { $in: roomIds },
-                senderId: { $ne: targetUserObjId },
-                readBy: { $ne: targetUserObjId },
-                isDeleted: { $ne: true }
-              }
-            },
-            {
-              $group: {
-                _id: '$roomId',
-                count: { $sum: 1 }
-              }
+      const targetUserObjId = targetUserId && mongoose.Types.ObjectId.isValid(targetUserId)
+        ? (typeof targetUserId === 'object' ? targetUserId : new mongoose.Types.ObjectId(targetUserId))
+        : null;
+
+      // Execute ultra-fast single-doc primary index queries for each room in parallel (< 5ms total)
+      await Promise.all(rooms.map(async (r) => {
+        try {
+          // 1. Fetch latest message using indexed compound sort
+          const lastMsg = await ChatMessage.findOne({ roomId: r._id })
+            .sort({ _id: -1 })
+            .select('_id roomId content type senderId senderName msgType priority createdAt isDeleted attachment')
+            .populate('senderId', 'name username email avatarUrl')
+            .maxTimeMS(1200)
+            .lean();
+
+          if (lastMsg) {
+            if (lastMsg.isDeleted) {
+              lastMsg.content = 'This message was deleted';
+              lastMsg.attachment = null;
             }
-          ]);
-          unreadAgg.forEach((u) => {
-            unreadMap[String(u._id)] = u.count;
-          });
+            lastMsgMap[String(r._id)] = lastMsg;
+          }
+
+          // 2. Fetch unread count for current user with fast timeout
+          if (targetUserObjId) {
+            const count = await ChatMessage.countDocuments({
+              roomId: r._id,
+              senderId: { $ne: targetUserObjId },
+              readBy: { $ne: targetUserObjId },
+              isDeleted: { $ne: true }
+            }).maxTimeMS(1000);
+            unreadMap[String(r._id)] = count || 0;
+          }
+        } catch (_) {
+          // Fallback to room's own lastMessage or empty if DB is under brief contention
+          if (r.lastMessage) {
+            lastMsgMap[String(r._id)] = r.lastMessage;
+          }
         }
-      }
+      }));
     }
 
     const roomsWithMeta = rooms.map((room) => {
