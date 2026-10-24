@@ -377,6 +377,22 @@ router.post('/', (req, res, next) => {
     return res.status(400).json({ error: 'File content does not match genuine allowed format signature.' });
   }
 
+  // Deep image content sniffing: Prevent spoofed images (e.g. JPEG magic bytes + ELF/script payloads)
+  const isImageFormat = ['.jpg', '.jpeg', '.jfif', '.png', '.webp', '.gif', '.bmp'].includes(fileExt);
+  if (isImageFormat && fileBuffer) {
+    try {
+      const meta = await sharp(fileBuffer).metadata();
+      if (!meta || !meta.width || !meta.height) {
+        throw new Error('Image dimensions could not be parsed');
+      }
+    } catch (err) {
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      return res.status(400).json({ error: 'Invalid or corrupt image content. Spoofed image files are strictly rejected.' });
+    }
+  }
+
   const folder = (req.body?.folder || req.query?.folder || 'designs').trim();
   const designName = (req.body?.designName || req.query?.designName || '').trim();
 
@@ -538,6 +554,12 @@ router.post('/presign', async (req, res) => {
   if (extCheck === '.tif' || extCheck === '.tiff' || mimeCheck === 'image/tiff' || mimeCheck === 'image/tif') {
     return res.status(400).json({
       error: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
+    });
+  }
+
+  if (!ALLOWED_EXTENSIONS.has(extCheck)) {
+    return res.status(400).json({
+      error: `File extension '${extCheck}' is not permitted. Allowed extensions: ${Array.from(ALLOWED_EXTENSIONS).join(', ')}`
     });
   }
 

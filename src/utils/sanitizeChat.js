@@ -33,6 +33,9 @@ function sanitizeChatMessage(text, maxLength = 10000) {
     sanitized = sanitized.replace(pattern, '');
   });
 
+  // Escape raw HTML brackets into safe entities (&lt; &gt;)
+  sanitized = sanitized.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
   // Truncate to maximum permissible character length
   if (sanitized.length > maxLength) {
     sanitized = sanitized.substring(0, maxLength);
