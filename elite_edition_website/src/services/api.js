@@ -2624,6 +2624,20 @@ export const api = {
     });
   },
 
+  async updateCommunicationGroup(groupId, updates) {
+    return request(`/communication/groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  async updateCurrentUserProfile(updates) {
+    return request('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  },
+
   async deleteCommunicationGroup(groupId) {
     return request(`/communication/groups/${groupId}`, {
       method: 'DELETE',

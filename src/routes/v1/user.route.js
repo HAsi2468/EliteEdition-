@@ -28,6 +28,45 @@ router.get('/me', async (req, res) => {
 	}
 });
 
+router.patch('/me', async (req, res) => {
+	try {
+		const userId = req.user?.id || req.user?._id;
+		if (!userId) {
+			return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Unauthorized' });
+		}
+		const User = require('../../db/models').user || require('../../db/models/user.model');
+		const { name, about, phone, avatarUrl, department } = req.body;
+		const updates = {};
+		if (typeof name === 'string' && name.trim()) {
+			updates.name = name.trim().substring(0, 60);
+		}
+		if (typeof about === 'string') {
+			updates.about = about.trim().substring(0, 200);
+		}
+		if (typeof phone === 'string') {
+			updates.phone = phone.trim().substring(0, 25);
+		}
+		if (typeof avatarUrl === 'string') {
+			updates.avatarUrl = avatarUrl.trim();
+		}
+		if (typeof department === 'string' && department.trim() && req.user.role === 'admin') {
+			updates.department = department.trim().substring(0, 60);
+		}
+		updates.modified_date_time = new Date();
+
+		const updatedUser = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true })
+			.select('-password')
+			.lean();
+
+		if (!updatedUser) {
+			return res.status(404).json({ success: false, message: 'User not found' });
+		}
+		return res.status(200).json({ success: true, user: updatedUser });
+	} catch (error) {
+		return res.status(500).json({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
+	}
+});
+
 router
 	.route('/:id')
 	.get(

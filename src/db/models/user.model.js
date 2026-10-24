@@ -36,6 +36,21 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			default: 'General',
 		},
+		about: {
+			type: String,
+			default: 'Hey there! I am using Elite Edition.',
+			trim: true,
+		},
+		avatarUrl: {
+			type: String,
+			default: '',
+			trim: true,
+		},
+		phone: {
+			type: String,
+			default: '',
+			trim: true,
+		},
 		designerName: {
 			type: String,
 			default: '',

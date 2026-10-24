@@ -10,6 +10,7 @@ router.use(requireAuth);
 // 2. Groups & Channels
 router.get('/groups', communicationController.getGroups);
 router.post('/groups', communicationController.createGroup);
+router.patch('/groups/:groupId', requireGroupAccess, communicationController.updateGroup);
 router.delete('/groups/:groupId', requireGroupAccess, communicationController.deleteGroup);
 router.post('/groups/sync', requireAdmin, communicationController.syncGroups);
 

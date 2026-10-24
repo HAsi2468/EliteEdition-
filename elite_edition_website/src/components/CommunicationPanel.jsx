@@ -88,7 +88,9 @@ import {
   ArrowLeft,
   ZoomIn,
   ZoomOut,
-  RotateCw
+  RotateCw,
+  Settings,
+  Camera
 } from 'lucide-react';
 
 function formatFileSize(bytes) {
@@ -769,6 +771,28 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [staffSearch, setStaffSearch] = useState('');
   const [creatingGroup, setCreatingGroup] = useState(false);
 
+  // User Profile / Settings Modal (WhatsApp Style)
+  const [showUserSettingsModal, setShowUserSettingsModal] = useState(false);
+  const [userProfileForm, setUserProfileForm] = useState({
+    name: '',
+    about: '',
+    phone: '',
+    avatarUrl: '',
+    department: ''
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState('profile');
+
+  // Group Settings Modal (WhatsApp Style for Groups)
+  const [showGroupSettingsModal, setShowGroupSettingsModal] = useState(false);
+  const [groupSettingsForm, setGroupSettingsForm] = useState({
+    name: '',
+    description: '',
+    department: '',
+    avatarUrl: ''
+  });
+  const [savingGroupSettings, setSavingGroupSettings] = useState(false);
+
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -927,6 +951,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         else if (showForwardModal) setShowForwardModal(false);
         else if (showClearAllModal) setShowClearAllModal(false);
         else if (showChatTaskModal) setShowChatTaskModal(false);
+        else if (showUserSettingsModal) setShowUserSettingsModal(false);
+        else if (showGroupSettingsModal) setShowGroupSettingsModal(false);
         else if (showDialpad) setShowDialpad(false);
         else if (attachmentViewer) setAttachmentViewer(null);
       }
@@ -938,7 +964,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     showMobileActionMenu, showMobileHeaderMenu, showDesktopHeaderMenu,
     showNewDmModal, showCreateGroupModal, showMembersModal, showShareModal,
     showGalleryModal, showPollModal, showForwardModal, showClearAllModal,
-    showChatTaskModal, showDialpad, attachmentViewer
+    showChatTaskModal, showUserSettingsModal, showGroupSettingsModal, showDialpad, attachmentViewer
   ]);
 
   // ─── Real-Time Voice & Video Calling Handlers (WebRTC) ───
@@ -2734,6 +2760,109 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       alert('Failed to create group: ' + err.message);
     } finally {
       setCreatingGroup(false);
+    }
+  };
+
+  const showAppToast = ({ title, message, type = 'info' }) => {
+    try {
+      window.dispatchEvent(new CustomEvent('elite-push-notification', {
+        detail: {
+          title,
+          message,
+          type,
+          timestamp: Date.now()
+        }
+      }));
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (showUserSettingsModal && currentUser) {
+      setUserProfileForm({
+        name: currentUser.name || currentUser.username || '',
+        about: currentUser.about || 'Hey there! I am using Elite Edition.',
+        phone: currentUser.phone || '',
+        avatarUrl: currentUser.avatarUrl || '',
+        department: currentUser.department || 'General'
+      });
+    }
+  }, [showUserSettingsModal, currentUser]);
+
+  const handleSaveUserProfile = async (e) => {
+    if (e) e.preventDefault();
+    if (!userProfileForm.name.trim()) {
+      showAppToast({ title: 'Validation Error', message: 'Name cannot be empty', type: 'error' });
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const res = await api.updateCurrentUserProfile({
+        name: userProfileForm.name.trim(),
+        about: userProfileForm.about.trim(),
+        phone: userProfileForm.phone.trim(),
+        avatarUrl: userProfileForm.avatarUrl.trim()
+      });
+      if (res && res.success && res.user) {
+        try {
+          const stored = localStorage.getItem('user');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            localStorage.setItem('user', JSON.stringify({ ...parsed, ...res.user }));
+          }
+        } catch (e) {}
+        if (currentUser) {
+          Object.assign(currentUser, res.user);
+        }
+        showAppToast({ title: 'Profile Updated', message: 'Your WhatsApp-style basic details have been saved!', type: 'success' });
+        setShowUserSettingsModal(false);
+      } else {
+        throw new Error(res?.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      showAppToast({ title: 'Update Failed', message: err.message, type: 'error' });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleOpenGroupSettings = () => {
+    if (!activeGroup) return;
+    setGroupSettingsForm({
+      name: activeGroup.name || '',
+      description: activeGroup.description || '',
+      department: activeGroup.department || 'General',
+      avatarUrl: activeGroup.avatarUrl || ''
+    });
+    setShowGroupSettingsModal(true);
+  };
+
+  const handleSaveGroupSettings = async (e) => {
+    if (e) e.preventDefault();
+    if (!groupSettingsForm.name.trim()) {
+      showAppToast({ title: 'Validation Error', message: 'Group name is required', type: 'error' });
+      return;
+    }
+    setSavingGroupSettings(true);
+    try {
+      const res = await api.updateCommunicationGroup(activeGroup._id, {
+        name: groupSettingsForm.name.trim(),
+        description: groupSettingsForm.description.trim(),
+        department: groupSettingsForm.department.trim(),
+        avatarUrl: groupSettingsForm.avatarUrl.trim()
+      });
+      if (res && res.success && res.data) {
+        const updated = res.data;
+        setActiveGroup((prev) => ({ ...prev, ...updated }));
+        setGroups((prev) => prev.map((g) => (String(g._id) === String(updated._id) ? { ...g, ...updated } : g)));
+        showAppToast({ title: 'Group Updated', message: 'Group details updated successfully!', type: 'success' });
+        setShowGroupSettingsModal(false);
+      } else {
+        throw new Error(res?.message || 'Failed to update group');
+      }
+    } catch (err) {
+      showAppToast({ title: 'Update Failed', message: err.message, type: 'error' });
+    } finally {
+      setSavingGroupSettings(false);
     }
   };
 
@@ -4756,16 +4885,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {/* Task Toggle Pill */}
+              {/* WhatsApp-Style User Settings Button */}
               <button
                 type="button"
-                onClick={() => setMainTab('task')}
+                onClick={() => setShowUserSettingsModal(true)}
                 className="phoenix-action-btn-neutral"
-                style={{ width: 'auto', padding: '0 10px', height: '32px', fontSize: '0.76rem', fontWeight: 700, gap: '4px' }}
-                title="Switch to Kanban Tasks"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+                title="Settings & Profile"
+                aria-label="Settings & Profile"
               >
-                <CheckSquare size={13} color="#3874ff" />
-                <span>Tasks</span>
+                <Settings size={16} color="var(--text-primary, #0f172a)" />
               </button>
 
               {/* + Button for New Chat / Group */}
@@ -4924,9 +5061,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       }}
                     >
                       {isDirect ? (
-                        (displayName || 'D').charAt(0).toUpperCase()
+                        colleague?.avatarUrl ? (
+                          <img src={colleague.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          (displayName || 'D').charAt(0).toUpperCase()
+                        )
                       ) : (
-                        <Building2 size={18} color={deptCol} />
+                        g.avatarUrl ? (
+                          <img src={g.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <Building2 size={18} color={deptCol} />
+                        )
                       )}
                       {isDirect && (() => {
                         const colleagueId = colleague?._id || colleague?.id;
@@ -5143,9 +5288,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           }}
                         >
                           {isDirect ? (
-                            (displayName || 'D').charAt(0).toUpperCase()
+                            colleague?.avatarUrl ? (
+                              <img src={colleague.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                              (displayName || 'D').charAt(0).toUpperCase()
+                            )
                           ) : (
-                            <Building2 size={18} color={deptCol} />
+                            activeGroup?.avatarUrl ? (
+                              <img src={activeGroup.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                              <Building2 size={18} color={deptCol} />
+                            )
                           )}
                           {isDirect && (() => {
                             const colleagueId = colleague?._id || colleague?.id;
@@ -5438,20 +5591,48 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                   <span>Share Record Card</span>
                                 </button>
 
-                                {/* Members (if group) */}
+                                {/* For Groups: Group Settings, Tasks & Members */}
                                 {!isDirect && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setShowDesktopHeaderMenu(false); handleOpenMembers(); }}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
-                                      fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
-                                    }}
-                                  >
-                                    <Users size={14} color="#0ea5e9" />
-                                    <span>Members ({activeGroup.members?.length || 0})</span>
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); handleOpenGroupSettings(); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                      }}
+                                    >
+                                      <Settings size={14} color="#f59e0b" />
+                                      <span>Group Settings</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); setMainTab('task'); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                      }}
+                                    >
+                                      <CheckSquare size={14} color="#3874ff" />
+                                      <span>Group Tasks & Kanban</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); handleOpenMembers(); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                      }}
+                                    >
+                                      <Users size={14} color="#0ea5e9" />
+                                      <span>Members ({activeGroup.members?.length || 0})</span>
+                                    </button>
+                                  </>
                                 )}
 
                                 {/* Sound Toggle */}
@@ -9951,6 +10132,899 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         >
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '680px' }}>
             <ChatContainer onClose={() => setShowCopilotModal(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* ── WHATSAPP-STYLE USER SETTINGS & PROFILE MODAL ── */}
+      {showUserSettingsModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => setShowUserSettingsModal(false)}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              width: '100%',
+              maxWidth: 500,
+              maxHeight: '90vh',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+              background: 'var(--bg-card, #ffffff)',
+              border: '1px solid var(--border-light, #e2e8f0)',
+              animation: 'scrollBottomEntrance 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '1.2rem 1.4rem',
+                borderBottom: '1px solid var(--border-light, #e2e8f0)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                color: '#ffffff'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: '10px',
+                    background: 'rgba(255,255,255,0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff'
+                  }}
+                >
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                    Settings & Profile
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.74rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
+                    Manage basic details, status bio, and chat settings
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowUserSettingsModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s ease'
+                }}
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Navigation Tabs */}
+            <div
+              style={{
+                display: 'flex',
+                borderBottom: '1px solid var(--border-light, #e2e8f0)',
+                background: 'var(--bg-main, #f8fafc)',
+                padding: '0.4rem 1rem',
+                gap: '8px'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setActiveSettingsTab('profile')}
+                style={{
+                  padding: '7px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: activeSettingsTab === 'profile' ? 700 : 600,
+                  cursor: 'pointer',
+                  background: activeSettingsTab === 'profile' ? '#0d9488' : 'transparent',
+                  color: activeSettingsTab === 'profile' ? '#ffffff' : 'var(--text-secondary, #64748b)',
+                  transition: 'all 0.15s ease',
+                  boxShadow: activeSettingsTab === 'profile' ? '0 2px 8px rgba(13,148,136,0.3)' : 'none'
+                }}
+              >
+                👤 Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSettingsTab('preferences')}
+                style={{
+                  padding: '7px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: activeSettingsTab === 'preferences' ? 700 : 600,
+                  cursor: 'pointer',
+                  background: activeSettingsTab === 'preferences' ? '#0d9488' : 'transparent',
+                  color: activeSettingsTab === 'preferences' ? '#ffffff' : 'var(--text-secondary, #64748b)',
+                  transition: 'all 0.15s ease',
+                  boxShadow: activeSettingsTab === 'preferences' ? '0 2px 8px rgba(13,148,136,0.3)' : 'none'
+                }}
+              >
+                ⚙️ Preferences
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              {activeSettingsTab === 'profile' ? (
+                <>
+                  {/* Avatar Upload with Camera Badge */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ position: 'relative' }}>
+                      <div
+                        style={{
+                          width: 88,
+                          height: 88,
+                          borderRadius: '50%',
+                          background: userProfileForm.avatarUrl
+                            ? 'transparent'
+                            : 'linear-gradient(135deg, #0d9488 0%, #2563eb 100%)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '2rem',
+                          fontWeight: 800,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                          border: '3px solid var(--bg-card, #ffffff)',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {userProfileForm.avatarUrl ? (
+                          <img
+                            src={userProfileForm.avatarUrl}
+                            alt="Avatar"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          (userProfileForm.name || currentUser?.name || 'U').charAt(0).toUpperCase()
+                        )}
+                      </div>
+
+                      {/* Camera Button Badge */}
+                      <label
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          right: 0,
+                          width: 30,
+                          height: 30,
+                          borderRadius: '50%',
+                          background: '#0d9488',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                          border: '2px solid #ffffff',
+                          transition: 'transform 0.15s ease'
+                        }}
+                        title="Upload Profile Photo"
+                      >
+                        <Camera size={15} />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const reader = new FileReader();
+                              reader.onload = (loadEvt) => {
+                                setUserProfileForm((prev) => ({
+                                  ...prev,
+                                  avatarUrl: loadEvt.target.result
+                                }));
+                              };
+                              reader.readAsDataURL(file);
+                            } catch (err) {
+                              console.error('Failed to read image', err);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    {userProfileForm.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setUserProfileForm((prev) => ({ ...prev, avatarUrl: '' }))}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: '2px 8px'
+                        }}
+                      >
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Name Input */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
+                      Your Name
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={60}
+                      value={userProfileForm.name}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, name: e.target.value })}
+                      placeholder="Enter your display name"
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-light, #cbd5e1)',
+                        background: 'var(--bg-main, #f8fafc)',
+                        color: 'var(--text-primary, #0f172a)',
+                        fontSize: '0.88rem',
+                        fontWeight: 600,
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #94a3b8)', marginTop: '4px', display: 'block' }}>
+                      This name is visible to your team members in chats and activity feeds.
+                    </span>
+                  </div>
+
+                  {/* WhatsApp-Style About / Status Bio */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
+                      About / Status
+                    </label>
+                    <textarea
+                      rows={2}
+                      maxLength={200}
+                      value={userProfileForm.about}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, about: e.target.value })}
+                      placeholder="e.g. Available, At work, In a meeting..."
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-light, #cbd5e1)',
+                        background: 'var(--bg-main, #f8fafc)',
+                        color: 'var(--text-primary, #0f172a)',
+                        fontSize: '0.86rem',
+                        outline: 'none',
+                        resize: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+
+                    {/* Quick WhatsApp Status Chips */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }}>
+                      {[
+                        'Available 🟢',
+                        'Busy 🔴',
+                        'At work 💼',
+                        'In a meeting 📅',
+                        'Urgent calls only 📞',
+                        'Working remotely 🏡'
+                      ].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => setUserProfileForm({ ...userProfileForm, about: chip })}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '14px',
+                            border: '1px solid var(--border-light, #e2e8f0)',
+                            background: userProfileForm.about === chip ? 'rgba(13,148,136,0.12)' : 'var(--bg-card, #ffffff)',
+                            color: userProfileForm.about === chip ? '#0d9488' : 'var(--text-secondary, #64748b)',
+                            fontSize: '0.72rem',
+                            fontWeight: userProfileForm.about === chip ? 700 : 500,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Phone & Email Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
+                        Phone
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={25}
+                        value={userProfileForm.phone}
+                        onChange={(e) => setUserProfileForm({ ...userProfileForm, phone: e.target.value })}
+                        placeholder="+91 98765 43210"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--border-light, #cbd5e1)',
+                          background: 'var(--bg-main, #f8fafc)',
+                          color: 'var(--text-primary, #0f172a)',
+                          fontSize: '0.84rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
+                        Email (Login)
+                      </label>
+                      <input
+                        type="text"
+                        disabled
+                        value={currentUser?.email || ''}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--border-light, #cbd5e1)',
+                          background: 'var(--bg-main, #f1f5f9)',
+                          color: 'var(--text-muted, #94a3b8)',
+                          fontSize: '0.84rem',
+                          outline: 'none',
+                          cursor: 'not-allowed',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Role & Department info pill */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(37,99,235,0.06)', borderRadius: '10px', border: '1px solid rgba(37,99,235,0.15)' }}>
+                    <Shield size={16} color="#2563eb" />
+                    <span style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 600 }}>
+                      Role: <strong>{currentUser?.role === 'admin' ? 'Company Admin' : 'Staff Member'}</strong> • Department: <strong>{currentUser?.department || 'General'}</strong>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                /* Preferences Tab */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Sound Toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '12px', background: 'var(--bg-main, #f8fafc)', border: '1px solid var(--border-light, #e2e8f0)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: 34, height: 34, borderRadius: '8px', background: chatSoundMuted ? '#fee2e2' : '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {chatSoundMuted ? <VolumeX size={18} color="#ef4444" /> : <Volume2 size={18} color="#16a34a" />}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Chat Notification Chime</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Play subtle audio pop on incoming messages</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !chatSoundMuted;
+                        setChatSoundMuted(next);
+                        if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        border: 'none',
+                        background: chatSoundMuted ? '#ef4444' : '#10b981',
+                        color: '#ffffff',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chatSoundMuted ? 'Muted' : 'Enabled'}
+                    </button>
+                  </div>
+
+                  {/* Browser Push Notifications */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '12px', background: 'var(--bg-main, #f8fafc)', border: '1px solid var(--border-light, #e2e8f0)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: 34, height: 34, borderRadius: '8px', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Info size={18} color="#2563eb" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Desktop Alerts</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>System push notifications when app is in background</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (typeof Notification !== 'undefined') {
+                          const perm = await Notification.requestPermission();
+                          if (perm === 'granted') {
+                            showAppToast({ title: 'Notifications Enabled', message: 'Desktop notifications are active', type: 'success' });
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        border: '1px solid #cbd5e1',
+                        background: 'var(--bg-card, #ffffff)',
+                        color: 'var(--text-primary, #0f172a)',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Allowed ✓' : 'Enable'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '0.9rem 1.4rem',
+                borderTop: '1px solid var(--border-light, #e2e8f0)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'var(--bg-main, #f8fafc)'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowUserSettingsModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-light, #cbd5e1)',
+                  background: 'var(--bg-card, #ffffff)',
+                  color: 'var(--text-secondary, #64748b)',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingProfile}
+                onClick={handleSaveUserProfile}
+                style={{
+                  padding: '8px 22px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                  color: '#ffffff',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: savingProfile ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(13,148,136,0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {savingProfile ? (
+                  <>
+                    <RefreshCw size={14} className="spin-loader" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} />
+                    <span>Save Changes</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── WHATSAPP-STYLE GROUP SETTINGS & DETAILS MODAL ── */}
+      {showGroupSettingsModal && activeGroup && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => setShowGroupSettingsModal(false)}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              width: '100%',
+              maxWidth: 500,
+              maxHeight: '90vh',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+              background: 'var(--bg-card, #ffffff)',
+              border: '1px solid var(--border-light, #e2e8f0)',
+              animation: 'scrollBottomEntrance 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '1.2rem 1.4rem',
+                borderBottom: '1px solid var(--border-light, #e2e8f0)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'linear-gradient(135deg, #b45309 0%, #d97706 100%)',
+                color: '#ffffff'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: '10px',
+                    background: 'rgba(255,255,255,0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff'
+                  }}
+                >
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                    Group Settings
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.74rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
+                    Edit group subject, description, department and icon
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowGroupSettingsModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              {/* Group Icon with Camera Badge */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: '50%',
+                      background: groupSettingsForm.avatarUrl
+                        ? 'transparent'
+                        : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.8rem',
+                      fontWeight: 800,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                      border: '3px solid var(--bg-card, #ffffff)',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {groupSettingsForm.avatarUrl ? (
+                      <img
+                        src={groupSettingsForm.avatarUrl}
+                        alt="Group Icon"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <Building2 size={36} color="#ffffff" />
+                    )}
+                  </div>
+
+                  <label
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: '#d97706',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                      border: '2px solid #ffffff'
+                    }}
+                    title="Upload Group Photo"
+                  >
+                    <Camera size={14} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const reader = new FileReader();
+                          reader.onload = (loadEvt) => {
+                            setGroupSettingsForm((prev) => ({
+                              ...prev,
+                              avatarUrl: loadEvt.target.result
+                            }));
+                          };
+                          reader.readAsDataURL(file);
+                        } catch (err) {
+                          console.error('Failed to read group photo', err);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {groupSettingsForm.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setGroupSettingsForm((prev) => ({ ...prev, avatarUrl: '' }))}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: '2px 8px'
+                    }}
+                  >
+                    Remove Group Photo
+                  </button>
+                )}
+              </div>
+
+              {/* Group Name */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
+                  Group Name *
+                </label>
+                <input
+                  type="text"
+                  maxLength={100}
+                  value={groupSettingsForm.name}
+                  onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, name: e.target.value })}
+                  placeholder="e.g. Production Team, Design Studio"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-light, #cbd5e1)',
+                    background: 'var(--bg-main, #f8fafc)',
+                    color: 'var(--text-primary, #0f172a)',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Group Description */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
+                  Group Description
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={500}
+                  value={groupSettingsForm.description}
+                  onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, description: e.target.value })}
+                  placeholder="Describe the objective or topics for this group channel..."
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-light, #cbd5e1)',
+                    background: 'var(--bg-main, #f8fafc)',
+                    color: 'var(--text-primary, #0f172a)',
+                    fontSize: '0.86rem',
+                    outline: 'none',
+                    resize: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Department */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
+                  Department / Operational Unit
+                </label>
+                <select
+                  value={groupSettingsForm.department}
+                  onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, department: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-light, #cbd5e1)',
+                    background: 'var(--bg-main, #f8fafc)',
+                    color: 'var(--text-primary, #0f172a)',
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  {['Production', 'Digital Print', 'Design', 'Stitching', 'Sales', 'Accounts', 'General', 'Management'].map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Members Quick Link */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.2)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={16} color="#d97706" />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e' }}>
+                    {activeGroup.members?.length || 0} Members in Group
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowGroupSettingsModal(false);
+                    handleOpenMembers();
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#d97706',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Manage Members →
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '0.9rem 1.4rem',
+                borderTop: '1px solid var(--border-light, #e2e8f0)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'var(--bg-main, #f8fafc)'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowGroupSettingsModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-light, #cbd5e1)',
+                  background: 'var(--bg-card, #ffffff)',
+                  color: 'var(--text-secondary, #64748b)',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingGroupSettings}
+                onClick={handleSaveGroupSettings}
+                style={{
+                  padding: '8px 22px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #b45309 0%, #d97706 100%)',
+                  color: '#ffffff',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: savingGroupSettings ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {savingGroupSettings ? (
+                  <>
+                    <RefreshCw size={14} className="spin-loader" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} />
+                    <span>Save Group Details</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

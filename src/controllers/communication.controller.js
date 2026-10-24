@@ -1239,6 +1239,68 @@ const deleteGroup = async (req, res) => {
 };
 
 /**
+ * Update basic details of an existing group (Name, Description, Department, AvatarUrl)
+ */
+const updateGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing Group ID' });
+    }
+
+    const room = await ChatRoom.findById(groupId);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    const isSuperOrAdmin = req.user && (
+      req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
+      req.user.isAdmin === true ||
+      req.user.isMainAdmin === true
+    );
+    const isCreator = req.user && room.createdBy && String(room.createdBy) === String(req.user._id);
+    const isMember = room.members && room.members.some((m) => getMemberIdString(m) === String(req.user?._id));
+
+    if (!isSuperOrAdmin && !isCreator && !isMember) {
+      return res.status(403).json({ success: false, message: 'Access denied: Only group members or admins can edit group details' });
+    }
+
+    const { name, description, department, avatarUrl } = req.body;
+    if (name !== undefined && typeof name === 'string' && name.trim()) {
+      room.name = sanitizeChatMessage(name, 100);
+    }
+    if (description !== undefined && typeof description === 'string') {
+      room.description = sanitizeChatMessage(description, 500);
+    }
+    if (department !== undefined && typeof department === 'string' && department.trim()) {
+      room.department = department.trim();
+    }
+    if (avatarUrl !== undefined && typeof avatarUrl === 'string') {
+      room.avatarUrl = avatarUrl.trim();
+    }
+
+    await room.save();
+
+    const populatedRoom = await ChatRoom.findById(room._id)
+      .populate('members', 'name email role permissions department allowedCompanies avatarUrl');
+
+    const io = req.app.get('socketio') || global.io;
+    if (io) {
+      io.to(String(room._id)).emit('group-updated', {
+        groupId: String(room._id),
+        group: populatedRoom
+      });
+    }
+
+    return res.json({ success: true, data: populatedRoom });
+  } catch (error) {
+    console.error('Error updating group details:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update group details', error: error.message });
+  }
+};
+
+/**
  * Admin endpoint to broadcast force hard-reload signal to all connected Socket clients
  */
 const forceReloadAllUsers = async (req, res) => {
@@ -1573,6 +1635,7 @@ module.exports = {
   getUsersForDM,
   createOrGetDirectRoom,
   createGroup,
+  updateGroup,
   deleteGroup,
   deleteMessage,
   editMessage,
