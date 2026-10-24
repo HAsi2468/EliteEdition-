@@ -31,6 +31,7 @@ const createInward = async (req, res) => {
   try {
     const compEntity = req.body.companyEntity || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
+      const docs = req.body.map((item) => {
         const {
           challanNo, vendorName, materialName, qty, unit, date, notes,
           panna, paperQuality, color, canSize, metersPerRoll, companyEntity,

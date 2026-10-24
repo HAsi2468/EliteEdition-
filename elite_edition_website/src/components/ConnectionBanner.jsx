@@ -80,10 +80,14 @@ export function ConnectionBanner() {
     };
   }, []);
 
+  const hasAuthToken = Boolean(
+    typeof localStorage !== 'undefined' && localStorage.getItem('elite_auth_token')
+  );
+
   // If the WebSocket is connected, we are connected! Never display false offline if socket is healthy.
   const isActuallyConnected = status === 'connected' && socketManager.isConnected();
-  const isOffline = !isActuallyConnected && (!isBrowserOnline || status === 'offline');
-  const isReconnecting = !isActuallyConnected && !isOffline;
+  const isOffline = hasAuthToken && !isActuallyConnected && (!isBrowserOnline || status === 'offline');
+  const isReconnecting = hasAuthToken && !isActuallyConnected && !isOffline && status === 'reconnecting';
 
   // Debounce reconnecting pill: Do not flash intrusive "Reconnecting..." on sub-second transient blips
   const [showReconnectingPill, setShowReconnectingPill] = useState(false);
@@ -93,7 +97,7 @@ export function ConnectionBanner() {
     if (isReconnecting) {
       timer = setTimeout(() => {
         setShowReconnectingPill(true);
-      }, 1500);
+      }, 3000);
     } else {
       setShowReconnectingPill(false);
     }

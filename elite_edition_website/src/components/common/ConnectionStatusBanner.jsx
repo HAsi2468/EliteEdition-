@@ -82,8 +82,11 @@ export function ConnectionStatusBanner() {
   }, []);
 
   const isActuallyConnected = isBrowserOnline && status === 'connected';
-  const isOffline = !isBrowserOnline || status === 'offline';
-  const isReconnecting = !isOffline && status !== 'connected';
+  const hasAuthToken = Boolean(
+    typeof localStorage !== 'undefined' && localStorage.getItem('elite_auth_token')
+  );
+  const isOffline = hasAuthToken && (!isBrowserOnline || status === 'offline');
+  const isReconnecting = hasAuthToken && !isOffline && status === 'reconnecting';
 
   // Handle recovery confirmation badge transition
   useEffect(() => {

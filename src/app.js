@@ -100,6 +100,9 @@ const isPublicRoute = (path) => {
   return (
     p === '/v1/auth/ping' ||
     p === '/api/v1/auth/ping' ||
+    p === '/api/v1/ping' ||
+    p === '/v1/ping' ||
+    p === '/ping' ||
     p.startsWith('/v1/auth') ||
     p.startsWith('/api/v1/auth') ||
     p === '/v1/notifications/vapid-key' ||
