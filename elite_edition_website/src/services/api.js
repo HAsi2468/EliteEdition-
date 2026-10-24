@@ -845,11 +845,11 @@ export const api = {
   },
 
   // ─── Job Cards ─────────────────────────────────────────────────────────────
-  async getJobCards(params = {}) {
+  async getJobCards(params = {}, options = {}) {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return request(`/jobCards${qs}`);
+    return request(`/jobCards${qs}`, options);
   },
   async getJobCard(id) {
     return request(`/jobCards/${id}`);
