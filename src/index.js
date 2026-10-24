@@ -74,8 +74,9 @@ setInterval(() => {
 }, 60000);
 
 const port = process.env.PORT || 3001;
-server.listen(port, '0.0.0.0', async () => {
-  logger.info(`App is listening on primary port ${port}`);
+const host = process.env.HOST || '127.0.0.1';
+server.listen(port, host, async () => {
+  logger.info(`App is listening on primary port ${port} on ${host}`);
   console.log('Server bound to', server.address());
 
   await syncCommunicationGroups();

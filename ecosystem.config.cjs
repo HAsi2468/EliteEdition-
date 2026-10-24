@@ -38,6 +38,7 @@ module.exports = {
       // Production Environment Variables
       env_production: {
         NODE_ENV: 'production',
+        HOST: '127.0.0.1',
         PORT: 3001,
         REDIS_HOST: '127.0.0.1',
         REDIS_PORT: 6379,
@@ -47,6 +48,7 @@ module.exports = {
       // Staging / Testing Environment Variables
       env_staging: {
         NODE_ENV: 'staging',
+        HOST: '127.0.0.1',
         PORT: 3002,
         REDIS_HOST: '127.0.0.1',
         REDIS_PORT: 6379,
