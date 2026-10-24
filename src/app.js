@@ -72,12 +72,46 @@ if (config.env !== 'test') {
 	app.use(morgan.errorHandler);
 }
 
-// set security HTTP headers
+// Comprehensive Helmet Security Headers Suite with Enterprise CSP
 app.use(
 	helmet({
-		contentSecurityPolicy: false,
+		contentSecurityPolicy: {
+			directives: {
+				defaultSrc: ["'self'"],
+				scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+				styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+				fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+				imgSrc: [
+					"'self'",
+					'data:',
+					'blob:',
+					'https://*.r2.dev',
+					'https://*.cloudflarestorage.com',
+					'https://*.s3.amazonaws.com',
+					'https://*.amazonaws.com',
+					'https://lh3.googleusercontent.com',
+					'https://*.googleusercontent.com',
+					'https://drive.google.com',
+				],
+				connectSrc: [
+					"'self'",
+					'https://erp.eliteedition.in',
+					'wss://erp.eliteedition.in',
+					'ws://localhost:3001',
+					'http://localhost:3001',
+					'https://*.r2.dev',
+					'https://*.cloudflarestorage.com',
+					'https://*.s3.amazonaws.com',
+				],
+				mediaSrc: ["'self'", 'blob:', 'data:', 'https://*.r2.dev'],
+				objectSrc: ["'none'"],
+				frameSrc: ["'self'"],
+				upgradeInsecureRequests: [],
+			},
+		},
 		crossOriginResourcePolicy: { policy: 'cross-origin' },
 		crossOriginEmbedderPolicy: false,
+		crossOriginOpenerPolicy: { policy: 'same-origin' },
 		hsts: {
 			maxAge: 31536000,
 			includeSubDomains: true,
@@ -85,6 +119,10 @@ app.use(
 		},
 		frameguard: { action: 'sameorigin' },
 		noSniff: true,
+		xssFilter: true,
+		referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+		dnsPrefetchControl: { allow: false },
+		permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 	})
 );
 
