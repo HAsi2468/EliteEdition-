@@ -177,6 +177,15 @@ const chatMessageSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    pinnedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    pinnedAt: {
+      type: Date,
+      default: null
+    },
     // ── Interactive Polls & Scheduling fields ──
     pollMeta: {
       question: { type: String, default: '' },

@@ -263,17 +263,19 @@ const getGroupMessages = async (req, res) => {
     const [total, messages] = await Promise.all([
       ChatMessage.countDocuments(query),
       ChatMessage.find(query)
-        .populate('senderId', 'name username email role')
-        .populate('mentions', 'name username email')
-        .populate('pinnedBy', 'name username email')
-        .populate('pollMeta.options.votes', 'name username email')
+        .populate({ path: 'senderId', select: 'name username email role', options: { strictPopulate: false } })
+        .populate({ path: 'mentions', select: 'name username email', options: { strictPopulate: false } })
+        .populate({ path: 'pinnedBy', select: 'name username email', options: { strictPopulate: false } })
+        .populate({ path: 'pollMeta.options.votes', select: 'name username email', options: { strictPopulate: false } })
         .populate({
           path: 'reactions.user',
-          select: 'name username email'
+          select: 'name username email',
+          options: { strictPopulate: false }
         })
         .populate({
           path: 'replyTo',
-          populate: { path: 'senderId', select: 'name username email' }
+          populate: { path: 'senderId', select: 'name username email', options: { strictPopulate: false } },
+          options: { strictPopulate: false }
         })
         .sort({ _id: -1 })
         .skip(skip)
