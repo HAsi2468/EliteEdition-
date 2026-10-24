@@ -22,15 +22,21 @@ const getSelectedCanSize = (currentVal, options) => {
   return match || currentVal;
 };
 
-export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print', initialTab = 'dashboard' } = {}) {
-  const [activeTab, setActiveTab] = useState(initialTab || 'dashboard');
+export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print', initialTab = null } = {}) {
+  const isDigitalPrint = /^elite\s*digital\s*print/i.test(companyEntity) || companyEntity === 'digital_print';
+  const [activeTab, setActiveTab] = useState(() => {
+    if (initialTab) return initialTab;
+    return isDigitalPrint ? 'dashboard' : 'sister_inward';
+  });
   const currentUser = api.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
   const [stock, setStock] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [materialsList, setMaterialsList] = useState([
-    'Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'
-  ]);
+  const [materialsList, setMaterialsList] = useState(() => (
+    isDigitalPrint
+      ? ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink']
+      : ['Fabric Material', 'Grey Fabric', 'Finished Goods', 'Stitching Accessories', 'Packaging Material']
+  ));
   const [vendorsList, setVendorsList] = useState([]);
   const [partiesList, setPartiesList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -304,8 +310,12 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, label }
 
   const [printConfig, setPrintConfig] = useState(null);
-  const [inwardTab, setInwardTab] = useState('Sublimation Paper');
-  const [outwardTab, setOutwardTab] = useState('Sublimation Paper');
+  const [inwardTab, setInwardTab] = useState(() => (
+    isDigitalPrint ? 'Sublimation Paper' : 'Fabric Material'
+  ));
+  const [outwardTab, setOutwardTab] = useState(() => (
+    isDigitalPrint ? 'Sublimation Paper' : 'Fabric Material'
+  ));
 
   // Modals
   const [isInwardOpen, setIsInwardOpen] = useState(false);
@@ -510,18 +520,20 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     setLoading(true);
     setError('');
     try {
-      // 1. Fetch PrintConfig to get custom list of raw materials if saved
-      try {
-        const cfg = await api.getPrintConfig();
-        if (cfg) {
-          setPrintConfig(cfg);
-          if (Array.isArray(cfg.rawMaterials) && cfg.rawMaterials.length > 0) {
-            setMaterialsList(cfg.rawMaterials);
+      // 1. Fetch PrintConfig to get custom list of raw materials if saved (digital print only)
+      if (isDigitalPrint) {
+        try {
+          const cfg = await api.getPrintConfig();
+          if (cfg) {
+            setPrintConfig(cfg);
+            if (Array.isArray(cfg.rawMaterials) && cfg.rawMaterials.length > 0) {
+              setMaterialsList(cfg.rawMaterials);
+            }
+            if (cfg.parties) setPartiesList(cfg.parties);
           }
-          if (cfg.parties) setPartiesList(cfg.parties);
+        } catch (e) {
+          console.warn('Failed to fetch print config:', e);
         }
-      } catch (e) {
-        console.warn('Failed to fetch print config:', e);
       }
 
       // 2. Fetch vendors list
@@ -534,7 +546,15 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
       // 3. Fetch Stock Overview
       const stockRes = await api.getRawMaterialStock({ companyEntity });
-      if (stockRes.success) setStock(stockRes.data);
+      if (stockRes.success && Array.isArray(stockRes.data)) {
+        setStock(stockRes.data);
+        if (!isDigitalPrint) {
+          const extraMaterials = [...new Set(stockRes.data.map(s => s.materialName).filter(Boolean))];
+          if (extraMaterials.length > 0) {
+            setMaterialsList(prev => [...new Set([...prev, ...extraMaterials])]);
+          }
+        }
+      }
 
       // 4. Fetch Transactions
       const transRes = await api.getRawMaterialTransactions({ companyEntity });
@@ -1380,12 +1400,16 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   onChange={e => setStockMaterialType(e.target.value)}
                 >
                   <option value="All">All Material Types</option>
-                  <option value="Ink">All Inks (Grando / Printdot)</option>
-                  <option value="Paper">All Papers (Sublimation / Butter)</option>
-                  <option value="Sublimation Paper">Sublimation Paper</option>
-                  <option value="Butter Paper">Butter Paper</option>
-                  <option value="Grando Ink">Grando Ink</option>
-                  <option value="Printdot Ink">Printdot Ink</option>
+                  {isDigitalPrint && (
+                    <>
+                      <option value="Ink">All Inks (Grando / Printdot)</option>
+                      <option value="Paper">All Papers (Sublimation / Butter)</option>
+                      <option value="Sublimation Paper">Sublimation Paper</option>
+                      <option value="Butter Paper">Butter Paper</option>
+                      <option value="Grando Ink">Grando Ink</option>
+                      <option value="Printdot Ink">Printdot Ink</option>
+                    </>
+                  )}
                   {materialsList.filter(m => !['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'].includes(m)).map(m => (
                     <option key={m} value={m}>{m}</option>
                   ))}
@@ -1407,10 +1431,10 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   }}
                 />
 
-                <button onClick={() => { setEditingTransaction(null); setIsInwardOpen(true); handleInwardTabChange('Sublimation Paper'); setInwardItems([]); }} className="btn-primary" style={{ gap: '0.4rem' }}>
+                <button onClick={() => { setEditingTransaction(null); setIsInwardOpen(true); handleInwardTabChange(isDigitalPrint ? 'Sublimation Paper' : (materialsList[0] || 'Fabric Material')); setInwardItems([]); }} className="btn-primary" style={{ gap: '0.4rem' }}>
                   <ArrowDownToLine size={16} /> Stock Inward
                 </button>
-                <button onClick={() => { setIsOutwardOpen(true); handleOutwardTabChange('Sublimation Paper'); setOutwardItems([]); }} className="btn-secondary" style={{ gap: '0.4rem' }}>
+                <button onClick={() => { setIsOutwardOpen(true); handleOutwardTabChange(isDigitalPrint ? 'Sublimation Paper' : (materialsList[0] || 'Fabric Material')); setOutwardItems([]); }} className="btn-secondary" style={{ gap: '0.4rem' }}>
                   <ArrowUpFromLine size={16} /> Stock Outward
                 </button>
               </div>
@@ -1444,9 +1468,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               const printdotItems = stock.filter(item => isPrintdotItem(item));
               const otherItems = stock.filter(item => !isPaperItem(item) && !isGrandoItem(item) && !isPrintdotItem(item));
 
-              const showPaper = stockMaterialType === 'All' || matchesMaterialType('Sublimation Paper', stockMaterialType) || matchesMaterialType('Butter Paper', stockMaterialType);
-              const showGrando = stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Grando Ink';
-              const showPrintdot = stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Printdot Ink';
+              const showPaper = (isDigitalPrint || paperItems.length > 0) && (stockMaterialType === 'All' || matchesMaterialType('Sublimation Paper', stockMaterialType) || matchesMaterialType('Butter Paper', stockMaterialType));
+              const showGrando = (isDigitalPrint || grandoItems.length > 0) && (stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Grando Ink');
+              const showPrintdot = (isDigitalPrint || printdotItems.length > 0) && (stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Printdot Ink');
               const showOther = stockMaterialType === 'All' || (!showPaper && !showGrando && !showPrintdot);
 
               const CMYK_SPECS = [
@@ -1954,80 +1978,98 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                     </div>
                   )}
 
-                  {/* 4. OTHER MATERIALS TABLE (If any) */}
-                  {showOther && otherItems.length > 0 && (
-                    <div style={tableCardStyle}>
-                      <div style={tableHeaderBarStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Layers size={18} />
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Other Raw Materials</h3>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Additional configured accessories & raw materials</span>
+                  {/* 4. FABRIC & RAW MATERIALS TABLE */}
+                  {showOther && (
+                    otherItems.length > 0 ? (
+                      <div style={tableCardStyle}>
+                        <div style={tableHeaderBarStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Layers size={18} />
+                            </div>
+                            <div>
+                              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {isDigitalPrint ? 'Other Raw Materials' : 'Fabric & Raw Material Inventory'}
+                              </h3>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {isDigitalPrint ? 'Additional configured accessories & raw materials' : `${companyEntity} active fabric stock, rolls & inward materials`}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
-                          <thead>
-                            <tr>
-                              <th style={thStyle}>Material Name</th>
-                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Inward</th>
-                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Outward</th>
-                              <th style={{ ...thStyle, textAlign: 'right' }}>Available Stock</th>
-                              <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
-                              <th style={{ ...thStyle, textAlign: 'center' }}>Quick Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {otherItems.map((item, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                                <td style={tdStyle}>
-                                  <strong style={{ color: 'var(--text-primary)' }}>{item.materialName}</strong>
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--success)', fontWeight: 700 }}>
-                                  {item.totalInward || 0} {item.unit || 'Units'}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>
-                                  {item.totalOutward || 0} {item.unit || 'Units'}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                  <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: (item.currentStock || 0) <= 0 ? 'var(--danger)' : 'var(--primary)' }}>
-                                    {item.currentStock || 0}
-                                  </strong>
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>{item.unit || 'Units'}</span>
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                  {renderStockStatusBadge(item.currentStock || 0)}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                  <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                    <button 
-                                      onClick={() => handleQuickInward(item.materialName)}
-                                      className="btn-primary" 
-                                      title={`Quick Inward for ${item.materialName}`}
-                                      style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                    <button 
-                                      onClick={() => handleQuickOutward(item.materialName)}
-                                      className="btn-secondary" 
-                                      title={`Quick Outward for ${item.materialName}`}
-                                      style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
-                                    >
-                                      <ArrowUpFromLine size={14} />
-                                    </button>
-                                  </div>
-                                </td>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+                            <thead>
+                              <tr>
+                                <th style={thStyle}>Material / Fabric Name</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Total Inward</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Total Outward</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Available Stock</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Quick Actions</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {otherItems.map((item, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                  <td style={tdStyle}>
+                                    <strong style={{ color: 'var(--text-primary)' }}>{item.materialName}</strong>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--success)', fontWeight: 700 }}>
+                                    {item.totalInward || 0} {item.unit || 'Meters'}
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>
+                                    {item.totalOutward || 0} {item.unit || 'Meters'}
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                    <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: (item.currentStock || 0) <= 0 ? 'var(--danger)' : 'var(--primary)' }}>
+                                      {item.currentStock || 0}
+                                    </strong>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>{item.unit || 'Meters'}</span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {renderStockStatusBadge(item.currentStock || 0)}
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                      <button 
+                                        onClick={() => handleQuickInward(item.materialName)}
+                                        className="btn-primary" 
+                                        title={`Quick Inward for ${item.materialName}`}
+                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleQuickOutward(item.materialName)}
+                                        className="btn-secondary" 
+                                        title={`Quick Outward for ${item.materialName}`}
+                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                      >
+                                        <ArrowUpFromLine size={14} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      !isDigitalPrint && (
+                        <div style={{ ...tableCardStyle, padding: '2.5rem 1.5rem', textAlign: 'center' }}>
+                          <Layers size={36} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '0.75rem' }} />
+                          <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)', fontSize: '1.05rem' }}>
+                            No Verified Fabric Stock for {companyEntity} Yet
+                          </h3>
+                          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '520px', marginInline: 'auto', lineHeight: 1.5 }}>
+                            Transfers from sister companies (via Invoices or Delivery Challans) arrive in the <strong>"Sister Inward Check"</strong> tab. Once physically verified and accepted, your active fabric stock will be displayed here.
+                          </p>
+                        </div>
+                      )
+                    )
                   )}
 
                 </div>
