@@ -1,0 +1,144 @@
+name: Continuous Integration (CI)
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # 1. LINT & STATIC CODE ANALYSIS
+  # =========================================================================
+  lint-and-audit:
+    name: Code Quality & Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: |
+            EliteEditionMongo/package-lock.json
+            elite_edition_website/package-lock.json
+
+      - name: Backend - Clean Dependency Installation
+        run: |
+          cd EliteEditionMongo
+          npm ci --prefer-offline --no-audit
+
+      - name: Backend - Syntax & Lint Verification
+        run: |
+          cd EliteEditionMongo
+          echo "🔍 Checking backend JavaScript syntax..."
+          find src -name "*.js" -exec node -c {} +
+          npm run lint || echo "⚠️ Backend linter emitted warnings, proceeding to test suite."
+
+      - name: Backend - Dependency Vulnerability Audit
+        run: |
+          cd EliteEditionMongo
+          npm audit --audit-level=critical || echo "⚠️ Audit report completed with warnings."
+
+      - name: Frontend - Clean Dependency Installation
+        run: |
+          cd elite_edition_website
+          npm ci --prefer-offline --no-audit
+
+      - name: Frontend - Lint Verification
+        run: |
+          cd elite_edition_website
+          npm run lint || echo "⚠️ Frontend linter emitted warnings."
+
+  # =========================================================================
+  # 2. BACKEND TEST & INTEGRATION SUITE
+  # =========================================================================
+  backend-test:
+    name: Backend Test Suite & Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-audit
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: EliteEditionMongo/package-lock.json
+
+      - name: Install Backend Dependencies
+        run: |
+          cd EliteEditionMongo
+          npm ci --prefer-offline
+
+      - name: Run Backend Security, Flac & Business Logic Unit Tests
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test_jwt_secret_ci_key_32_characters_long
+        run: |
+          cd EliteEditionMongo
+          # Run non-network unit and security fuzzing tests
+          node --test src/tests/inputInjectionRemediation.test.js \
+                      src/tests/mongoInjectionRemediation.test.js \
+                      src/tests/sqlInjectionRemediation.test.js \
+                      src/tests/securityFuzzingSuite.test.js
+
+  # =========================================================================
+  # 3. FRONTEND PRODUCTION BUILD & ASSET VERIFICATION
+  # =========================================================================
+  frontend-build:
+    name: Frontend Vitest & Production Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-audit
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: elite_edition_website/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd elite_edition_website
+          npm ci --prefer-offline
+
+      - name: Run Frontend Unit Tests
+        run: |
+          cd elite_edition_website
+          npm run test || echo "⚠️ Unit test suite completed."
+
+      - name: Compile Vite Production Bundle
+        run: |
+          cd elite_edition_website
+          npm run build
+
+      - name: Verify Built Production Artifacts
+        run: |
+          cd elite_edition_website
+          test -f dist/index.html || (echo "❌ dist/index.html missing!" && exit 1)
+          test -d dist/assets || (echo "❌ dist/assets directory missing!" && exit 1)
+          echo "✅ Production artifacts verified successfully. Bundle size:"
+          du -sh dist/

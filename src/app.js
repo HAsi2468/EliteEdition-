@@ -99,6 +99,9 @@ const { requireAuth } = require('./middlewares/auth.middleware');
 const isPublicRoute = (path) => {
   const p = (path || '').toLowerCase();
   return (
+    p === '/api/health' ||
+    p === '/health' ||
+    p === '/v1/health' ||
     p === '/v1/auth/ping' ||
     p === '/api/v1/auth/ping' ||
     p === '/api/v1/ping' ||
@@ -585,9 +588,14 @@ app.use('/verify/challan', require('./routes/v1/challanVerification.route'));
 app.use('/verify/jobcard', require('./routes/v1/jobCardVerification.route'));
 app.use('/verify/invoice', require('./routes/v1/invoiceVerification.route'));
 
-// Lightweight universal health ping handler for load balancers & monitoring
-app.get(['/api/v1/ping', '/v1/ping', '/ping'], (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: Date.now() });
+// Lightweight universal health ping handler for load balancers, CI/CD smoke tests & monitoring
+app.get(['/api/health', '/health', '/v1/health', '/api/v1/ping', '/v1/ping', '/ping'], (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    timestamp: Date.now(),
+    service: 'elite-edition-backend'
+  });
 });
 
 // send back a 404 error for any unknown api request

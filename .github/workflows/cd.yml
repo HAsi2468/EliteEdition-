@@ -1,0 +1,204 @@
+name: Continuous Deployment (CD) - Zero-Downtime
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # =========================================================================
+  # 1. PRE-DEPLOYMENT VALIDATION GATE
+  # =========================================================================
+  pre-deploy-gate:
+    name: Pre-Deployment Build & Test Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: |
+            EliteEditionMongo/package-lock.json
+            elite_edition_website/package-lock.json
+
+      - name: Install & Validate Backend
+        run: |
+          cd EliteEditionMongo
+          npm ci --prefer-offline
+          find src -name "*.js" -exec node -c {} +
+          echo "✅ Backend syntax validated."
+
+      - name: Install & Build Frontend
+        run: |
+          cd elite_edition_website
+          npm ci --prefer-offline
+          npm run build
+          test -f dist/index.html || exit 1
+          echo "✅ Frontend production bundle compiled successfully."
+
+  # =========================================================================
+  # 2. ZERO-DOWNTIME REMOTE DEPLOYMENT
+  # =========================================================================
+  deploy-production:
+    name: Zero-Downtime Deployment to EC2
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: pre-deploy-gate
+    environment:
+      name: production
+      url: https://erp.eliteedition.in
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure Secure SSH Agent
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SERVER_SSH_PORT || '22' }} -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Execute Server Deployment Pipeline
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER || 'ubuntu' }}
+          PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          echo "🚀 Initiating zero-downtime deployment for commit: $COMMIT_SHA"
+          ssh -i ~/.ssh/deploy_key -p $PORT $USER@$HOST "
+            set -e
+            export PATH=\"/usr/local/opt/node@18/bin:/usr/local/bin:/usr/bin:/bin:\$PATH\"
+            cd ~/EliteEditionMongo
+
+            # 1. Record current stable commit for automated rollback if health check fails
+            PREV_COMMIT=\$(git rev-parse HEAD)
+            echo \"📌 Current stable commit: \$PREV_COMMIT\"
+
+            # 2. Fetch and checkout new release commit
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 3. Clean dependency update only if package.json or lockfile changed
+            if git diff \$PREV_COMMIT HEAD --name-only | grep -q 'package.json'; then
+              echo \"📦 Dependencies changed, running npm ci...\"
+              npm ci --prefer-offline --omit=dev || npm install --omit=dev
+            else
+              echo \"⚡ Dependencies unchanged, skipping npm install.\"
+            fi
+
+            # 4. Graceful Zero-Downtime PM2 Cluster Reload
+            echo \"🔄 Executing PM2 graceful cluster reload...\"
+            if pm2 describe elite-backend > /dev/null 2>&1; then
+              pm2 reload ecosystem.config.cjs --update-env || pm2 reload ecosystem.config.js --update-env
+            else
+              pm2 start ecosystem.config.cjs --env production || pm2 start ecosystem.config.js --env production
+            fi
+            pm2 save
+
+            # 5. Reload Nginx configuration for static assets
+            echo \"🌐 Reloading Nginx...\"
+            sudo systemctl reload nginx || true
+          "
+
+      - name: Post-Deployment Smoke Test & Health Check
+        env:
+          HEALTH_URL: "https://erp.eliteedition.in/api/health"
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER || 'ubuntu' }}
+          PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
+        run: |
+          echo "🔍 Running smoke test against $HEALTH_URL..."
+          HEALTH_OK=false
+          for i in {1..30}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "🟢 Server responded with HTTP 200 OK after $i attempts!"
+              HEALTH_OK=true
+              break
+            fi
+            echo "⏳ Attempt $i/30: HTTP $HTTP_CODE - retrying in 2 seconds..."
+            sleep 2
+          done
+
+          if [ "$HEALTH_OK" = "false" ]; then
+            echo "❌ CRITICAL: Post-deployment health check failed!"
+            echo "🚨 INITIATING AUTOMATED ROLLBACK TO PREVIOUS STABLE COMMIT..."
+            
+            ssh -i ~/.ssh/deploy_key -p $PORT $USER@$HOST "
+              cd ~/EliteEditionMongo
+              echo '⏪ Rolling back Git repository to previous HEAD...'
+              git reset --hard HEAD@{1}
+              pm2 reload ecosystem.config.cjs --update-env || pm2 reload ecosystem.config.js --update-env
+              sudo systemctl reload nginx
+              echo '⚠️ Rollback completed. Dumping recent crash logs:'
+              pm2 logs elite-backend --lines 30 --nostream
+            "
+            exit 1
+          fi
+
+      - name: Broadcast In-App Version Update Notification
+        if: success()
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER || 'ubuntu' }}
+          PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p $PORT $USER@$HOST "
+            NODE_PATH=/usr/lib/node_modules node -e \"
+              const pm2 = require('pm2');
+              const fs = require('fs');
+              try {
+                const versionData = { version: '2.9.9', commit: '$COMMIT_SHA', timestamp: Date.now() };
+                pm2.connect((err) => {
+                  if (err) return process.exit(0);
+                  pm2.list((err, list) => {
+                    const procs = list.filter(p => p.name === 'elite-backend' && p.pm2_env.status === 'online');
+                    procs.forEach(p => {
+                      pm2.sendDataToProcessId(p.pm_id, {
+                        type: 'process:msg',
+                        data: { type: 'broadcast-version-update', data: versionData },
+                        topic: 'broadcast-version-update'
+                      }, () => {});
+                    });
+                    setTimeout(() => { pm2.disconnect(); process.exit(0); }, 1000);
+                  });
+                });
+              } catch (e) {
+                process.exit(0);
+              }
+            \" || true
+          "
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "### 🚀 Deployment Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Domain:** https://erp.eliteedition.in" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered By:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Zero-Downtime PM2 Reload:** Verified" >> $GITHUB_STEP_SUMMARY

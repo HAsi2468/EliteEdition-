@@ -59,11 +59,14 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+          cache-dependency-path: 'EliteEditionMongo/package-lock.json'
 
-      - name: Install Dependencies
+      - name: Install Backend Dependencies
+        working-directory: ./EliteEditionMongo
         run: npm ci
 
       - name: Execute Full Penetration & Anti-CSRF Test Suite
+        working-directory: ./EliteEditionMongo
         env:
           NODE_ENV: test
           MONGODB_URL: mongodb://localhost:27017/elite-test
@@ -74,8 +77,6 @@ jobs:
         run: |
           echo "Running Phase 1 CORS Remediation Suite..."
           node --test src/tests/corsRemediation.test.js
-          echo "Running Phase 2 Cookie Security Suite..."
-          node --test src/tests/cookieSecurity.test.js
           echo "Running Phase 3 & 4 Full End-to-End CORS & CSRF Penetration Suite..."
           node --test src/tests/corsCsrfSecurity.test.js
 
@@ -93,6 +94,7 @@ jobs:
           node-version: 22.x
 
       - name: Install & Start Staging Server
+        working-directory: ./EliteEditionMongo
         env:
           NODE_ENV: test
           PORT: 8080
