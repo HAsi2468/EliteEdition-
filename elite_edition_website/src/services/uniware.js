@@ -1,34 +1,8 @@
-import { getBaseUrl } from './api';
+import { api } from './api';
 
-// Generic request wrapper
+// Route all requests through standardized api.request (enforcing withCredentials: true and HttpOnly cookies)
 const request = async (path, options = {}) => {
-  const baseUrl = getBaseUrl();
-  const token = localStorage.getItem('elite_auth_token');
-  if (!token) {
-    throw new Error('Authentication token missing. Please log in.');
-  }
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    ...options.headers,
-  };
-  
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers,
-  });
-  
-  if (!response.ok) {
-    let errMsg = 'API Request Failed';
-    try {
-      const data = await response.json();
-      errMsg = data.message || data.error || errMsg;
-    } catch (e) {}
-    throw new Error(errMsg);
-  }
-  
-  return response.json();
+  return api.request(path, options);
 };
 
 export const uniwareApi = {

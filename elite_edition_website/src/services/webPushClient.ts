@@ -5,6 +5,8 @@
  * ============================================================================
  */
 
+import { getAccessToken } from './api';
+
 export interface PushSubscriptionKeys {
   p256dh: string;
   auth: string;
@@ -155,7 +157,7 @@ export class WebPushClientManager {
         }
       } catch (e) {}
 
-      const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_auth_token') || localStorage.getItem('token')) : null;
+      const authToken = getAccessToken();
 
       const saveResponse = await fetch('/v1/notifications/subscribe', {
         method: 'POST',
@@ -212,10 +214,11 @@ export class WebPushClientManager {
           localStorage.removeItem('elite_push_user_id');
         } catch (e) {}
 
-        const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_auth_token') || localStorage.getItem('token')) : null;
+        const authToken = getAccessToken();
         // Notify backend to drop subscription record
         await fetch('/v1/notifications/unsubscribe', {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
@@ -275,9 +278,10 @@ export class WebPushClientManager {
 
     if (!uId) return;
 
-    const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_auth_token') || localStorage.getItem('token')) : null;
+    const authToken = getAccessToken();
     fetch('/v1/notifications/focus', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),

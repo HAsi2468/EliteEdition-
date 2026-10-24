@@ -6,6 +6,8 @@
  * ============================================================================
  */
 
+import { getAccessToken } from './api';
+
 export interface CrashTelemetryPayload {
   incidentId?: string;
   name: string;
@@ -38,10 +40,7 @@ class TelemetryService {
     this.recentHashes.add(errorHash);
     setTimeout(() => this.recentHashes.delete(errorHash), 30000);
 
-    const userSessionId =
-      typeof localStorage !== 'undefined'
-        ? localStorage.getItem('elite_auth_token')?.slice(-10) || 'anonymous'
-        : 'unknown';
+    const userSessionId = getAccessToken()?.slice(-10) || 'anonymous';
 
     const fullPayload: CrashTelemetryPayload = {
       ...payload,

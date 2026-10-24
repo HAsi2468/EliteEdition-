@@ -15,6 +15,20 @@ import { enforceGlobalDDMMYYYYFormat } from './utils/dateUtils'
 
 // Enforce withCredentials: true globally across all HTTP network clients
 axios.defaults.withCredentials = true;
+axios.interceptors.request.use((config) => {
+  config.withCredentials = true;
+  if (typeof document !== 'undefined') {
+    const match = document.cookie.match(/(?:^|;\s*)(?:XSRF-TOKEN|csrf_token)=([^;]+)/);
+    if (match && match[1]) {
+      try {
+        config.headers['X-CSRF-Token'] = decodeURIComponent(match[1]);
+      } catch (e) {
+        config.headers['X-CSRF-Token'] = match[1];
+      }
+    }
+  }
+  return config;
+});
 
 // Initialize device & hardware telemetry, enterprise dialog, global error and cross-tab sync listeners
 initERPTelemetry()

@@ -56,21 +56,22 @@ function clearAuthCookies(res) {
   const isProduction = process.env.NODE_ENV === 'production';
   const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
 
+  const cookieNames = ['refreshToken', 'accessToken', 'token', 'elite_auth_token', 'elite_refresh_token'];
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
     sameSite: 'lax',
     path: '/',
-    domain: cookieDomain,
     maxAge: 0,
     expires: new Date(0),
   };
 
-  res.clearCookie('refreshToken', cookieOptions);
-  res.clearCookie('accessToken', cookieOptions);
-  res.clearCookie('token', cookieOptions);
-  res.clearCookie('elite_auth_token', cookieOptions);
-  res.clearCookie('elite_refresh_token', cookieOptions);
+  cookieNames.forEach((name) => {
+    res.clearCookie(name, cookieOptions);
+    if (cookieDomain) {
+      res.clearCookie(name, { ...cookieOptions, domain: cookieDomain });
+    }
+  });
 }
 
 const register = catchAsync(async (req, res) => {
@@ -103,9 +104,11 @@ const refreshTokens = catchAsync(async (req, res) => {
   const refreshToken =
     req.body?.refreshToken ||
     req.cookies?.refreshToken ||
+    req.cookies?.elite_refresh_token ||
     req.headers['x-refresh-token'];
 
   if (!refreshToken) {
+    clearAuthCookies(res);
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Refresh token required');
   }
 

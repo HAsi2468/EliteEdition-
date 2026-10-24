@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { api, getBaseUrl } from '../services/api';
+import { api, getBaseUrl, getAccessToken, authFetch } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import socketManager from '../services/socketManager';
 import TaskManagerPanel from './TaskManagerPanel';
@@ -143,11 +143,8 @@ function CsvDataViewer({ fileUrl, fileName }) {
 
       if (!text) {
         try {
-          const token = localStorage.getItem('elite_auth_token') || '';
-          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.csv')}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
-          const res = await fetch(proxyUrl, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
-          });
+          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.csv')}`;
+          const res = await authFetch(proxyUrl);
           if (res.ok) {
             text = await res.text();
           } else {
@@ -278,11 +275,8 @@ function TextFileViewer({ fileUrl, fileName }) {
 
       if (text === null) {
         try {
-          const token = localStorage.getItem('elite_auth_token') || '';
-          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.txt')}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
-          const res = await fetch(proxyUrl, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
-          });
+          const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName || 'file.txt')}`;
+          const res = await authFetch(proxyUrl);
           if (res.ok) {
             text = await res.text();
           } else {
@@ -3442,7 +3436,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleDownloadAttachment = async (url, name) => {
     if (!url) return;
     const cleanName = name || 'download';
-    const token = localStorage.getItem('elite_auth_token') || '';
 
     // Safe helper to trigger file save from blob
     const triggerBlobDownload = (blob) => {
@@ -3472,10 +3465,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     // 2. Fetch via backend download proxy with auth
     try {
-      const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
-      const res = await fetch(proxyUrl, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
+      const proxyUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}`;
+      const res = await authFetch(proxyUrl);
       if (res.ok) {
         const blob = await res.blob();
         triggerBlobDownload(blob);
@@ -3485,8 +3476,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       console.warn('[handleDownloadAttachment] Proxy fetch error:', err);
     }
 
-    // 3. Fallback: Browser download navigation link with token in query param
-    const finalUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+    // 3. Fallback: Browser download navigation link
+    const finalUrl = `/v1/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanName)}`;
     const link = document.createElement('a');
     link.href = finalUrl;
     link.download = cleanName;
@@ -3495,7 +3486,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     link.click();
     setTimeout(() => {
       if (link.parentNode) link.parentNode.removeChild(link);
-    }, 2000);
+    }, 60000);
   };
 
 

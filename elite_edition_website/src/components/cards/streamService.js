@@ -12,12 +12,10 @@
  *   error       → { message }        — rejects or shows error
  */
 
-import { getBaseUrl } from '../../services/api';
+import { getBaseUrl, getAccessToken } from '../../services/api';
 
 function getAuthHeaders() {
-  const token = typeof localStorage !== 'undefined'
-    ? (localStorage.getItem('elite_auth_token') || localStorage.getItem('token'))
-    : null;
+  const token = getAccessToken();
   const activeCompanyId = typeof localStorage !== 'undefined'
     ? (localStorage.getItem('elite_active_department') || '')
     : '';

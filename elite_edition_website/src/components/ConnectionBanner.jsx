@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import socketManager from '../services/socketManager';
-import { lifecycleManager } from '../services/resilientLifecycleManager';
+import { isAuthenticated } from '../services/api';
 
 /**
  * Non-Intrusive Real-Time Connection Banner
@@ -80,9 +80,7 @@ export function ConnectionBanner() {
     };
   }, []);
 
-  const hasAuthToken = Boolean(
-    typeof localStorage !== 'undefined' && localStorage.getItem('elite_auth_token')
-  );
+  const hasAuthToken = Boolean(isAuthenticated());
 
   // If the WebSocket is connected, we are connected! Never display false offline if socket is healthy.
   const isActuallyConnected = status === 'connected' && socketManager.isConnected();

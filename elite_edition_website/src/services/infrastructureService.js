@@ -1,12 +1,14 @@
 import axios from 'axios';
-import { getBaseUrl, getCsrfTokenFromCookie } from './api';
+import { getBaseUrl, getCsrfTokenFromCookie, getAccessToken } from './api';
 
 const apiClient = axios.create({
   timeout: 30000,
+  withCredentials: true,
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+  config.withCredentials = true;
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

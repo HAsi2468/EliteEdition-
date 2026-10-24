@@ -12,8 +12,8 @@ const requireAuth = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
-    } else if (req.cookies && (req.cookies.accessToken || req.cookies.token)) {
-      token = req.cookies.accessToken || req.cookies.token;
+    } else if (req.cookies && (req.cookies.accessToken || req.cookies.token || req.cookies.elite_auth_token)) {
+      token = req.cookies.accessToken || req.cookies.token || req.cookies.elite_auth_token;
     } else if (req.query && req.query.token) {
       token = req.query.token;
     }
@@ -32,6 +32,10 @@ const requireAuth = async (req, res, next) => {
         algorithms: ['HS256']
       });
     } catch (err) {
+      try {
+        const { clearAuthCookies } = require('../controllers/auth.controller');
+        if (typeof clearAuthCookies === 'function') clearAuthCookies(res);
+      } catch (_) {}
       return res.status(401).json({
         success: false,
         code: 'INVALID_TOKEN',

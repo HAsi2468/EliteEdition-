@@ -23,6 +23,7 @@
  */
 
 import { io } from 'socket.io-client';
+import { getAccessToken } from './api';
 import { getBaseUrl } from './api';
 import { lifecycleManager } from './resilientLifecycleManager';
 
@@ -108,6 +109,7 @@ class SocketManager {
     this._setStatus('reconnecting');
 
     this.socket = io(socketUrl, {
+      withCredentials: true,
       transports: ['websocket', 'polling'], // WebSocket preferred, polling fallback
       auth: (cb) => {
         cb({
@@ -1055,7 +1057,7 @@ class SocketManager {
 
   _getAuthToken() {
     try {
-      return localStorage.getItem('elite_auth_token') || '';
+      return getAccessToken() || '';
     } catch (e) {
       return '';
     }

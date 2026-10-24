@@ -13,6 +13,7 @@
  */
 
 import { lifecycleManager, ConnectionState } from './resilientLifecycleManager';
+import { getAccessToken } from './api';
 
 export interface QueuedMutation {
   id: string; // Unique client mutation ID
@@ -233,7 +234,7 @@ export class OfflineQueueManager {
    * Executes a single queued mutation over the wire with its Idempotency-Key
    */
   private async executeQueuedMutation(item: QueuedMutation): Promise<boolean> {
-    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('elite_auth_token') : null;
+    const token = getAccessToken();
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -247,6 +248,7 @@ export class OfflineQueueManager {
       const response = await fetch(item.url, {
         method: item.method,
         headers,
+        credentials: 'include',
         body: item.body ? (typeof item.body === 'string' ? item.body : JSON.stringify(item.body)) : undefined,
       });
 

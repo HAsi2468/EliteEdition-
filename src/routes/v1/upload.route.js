@@ -145,19 +145,47 @@ const upload = multer({
 });
 
 /**
- * Validates a target URL against SSRF attacks (blocks AWS IMDS, loopback, private RFC-1918 IPs, file://, etc.)
+ * Validates a target URL against SSRF attacks.
+ * Strictly allowlists safe HTTPS image CDN hosts and blocks:
+ * AWS/Cloud metadata (169.254.0.0/16), localhost, loopbacks, private RFC-1918 IPs, file://, and arbitrary external hosts.
  */
 function isSafeImageUrl(targetUrl) {
   if (!targetUrl || typeof targetUrl !== 'string') return false;
   const trimmed = targetUrl.trim();
 
-  // Allow safe relative paths to local uploads
-  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
-    if (trimmed.includes('..') || trimmed.includes('\\')) return false;
-    return true;
+  // Block null bytes, directory traversal, and dangerous characters
+  if (trimmed.includes('\0') || trimmed.includes('..') || trimmed.includes('\\')) {
+    return false;
   }
 
-  // Parse URL strictly
+  // Explicitly block dangerous URI schemes before any URL parsing
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith('file:') ||
+    lower.startsWith('gopher:') ||
+    lower.startsWith('ftp:') ||
+    lower.startsWith('data:') ||
+    lower.startsWith('dict:') ||
+    lower.startsWith('ldap:') ||
+    lower.startsWith('tftp:')
+  ) {
+    return false;
+  }
+
+  // Allow safe relative paths to local uploads or R2 keys
+  const isRelativeKey =
+    trimmed.startsWith('/uploads/') ||
+    trimmed.startsWith('uploads/') ||
+    trimmed.startsWith('designs/') ||
+    trimmed.startsWith('sample_reference/') ||
+    trimmed.startsWith('design_samples/');
+
+  if (isRelativeKey && !trimmed.includes('://')) {
+    // Only permit standard path characters
+    return /^[a-zA-Z0-9_\-\.\/]+$/.test(trimmed.replace(/^\/+/, ''));
+  }
+
+  // If not a relative path, it MUST be a valid absolute HTTPS URL
   let parsed;
   try {
     parsed = new URL(trimmed);
@@ -165,14 +193,14 @@ function isSafeImageUrl(targetUrl) {
     return false;
   }
 
-  // Strict HTTPS protocol enforcement (blocks file://, gopher://, http://, data://, etc.)
+  // Strict HTTPS protocol enforcement (blocks http://, file://, etc.)
   if (parsed.protocol !== 'https:') {
     return false;
   }
 
   const hostname = parsed.hostname.toLowerCase();
 
-  // Block localhost, IP literals, AWS IMDS, and loopbacks
+  // Block localhost, IP literals, AWS IMDS, private networks, and loopbacks
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
@@ -180,23 +208,33 @@ function isSafeImageUrl(targetUrl) {
     hostname === '::1' ||
     hostname.endsWith('.localhost') ||
     hostname.endsWith('.local') ||
-    /^169\.254\./.test(hostname) || // AWS IMDS Link-Local
+    hostname.endsWith('.internal') ||
+    /^169\.254\./.test(hostname) || // AWS / Cloud IMDS Link-Local
     /^10\./.test(hostname) ||        // RFC-1918 Private Class A
     /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) || // RFC-1918 Private Class B
     /^192\.168\./.test(hostname) ||  // RFC-1918 Private Class C
+    /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(hostname) || // Carrier-Grade NAT (RFC-6598)
     /^127\./.test(hostname) ||       // Loopbacks
     /^0\./.test(hostname) ||
-    /^\d+\.\d+\.\d+\.\d+$/.test(hostname) // Block all raw IP addresses
+    /^\d+$/.test(hostname) ||        // Decimal / DWORD IP (e.g. 2130706433)
+    /^0x[0-9a-f]+$/i.test(hostname) || // Hex IP
+    /^\d+\.\d+\.\d+\.\d+$/.test(hostname) || // All raw IPv4 addresses
+    hostname.startsWith('[') || hostname.endsWith(']') // IPv6 literals
   ) {
     return false;
   }
 
-  // Allowlist of trusted domain patterns (Cloudflare R2, AWS S3, Elite Edition ERP domains)
+  // Allowlist of trusted image hosts only (Cloudflare R2, AWS S3, Elite Edition ERP domains, Google CDN)
   const isAllowedDomain =
     hostname.endsWith('.r2.dev') ||
+    hostname.endsWith('.r2.cloudflarestorage.com') ||
     hostname.endsWith('.cloudflarestorage.com') ||
-    hostname.endsWith('eliteedition.in') ||
-    hostname.endsWith('.amazonaws.com');
+    hostname === 'eliteedition.in' ||
+    hostname.endsWith('.eliteedition.in') ||
+    hostname.endsWith('.s3.amazonaws.com') ||
+    hostname.endsWith('.s3.ap-south-1.amazonaws.com') ||
+    hostname === 'lh3.googleusercontent.com' ||
+    hostname === 'drive.google.com';
 
   return isAllowedDomain;
 }
@@ -210,12 +248,12 @@ router.get('/preview', async (req, res) => {
   try {
     const rawUrl = req.query.url;
     if (!rawUrl || typeof rawUrl !== 'string') {
-      return res.status(400).send('Missing url parameter');
+      return res.status(400).json({ error: 'Missing or invalid url query parameter.' });
     }
 
     const targetUrl = rawUrl.trim();
 
-    // SSRF Guard Check: Validate URL safety before attempting any network requests
+    // SSRF Guard Check: Validate URL safety before attempting any network requests or file reads
     if (!isSafeImageUrl(targetUrl)) {
       return res.status(403).json({
         error: 'Forbidden: Access to requested URL host or protocol is blocked by SSRF security policies.'
@@ -227,39 +265,46 @@ router.get('/preview', async (req, res) => {
     // 1. If local file path
     if (targetUrl.startsWith('/uploads/') || targetUrl.startsWith('uploads/')) {
       const cleanPath = targetUrl.replace(/^\/?uploads\//, '');
-      const localPath = path.join(uploadDir, cleanPath);
-      if (fs.existsSync(localPath)) {
+      const localPath = path.resolve(uploadDir, cleanPath);
+      // Ensure path traversal cannot escape uploadDir
+      if (localPath.startsWith(path.resolve(uploadDir)) && fs.existsSync(localPath)) {
         imageBuffer = fs.readFileSync(localPath);
       }
     }
 
     // 2. If remote URL (Cloudflare R2 CDN or verified HTTPS domain)
     if (!imageBuffer) {
-      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-        // Assume R2 key if just a filename or relative path
+      if (!targetUrl.startsWith('https://')) {
+        // Assume R2 key if just a filename or relative key
         const { getR2PublicUrl } = require('../../utils/r2Storage');
-        const remoteUrl = `${getR2PublicUrl()}/${targetUrl.replace(/^\/+/, '')}`;
+        const publicBase = typeof getR2PublicUrl === 'function' ? getR2PublicUrl() : '';
+        if (!publicBase) {
+          return res.status(400).json({ error: 'Storage public URL is not configured.' });
+        }
+        const remoteUrl = `${publicBase}/${targetUrl.replace(/^\/+/, '')}`;
         if (!isSafeImageUrl(remoteUrl)) {
           return res.status(403).json({ error: 'Forbidden: Invalid R2 object URL target.' });
         }
         const resp = await axios.get(remoteUrl, {
           responseType: 'arraybuffer',
-          timeout: 15000,
-          maxContentLength: 100 * 1024 * 1024,
+          timeout: 10000,
+          maxRedirects: 0, // Prevent redirect SSRF bypass
+          maxContentLength: 50 * 1024 * 1024,
         });
         imageBuffer = Buffer.from(resp.data);
       } else {
         const resp = await axios.get(targetUrl, {
           responseType: 'arraybuffer',
-          timeout: 15000,
-          maxContentLength: 100 * 1024 * 1024,
+          timeout: 10000,
+          maxRedirects: 0, // Prevent redirect SSRF bypass
+          maxContentLength: 50 * 1024 * 1024,
         });
         imageBuffer = Buffer.from(resp.data);
       }
     }
 
     if (!imageBuffer) {
-      return res.status(404).send('Image could not be retrieved');
+      return res.status(404).json({ error: 'Image could not be retrieved or found.' });
     }
 
     let pipeline = sharp(imageBuffer).rotate();
@@ -277,7 +322,10 @@ router.get('/preview', async (req, res) => {
     return res.send(jpegBuffer);
   } catch (err) {
     console.error('[Upload Preview] Conversion failed:', err.message);
-    return res.status(500).send('Failed to generate image preview: ' + err.message);
+    // Never return 500 error; return standardized 400 Bad Request
+    return res.status(400).json({
+      error: 'Failed to generate image preview: Invalid image format or inaccessible resource.'
+    });
   }
 });
 
@@ -443,13 +491,20 @@ router.get('/download', async (req, res) => {
     }
   }
 
+  // Strict SSRF guard for remote URLs
+  if (!isSafeImageUrl(fileUrl)) {
+    return res.status(403).json({ error: 'Forbidden: Access to requested URL host or protocol is blocked' });
+  }
+
   // Stream remote R2/Cloudflare URL
   try {
     const response = await axios({
       method: 'GET',
       url: fileUrl,
       responseType: 'stream',
-      timeout: 30000
+      timeout: 30000,
+      maxRedirects: 0,
+      validateStatus: (status) => status >= 200 && status < 400
     });
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
@@ -462,8 +517,8 @@ router.get('/download', async (req, res) => {
     }
     response.data.pipe(res);
   } catch (err) {
-    console.warn('[upload/download] Remote stream failed, redirecting:', err.message);
-    res.redirect(fileUrl);
+    console.warn('[upload/download] Remote stream failed:', err.message);
+    return res.status(400).json({ error: 'Failed to download remote file', details: err.message });
   }
 });
 

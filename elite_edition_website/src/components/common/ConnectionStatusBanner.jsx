@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Wifi, WifiOff, RefreshCw, CloudQueue, CheckCircle2 } from 'lucide-react';
 import socketManager from '../../services/socketManager';
 import { lifecycleManager } from '../../services/resilientLifecycleManager';
+import { isAuthenticated } from '../../services/api';
 
 /**
  * Enterprise Resilient Connection Status Banner (Tailwind CSS)
@@ -82,9 +83,7 @@ export function ConnectionStatusBanner() {
   }, []);
 
   const isActuallyConnected = isBrowserOnline && status === 'connected';
-  const hasAuthToken = Boolean(
-    typeof localStorage !== 'undefined' && localStorage.getItem('elite_auth_token')
-  );
+  const hasAuthToken = Boolean(isAuthenticated());
   const isOffline = hasAuthToken && (!isBrowserOnline || status === 'offline');
   const isReconnecting = hasAuthToken && !isOffline && status === 'reconnecting';
 

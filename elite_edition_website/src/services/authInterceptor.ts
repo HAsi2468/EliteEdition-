@@ -125,17 +125,13 @@ export class SilentAuthInterceptor {
    * Executes the silent token refresh call
    */
   public async performSilentRefresh(): Promise<string> {
-    const refreshToken = typeof localStorage !== 'undefined'
-      ? localStorage.getItem('elite_refresh_token')
-      : null;
-
     const response = await fetch(this.refreshEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      credentials: 'include', // Includes HTTP-only cookies
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include', // Guarantees HttpOnly authentication cookies are included
+      body: JSON.stringify({}),
     });
 
     if (!response.ok) {

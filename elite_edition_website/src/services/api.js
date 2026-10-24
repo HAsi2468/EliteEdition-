@@ -24,6 +24,21 @@ export const setBaseUrl = (url) => {
 let inMemoryAccessToken = null;
 export const setInMemoryToken = (t) => { inMemoryAccessToken = t; };
 export const getInMemoryToken = () => inMemoryAccessToken;
+export const getAccessToken = () => inMemoryAccessToken;
+export const isAuthenticated = () => Boolean(inMemoryAccessToken || (typeof localStorage !== 'undefined' && localStorage.getItem('elite_user')));
+
+export const authFetch = async (url, options = {}) => {
+  const token = inMemoryAccessToken;
+  const headers = {
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+  return fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include', // Guarantees HttpOnly authentication cookies are included
+  });
+};
 
 // CSRF Token Resolver & Injector for State-Changing Requests (Phase 3)
 let inMemoryCsrfToken = null;
@@ -116,7 +131,7 @@ const request = async (path, options = {}) => {
   while (attempt <= maxRetries) {
     attempt++;
     const baseUrl = getBaseUrl();
-    const token = inMemoryAccessToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('elite_auth_token') : null);
+    const token = inMemoryAccessToken;
 
     // Note: Do not prematurely block on navigator.onLine if retrying; browsers frequently report
     // false negatives on wake-from-sleep or WiFi reconnect handoffs. Let fetch attempt or retry handle it.
@@ -394,7 +409,7 @@ export const api = {
   },
 
   isAuthenticated() {
-    return Boolean(inMemoryAccessToken || (typeof localStorage !== 'undefined' && (localStorage.getItem('elite_user') || localStorage.getItem('elite_auth_token'))));
+    return Boolean(inMemoryAccessToken || (typeof localStorage !== 'undefined' && localStorage.getItem('elite_user')));
   },
 
   // Users Management
@@ -659,14 +674,7 @@ export const api = {
   // Reports
   async downloadReport(reportPath, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
-
-    const response = await fetch(`${baseUrl}/${reportPath}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/${reportPath}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate report PDF');
@@ -678,18 +686,12 @@ export const api = {
 
   async downloadInventoryReport(reportPath, dateStart, dateEnd, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     const queryString = query.toString() ? `?${query.toString()}` : '';
 
-    const response = await fetch(`${baseUrl}/inventory/report/${reportPath}${queryString}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/inventory/report/${reportPath}${queryString}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate inventory report PDF');
@@ -701,16 +703,10 @@ export const api = {
 
   async downloadSalesReport(dateStart, dateEnd, searchCode, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
     const query = new URLSearchParams({ dateStart, dateEnd });
     if (searchCode) query.append('searchCode', searchCode);
 
-    const response = await fetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate sales report PDF');
@@ -722,16 +718,10 @@ export const api = {
 
   async downloadBrandReport(dateStart, dateEnd, searchCode, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
     const query = new URLSearchParams({ type: 'brand', dateStart, dateEnd });
     if (searchCode) query.append('searchCode', searchCode);
 
-    const response = await fetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate brand report PDF');
@@ -743,16 +733,10 @@ export const api = {
 
   async downloadBrandReportHourWise(dateStart, dateEnd, searchCode, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
     const query = new URLSearchParams({ type: 'brand-hourly', dateStart, dateEnd });
     if (searchCode) query.append('searchCode', searchCode);
 
-    const response = await fetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate hourly brand report PDF');
@@ -764,15 +748,9 @@ export const api = {
 
   async downloadReturnsBrandReport(dateStart, dateEnd, subType, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
     const query = new URLSearchParams({ type: 'returns-analysis', subType, dateStart, dateEnd });
 
-    const response = await fetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate returns brand report PDF');
@@ -784,15 +762,9 @@ export const api = {
 
   async downloadSalesReturnsRatioReport(dateStart, dateEnd, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
     const query = new URLSearchParams({ type: 'sales-returns-ratio', dateStart, dateEnd });
 
-    const response = await fetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate sales & returns ratio report PDF');
@@ -845,18 +817,12 @@ export const api = {
 
   async downloadElitePrintReport(dateStart, dateEnd, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     const queryString = query.toString() ? `?${query.toString()}` : '';
 
-    const response = await fetch(`${baseUrl}/department-reports/elite-print/pdf${queryString}`, {
-      headers,
-    });
+    const response = await authFetch(`${baseUrl}/department-reports/elite-print/pdf${queryString}`);
 
     if (!response.ok) {
       throw new Error('Failed to generate Elite Print report PDF');
@@ -911,10 +877,7 @@ export const api = {
   },
   async downloadJobCardPdf(id, jobNo = '') {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');
-    const response = await fetch(`${baseUrl}/jobCards/pdf/${id}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/jobCards/pdf/${id}`);
     if (!response.ok) throw new Error('Failed to download Job Card PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, `JobCard_${jobNo || 'preview'}.pdf`, { title: `Job Card #${jobNo || id}` });
@@ -922,10 +885,7 @@ export const api = {
   async downloadBulkJobCardPdf(ids = [], fileName = 'Combined_Job_Cards.pdf') {
     if (!ids || ids.length === 0) return;
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');
-    const response = await fetch(`${baseUrl}/jobCards/bulk-pdf?ids=${ids.join(',')}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/jobCards/bulk-pdf?ids=${ids.join(',')}`);
     if (!response.ok) throw new Error('Failed to generate combined Job Cards PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Combined Job Cards' });
@@ -1647,14 +1607,11 @@ export const api = {
 
   async downloadFabricLotWisePdf(dateStart = '', dateEnd = '', fileName = 'Fabric_LotWise_Stock_Report.pdf') {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`);
     if (!response.ok) throw new Error('Failed to generate lot-wise fabric PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Stock Report' });
@@ -1662,11 +1619,8 @@ export const api = {
 
   async downloadSingleLotPdf(lotNo, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const safeLotNo = encodeURIComponent(String(lotNo || '').trim());
-    const response = await fetch(`${baseUrl}/fabric/report/lot-statement-pdf/${safeLotNo}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/report/lot-statement-pdf/${safeLotNo}`);
     if (!response.ok) throw new Error('Failed to generate lot statement PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName || `Fabric_Lot_${lotNo}_Statement.pdf`, { title: `Fabric Lot ${lotNo} Statement` });
@@ -1690,16 +1644,13 @@ export const api = {
 
   async downloadFabricLedgerPdf(params = {}) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');
     const query = new URLSearchParams();
     if (params.dateStart) query.append('dateStart', params.dateStart);
     if (params.dateEnd) query.append('dateEnd', params.dateEnd);
     if (params.fabricQuality && params.fabricQuality !== 'All') query.append('fabricQuality', params.fabricQuality);
     const qs = query.toString() ? `?${query.toString()}` : '';
 
-    const response = await fetch(`${baseUrl}/fabric/report/pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/report/pdf${qs}`);
     if (!response.ok) {
       let errText = 'Failed to generate Fabric Ledger PDF';
       try {
@@ -1761,7 +1712,6 @@ export const api = {
 
   async downloadRawMaterialLedgerPdf(params = {}) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');
     const query = new URLSearchParams();
     if (params.dateStart) query.append('dateStart', params.dateStart);
     if (params.dateEnd) query.append('dateEnd', params.dateEnd);
@@ -1771,9 +1721,7 @@ export const api = {
     if (params.companyEntity) query.append('companyEntity', params.companyEntity);
     const qs = query.toString() ? `?${query.toString()}` : '';
 
-    const response = await fetch(`${baseUrl}/raw-materials/report/pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/raw-materials/report/pdf${qs}`);
     if (!response.ok) {
       let errText = 'Failed to generate Raw Materials Ledger PDF';
       try {
@@ -1828,14 +1776,11 @@ export const api = {
 
   async downloadFabricInwardReportPdf(dateStart, dateEnd, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/fabric/report/inward-pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/report/inward-pdf${qs}`);
     if (!response.ok) throw new Error('Failed to generate Fabric Inward PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Inward Report' });
@@ -1843,14 +1788,11 @@ export const api = {
 
   async downloadFabricOutwardReportPdf(dateStart, dateEnd, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/fabric/report/outward-pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/report/outward-pdf${qs}`);
     if (!response.ok) throw new Error('Failed to generate Fabric Outward PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Outward Report' });
@@ -1858,14 +1800,11 @@ export const api = {
 
   async downloadFabricLotWiseReportPdf(dateStart, dateEnd, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`);
     if (!response.ok) throw new Error('Failed to generate Lot-Wise Fabric PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Lot-Wise Report' });
@@ -1873,7 +1812,6 @@ export const api = {
 
   async downloadFabricCombinedReportPdf(dateStart, dateEnd, reportsArray, fileName, filters = {}) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
@@ -1886,9 +1824,7 @@ export const api = {
     if (filters.stopTime) query.append('stopTime', filters.stopTime);
 
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/fabric/report/combined-pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/report/combined-pdf${qs}`);
     if (!response.ok) {
       let errText = 'Failed to generate Combined Multi-Report PDF';
       try {
@@ -1941,11 +1877,8 @@ export const api = {
 
   async downloadInfraBillInvoicePdf(id, month) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const url = `${baseUrl}/infra-bills/${id}/invoice-pdf`;
-    const response = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(url);
     if (!response.ok) throw new Error('Failed to download Infrastructure Invoice PDF');
     const blob = await response.blob();
     const safeMonth = (month || 'Bill').replace(/\s+/g, '_');
@@ -1992,10 +1925,7 @@ export const api = {
 
   async downloadFabricChallanPdf(id, challanNo) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const response = await fetch(`${baseUrl}/fabric-challan/${id}/pdf`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric-challan/${id}/pdf`);
     if (!response.ok) throw new Error('Failed to generate challan PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, `Challan_${challanNo || 'preview'}.pdf`, { title: `Fabric Challan #${challanNo || id}` });
@@ -2004,10 +1934,7 @@ export const api = {
   async downloadBulkFabricChallanPdf(ids = [], fileName = 'Combined_Fabric_Challans.pdf') {
     if (!ids || ids.length === 0) return;
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const response = await fetch(`${baseUrl}/fabric-challan/bulk-pdf?ids=${ids.join(',')}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric-challan/bulk-pdf?ids=${ids.join(',')}`);
     if (!response.ok) throw new Error('Failed to generate combined Fabric Challans PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Combined Fabric Challans' });
@@ -2015,15 +1942,12 @@ export const api = {
 
   async downloadChallanReportPdf(dateStart, dateEnd, search, fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     if (search) query.append('search', search);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/fabric-challan/report/pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric-challan/report/pdf${qs}`);
     if (!response.ok) throw new Error('Failed to generate Fabric Challan report PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Fabric Challan Report' });
@@ -2062,10 +1986,7 @@ export const api = {
   },
   async downloadStitchingChallanPdf(id, challanNo) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const response = await fetch(`${baseUrl}/stitching-challan/${id}/pdf`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/stitching-challan/${id}/pdf`);
     if (!response.ok) throw new Error('Failed to generate Stitching Challan PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, `Stitching_Challan_${challanNo || 'PCH'}.pdf`, { title: `Stitching Challan #${challanNo || 'PCH'}` });
@@ -2074,10 +1995,7 @@ export const api = {
   async downloadBulkStitchingChallanPdf(ids = [], fileName = 'Combined_Stitching_Challans.pdf') {
     if (!ids || ids.length === 0) return;
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const response = await fetch(`${baseUrl}/stitching-challan/bulk-pdf?ids=${ids.join(',')}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/stitching-challan/bulk-pdf?ids=${ids.join(',')}`);
     if (!response.ok) throw new Error('Failed to generate combined Stitching Challans PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Combined Stitching Challans' });
@@ -2108,10 +2026,7 @@ export const api = {
 
   async downloadStockAdjustmentPdf(id, saNo) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const response = await fetch(`${baseUrl}/fabric/stock-adjustment/${id}/pdf`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(`${baseUrl}/fabric/stock-adjustment/${id}/pdf`);
     if (!response.ok) throw new Error('Failed to generate Stock Adjustment PDF');
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
@@ -2247,11 +2162,8 @@ export const api = {
 
   async downloadDeliveryChallanPdf(id, challanNo) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const url = `${baseUrl}/delivery-challans/${id}/pdf`;
-    const response = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(url);
     if (!response.ok) throw new Error('Failed to generate Delivery Challan PDF');
     const blob = await response.blob();
     const pdfName = `Delivery_Challan_${challanNo || 'Draft'}.pdf`;
@@ -2366,11 +2278,8 @@ export const api = {
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
     const t0 = performance.now();
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const url = `${baseUrl}/billing/invoices/${id}/pdf?t=${Date.now()}${duplicate ? '&duplicate=true' : ''}`;
-    const response = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(url);
     if (!response.ok) throw new Error('Failed to generate Invoice PDF');
     const blob = await response.blob();
     const pdfName = `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`;
@@ -2382,11 +2291,8 @@ export const api = {
     if (!ids || ids.length === 0) return;
     const t0 = performance.now();
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const url = `${baseUrl}/billing/invoices-bulk-pdf?ids=${ids.join(',')}`;
-    const response = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const response = await authFetch(url);
     if (!response.ok) throw new Error('Failed to generate combined Invoices PDF');
     const blob = await response.blob();
     downloadOrPreviewPdf(blob, fileName, { title: 'Combined Invoices' });
@@ -2518,18 +2424,13 @@ export const api = {
   // Data Backup
   async downloadDataBackup({ startDate, endDate, department, format = 'json' }) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const params = new URLSearchParams({
       ...(startDate ? { startDate } : {}),
       ...(endDate ? { endDate } : {}),
       ...(department ? { department } : {}),
       format
     });
-    const res = await fetch(`${baseUrl}/backup/download?${params.toString()}`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    });
+    const res = await authFetch(`${baseUrl}/backup/download?${params.toString()}`);
     if (!res.ok) {
       throw new Error('Failed to generate data backup');
     }
@@ -2553,12 +2454,7 @@ export const api = {
 
   async downloadDailyBackupArchive(fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const res = await fetch(`${baseUrl}/backup/download-archive/${encodeURIComponent(fileName)}`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    });
+    const res = await authFetch(`${baseUrl}/backup/download-archive/${encodeURIComponent(fileName)}`);
     if (!res.ok) {
       throw new Error(`Failed to download backup archive: ${res.statusText}`);
     }
@@ -2588,12 +2484,7 @@ export const api = {
 
   async downloadImagesBackupArchive(fileName) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const res = await fetch(`${baseUrl}/backup/download-images-archive/${encodeURIComponent(fileName)}`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    });
+    const res = await authFetch(`${baseUrl}/backup/download-images-archive/${encodeURIComponent(fileName)}`);
     if (!res.ok) {
       throw new Error(`Failed to download images archive: ${res.statusText}`);
     }
@@ -3329,14 +3220,11 @@ export const api = {
 
   async generateTemplatePdf(payload) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
-    const response = await fetch(`${baseUrl}/document-templates/generate-pdf`, {
+    const response = await authFetch(`${baseUrl}/document-templates/generate-pdf`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
@@ -3348,14 +3236,11 @@ export const api = {
 
   async generateBatchPdf(payload) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
-    const response = await fetch(`${baseUrl}/document-templates/batch-print-pdf`, {
+    const response = await authFetch(`${baseUrl}/document-templates/batch-print-pdf`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
