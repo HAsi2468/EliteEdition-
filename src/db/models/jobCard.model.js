@@ -152,6 +152,8 @@ jobCardSchema.index({ party: 1 });
 jobCardSchema.index({ fabric: 1 });
 // Default sort order for job card listing
 jobCardSchema.index({ created_date_time: -1 });
+jobCardSchema.index({ created_date_time: -1, _id: -1 });
+jobCardSchema.index({ department: 1, created_date_time: -1 });
 // High-concurrency dashboard & fusing queue lookup
 jobCardSchema.index({ fusingStatus: 1, fusingDate: -1 });
 jobCardSchema.index({ printStatus: 1, fusingStatus: 1, department: 1 });

@@ -131,14 +131,25 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
   return `${h}H & ${m}M`;
 }
 
-// In-memory cache for JobCard status/meter aggregation (15s TTL)
+// In-memory cache for JobCard status/meter aggregation & page 1 listings (10s TTL)
 const jobStatsCache = new Map();
-const invalidateJobStatsCache = () => { jobStatsCache.clear(); };
+const jobCardsListCache = new Map();
+const invalidateJobStatsCache = () => {
+  jobStatsCache.clear();
+  jobCardsListCache.clear();
+};
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 const getAllJobCards = async (req, res) => {
   try {
     const { status, printStatus, fusingStatus, deliveryStatus, party, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department, dateField } = req.query;
+
+    const listCacheKey = `${req.user?.role || 'user'}_${page}_${limit}_${status || 'all'}_${printStatus || 'all'}_${fusingStatus || 'all'}_${deliveryStatus || 'all'}_${party || 'all'}_${search || ''}_${category || 'all'}_${department || 'all'}_${sortBy || 'default'}_${sortOrder || 'desc'}_${dateStart || ''}_${dateEnd || ''}`;
+    const cachedList = jobCardsListCache.get(listCacheKey);
+    if (cachedList && (Date.now() - cachedList.time < 10000)) {
+      return res.json({ ...cachedList.payload, cached: true });
+    }
+
     const baseFilter = {};
     const baseAndClauses = [];
 
@@ -441,7 +452,11 @@ const getAllJobCards = async (req, res) => {
         .sort({ created_date_time: order, _id: order })
         .skip(skip)
         .limit(Number(limit));
-      if (selectFields) query = query.select(selectFields);
+      if (selectFields) {
+        query = query.select(selectFields);
+      } else if (req.query.includeAudit !== 'true') {
+        query = query.select('-auditTrail');
+      }
       cards = await query.lean();
     } else {
       const order = sortOrder === 'asc' ? 1 : -1;
@@ -450,7 +465,11 @@ const getAllJobCards = async (req, res) => {
       let query = db.JobCard.find(filter)
         .collation({ locale:'en', numericOrdering:true })
         .sort(sortObj).skip(skip).limit(Number(limit));
-      if (selectFields) query = query.select(selectFields);
+      if (selectFields) {
+        query = query.select(selectFields);
+      } else if (req.query.includeAudit !== 'true') {
+        query = query.select('-auditTrail');
+      }
       cards = await query.lean();
     }
 
@@ -476,7 +495,7 @@ const getAllJobCards = async (req, res) => {
       imageUrl2: normalizeImageUrl(c.imageUrl2, c.designName ? `${c.designName}-2` : ''),
     }));
 
-    res.json({
+    const responsePayload = {
       data: normalizedCards,
       total,
       totalMtr,
@@ -488,7 +507,10 @@ const getAllJobCards = async (req, res) => {
         limit: Number(limit),
         totalPages: Math.ceil(total / Number(limit))
       }
-    });
+    };
+
+    jobCardsListCache.set(listCacheKey, { time: Date.now(), payload: responsePayload });
+    res.json(responsePayload);
   } catch (err) {
     logger.error('getAllJobCards error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -1154,6 +1176,7 @@ const updateJobCard = async (req, res) => {
 
 const deleteJobCard = async (req, res) => {
   try {
+    invalidateJobStatsCache();
     const card = await db.JobCard.findByIdAndDelete(req.params.id);
     if (!card) return res.status(404).json({ error: 'Job card not found' });
     emitSocketEvent(req, 'job-deleted', { id: req.params.id });
