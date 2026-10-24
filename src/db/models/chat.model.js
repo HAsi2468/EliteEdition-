@@ -267,6 +267,7 @@ chatRoomSchema.index({ type: 1, isArchived: 1, updatedAt: -1 });
 chatRoomSchema.index({ isArchived: 1, updatedAt: -1 });
 
 // High-performance indexes for ChatMessage
+chatMessageSchema.index({ roomId: 1, _id: -1 });
 chatMessageSchema.index({ roomId: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, msgType: 1, createdAt: -1 });
 chatMessageSchema.index({ roomId: 1, senderId: 1, readBy: 1 });

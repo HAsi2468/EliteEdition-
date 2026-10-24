@@ -16,6 +16,10 @@ const getMemberIdString = (m) => {
   return String(m);
 };
 
+// High-performance in-memory cache for getGroups with 15s TTL
+const groupsCache = new Map();
+const invalidateGroupsCache = () => { groupsCache.clear(); };
+
 /**
  * Get all communication groups accessible to the user
  */
@@ -39,6 +43,12 @@ const getGroups = async (req, res) => {
       req.user.isMainAdmin === true ||
       req.headers['x-is-admin'] === 'true'
     );
+
+    const cacheKey = `${rawUserId || 'anon'}_${isSuperOrAdmin ? 'admin' : (isClient ? 'client' : 'staff')}`;
+    const cachedEntry = groupsCache.get(cacheKey);
+    if (cachedEntry && (Date.now() - cachedEntry.time < 15000)) {
+      return res.json({ success: true, data: cachedEntry.data, cached: true });
+    }
     let query;
 
     if (isClient) {
@@ -184,6 +194,7 @@ const getGroups = async (req, res) => {
       return timeB - timeA;
     });
 
+    groupsCache.set(cacheKey, { time: Date.now(), data: roomsWithMeta });
     res.json({ success: true, data: roomsWithMeta });
   } catch (error) {
     console.error('Error fetching communication groups:', error);
@@ -770,6 +781,7 @@ const postGroupMessage = async (req, res) => {
       console.warn('[postGroupMessage Orchestrator trigger error]:', orchErr.message);
     }
 
+    invalidateGroupsCache();
     res.json({ success: true, data: populatedMessage });
   } catch (error) {
     if (error.code === 11000 && clientMsgId) {
@@ -1828,6 +1840,7 @@ const markGroupAsRead = async (req, res) => {
       broadcast.emit('messages-read', { roomId: groupId, conversationId: groupId, userId: String(rawUserId) });
     }
 
+    invalidateGroupsCache();
     return res.json({
       success: true,
       message: 'Room marked as read',

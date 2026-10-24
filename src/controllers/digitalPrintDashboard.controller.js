@@ -15,6 +15,9 @@ function toYMD(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// High-performance operations summary cache (15s TTL)
+const opsSummaryCache = new Map();
+
 const getDailyOperationsSummary = async (req, res) => {
   try {
     let { dateStart, dateEnd, shift = 'All', companyEntity = 'Elite Digital Print' } = req.query;
@@ -26,6 +29,12 @@ const getDailyOperationsSummary = async (req, res) => {
 
     const cleanStart = dateStart.split('T')[0];
     const cleanEnd = dateEnd.split('T')[0];
+
+    const cacheKey = `${cleanStart}_${cleanEnd}_${shift}_${companyEntity}`;
+    const cached = opsSummaryCache.get(cacheKey);
+    if (cached && (Date.now() - cached.time < 15000)) {
+      return res.json(cached.payload);
+    }
 
     // Build Date bounds for Date objects (00:00:00 to 23:59:59.999)
     const startDateObj = new Date(cleanStart + 'T00:00:00.000Z');
@@ -689,7 +698,7 @@ const getDailyOperationsSummary = async (req, res) => {
     // ──────────────────────────────────────────────────────────────────────────
     // RESPONSE PAYLOAD
     // ──────────────────────────────────────────────────────────────────────────
-    return res.json({
+    const responsePayload = {
       success: true,
       query: {
         dateStart: cleanStart,
@@ -765,7 +774,10 @@ const getDailyOperationsSummary = async (req, res) => {
         openComplaints,
         resolvedComplaints
       }
-    });
+    };
+
+    opsSummaryCache.set(cacheKey, { time: Date.now(), payload: responsePayload });
+    return res.json(responsePayload);
   } catch (err) {
     console.error('digitalPrintDashboard error:', err);
     return res.status(500).json({
