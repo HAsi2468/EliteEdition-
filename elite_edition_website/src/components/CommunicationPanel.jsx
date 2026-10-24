@@ -420,7 +420,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       setMainTab(initialMainTab);
     }
   }, [initialMainTab]);
-  const [groups, setGroups] = useState([]);
+  const [groups, setGroups] = useState(() => {
+    try {
+      const cached = typeof localStorage !== 'undefined' ? localStorage.getItem('elite_cached_groups') : null;
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
   const [activeGroup, setActiveGroup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -793,7 +802,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   });
   const [savingGroupSettings, setSavingGroupSettings] = useState(false);
 
-  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [loadingGroups, setLoadingGroups] = useState(() => {
+    try {
+      const cached = typeof localStorage !== 'undefined' ? localStorage.getItem('elite_cached_groups') : null;
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return false;
+      }
+    } catch (e) {}
+    return true;
+  });
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -1800,7 +1818,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   // Initialize Socket.io connection listeners & fetch groups & user directory
   useEffect(() => {
-    fetchGroups();
+    fetchGroups(false);
 
     const uId = currentUser?._id || currentUser?.id;
     if (uId) {
@@ -2472,8 +2490,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   }, [messages, viewportHeight]);
 
-  const fetchGroups = async (showLoader = true) => {
-    if (showLoader) setLoadingGroups(true);
+  const fetchGroups = async (showLoader = false) => {
+    if (showLoader) {
+      setLoadingGroups((prev) => (groups && groups.length > 0 ? false : true));
+    }
+    const safetyTimer = setTimeout(() => {
+      setLoadingGroups(false);
+    }, 2000);
     try {
       const uId = currentUser?._id || currentUser?.id;
       const res = await api.getCommunicationGroups(uId);
@@ -2497,6 +2520,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             const timeB = new Date(b.lastMessage?.createdAt || b.updatedAt || b.createdAt || 0).getTime();
             return timeB - timeA;
           });
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('elite_cached_groups', JSON.stringify(merged));
+            }
+          } catch (e) {}
           return merged;
         });
 
@@ -2526,7 +2554,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     } catch (err) {
       console.error('Failed to fetch communication groups:', err);
     } finally {
-      if (showLoader) setLoadingGroups(false);
+      clearTimeout(safetyTimer);
+      setLoadingGroups(false);
     }
   };
 

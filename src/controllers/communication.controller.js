@@ -110,8 +110,8 @@ const getGroups = async (req, res) => {
           // 1. Fetch latest message using indexed compound sort
           const lastMsg = await ChatMessage.findOne({ roomId: r._id })
             .sort({ _id: -1 })
-            .select('_id roomId content type senderId senderName msgType priority createdAt isDeleted attachment')
-            .populate('senderId', 'name username email avatarUrl')
+            .select('_id roomId content type senderId senderName msgType priority createdAt isDeleted attachment readBy')
+            .populate({ path: 'senderId', select: 'name username email avatarUrl', options: { strictPopulate: false } })
             .maxTimeMS(1200)
             .lean();
 
@@ -121,23 +121,31 @@ const getGroups = async (req, res) => {
               lastMsg.attachment = null;
             }
             lastMsgMap[String(r._id)] = lastMsg;
-          }
 
-          // 2. Fetch unread count for current user with fast timeout
-          if (targetUserObjId) {
-            const count = await ChatMessage.countDocuments({
-              roomId: r._id,
-              senderId: { $ne: targetUserObjId },
-              readBy: { $ne: targetUserObjId },
-              isDeleted: { $ne: true }
-            }).maxTimeMS(1000);
-            unreadMap[String(r._id)] = count || 0;
+            // Smart Unread Calculation: If last message was sent by user or already read, unread count is 0!
+            const senderIdStr = String(lastMsg.senderId?._id || lastMsg.senderId || '');
+            const targetIdStr = String(targetUserObjId || '');
+            const hasReadLastMsg = senderIdStr === targetIdStr || (Array.isArray(lastMsg.readBy) && lastMsg.readBy.some(id => String(id) === targetIdStr));
+
+            if (hasReadLastMsg) {
+              unreadMap[String(r._id)] = 0;
+            } else if (targetUserObjId) {
+              const count = await ChatMessage.countDocuments({
+                roomId: r._id,
+                senderId: { $ne: targetUserObjId },
+                readBy: { $ne: targetUserObjId },
+                isDeleted: { $ne: true }
+              }).maxTimeMS(600);
+              unreadMap[String(r._id)] = count || 0;
+            }
+          } else {
+            unreadMap[String(r._id)] = 0;
           }
         } catch (_) {
-          // Fallback to room's own lastMessage or empty if DB is under brief contention
           if (r.lastMessage) {
             lastMsgMap[String(r._id)] = r.lastMessage;
           }
+          unreadMap[String(r._id)] = 0;
         }
       }));
     }
@@ -890,18 +898,37 @@ const acknowledgeMessage = async (req, res) => {
   }
 };
 
+let dmUsersCache = null;
+let dmUsersCacheTime = 0;
+
 /**
  * Get active users list for starting private 1-on-1 direct messages
  */
 const getUsersForDM = async (req, res) => {
   try {
     const rawUserId = req.user ? req.user._id : req.query.userId;
-    let query = {};
-    if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
-      query = { _id: { $ne: new mongoose.Types.ObjectId(rawUserId) } };
+    const now = Date.now();
+    let allUsers = dmUsersCache;
+
+    if (!allUsers || now - dmUsersCacheTime > 60000) {
+      allUsers = await User.find({})
+        .select('_id name username email role department avatarUrl')
+        .maxTimeMS(2000)
+        .lean();
+      if (Array.isArray(allUsers)) {
+        allUsers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        dmUsersCache = allUsers;
+        dmUsersCacheTime = now;
+      } else {
+        allUsers = [];
+      }
     }
-    const users = await User.find(query).select('name username email role department').sort({ name: 1 });
-    res.json({ success: true, data: users });
+
+    const filtered = rawUserId
+      ? allUsers.filter(u => String(u._id) !== String(rawUserId))
+      : allUsers;
+
+    res.json({ success: true, data: filtered });
   } catch (error) {
     console.error('Error fetching users for DM:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch users', error: error.message });
