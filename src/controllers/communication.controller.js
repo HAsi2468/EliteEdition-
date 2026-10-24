@@ -151,8 +151,24 @@ const getGroups = async (req, res) => {
     }
 
     const roomsWithMeta = rooms.map((room) => {
+      let safeAvatar = room.avatarUrl;
+      if (safeAvatar && typeof safeAvatar === 'string' && safeAvatar.length > 2048 && safeAvatar.startsWith('data:')) {
+        safeAvatar = ''; // Strip massive 8-10MB base64 data URIs that freeze mobile network transfers
+      }
+
+      const safeMembers = Array.isArray(room.members) ? room.members.map(m => {
+        if (!m || typeof m !== 'object') return m;
+        let memberAvatar = m.avatarUrl;
+        if (memberAvatar && typeof memberAvatar === 'string' && memberAvatar.length > 2048 && memberAvatar.startsWith('data:')) {
+          memberAvatar = '';
+        }
+        return { ...m, avatarUrl: memberAvatar };
+      }) : room.members;
+
       return {
         ...room,
+        avatarUrl: safeAvatar,
+        members: safeMembers,
         lastMessage: lastMsgMap[String(room._id)] || null,
         unreadCount: unreadMap[String(room._id)] || 0
       };
