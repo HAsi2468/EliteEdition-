@@ -99,7 +99,6 @@ const courierManifestSchema = new mongoose.Schema(
   }
 );
 
-courierManifestSchema.index({ manifestId: 1 });
 courierManifestSchema.index({ courier: 1 });
 courierManifestSchema.index({ createdAt: -1 });
 

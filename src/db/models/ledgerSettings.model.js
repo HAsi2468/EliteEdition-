@@ -17,7 +17,4 @@ const ledgerSettingsSchema = new mongoose.Schema(
   }
 );
 
-ledgerSettingsSchema.index({ businessUnit: 1 });
-ledgerSettingsSchema.index({ companyEntity: 1 });
-
 module.exports = mongoose.model('LedgerSettings', ledgerSettingsSchema);

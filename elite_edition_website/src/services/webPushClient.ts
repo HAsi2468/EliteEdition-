@@ -155,11 +155,14 @@ export class WebPushClientManager {
         }
       } catch (e) {}
 
+      const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_auth_token') || localStorage.getItem('token')) : null;
+
       const saveResponse = await fetch('/v1/notifications/subscribe', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
           ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
           ...(effectiveUserId ? { 'X-User-Id': effectiveUserId } : {}),
         },
@@ -209,10 +212,14 @@ export class WebPushClientManager {
           localStorage.removeItem('elite_push_user_id');
         } catch (e) {}
 
+        const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_auth_token') || localStorage.getItem('token')) : null;
         // Notify backend to drop subscription record
         await fetch('/v1/notifications/unsubscribe', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+          },
           body: JSON.stringify({ endpoint }),
         });
       }
@@ -268,10 +275,12 @@ export class WebPushClientManager {
 
     if (!uId) return;
 
+    const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('elite_auth_token') || localStorage.getItem('token')) : null;
     fetch('/v1/notifications/focus', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
         'X-User-Id': uId,
       },
       body: JSON.stringify({ roomId }),

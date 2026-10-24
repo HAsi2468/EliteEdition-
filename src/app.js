@@ -108,6 +108,8 @@ const isPublicRoute = (path) => {
     p.startsWith('/api/v1/auth') ||
     p === '/v1/notifications/vapid-key' ||
     p === '/api/v1/notifications/vapid-key' ||
+    p === '/v1/notifications/focus' ||
+    p === '/api/v1/notifications/focus' ||
     p === '/v1/clients/login' ||
     p === '/api/v1/clients/login' ||
     p.startsWith('/v1/verify') ||

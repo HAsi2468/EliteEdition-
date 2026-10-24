@@ -156,7 +156,6 @@ jobCardSchema.index({ created_date_time: -1 });
 jobCardSchema.index({ fusingStatus: 1, fusingDate: -1 });
 jobCardSchema.index({ printStatus: 1, fusingStatus: 1, department: 1 });
 jobCardSchema.index({ date: -1, department: 1, category: 1 });
-jobCardSchema.index({ jobNo: 1 });
 jobCardSchema.index({ company_id: 1, status: 1 });
 jobCardSchema.index({ companyId: 1, status: 1 });
 
