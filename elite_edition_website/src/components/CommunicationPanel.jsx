@@ -10433,7 +10433,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     />
 
                     {/* Quick WhatsApp Status Chips */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
                       {[
                         'Available 🟢',
                         'Busy 🔴',
@@ -10441,26 +10441,34 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         'In a meeting 📅',
                         'Urgent calls only 📞',
                         'Working remotely 🏡'
-                      ].map((chip) => (
-                        <button
-                          key={chip}
-                          type="button"
-                          onClick={() => setUserProfileForm({ ...userProfileForm, about: chip })}
-                          style={{
-                            padding: '3px 9px',
-                            borderRadius: '14px',
-                            border: userProfileForm.about === chip ? '1px solid rgba(37,99,235,0.4)' : '1px solid var(--border-light, #e2e8f0)',
-                            background: userProfileForm.about === chip ? 'rgba(37,99,235,0.12)' : 'var(--bg-card, #ffffff)',
-                            color: userProfileForm.about === chip ? '#1d4ed8' : 'var(--text-secondary, #64748b)',
-                            fontSize: '0.72rem',
-                            fontWeight: userProfileForm.about === chip ? 700 : 500,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {chip}
-                        </button>
-                      ))}
+                      ].map((chip) => {
+                        const currentAbout = (userProfileForm.about || '').trim().toLowerCase();
+                        const chipLower = chip.toLowerCase();
+                        const chipClean = chip.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim().toLowerCase();
+                        const isSelected = currentAbout === chipLower || currentAbout === chipClean || (chipClean && currentAbout.startsWith(chipClean));
+
+                        return (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setUserProfileForm({ ...userProfileForm, about: chip })}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '16px',
+                              border: isSelected ? '1.5px solid #2563eb' : '1px solid var(--border-light, #cbd5e1)',
+                              background: isSelected ? '#eff6ff' : 'var(--bg-card, #ffffff)',
+                              color: isSelected ? '#1e40af' : 'var(--text-secondary, #64748b)',
+                              fontSize: '0.74rem',
+                              fontWeight: isSelected ? 700 : 500,
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? '0 0 0 2px rgba(37,99,235,0.25)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {chip}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
