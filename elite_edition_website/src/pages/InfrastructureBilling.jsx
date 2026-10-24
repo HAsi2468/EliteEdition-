@@ -1128,7 +1128,7 @@ Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} I
                   )}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                  Region: ap-south-1 (Mumbai) • Host: 3.7.174.180 • Zero-Downtime Cluster
+                  Region: ap-south-1 (Mumbai) • Host: erp.eliteedition.in • Zero-Downtime Cluster
                 </div>
               </div>
             </div>

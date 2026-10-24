@@ -13,7 +13,10 @@ const fetchImageBuffer = async (imageUrl) => {
   try {
     let url = imageUrl.trim();
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = `http://3.7.174.180:3001${url}`;
+      const baseUrl = process.env.APP_URL || 'https://erp.eliteedition.in';
+      url = `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+    } else {
+      url = url.replace(/http:\/\/3\.7\.174\.180(:3001)?/g, 'https://erp.eliteedition.in');
     }
     url = url
       .replace(/tr:f-webp,w-\d+/g, 'tr:f-jpg,w-400')
