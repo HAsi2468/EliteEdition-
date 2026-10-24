@@ -89,6 +89,11 @@ server.listen(port, host, async () => {
 
   process.on('message', (packet) => {
     try {
+      if (packet === 'shutdown' || packet?.type === 'shutdown') {
+        logger.info('PM2 graceful shutdown IPC received. Draining connections...');
+        exitHandler(0);
+        return;
+      }
       if (packet && (packet.type === 'broadcast-version-update' || packet.action === 'broadcast-version-update')) {
         const payload = packet.data || {
           version: 1791022781512,
@@ -110,13 +115,19 @@ server.listen(port, host, async () => {
 
 const exitHandler = (code = 1) => {
   if (server) {
+    try {
+      if (io && typeof io.disconnectSockets === 'function') {
+        io.disconnectSockets(true);
+      }
+    } catch (_) {}
+
     server.close(() => {
       logger.info('Server closed gracefully');
       process.exit(code);
     });
     setTimeout(() => {
       process.exit(code);
-    }, 5000).unref();
+    }, 4000).unref();
   } else {
     process.exit(code);
   }
