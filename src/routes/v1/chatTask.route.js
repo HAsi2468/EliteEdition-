@@ -50,6 +50,52 @@ const ALLOWED_EXTENSIONS = [
   '.zip', '.rar', '.7z', '.tar', '.gz'
 ];
 
+function verifyFileSignature(buffer, ext) {
+  if (!buffer || buffer.length < 4) return false;
+  const cleanExt = (ext || '').toLowerCase();
+
+  // PNG: 89 50 4E 47
+  if (cleanExt === '.png') {
+    return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  }
+  // JPEG / JFIF: FF D8 FF
+  if (cleanExt === '.jpg' || cleanExt === '.jpeg' || cleanExt === '.jfif') {
+    return buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  }
+  // GIF: 47 49 46 38
+  if (cleanExt === '.gif') {
+    return buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38;
+  }
+  // PDF: 25 50 44 46 (%PDF)
+  if (cleanExt === '.pdf') {
+    return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+  }
+  // WEBP: 52 49 46 46 (RIFF) ... 57 45 42 50 (WEBP)
+  if (cleanExt === '.webp') {
+    return buffer.length >= 12 &&
+      buffer.toString('ascii', 0, 4) === 'RIFF' &&
+      buffer.toString('ascii', 8, 12) === 'WEBP';
+  }
+  // BMP: 42 4D
+  if (cleanExt === '.bmp') {
+    return buffer[0] === 0x42 && buffer[1] === 0x4D;
+  }
+  // ZIP / XLSX / DOCX: 50 4B 03 04 (PK)
+  if (cleanExt === '.zip' || cleanExt === '.xlsx' || cleanExt === '.docx' || cleanExt === '.pptx' || cleanExt === '.jar') {
+    return buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07);
+  }
+  // Legacy MS Office (DOC/XLS): D0 CF 11 E0
+  if (cleanExt === '.doc' || cleanExt === '.xls') {
+    return (buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0) ||
+           (buffer[0] === 0x50 && buffer[1] === 0x4B);
+  }
+  // Text formats: CSV / plain text / SVG / Markdown / JSON (no null bytes in initial chunk)
+  if (cleanExt === '.csv' || cleanExt === '.txt' || cleanExt === '.svg' || cleanExt === '.md' || cleanExt === '.json' || cleanExt === '.tsv') {
+    return !buffer.slice(0, 512).includes(0x00);
+  }
+  return true;
+}
+
 const upload = multer({
   storage: isR2Configured() ? memoryStorage : diskStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per attachment
@@ -114,14 +160,26 @@ router.post('/upload', (req, res, next) => {
       });
     }
 
+    const fileBuffer = req.file.buffer || (req.file.path && fs.existsSync(req.file.path) ? fs.readFileSync(req.file.path) : null);
+    if (!fileBuffer) {
+      return res.status(400).json({ success: false, message: 'Unable to read upload payload data' });
+    }
+
+    // Verify magic bytes signature matches extension
+    if (!verifyFileSignature(fileBuffer, fileExt)) {
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+      }
+      return res.status(415).json({
+        success: false,
+        message: `File content does not match the claimed extension (${fileExt}). Renamed or spoofed files are rejected.`
+      });
+    }
+
     const targetFolder = (req.body?.folder || req.query?.folder || 'Chat').trim();
 
     // If R2 is configured and file was stored in memory/disk, upload to R2
     if (isR2Configured()) {
-      const fileBuffer = req.file.buffer || (req.file.path && fs.existsSync(req.file.path) ? fs.readFileSync(req.file.path) : null);
-      if (!fileBuffer) {
-        return res.status(400).json({ success: false, message: 'Unable to read upload payload data' });
-      }
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const ext = path.extname(cleanOriginalName) || '.bin';
       const rawBase = sanitizeUnicodeKeyName(path.basename(cleanOriginalName, ext));
@@ -383,7 +441,7 @@ router.get('/rooms/:roomId/messages', async (req, res) => {
       query._id = { $lt: before };
     }
 
-    const limitVal = parseInt(limit, 10);
+    const limitVal = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
 
     const messages = await ChatMessage.find(query)
       .populate('senderId', 'name username email')

@@ -338,6 +338,13 @@ const setupSockets = (io) => {
         }
         socket._msgTimestamps.push(now);
 
+        const rawContent = typeof content === 'string' ? content : (content != null ? String(content) : '');
+        const trimmedContent = rawContent.trim();
+        if (!trimmedContent && !attachment && type !== 'poll') {
+          socket.emit('error-notice', { message: 'Message content cannot be empty' });
+          return;
+        }
+
         // Attachment security check (block executables and oversized payloads)
         if (attachment) {
           const attachCheck = validateAttachment(attachment);
@@ -383,8 +390,8 @@ const setupSockets = (io) => {
           }
         }
 
-        // Sanitize content against stored XSS
-        const sanitizedContent = sanitizeChatMessage(content || '');
+        // Sanitize content against stored XSS (trimmed)
+        const sanitizedContent = sanitizeChatMessage(trimmedContent || '').trim();
         
         // Parse user mentions (supports explicit mentionedUserIds, full names e.g. @QA Automation Bot, @usernames, and @all / @everyone)
         let mentions = Array.isArray(inMentionedUserIds) ? [...inMentionedUserIds] : [];

@@ -19,6 +19,7 @@ require('./schedule/myntraScheduler').startMyntraScheduler();
 require('./schedule/eodExecutiveBriefingScheduler').startEodExecutiveBriefingScheduler();
 require('./schedule/infrastructureBillingScheduler').startInfrastructureBillingScheduler();
 require('./schedule/catalogImageSyncScheduler').startCatalogImageSyncScheduler();
+require('./schedule/chatOrphanCleanupScheduler').startChatOrphanCleanupScheduler();
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const userModel = require('./db/models/user.model');

@@ -16,6 +16,8 @@ router.post('/groups/sync', requireAdmin, communicationController.syncGroups);
 // 3. Message Access & Membership (Protected by Group Access Guard)
 router.get('/groups/:groupId/messages', requireGroupAccess, communicationController.getGroupMessages);
 router.post('/groups/:groupId/messages', requireGroupAccess, communicationController.postGroupMessage);
+router.post('/groups/:groupId/read', requireGroupAccess, communicationController.markGroupAsRead);
+router.post('/:groupId/read', requireGroupAccess, communicationController.markGroupAsRead);
 router.get('/groups/:groupId/members', requireGroupAccess, communicationController.getGroupMembers);
 router.post('/groups/:groupId/members', requireGroupAccess, communicationController.updateGroupMembers);
 

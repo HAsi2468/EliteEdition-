@@ -71,33 +71,46 @@ const MIME_TO_EXT = {
 
 function verifyFileSignature(buffer, ext) {
   if (!buffer || buffer.length < 4) return false;
-  // JPEG / JFIF: FF D8 FF
-  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return true;
+  const cleanExt = (ext || '').toLowerCase();
+
   // PNG: 89 50 4E 47
-  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return true;
+  if (cleanExt === '.png') {
+    return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  }
+  // JPEG / JFIF: FF D8 FF
+  if (cleanExt === '.jpg' || cleanExt === '.jpeg' || cleanExt === '.jfif') {
+    return buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  }
   // GIF: 47 49 46 38
-  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) return true;
+  if (cleanExt === '.gif') {
+    return buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38;
+  }
   // PDF: 25 50 44 46 (%PDF)
-  if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) return true;
+  if (cleanExt === '.pdf') {
+    return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+  }
   // WEBP: 52 49 46 46 (RIFF) ... 57 45 42 50 (WEBP)
-  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') return true;
+  if (cleanExt === '.webp') {
+    return buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP';
+  }
   // BMP: 42 4D
-  if (buffer[0] === 0x42 && buffer[1] === 0x4D) return true;
-  // ZIP / XLSX / DOCX: 50 4B 03 04
-  if (buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07)) return true;
+  if (cleanExt === '.bmp') {
+    return buffer[0] === 0x42 && buffer[1] === 0x4D;
+  }
+  // ZIP / XLSX / DOCX: 50 4B 03 04 (PK)
+  if (cleanExt === '.zip' || cleanExt === '.xlsx' || cleanExt === '.docx') {
+    return buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07);
+  }
   // Legacy MS Office (DOC/XLS): D0 CF 11 E0
-  if (buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0) return true;
+  if (cleanExt === '.doc' || cleanExt === '.xls') {
+    return (buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0) ||
+           (buffer[0] === 0x50 && buffer[1] === 0x4B);
+  }
   // CSV / plain text / SVG / Markdown / JSON (no null bytes in initial chunk)
-  if (ext === '.csv' || ext === '.txt' || ext === '.svg' || ext === '.md' || ext === '.markdown' || ext === '.json') {
+  if (cleanExt === '.csv' || cleanExt === '.txt' || cleanExt === '.svg' || cleanExt === '.md' || cleanExt === '.markdown' || cleanExt === '.json') {
     return !buffer.slice(0, 512).includes(0x00);
   }
-  // Generic fallback: check if starts with known safe image magic bytes
-  if ((buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) ||
-      (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) ||
-      (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP')) {
-    return true;
-  }
-  return false;
+  return true;
 }
 
 const fileFilter = (req, file, cb) => {

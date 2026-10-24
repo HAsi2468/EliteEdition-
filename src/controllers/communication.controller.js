@@ -204,8 +204,8 @@ const getGroupMessages = async (req, res) => {
 
     const { page = 1, limit = 50, msgType, beforeSeq, before, afterSeq, after } = req.query;
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
     const skip = (beforeSeq || before || afterSeq || after) ? 0 : (pageNum - 1) * limitNum;
 
     const room = await ChatRoom.findById(groupId).select('_id type members');
@@ -553,8 +553,8 @@ const postGroupMessage = async (req, res) => {
       await targetRoom.save();
     }
 
-    // Sanitize content against Stored XSS and malicious script injection
-    const sanitizedContent = sanitizeChatMessage(content || '');
+    // Sanitize content against Stored XSS and malicious script injection (trimmed)
+    const sanitizedContent = sanitizeChatMessage(trimmedContent || '').trim();
 
     // Parse user mentions (supports explicit mentionedUserIds, full names e.g. @QA Automation Bot, @usernames, and @all / @everyone)
     let mentions = Array.isArray(inMentionedUserIds) ? [...inMentionedUserIds] : [];
@@ -1511,6 +1511,54 @@ const purgeOrphanChatFiles = async (req, res) => {
   }
 };
 
+/**
+ * POST /v1/communication/groups/:groupId/read
+ * Mark all messages in a group/room as read for the requesting user
+ */
+const markGroupAsRead = async (req, res) => {
+  try {
+    const groupId = req.params.groupId || req.params.id;
+    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing Group ID' });
+    }
+
+    const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body?.userId || req.query?.userId);
+    if (!rawUserId) {
+      return res.status(401).json({ success: false, message: 'User ID is required to mark messages as read' });
+    }
+
+    const userObjId = mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : rawUserId;
+
+    const result = await ChatMessage.updateMany(
+      { roomId: groupId, senderId: { $ne: userObjId }, readBy: { $ne: userObjId } },
+      { $addToSet: { readBy: userObjId, deliveredTo: userObjId } }
+    );
+
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
+    if (io) {
+      let broadcast = io.to(String(groupId));
+      const targetRoom = await ChatRoom.findById(groupId).select('members');
+      if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {
+        targetRoom.members.forEach((m) => {
+          const mIdStr = getMemberIdString(m);
+          if (mIdStr) broadcast = broadcast.to(`user_${mIdStr}`);
+        });
+      }
+      broadcast.emit('room-messages-read', { roomId: groupId, userId: String(rawUserId) });
+      broadcast.emit('messages-read', { roomId: groupId, conversationId: groupId, userId: String(rawUserId) });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Room marked as read',
+      modifiedCount: result.modifiedCount || 0
+    });
+  } catch (error) {
+    console.error('Error marking group as read:', error);
+    return res.status(500).json({ success: false, message: 'Failed to mark group as read', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -1529,6 +1577,7 @@ module.exports = {
   deleteMessage,
   editMessage,
   searchMessages,
+  markGroupAsRead,
   purgeOrphanChatFiles,
   forceReloadAllUsers,
   clearAllData,
