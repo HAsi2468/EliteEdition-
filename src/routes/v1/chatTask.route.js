@@ -31,16 +31,34 @@ const diskStorage = multer.diskStorage({
 
 const FORBIDDEN_EXTENSIONS = [
   '.exe', '.bat', '.cmd', '.sh', '.bash', '.php', '.phtml',
-  '.cgi', '.pl', '.py', '.vbs', '.msi', '.jar', '.scr', '.html', '.htm'
+  '.cgi', '.pl', '.py', '.vbs', '.msi', '.jar', '.scr', '.html', '.htm',
+  '.bin', '.dll', '.so', '.com'
+];
+
+const ALLOWED_EXTENSIONS = [
+  // Images
+  '.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.bmp', '.ico', '.avif',
+  // Documents
+  '.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt',
+  // Spreadsheets
+  '.csv', '.xlsx', '.xls', '.tsv', '.json',
+  // Audio
+  '.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm',
+  // Video
+  '.mp4', '.mov', '.avi', '.mkv',
+  // Archives
+  '.zip', '.rar', '.7z', '.tar', '.gz'
 ];
 
 const upload = multer({
   storage: isR2Configured() ? memoryStorage : diskStorage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit per attachment
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per attachment
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
-    if (FORBIDDEN_EXTENSIONS.includes(ext)) {
-      return cb(new Error(`File type ${ext} is blocked for security reasons.`));
+    if (!ext || FORBIDDEN_EXTENSIONS.includes(ext) || !ALLOWED_EXTENSIONS.includes(ext)) {
+      const err = new Error(`Unsupported file format (${ext || 'binary'}). Allowed formats: images, documents, spreadsheets, audio, archives.`);
+      err.statusCode = 415;
+      return cb(err);
     }
     cb(null, true);
   }
@@ -54,7 +72,10 @@ router.post('/upload', (req, res, next) => {
   upload.any()(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ success: false, message: 'File size exceeds maximum limit of 50MB' });
+        return res.status(413).json({ success: false, message: 'File size exceeds maximum allowable limit of 10MB' });
+      }
+      if (err.statusCode === 415 || err.message?.includes('Unsupported file format') || err.message?.includes('blocked')) {
+        return res.status(415).json({ success: false, message: err.message });
       }
       return res.status(400).json({ success: false, message: err.message || 'File upload validation failed' });
     }
@@ -68,14 +89,26 @@ router.post('/upload', (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
+    if (req.file.size > 10 * 1024 * 1024) {
+      return res.status(413).json({ success: false, message: 'File size exceeds maximum allowable limit of 10MB' });
+    }
+
     // Full multi-language / Unicode support (Gujarati, Hindi, Arabic, Chinese, Emoji, Mac UTF-8)
     const cleanOriginalName = decodeUnicodeFileName(req.file.originalname);
     req.file.originalname = cleanOriginalName;
 
     const fileExt = path.extname(cleanOriginalName || '').toLowerCase();
     const fileMime = (req.file.mimetype || '').toLowerCase();
+
+    if (!fileExt || FORBIDDEN_EXTENSIONS.includes(fileExt) || !ALLOWED_EXTENSIONS.includes(fileExt)) {
+      return res.status(415).json({
+        success: false,
+        message: `Unsupported file format (${fileExt || fileMime || 'unknown'}). Allowed formats: images, documents, spreadsheets, audio, archives.`
+      });
+    }
+
     if (fileExt === '.tif' || fileExt === '.tiff' || fileMime === 'image/tiff' || fileMime === 'image/tif') {
-      return res.status(400).json({
+      return res.status(415).json({
         success: false,
         message: 'TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard image formats.'
       });
@@ -192,6 +225,9 @@ router.delete('/r2-attachments', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to clear R2 chat attachments', error: err.message });
   }
 });
+
+// Purge Orphan Chat Files (files in R2 Chat/ with no live message)
+router.delete('/r2-orphans', communicationController.purgeOrphanChatFiles);
 
 
 router.get('/rooms', communicationController.getGroups);

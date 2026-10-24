@@ -391,8 +391,17 @@ const forwardMessage = async (req, res) => {
 
     const origRoom = await ChatRoom.findById(origMessage.roomId);
 
+    // Monotonic room sequence increment for target room
+    const updatedTargetRoom = await ChatRoom.findByIdAndUpdate(
+      targetRoomId,
+      { $inc: { lastSeq: 1 }, updatedAt: new Date() },
+      { new: true }
+    );
+    const roomSeq = updatedTargetRoom?.lastSeq || 1;
+
     const forwardedMsg = await ChatMessage.create({
       roomId: targetRoomId,
+      roomSeq,
       senderId: rawSenderId,
       content: origMessage.content,
       type: origMessage.type,
@@ -408,7 +417,10 @@ const forwardMessage = async (req, res) => {
       readBy: [rawSenderId]
     });
 
-    await ChatRoom.findByIdAndUpdate(targetRoomId, { updatedAt: new Date() });
+    if (updatedTargetRoom) {
+      updatedTargetRoom.lastMessage = forwardedMsg;
+      await updatedTargetRoom.save();
+    }
 
     const populatedMsg = await ChatMessage.findById(forwardedMsg._id)
       .populate('senderId', 'name username email role')
@@ -456,8 +468,31 @@ const postGroupMessage = async (req, res) => {
     const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions, mentionedUserIds: inMentionedUserIds, clientMsgId: inClientMsgId } = req.body;
     const clientMsgId = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || inClientMsgId || null;
 
-    if (!content && !attachment && type !== 'poll') {
-      return res.status(400).json({ success: false, message: 'Message content, attachment, or poll is required' });
+    const rawContent = typeof content === 'string' ? content : (content != null ? String(content) : '');
+    const trimmedContent = rawContent.trim();
+
+    if (!trimmedContent && !attachment && type !== 'poll') {
+      return res.status(400).json({ success: false, message: 'Message content cannot be empty' });
+    }
+
+    if (rawContent.length > 10000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message content exceeds maximum allowable limit of 10,000 characters'
+      });
+    }
+
+    // Validate replyTo: must exist within this room or return 400
+    let cleanReplyTo = null;
+    if (replyTo) {
+      if (!mongoose.Types.ObjectId.isValid(replyTo)) {
+        return res.status(400).json({ success: false, message: 'Invalid replyTo message ID' });
+      }
+      const referencedMsg = await ChatMessage.findOne({ _id: replyTo, roomId: groupId }).lean();
+      if (!referencedMsg) {
+        return res.status(400).json({ success: false, message: 'Referenced replyTo message not found in this room' });
+      }
+      cleanReplyTo = referencedMsg._id;
     }
 
     // Idempotency: Return existing message on retry or duplicate POST instead of creating duplicate DB document
@@ -574,8 +609,6 @@ const postGroupMessage = async (req, res) => {
     );
     const roomSeq = updatedRoom?.lastSeq || 1;
 
-    // Validate replyTo: if optimistic temp ID, ignore to prevent CastError
-    const cleanReplyTo = (replyTo && mongoose.Types.ObjectId.isValid(replyTo)) ? new mongoose.Types.ObjectId(replyTo) : null;
     const messageContent = (sanitizedContent || '').trim() || (pollMeta ? pollMeta.question : (attachment?.fileName ? attachment.fileName : 'Message'));
 
     const newMessage = await ChatMessage.create({
@@ -1434,6 +1467,50 @@ const editMessage = async (req, res) => {
   }
 };
 
+/**
+ * Purge orphan chat files from Cloudflare R2 storage
+ * (Files under Chat/ older than 1 hour with no live message reference)
+ */
+const purgeOrphanChatFiles = async (req, res) => {
+  try {
+    const { listR2Objects, deleteR2Object } = require('../utils/r2Storage');
+    const objects = await listR2Objects({ folder: 'Chat' });
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    let deletedCount = 0;
+    const deletedKeys = [];
+
+    for (const obj of objects) {
+      if (obj.lastModified && new Date(obj.lastModified) > oneHourAgo) {
+        continue;
+      }
+      const keyEscaped = obj.key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const isReferenced = await ChatMessage.exists({
+        isDeleted: { $ne: true },
+        $or: [
+          { 'attachment.fileUrl': { $regex: keyEscaped, $options: 'i' } },
+          { 'attachment.fileName': obj.key.split('/').pop() }
+        ]
+      });
+
+      if (!isReferenced) {
+        await deleteR2Object(obj.key);
+        deletedCount++;
+        deletedKeys.push(obj.key);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Cleaned up ${deletedCount} orphan chat files from Cloudflare R2.`,
+      deletedCount,
+      deletedKeys
+    });
+  } catch (error) {
+    console.error('Error purging orphan chat files:', error);
+    res.status(500).json({ success: false, message: 'Failed to purge orphan chat files', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -1452,6 +1529,7 @@ module.exports = {
   deleteMessage,
   editMessage,
   searchMessages,
+  purgeOrphanChatFiles,
   forceReloadAllUsers,
   clearAllData,
   broadcastVersionUpdate,

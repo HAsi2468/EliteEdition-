@@ -15,7 +15,7 @@ export function useFileUpload(defaultOptions = {}) {
   /**
    * Validate and sanitize file before upload
    */
-  const validateFile = useCallback((file) => {
+  const validateFile = useCallback((file, options = {}) => {
     if (!file) throw new Error('No file provided');
     const lowerName = (file.name || '').toLowerCase();
     const mime = (file.type || '').toLowerCase();
@@ -25,10 +25,26 @@ export function useFileUpload(defaultOptions = {}) {
       throw new Error('TIFF files (.tif, .tiff) are not allowed. Please upload JPG, PNG, WEBP, or standard document formats.');
     }
 
-    // 100MB max limit
-    const MAX_SIZE = 100 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      throw new Error('File exceeds maximum size limit of 100MB.');
+    // Enforce forbidden executable and binary extensions
+    const FORBIDDEN_EXTENSIONS = [
+      '.exe', '.bat', '.cmd', '.sh', '.bash', '.php', '.phtml',
+      '.cgi', '.pl', '.py', '.vbs', '.msi', '.jar', '.scr', '.html', '.htm',
+      '.bin', '.dll', '.so', '.com'
+    ];
+    const ext = '.' + (lowerName.split('.').pop() || '');
+    if (FORBIDDEN_EXTENSIONS.includes(ext)) {
+      throw new Error(`File type ${ext} is blocked for security reasons. Executable and raw binary files cannot be uploaded.`);
+    }
+
+    // Dynamic size limit: 10MB for chat / custom maxSizeMB, otherwise 100MB standard limit
+    const isChat = options.useChatEndpoint || (options.folder && options.folder.startsWith('Chat'));
+    const maxLimit = options.maxSizeMB
+      ? options.maxSizeMB * 1024 * 1024
+      : (isChat ? 10 * 1024 * 1024 : 100 * 1024 * 1024);
+
+    if (file.size > maxLimit) {
+      const limitMb = Math.round(maxLimit / (1024 * 1024));
+      throw new Error(`File size exceeds maximum allowable limit of ${limitMb}MB (selected: ${(file.size / (1024 * 1024)).toFixed(1)}MB).`);
     }
 
     return true;
@@ -54,7 +70,7 @@ export function useFileUpload(defaultOptions = {}) {
    */
   const uploadFile = useCallback(async (file, options = {}) => {
     const opts = { ...defaultOptions, ...options };
-    validateFile(file);
+    validateFile(file, opts);
 
     setIsUploading(true);
     setProgress(10);

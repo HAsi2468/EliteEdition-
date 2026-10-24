@@ -893,7 +893,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   }, []);
 
   // Universal File Upload Hook for R2
-  const { uploadFile: uploadChatFileToR2 } = useFileUpload();
+  const { uploadFile: uploadChatFileToR2, progress: uploadChatProgress } = useFileUpload();
 
   // Escape Key Modal Dismissal
   useEffect(() => {
@@ -2734,10 +2734,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const processFileUpload = async (file) => {
     if (!file) return;
-    if (file.size > 100 * 1024 * 1024) {
-      alert('File size exceeds 100MB limit.');
+
+    // Upfront 10MB limit enforcement for Chat
+    const MAX_CHAT_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_CHAT_SIZE) {
+      alert(`File size exceeds 10MB limit (selected: ${(file.size / (1024 * 1024)).toFixed(1)}MB). Please choose a file under 10MB.`);
       return;
     }
+
+    const FORBIDDEN_EXTS = [
+      '.exe', '.bat', '.cmd', '.sh', '.bash', '.php', '.phtml',
+      '.cgi', '.pl', '.py', '.vbs', '.msi', '.jar', '.scr', '.html', '.htm',
+      '.bin', '.dll', '.so', '.com'
+    ];
 
     const ext = file.type ? file.type.split('/')[1] || 'png' : 'png';
     let rawFileName = file.name || '';
@@ -2745,6 +2754,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       rawFileName = `upload-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
     }
     const lowerName = rawFileName.toLowerCase();
+    const fileExt = '.' + (lowerName.split('.').pop() || '');
+
+    if (FORBIDDEN_EXTS.includes(fileExt)) {
+      alert(`File type "${fileExt}" is blocked for security reasons. Executables and binary files cannot be uploaded to chat.`);
+      return;
+    }
+
     const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(lowerName);
     const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
     const isAudio = file.type?.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(lowerName);
@@ -6960,7 +6976,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
               {/* Quoted Inline Reply Banner */}
               {replyToMessage && (
-                <div style={{ padding: '0.45rem 0.9rem', background: 'rgba(37,99,235,0.08)', borderTop: '1px solid #bfdbfe', borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: '#1d4ed8', fontWeight: 600 }}>
+                <div style={{ padding: '0.45rem 0.85rem', background: 'rgba(37,99,235,0.08)', borderTop: '1px solid #bfdbfe', borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: '#1d4ed8', fontWeight: 600, gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden', minWidth: 0, flex: 1 }}>
                     <Reply size={14} color="#2563eb" style={{ flexShrink: 0 }} />
                     <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -6968,8 +6984,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <span style={{ opacity: 0.9 }}>{replyToMessage.content?.substring(0, 80)}</span>
                     </div>
                   </div>
-                  <button onClick={() => setReplyToMessage(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                    <X size={14} />
+                  <button onClick={() => setReplyToMessage(null)} aria-label="Cancel reply" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderRadius: '4px', flexShrink: 0 }}>
+                    <X size={15} />
                   </button>
                 </div>
               )}
@@ -6983,14 +6999,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     borderTop: '1px solid #93c5fd',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
+                    justifyContent: 'space-between',
+                    gap: '12px',
                     fontSize: '0.8rem',
                     fontWeight: 700,
                     color: '#1d4ed8'
                   }}
                 >
-                  <RefreshCw size={15} className="spin-loader" />
-                  <span>Uploading attachment to secure cloud storage...</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                    <RefreshCw size={15} className="spin-loader" style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Uploading attachment to Cloudflare R2...
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div style={{ width: '70px', height: '6px', background: '#bfdbfe', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: `${uploadChatProgress || 40}%`, height: '100%', background: '#2563eb', transition: 'width 0.3s ease' }} />
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{uploadChatProgress || 40}%</span>
+                  </div>
                 </div>
               )}
 
