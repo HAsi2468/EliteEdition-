@@ -4660,46 +4660,57 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
             alignItems: 'center',
             gap: '0.45rem',
             padding: '0.45rem 0.85rem',
-            borderRadius: 'var(--radius-sm)',
-            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(16, 185, 129, 0.12))',
-            border: '1px solid rgba(37, 99, 235, 0.3)',
+            borderRadius: '8px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
             fontSize: '0.8rem',
             fontWeight: 700,
-            color: 'var(--text-primary)',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+            color: '#0f172a',
+            boxShadow: '0 1px 3px rgba(15,23,42,0.04)'
           }}>
-            <span style={{ color: '#38bdf8' }}>📊 {statusFilter}:</span>
-            <span style={{ color: '#a78bfa' }}><strong>{total}</strong> Cards</span>
-            <span style={{ color: 'var(--border-light)', margin: '0 1px' }}>•</span>
-            <span style={{ color: '#34d399' }}><strong>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr</span>
+            <span style={{ color: '#2563eb' }}>📊 {statusFilter}:</span>
+            <span style={{ color: '#0f172a' }}><strong>{total}</strong> Cards</span>
+            <span style={{ color: '#cbd5e1', margin: '0 1px' }}>•</span>
+            <span style={{ color: '#15803d' }}><strong>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr</span>
           </div>
 
           <button onClick={() => { setSortBy(prev => prev === 'urgency' ? '' : 'urgency'); setPage(1); }}
-            style={{ padding:'0.45rem 0.9rem', fontSize:'0.8rem', borderRadius:'var(--radius-sm)',
-              fontFamily:'var(--font-sans)', fontWeight:600, cursor:'pointer', border:'1px solid',
-              borderColor: sortBy==='urgency' ? '#fbbf24' : 'var(--border-light)',
-              background: sortBy==='urgency' ? 'rgba(245,158,11,0.12)' : 'transparent',
-              color: sortBy==='urgency' ? '#fbbf24' : 'var(--text-muted)',
-              display: 'flex', alignItems: 'center', gap: '0.45rem', transition: 'all 0.15s' }}>
+            style={{ 
+              padding: '0.45rem 0.9rem', 
+              fontSize: '0.8rem', 
+              borderRadius: '8px',
+              fontFamily: 'var(--font-sans)', 
+              fontWeight: 700, 
+              cursor: 'pointer', 
+              border: '1px solid',
+              borderColor: sortBy === 'urgency' ? '#f59e0b' : '#e2e8f0',
+              background: sortBy === 'urgency' ? '#fef3c7' : '#ffffff',
+              color: sortBy === 'urgency' ? '#b45309' : '#475569',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.45rem', 
+              transition: 'all 0.15s' 
+            }}>
             🔥 Urgency Priority
           </button>
           
-          <div style={{ display: 'flex', gap: '0.2rem', marginLeft: 'auto', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '2px' }}>
+          <div style={{ display: 'flex', gap: '0.2rem', marginLeft: 'auto', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '3px' }}>
             <button 
               type="button" 
               onClick={() => setViewMode('grid')}
               style={{
-                padding: '0.35rem 0.6rem',
+                padding: '0.35rem 0.65rem',
                 border: 'none',
-                background: viewMode === 'grid' ? 'var(--nav-active-bg)' : 'transparent',
-                color: viewMode === 'grid' ? 'var(--primary)' : 'var(--text-muted)',
-                borderRadius: 'var(--radius-xs)',
+                background: viewMode === 'grid' ? '#ffffff' : 'transparent',
+                color: viewMode === 'grid' ? '#2563eb' : '#64748b',
+                boxShadow: viewMode === 'grid' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.3rem',
                 fontSize: '0.75rem',
-                fontWeight: 600,
+                fontWeight: 700,
                 transition: 'all 0.15s'
               }}
             >
@@ -4709,17 +4720,18 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
               type="button" 
               onClick={() => setViewMode('list')}
               style={{
-                padding: '0.35rem 0.6rem',
+                padding: '0.35rem 0.65rem',
                 border: 'none',
-                background: viewMode === 'list' ? 'var(--nav-active-bg)' : 'transparent',
-                color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-muted)',
-                borderRadius: 'var(--radius-xs)',
+                background: viewMode === 'list' ? '#ffffff' : 'transparent',
+                color: viewMode === 'list' ? '#2563eb' : '#64748b',
+                boxShadow: viewMode === 'list' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.3rem',
                 fontSize: '0.75rem',
-                fontWeight: 600,
+                fontWeight: 700,
                 transition: 'all 0.15s'
               }}
             >

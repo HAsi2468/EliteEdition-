@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../services/api';
 import { 
   PackageMinus, 
@@ -9,9 +9,13 @@ import {
   RefreshCw,
   Zap,
   ListTodo,
-  History
+  History,
+  Download,
+  Filter
 } from 'lucide-react';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
+import { getDatePresetRange } from './DateRangePicker';
+import ErpUnifiedFilterBar from './common/ErpUnifiedFilterBar';
 
 export default function ReturnsManager() {
   const [activeTab, setActiveTab] = useState('process');
@@ -35,6 +39,84 @@ export default function ReturnsManager() {
   const [refinishQueue, setRefinishQueue] = useState([]);
   const [history, setHistory] = useState([]);
   const [selectedHistoryIds, setSelectedHistoryIds] = useState([]);
+
+  // Unified Filter States for History
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyDatePreset, setHistoryDatePreset] = useState('all');
+  const [historyDateStart, setHistoryDateStart] = useState('');
+  const [historyDateEnd, setHistoryDateEnd] = useState('');
+  const [historyCustomStart, setHistoryCustomStart] = useState('');
+  const [historyCustomEnd, setHistoryCustomEnd] = useState('');
+  const [historyFilters, setHistoryFilters] = useState({});
+
+  const returnsFilterCategories = useMemo(() => [
+    {
+      id: 'returnType',
+      label: 'Return Type',
+      multi: true,
+      options: [
+        { value: 'RTO', label: 'RTO' },
+        { value: 'CUSTOMER_RETURN', label: 'Customer Return' }
+      ]
+    },
+    {
+      id: 'condition',
+      label: 'Condition',
+      multi: true,
+      options: [
+        { value: 'INTACT', label: 'Intact' },
+        { value: 'DAMAGED', label: 'Damaged' },
+        { value: 'DEFECTIVE', label: 'Defective' }
+      ]
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      multi: true,
+      options: [
+        { value: 'STOCKED_IN', label: 'Stocked In' },
+        { value: 'DISPUTED', label: 'Disputed' },
+        { value: 'PENDING_REFINISH', label: 'Pending Refinish' }
+      ]
+    }
+  ], []);
+
+  const filteredHistory = useMemo(() => {
+    return history.filter(item => {
+      if (historySearch.trim()) {
+        const q = historySearch.toLowerCase();
+        const matchRef = (item.referenceId || '').toLowerCase().includes(q);
+        const matchOrder = (item.displayOrderId || '').toLowerCase().includes(q);
+        const matchSku = (item.sku || '').toLowerCase().includes(q);
+        const matchNotes = (item.notes || '').toLowerCase().includes(q);
+        if (!matchRef && !matchOrder && !matchSku && !matchNotes) return false;
+      }
+
+      if (historyDatePreset && historyDatePreset !== 'all') {
+        const range = getDatePresetRange(historyDatePreset, historyCustomStart, historyCustomEnd);
+        if (range && range.start && range.end) {
+          const itemDate = new Date(item.createdAt);
+          if (itemDate < range.start || itemDate > range.end) return false;
+        }
+      } else if (historyDateStart || historyDateEnd) {
+        const itemDate = new Date(item.createdAt);
+        if (historyDateStart && itemDate < new Date(`${historyDateStart}T00:00:00`)) return false;
+        if (historyDateEnd && itemDate > new Date(`${historyDateEnd}T23:59:59`)) return false;
+      }
+
+      if (historyFilters.returnType?.length > 0) {
+        if (!historyFilters.returnType.includes(item.returnType)) return false;
+      }
+      if (historyFilters.condition?.length > 0) {
+        if (!historyFilters.condition.includes(item.condition)) return false;
+      }
+      if (historyFilters.status?.length > 0) {
+        if (!historyFilters.status.includes(item.status)) return false;
+      }
+
+      return true;
+    });
+  }, [history, historySearch, historyDatePreset, historyCustomStart, historyCustomEnd, historyDateStart, historyDateEnd, historyFilters]);
 
   const toggleSelectHistory = (id) => {
     setSelectedHistoryIds(prev =>
@@ -632,11 +714,11 @@ export default function ReturnsManager() {
   );
 
   const renderHistory = () => (
-    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+    <div className="glass-panel" style={{ padding: '1.25rem' }}>
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Returns History & Claims</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Master ledger of all returns. Use this to file SPF claims for Disputed items.</p>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-primary)' }}>Returns History & Claims</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Master ledger of all returns. Use this to file SPF claims for Disputed items.</p>
         </div>
         {selectedHistoryIds.length > 0 && (
           <button
@@ -649,72 +731,158 @@ export default function ReturnsManager() {
         )}
       </div>
 
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: '38px', textAlign: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={history.length > 0 && selectedHistoryIds.length === history.length}
-                  onChange={handleSelectAllHistory}
-                  style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
-                />
-              </th>
-              <th>Date</th>
-              <th>AWB / Reference</th>
-              <th>Display Order ID</th>
-              <th>SKU</th>
-              <th>Type</th>
-              <th>Condition</th>
-              <th>Status</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.length === 0 ? (
-              <tr><td colSpan="9" className="text-center" style={{ padding: '2rem', color: 'var(--text-muted)' }}>No returns history found.</td></tr>
-            ) : (
-              history.map(item => {
-                const isSelected = selectedHistoryIds.includes(item._id);
-                return (
-                  <tr key={item._id} style={{ background: isSelected ? 'rgba(56,189,248,0.08)' : 'transparent' }}>
-                    <td style={{ textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectHistory(item._id)}
-                        style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
-                      />
-                    </td>
-                    <td>{formatDateTimeDDMMYYYY(item.createdAt)}</td>
-                  <td style={{ fontWeight: 'bold' }}>{item.referenceId}</td>
-                  <td style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{item.displayOrderId || '-'}</td>
-                  <td>{item.sku}</td>
-                  <td>
-                    <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: item.returnType === 'RTO' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)', color: item.returnType === 'RTO' ? '#60a5fa' : '#fcd34d' }}>
-                      {item.returnType}
-                    </span>
-                  </td>
-                  <td>{item.condition}</td>
-                  <td>
-                    <span style={{ 
-                      fontSize: '0.75rem', fontWeight: 'bold', padding: '0.2rem 0.5rem', borderRadius: '4px', 
-                      background: item.status === 'STOCKED_IN' ? 'rgba(16,185,129,0.1)' : item.status === 'DISPUTED' ? 'rgba(239,68,68,0.1)' : 'rgba(139,92,246,0.1)', 
-                      color: item.status === 'STOCKED_IN' ? '#34d399' : item.status === 'DISPUTED' ? '#ef4444' : '#a78bfa' 
-                    }}>
-                      {item.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
-                    {item.notes || '-'}
+      {/* ── Standard ERP Unified Filter Toolbar ── */}
+      <ErpUnifiedFilterBar
+        searchQuery={historySearch}
+        onSearchChange={setHistorySearch}
+        searchPlaceholder="Search AWB, Order ID, SKU, Notes..."
+        
+        datePreset={historyDatePreset}
+        onDateChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+          setHistoryDatePreset(p);
+          setHistoryDateStart(ds || '');
+          setHistoryDateEnd(de || '');
+        }}
+        customDateStart={historyCustomStart}
+        customDateEnd={historyCustomEnd}
+        onCustomDateChange={(s, e) => {
+          setHistoryCustomStart(s);
+          setHistoryCustomEnd(e);
+          setHistoryDateStart(s);
+          setHistoryDateEnd(e);
+        }}
+
+        categories={returnsFilterCategories}
+        activeFilters={historyFilters}
+        onFilterChange={setHistoryFilters}
+        filterPlaceholder="Type / Condition / Status"
+        showChips={true}
+        onReset={() => {
+          setHistorySearch('');
+          setHistoryDatePreset('all');
+          setHistoryDateStart('');
+          setHistoryDateEnd('');
+          setHistoryCustomStart('');
+          setHistoryCustomEnd('');
+          setHistoryFilters({});
+        }}
+        rightContent={
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+            Showing <strong>{filteredHistory.length}</strong> of {history.length}
+          </span>
+        }
+      />
+
+      <div className="table-responsive-wrapper" style={{ marginTop: '0.75rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', background: '#ffffff' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ width: '38px', textAlign: 'center', padding: '10px 8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={filteredHistory.length > 0 && selectedHistoryIds.length === filteredHistory.length}
+                    onChange={() => {
+                      if (selectedHistoryIds.length === filteredHistory.length) {
+                        setSelectedHistoryIds([]);
+                      } else {
+                        setSelectedHistoryIds(filteredHistory.map(item => item._id));
+                      }
+                    }}
+                    style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                  />
+                </th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Date</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>AWB / Reference</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Display Order ID</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>SKU</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Type</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Condition</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Status</th>
+                <th style={{ padding: '10px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredHistory.length === 0 ? (
+                <tr>
+                  <td colSpan="9" style={{ padding: '3rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                    No returns matching your search criteria or date filters.
                   </td>
                 </tr>
-              );
-            })
-          )}
-          </tbody>
-        </table>
+              ) : (
+                filteredHistory.map(item => {
+                  const isSelected = selectedHistoryIds.includes(item._id);
+                  const isRTO = item.returnType === 'RTO';
+                  const isStockedIn = item.status === 'STOCKED_IN';
+                  const isDisputed = item.status === 'DISPUTED';
+
+                  return (
+                    <tr 
+                      key={item._id} 
+                      style={{ 
+                        background: isSelected ? 'rgba(37, 99, 235, 0.05)' : 'transparent',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}
+                    >
+                      <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectHistory(item._id)}
+                          style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                        />
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>
+                        {formatDateTimeDDMMYYYY(item.createdAt)}
+                      </td>
+                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                        {item.referenceId}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#2563eb', fontWeight: 700, fontSize: '0.82rem' }}>
+                        {item.displayOrderId || '-'}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#0f172a', fontWeight: 600, fontSize: '0.82rem' }}>
+                        {item.sku}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ 
+                          fontSize: '0.72rem', 
+                          fontWeight: 700,
+                          padding: '3px 8px', 
+                          borderRadius: '6px', 
+                          background: isRTO ? '#eff6ff' : '#fef3c7', 
+                          color: isRTO ? '#1d4ed8' : '#b45309',
+                          border: `1px solid ${isRTO ? '#bfdbfe' : '#fcd34d'}`
+                        }}>
+                          {item.returnType}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#334155', fontSize: '0.82rem', fontWeight: 500 }}>
+                        {item.condition}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ 
+                          fontSize: '0.72rem', 
+                          fontWeight: 800, 
+                          padding: '3px 8px', 
+                          borderRadius: '6px', 
+                          background: isStockedIn ? '#ecfdf5' : isDisputed ? '#fef2f2' : '#f5f3ff', 
+                          color: isStockedIn ? '#15803d' : isDisputed ? '#b91c1c' : '#6d28d9',
+                          border: `1px solid ${isStockedIn ? '#a7f3d0' : isDisputed ? '#fecaca' : '#ddd6fe'}`
+                        }}>
+                          {(item.status || '').replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748b', fontSize: '0.8rem' }}>
+                        {item.notes || '-'}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -3983,20 +3983,20 @@ export default function EliteBillingDepartment({
 
             <div className="ent-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#34d399', marginTop: 2 }}>{fmtINR(periodStats.totalPaid)}</div>
-              <div style={{ fontSize: '0.68rem', color: '#10b981', marginTop: 2 }}>{periodStats.paidCount} Paid Invoices</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#15803d', marginTop: 2 }}>{fmtINR(periodStats.totalPaid)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#15803d', marginTop: 2 }}>{periodStats.paidCount} Paid Invoices</div>
             </div>
 
             <div className="ent-stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Balance</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24', marginTop: 2 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
-              <div style={{ fontSize: '0.68rem', color: '#f59e0b', marginTop: 2 }}>{periodStats.unpaidCount} Pending / Partial</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b45309', marginTop: 2 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
+              <div style={{ fontSize: '0.68rem', color: '#b45309', marginTop: 2 }}>{periodStats.unpaidCount} Pending / Partial</div>
             </div>
 
             <div className="ent-stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f87171', marginTop: 2 }}>{periodStats.overdueCount}</div>
-              <div style={{ fontSize: '0.68rem', color: '#ef4444', marginTop: 2 }}>Payment Passed</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b91c1c', marginTop: 2 }}>{periodStats.overdueCount}</div>
+              <div style={{ fontSize: '0.68rem', color: '#b91c1c', marginTop: 2 }}>Payment Passed</div>
             </div>
           </div>
         </div>
@@ -4026,14 +4026,16 @@ export default function EliteBillingDepartment({
                   onClick={() => setStatusFilter(st)}
                   style={{
                     padding: '0.4rem 0.8rem',
-                    borderRadius: 'var(--radius-sm)',
+                    borderRadius: '8px',
                     fontSize: '0.78rem',
                     fontWeight: 700,
                     border: '1px solid',
-                    borderColor: statusFilter === st ? '#7c3aed' : 'var(--border-light)',
-                    background: statusFilter === st ? 'rgba(124,58,237,0.15)' : 'transparent',
-                    color: statusFilter === st ? '#a78bfa' : 'var(--text-muted)',
-                    cursor: 'pointer'
+                    borderColor: statusFilter === st ? '#2563eb' : '#cbd5e1',
+                    background: statusFilter === st ? '#eff6ff' : '#ffffff',
+                    color: statusFilter === st ? '#1d4ed8' : '#475569',
+                    cursor: 'pointer',
+                    boxShadow: statusFilter === st ? '0 1px 2px rgba(37,99,235,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
                   {st}

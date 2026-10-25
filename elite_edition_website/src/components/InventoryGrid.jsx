@@ -10,6 +10,7 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { api } from '../services/api';
 import DateRangePicker from './DateRangePicker';
+import UnifiedFilterPopover from './common/UnifiedFilterPopover';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 import CatalogManagerModal from './CatalogManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
@@ -268,6 +269,83 @@ export default function InventoryGrid({
       return itemFac.toLowerCase() === facilityFilter.toLowerCase();
     });
   }, [safeItems, facilityFilter]);
+
+  // Standard Unified Filter Popover Categories for Overview Tab
+  const overviewFilterCategories = useMemo(() => [
+    {
+      id: 'facility',
+      label: 'Storage Facility',
+      icon: Warehouse,
+      multi: false,
+      options: [
+        { value: 'All', label: `All Facilities (${safeItems.length})` },
+        ...facilities.map(fac => ({
+          value: fac.name,
+          label: `${fac.name} ${fac.code ? `(${fac.code})` : ''}`
+        }))
+      ]
+    },
+    {
+      id: 'size',
+      label: 'Product Size',
+      icon: SlidersHorizontal,
+      multi: false,
+      options: sizes.map(s => ({
+        value: s,
+        label: s === 'All' ? 'All Sizes' : `Size: ${s}`
+      }))
+    }
+  ], [facilities, safeItems.length, sizes]);
+
+  const overviewFilterValues = useMemo(() => ({
+    facility: facilityFilter ? [facilityFilter] : ['All'],
+    size: sizeFilter ? [sizeFilter] : ['All']
+  }), [facilityFilter, sizeFilter]);
+
+  const handleOverviewFilterChange = useCallback((newVals) => {
+    const newFac = newVals.facility?.[0] || 'All';
+    const newSize = newVals.size?.[0] || 'All';
+    setFacilityFilter(newFac);
+    setSizeFilter(newSize);
+  }, []);
+
+  const handleClearOverviewFilters = useCallback(() => {
+    setFacilityFilter('All');
+    setSizeFilter('All');
+  }, []);
+
+  // Filter Categories for Inward and Outward Tabs
+  const inwardFilterCategories = useMemo(() => [
+    {
+      id: 'facility',
+      label: 'Storage Facility',
+      icon: Warehouse,
+      multi: false,
+      options: [
+        { value: 'All', label: 'All Facilities' },
+        ...facilities.map(fac => ({
+          value: fac.name,
+          label: `${fac.name} ${fac.code ? `(${fac.code})` : ''}`
+        }))
+      ]
+    }
+  ], [facilities]);
+
+  const outwardFilterCategories = useMemo(() => [
+    {
+      id: 'facility',
+      label: 'Storage Facility',
+      icon: Warehouse,
+      multi: false,
+      options: [
+        { value: 'All', label: 'All Facilities' },
+        ...facilities.map(fac => ({
+          value: fac.name,
+          label: `${fac.name} ${fac.code ? `(${fac.code})` : ''}`
+        }))
+      ]
+    }
+  ], [facilities]);
 
   // Overview Metrics (dynamically calculated for selected facility)
   const totalSkus = facilityScopedItems.length;
@@ -1814,49 +1892,15 @@ export default function InventoryGrid({
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
-              {/* Storage Facility Filter Dropdown */}
-              <div style={styles.filterBox}>
-                <Warehouse size={14} color="#0284c7" />
-                <select
-                  value={facilityFilter}
-                  onChange={(e) => setFacilityFilter(e.target.value)}
-                  style={{ ...styles.selectInput, fontWeight: 600, color: facilityFilter !== 'All' ? '#0369a1' : 'inherit' }}
-                  title="Filter inventory by Storage Facility"
-                >
-                  <option value="All">All Facilities ({safeItems.length})</option>
-                  {facilities.map((fac) => {
-                    const facName = fac.name;
-                    const countInFac = safeItems.filter(item => {
-                      const itemFac = (item.facility || '').trim();
-                      if (!itemFac) {
-                        return (item.party && item.party.trim().toLowerCase() === facName.toLowerCase()) || facName === 'Pankhudi';
-                      }
-                      return itemFac.toLowerCase() === facName.toLowerCase();
-                    }).length;
-                    return (
-                      <option key={fac._id || fac.id || facName} value={facName}>
-                        {facName} {fac.code ? `(${fac.code})` : ''} ({countInFac})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {/* Quick Manage Facilities Button removed - centralized in Top Right Settings */}
-
-              <div style={styles.filterBox}>
-                <SlidersHorizontal size={14} color="#64748b" />
-                <select
-                  value={sizeFilter}
-                  onChange={(e) => setSizeFilter(e.target.value)}
-                  style={styles.selectInput}
-                >
-                  {sizes.map((s, idx) => (
-                    <option key={idx} value={s}>{s === 'All' ? 'All Sizes' : `Size: ${s}`}</option>
-                  ))}
-                </select>
-              </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+              <UnifiedFilterPopover
+                categories={overviewFilterCategories}
+                activeFilters={overviewFilterValues}
+                onChange={handleOverviewFilterChange}
+                onClear={handleClearOverviewFilters}
+                placeholder="Filters (Facility / Size)"
+                showChips={true}
+              />
 
               <DateRangePicker
                 preset={overviewPreset}
@@ -1872,7 +1916,6 @@ export default function InventoryGrid({
                   setCustomOverviewEnd(e);
                 }}
               />
-
             </div>
           </div>
 
@@ -2145,27 +2188,22 @@ export default function InventoryGrid({
                 }}
               />
 
-              {/* Storage Facility Filter Dropdown for Inward */}
-              <div style={styles.filterBox}>
-                <Warehouse size={14} color="#0284c7" />
-                <select
-                  value={facilityFilter}
-                  onChange={(e) => {
-                    const newFac = e.target.value;
-                    setFacilityFilter(newFac);
-                    fetchInwardData(inwardDateStart, inwardDateEnd, newFac);
-                  }}
-                  style={{ ...styles.selectInput, fontWeight: 600, color: facilityFilter !== 'All' ? '#0369a1' : 'inherit' }}
-                  title="Filter Inward Stock by Storage Facility"
-                >
-                  <option value="All">All Facilities</option>
-                  {facilities.map((fac) => (
-                    <option key={fac._id || fac.id || fac.name} value={fac.name}>
-                      {fac.name} {fac.code ? `(${fac.code})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Storage Facility Filter Popover for Inward */}
+              <UnifiedFilterPopover
+                categories={inwardFilterCategories}
+                activeFilters={{ facility: [facilityFilter] }}
+                onChange={(vals) => {
+                  const newFac = vals.facility?.[0] || 'All';
+                  setFacilityFilter(newFac);
+                  fetchInwardData(inwardDateStart, inwardDateEnd, newFac);
+                }}
+                onClear={() => {
+                  setFacilityFilter('All');
+                  fetchInwardData(inwardDateStart, inwardDateEnd, 'All');
+                }}
+                placeholder="Storage Facility"
+                showChips={true}
+              />
 
               {/* View Switcher: Challan Wise (Default) vs Individual SKUs */}
               <div style={{
@@ -3039,27 +3077,22 @@ export default function InventoryGrid({
                 }}
               />
 
-              {/* Storage Facility Filter Dropdown for Outward */}
-              <div style={styles.filterBox}>
-                <Warehouse size={14} color="#ea580c" />
-                <select
-                  value={facilityFilter}
-                  onChange={(e) => {
-                    const newFac = e.target.value;
-                    setFacilityFilter(newFac);
-                    fetchOutwardData(outwardDateStart, outwardDateEnd, newFac);
-                  }}
-                  style={{ ...styles.selectInput, fontWeight: 600, color: facilityFilter !== 'All' ? '#c2410c' : 'inherit' }}
-                  title="Filter Outward Stock by Storage Facility"
-                >
-                  <option value="All">All Facilities</option>
-                  {facilities.map((fac) => (
-                    <option key={fac._id || fac.id || fac.name} value={fac.name}>
-                      {fac.name} {fac.code ? `(${fac.code})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Storage Facility Filter Popover for Outward */}
+              <UnifiedFilterPopover
+                categories={outwardFilterCategories}
+                activeFilters={{ facility: [facilityFilter] }}
+                onChange={(vals) => {
+                  const newFac = vals.facility?.[0] || 'All';
+                  setFacilityFilter(newFac);
+                  fetchOutwardData(outwardDateStart, outwardDateEnd, newFac);
+                }}
+                onClear={() => {
+                  setFacilityFilter('All');
+                  fetchOutwardData(outwardDateStart, outwardDateEnd, 'All');
+                }}
+                placeholder="Storage Facility"
+                showChips={true}
+              />
 
               {/* View Switcher: Challan Wise (Default) vs Individual SKUs */}
               <div style={{

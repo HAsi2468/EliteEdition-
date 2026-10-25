@@ -1,11 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../services/api';
 import { uniwareApi } from '../services/uniware';
-import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, RefreshCw, ShoppingBag } from 'lucide-react';
-import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  RefreshCw, 
+  ShoppingBag,
+  Package,
+  MapPin,
+  Clock,
+  RotateCcw
+} from 'lucide-react';
+import { formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
 import { SmartThumbnail } from './common/SmartThumbnail';
+import ErpUnifiedFilterBar from './common/ErpUnifiedFilterBar';
 
 export default function SalesGrid() {
   const [orders, setOrders] = useState([]);
@@ -25,9 +35,67 @@ export default function SalesGrid() {
   const [sortOrder, setSortOrder] = useState('desc');
 
   // Filter States
-  const [skuSearch, setSkuSearch] = useState('');
-  const [citySearch, setCitySearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Standard Date States
+  const [datePreset, setDatePreset] = useState('all');
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
+
+  // Unified Multi-Filter Popover States
+  const [activeFilters, setActiveFilters] = useState({});
+
+  const salesFilterCategories = useMemo(() => [
+    {
+      id: 'status',
+      label: 'Order Status',
+      icon: Clock,
+      multi: true,
+      options: [
+        { value: 'DELIVERED', label: 'Delivered' },
+        { value: 'SHIPPED', label: 'Shipped' },
+        { value: 'IN_TRANSIT', label: 'In Transit' },
+        { value: 'COMPLETE', label: 'Complete' },
+        { value: 'PROCESSING', label: 'Processing' },
+        { value: 'CREATED', label: 'Created' },
+        { value: 'CANCELLED', label: 'Cancelled' },
+        { value: 'RETURNED', label: 'Returned' }
+      ]
+    },
+    {
+      id: 'city',
+      label: 'Top Destinations',
+      icon: MapPin,
+      multi: true,
+      options: [
+        { value: 'Surat', label: 'Surat' },
+        { value: 'Mumbai', label: 'Mumbai' },
+        { value: 'Ahmedabad', label: 'Ahmedabad' },
+        { value: 'Delhi', label: 'Delhi' },
+        { value: 'Bengaluru', label: 'Bengaluru' },
+        { value: 'Jaipur', label: 'Jaipur' },
+        { value: 'Kolkata', label: 'Kolkata' },
+        { value: 'Hyderabad', label: 'Hyderabad' },
+        { value: 'Pune', label: 'Pune' },
+        { value: 'Lucknow', label: 'Lucknow' }
+      ]
+    },
+    {
+      id: 'category',
+      label: 'Category',
+      icon: Package,
+      multi: true,
+      options: [
+        { value: 'Kurti', label: 'Kurti' },
+        { value: 'Suit', label: 'Suit' },
+        { value: 'Saree', label: 'Saree' },
+        { value: 'Fabric', label: 'Fabric' },
+        { value: 'Dress Material', label: 'Dress Material' }
+      ]
+    }
+  ], []);
 
   const syncLiveOrderStatus = async (code) => {
     if (!code) return;
@@ -35,7 +103,6 @@ export default function SalesGrid() {
     try {
       const res = await uniwareApi.getLiveOrderStatus(code);
       if (res && res.success && res.order) {
-        // Update local state
         setOrders(prev => prev.map(o => {
           const orderId = o.saleOrderItemCode || o.saleOrderCode || o.displayorderCode || o.displayOrderCode;
           if (orderId === code) {
@@ -57,26 +124,32 @@ export default function SalesGrid() {
   pageRef.current = page;
   const loadingMoreRef = useRef(false);
 
-  // Debounced filters or search on trigger
   useEffect(() => {
     fetchOrders(false, 1);
     const interval = setInterval(() => fetchOrders(true, pageRef.current), 30000);
     return () => clearInterval(interval);
-  }, [sortField, sortOrder, statusFilter]);
+  }, [sortField, sortOrder, activeFilters, dateStart, dateEnd, searchQuery]);
 
   const fetchOrders = async (isSilent = false, targetPage = 1) => {
     if (!isSilent && orders.length === 0) setLoading(true);
     setError('');
     try {
       const effectivePage = targetPage;
+      const statuses = activeFilters.status || [];
+      const cities = activeFilters.city || [];
+      const categories = activeFilters.category || [];
+
       const params = {
         page: effectivePage,
         limit: 25,
         sortField,
         sortOrder,
-        itemSKUCode: skuSearch.trim() || undefined,
-        shippingAddressCity: citySearch.trim() || undefined,
-        saleOrderStatus: statusFilter === 'All' ? undefined : statusFilter,
+        itemSKUCode: searchQuery.trim() || undefined,
+        shippingAddressCity: cities.length > 0 ? cities.join(',') : undefined,
+        category: categories.length > 0 ? categories.join(',') : undefined,
+        saleOrderStatus: statuses.length > 0 ? statuses.join(',') : undefined,
+        dateStart: dateStart || undefined,
+        endDate: dateEnd || undefined
       };
 
       const res = await api.getSales(params);
@@ -102,14 +175,21 @@ export default function SalesGrid() {
     setLoadingMore(true);
     try {
       const nextPage = pageRef.current + 1;
+      const statuses = activeFilters.status || [];
+      const cities = activeFilters.city || [];
+      const categories = activeFilters.category || [];
+
       const params = {
         page: nextPage,
         limit: 25,
         sortField,
         sortOrder,
-        itemSKUCode: skuSearch.trim() || undefined,
-        shippingAddressCity: citySearch.trim() || undefined,
-        saleOrderStatus: statusFilter === 'All' ? undefined : statusFilter,
+        itemSKUCode: searchQuery.trim() || undefined,
+        shippingAddressCity: cities.length > 0 ? cities.join(',') : undefined,
+        category: categories.length > 0 ? categories.join(',') : undefined,
+        saleOrderStatus: statuses.length > 0 ? statuses.join(',') : undefined,
+        dateStart: dateStart || undefined,
+        endDate: dateEnd || undefined
       };
 
       const res = await api.getSales(params);
@@ -138,315 +218,268 @@ export default function SalesGrid() {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortOrder('desc'); // Default to desc for dates/counts
+      setSortOrder('desc');
     }
     setPage(1);
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
+  const handleClearAllFilters = () => {
+    setSearchQuery('');
+    setDatePreset('all');
+    setDateStart('');
+    setDateEnd('');
+    setCustomDateStart('');
+    setCustomDateEnd('');
+    setActiveFilters({});
     setPage(1);
-    fetchOrders();
   };
-
-  const handleClearFilters = () => {
-    setSkuSearch('');
-    setCitySearch('');
-    setStatusFilter('All');
-    setPage(1);
-    // Fetch immediately
-    setTimeout(() => fetchOrders(), 0);
-  };
-
-  const [showFilters, setShowFilters] = useState(false);
 
   return (
     <div className="glass-panel" style={styles.panel}>
-      {/* Search Header Form: Single Full-Width Search Field with Collapsible Filters */}
-      <form onSubmit={handleSearchSubmit} style={styles.formHeader}>
-        <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <input
-              type="text"
-              value={skuSearch}
-              onChange={(e) => setSkuSearch(e.target.value)}
-              placeholder="Search SKU or orders..."
-              style={{
-                width: '100%',
-                minHeight: '44px',
-                padding: '10px 14px',
-                fontSize: '16px',
-                borderRadius: 'var(--radius)',
-                border: '1px solid var(--border-color)',
-                boxSizing: 'border-box'
-              }}
-            />
+      {/* ── Standard ERP Unified Filter Toolbar ── */}
+      <ErpUnifiedFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={(q) => { setSearchQuery(q); setPage(1); }}
+        searchPlaceholder="Search SKU, Order Code, City..."
+        
+        datePreset={datePreset}
+        onDateChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+          setDatePreset(p);
+          setDateStart(ds || '');
+          setDateEnd(de || '');
+          setPage(1);
+        }}
+        customDateStart={customDateStart}
+        customDateEnd={customDateEnd}
+        onCustomDateChange={(s, e) => {
+          setCustomDateStart(s);
+          setCustomDateEnd(e);
+          setDateStart(s);
+          setDateEnd(e);
+          setPage(1);
+        }}
+
+        categories={salesFilterCategories}
+        activeFilters={activeFilters}
+        onFilterChange={(newFilters) => {
+          setActiveFilters(newFilters);
+          setPage(1);
+        }}
+        filterPlaceholder="Status / City / Category"
+        showChips={true}
+        onReset={handleClearAllFilters}
+        rightContent={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+              <strong>{total}</strong> Orders
+            </span>
+            <button
+              type="button"
+              onClick={() => fetchOrders(false, 1)}
+              className="btn-secondary"
+              style={{ padding: '0.35rem 0.65rem', minHeight: '36px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
+              title="Refresh Sales"
+            >
+              <RefreshCw size={13} className={loading ? 'spin-loader' : ''} />
+              <span>Refresh</span>
+            </button>
           </div>
-          <button 
-            type="button" 
-            onClick={() => setShowFilters(!showFilters)} 
-            className="btn-secondary"
-            style={{ minHeight: '44px', padding: '10px 14px' }}
-          >
-            {showFilters ? 'Hide Filters' : 'Filters'}
-          </button>
-          <button type="submit" className="btn-primary" style={{ minHeight: '44px', padding: '10px 16px' }}>
-            Search
-          </button>
-        </div>
-
-        {/* Collapsible Filter Panel */}
-        {showFilters && (
-          <div style={{
-            marginTop: '10px',
-            padding: '12px',
-            background: 'var(--bg-main)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius)',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '12px',
-            alignItems: 'flex-end'
-          }}>
-            <div>
-              <label style={{ fontSize: 'var(--font-size-meta)', marginBottom: '4px', display: 'block' }}>Destination City</label>
-              <input
-                type="text"
-                value={citySearch}
-                onChange={(e) => setCitySearch(e.target.value)}
-                placeholder="e.g. Surat, Mumbai"
-                style={{ minHeight: '44px', fontSize: '16px' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ fontSize: 'var(--font-size-meta)', marginBottom: '4px', display: 'block' }}>Order Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-                style={{ minHeight: '44px', fontSize: '16px' }}
-              >
-                <option value="All">All Statuses</option>
-                <option value="DELIVERED">Delivered</option>
-                <option value="CANCELLED">Cancelled</option>
-                <option value="RETURNED">Returned</option>
-                <option value="SHIPPED">Shipped</option>
-                <option value="IN_TRANSIT">In Transit</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                type="button" 
-                onClick={handleClearFilters} 
-                className="btn-secondary" 
-                style={{ minHeight: '44px', flex: 1 }}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-        )}
-      </form>
+        }
+      />
 
       {error && <div style={styles.error}>{error}</div>}
 
-      {/* Grid Table */}
-      <div className="table-container" style={styles.tableWrap}>
-        {loading ? (
-          <div style={styles.loadingBox}>
-            <RefreshCw size={28} className="spin-loader" color="var(--primary)" />
-            <p style={{ marginTop: '0.75rem', color: 'var(--text-muted)' }}>Loading sales orders...</p>
-          </div>
-        ) : orders.length === 0 ? (
-          <div style={styles.emptyBox}>
-            <ShoppingBag size={36} color="var(--text-muted)" />
-            <h4 style={{ marginTop: '0.8rem', color: 'var(--text-primary)' }}>No sales orders recorded</h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Check your search criteria or server connection.</p>
-          </div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th onClick={() => handleSort('orderDate')} style={styles.thSort}>
-                  Order Date {sortField === 'orderDate' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('itemSKUCode')} style={styles.thSort}>
-                  SKU Code {sortField === 'itemSKUCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th>Category</th>
-                <th>Destination</th>
-                <th onClick={() => handleSort('totalPrice')} style={styles.thSort} className="text-right">
-                  Price {sortField === 'totalPrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('discount')} style={styles.thSort} className="text-right">
-                  Discount {sortField === 'discount' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('itemSKUCodeCount')} style={styles.thSort} className="text-center">
-                  Qty {sortField === 'itemSKUCodeCount' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th className="text-center">Status</th>
-                <th className="text-center">Sync Live</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders
-                .filter(order => matchSearchQuery(order, skuSearch || citySearch, ['itemSKUCode', 'shippingAddressCity', 'shippingAddressState', 'category', 'saleOrderStatus', 'saleOrderItemCode', 'saleOrderCode']))
-                .map((order, idx) => {
-                const status = (order.saleOrderStatus || '').toUpperCase();
-                let statusClass = 'badge-warning';
-                if (status === 'DELIVERED') statusClass = 'badge-success';
-                if (status === 'CANCELLED' || status === 'RETURNED') statusClass = 'badge-danger';
-                
-                return (
-                  <tr key={order.id || idx}>
-                    <td>
-                      {formatDateTimeDDMMYYYY(order.orderDate)}
-                    </td>
-                    <td>
-                      <div style={styles.skuCell}>
-                        <SmartThumbnail
-                          src={order.productImage}
-                          alt={order.itemSKUCode || 'SKU'}
-                          title={order.itemSKUCode || 'Product'}
-                          size="sm"
-                          aspectRatio="1:1"
-                          category="catalog"
-                          metadata={{
-                            SKU: order.itemSKUCode,
-                            Category: order.category || 'N/A',
-                            OrderNo: order.saleOrderCode || order.id || 'N/A',
-                            City: order.shippingAddressCity || 'N/A'
-                          }}
-                        />
-                        <span style={styles.skuText}>{order.itemSKUCode}</span>
-                      </div>
-                    </td>
-                    <td>{order.category || 'N/A'}</td>
-                    <td>
-                      <div style={styles.destCell}>
-                        <div style={styles.cityText}>{order.shippingAddressCity || 'N/A'}</div>
-                        <div style={styles.stateText}>{order.shippingAddressState || 'N/A'} {order.shippingAddressPincode}</div>
-                      </div>
-                    </td>
-                    <td className="text-right">
-                      {order.totalPrice ? `Rs. ${parseFloat(order.totalPrice).toFixed(2)}` : 'Rs. 0.00'}
-                    </td>
-                    <td className="text-right">
-                      {order.discount ? `Rs. ${parseFloat(order.discount).toFixed(2)}` : 'Rs. 0.00'}
-                    </td>
-                    <td className="text-center">
-                      <span style={styles.qtyBadge}>{order.itemSKUCodeCount || 1}</span>
-                    </td>
-                    <td className="text-center">
-                      <span className={`badge ${statusClass}`}>{order.saleOrderStatus || 'N/A'}</span>
-                    </td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        onClick={() => syncLiveOrderStatus(order.saleOrderItemCode || order.saleOrderCode || order.displayorderCode || order.displayOrderCode)}
-                        disabled={!!syncingOrderId}
-                        className="btn-secondary"
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', height: '24px' }}
-                      >
-                        <RefreshCw size={11} className={syncingOrderId === (order.saleOrderItemCode || order.saleOrderCode || order.displayorderCode || order.displayOrderCode) ? 'spin-loader' : ''} />
-                        <span>Sync</span>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+      {/* Grid Table with Smooth Touch Scroll */}
+      <div className="table-responsive-wrapper" style={styles.tableWrap}>
+        <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {loading && orders.length === 0 ? (
+            <div style={styles.loadingBox}>
+              <RefreshCw size={28} className="spin-loader" color="var(--primary)" />
+              <p style={{ marginTop: '0.75rem', color: 'var(--text-muted)' }}>Loading sales orders...</p>
+            </div>
+          ) : orders.length === 0 ? (
+            <div style={styles.emptyBox}>
+              <ShoppingBag size={36} color="var(--text-muted)" />
+              <h4 style={{ marginTop: '0.8rem', color: '#0f172a', fontWeight: 700 }}>No sales orders recorded</h4>
+              <p style={{ fontSize: '0.82rem', color: '#64748b' }}>Check your search criteria or date filter selection.</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', background: '#ffffff' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <th onClick={() => handleSort('orderDate')} style={styles.thSort}>
+                    Order Date {sortField === 'orderDate' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th onClick={() => handleSort('itemSKUCode')} style={styles.thSort}>
+                    SKU Code {sortField === 'itemSKUCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th>Category</th>
+                  <th>Destination</th>
+                  <th onClick={() => handleSort('totalPrice')} style={styles.thSort} className="text-right">
+                    Price {sortField === 'totalPrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th onClick={() => handleSort('discount')} style={styles.thSort} className="text-right">
+                    Discount {sortField === 'discount' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th onClick={() => handleSort('itemSKUCodeCount')} style={styles.thSort} className="text-center">
+                    Qty {sortField === 'itemSKUCodeCount' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th className="text-center">Status</th>
+                  <th className="text-center">Sync Live</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders
+                  .filter(order => matchSearchQuery(order, searchQuery, ['itemSKUCode', 'shippingAddressCity', 'shippingAddressState', 'category', 'saleOrderStatus', 'saleOrderItemCode', 'saleOrderCode']))
+                  .map((order, idx) => {
+                  const status = (order.saleOrderStatus || '').toUpperCase();
+                  let statusBg = '#eff6ff';
+                  let statusColor = '#1d4ed8';
+                  let statusBorder = '#bfdbfe';
+
+                  if (status === 'DELIVERED' || status === 'COMPLETE') {
+                    statusBg = '#ecfdf5';
+                    statusColor = '#065f46';
+                    statusBorder = '#a7f3d0';
+                  } else if (status === 'CANCELLED' || status === 'RETURNED') {
+                    statusBg = '#fef2f2';
+                    statusColor = '#991b1b';
+                    statusBorder = '#fecaca';
+                  } else if (status === 'SHIPPED' || status === 'IN_TRANSIT') {
+                    statusBg = '#fffbeb';
+                    statusColor = '#78350f';
+                    statusBorder = '#fcd34d';
+                  }
+                  
+                  return (
+                    <tr key={order.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ color: '#334155', fontWeight: 600 }}>
+                        {formatDateTimeDDMMYYYY(order.orderDate)}
+                      </td>
+                      <td>
+                        <div style={styles.skuCell}>
+                          <SmartThumbnail
+                            src={order.productImage}
+                            alt={order.itemSKUCode || 'SKU'}
+                            title={order.itemSKUCode || 'Product'}
+                            size="sm"
+                            aspectRatio="1:1"
+                            category="catalog"
+                            metadata={{
+                              SKU: order.itemSKUCode,
+                              Category: order.category || 'N/A',
+                              OrderNo: order.saleOrderCode || order.id || 'N/A',
+                              City: order.shippingAddressCity || 'N/A'
+                            }}
+                          />
+                          <span style={styles.skuText}>{order.itemSKUCode}</span>
+                        </div>
+                      </td>
+                      <td style={{ color: '#475569' }}>{order.category || 'N/A'}</td>
+                      <td>
+                        <div style={styles.destCell}>
+                          <div style={styles.cityText}>{order.shippingAddressCity || 'N/A'}</div>
+                          <div style={styles.stateText}>{order.shippingAddressState || 'N/A'} {order.shippingAddressPincode}</div>
+                        </div>
+                      </td>
+                      <td className="text-right" style={{ fontWeight: 700, color: '#0f172a' }}>
+                        {order.totalPrice ? `₹${parseFloat(order.totalPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
+                      </td>
+                      <td className="text-right" style={{ color: '#64748b' }}>
+                        {order.discount ? `₹${parseFloat(order.discount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
+                      </td>
+                      <td className="text-center">
+                        <span style={styles.qtyBadge}>{order.itemSKUCodeCount || 1}</span>
+                      </td>
+                      <td className="text-center">
+                        <span style={{
+                          display: 'inline-block',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          background: statusBg,
+                          color: statusColor,
+                          border: `1px solid ${statusBorder}`,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {order.saleOrderStatus || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => syncLiveOrderStatus(order.saleOrderItemCode || order.saleOrderCode || order.displayorderCode || order.displayOrderCode)}
+                          disabled={!!syncingOrderId}
+                          className="btn-secondary"
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', height: '26px' }}
+                        >
+                          <RefreshCw size={12} className={syncingOrderId === (order.saleOrderItemCode || order.saleOrderCode) ? 'spin-loader' : ''} />
+                          <span>Sync</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      {/* Infinite Scroll & Modern Pagination Bar */}
+      {/* Infinite Scroll Trigger */}
       <InfiniteScrollPagination
+        loading={loadingMore}
         hasMore={page < totalPages}
-        loading={loading && orders.length === 0}
-        loadingMore={loadingMore}
         onLoadMore={loadMore}
-        page={page}
-        pages={totalPages}
-        total={total}
-        currentCount={orders.length}
-        itemName="sales orders"
-        onFirstPage={() => fetchOrders(false, 1)}
-        onPreviousPage={() => fetchOrders(false, Math.max(1, page - 1))}
-        onNextPage={() => fetchOrders(false, Math.min(totalPages, page + 1))}
-        onLastPage={() => fetchOrders(false, totalPages)}
+        totalRecords={total}
+        loadedRecords={orders.length}
       />
+
+      {/* Fallback pagination */}
+      {totalPages > 1 && (
+        <div style={styles.pagination}>
+          <button 
+            type="button"
+            disabled={page <= 1} 
+            onClick={() => { const p = Math.max(1, page - 1); setPage(p); fetchOrders(false, p); }}
+            className="btn-secondary"
+            style={styles.pagBtn}
+          >
+            <ChevronLeft size={16} /> Prev
+          </button>
+          <span style={styles.pageIndicator}>
+            Page {page} of {totalPages} ({total} Orders)
+          </span>
+          <button 
+            type="button"
+            disabled={page >= totalPages} 
+            onClick={() => { const p = Math.min(totalPages, page + 1); setPage(p); fetchOrders(false, p); }}
+            className="btn-secondary"
+            style={styles.pagBtn}
+          >
+            Next <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 const styles = {
   panel: {
-    padding: '12px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    width: '100%',
-    boxSizing: 'border-box',
-    minHeight: '450px',
-  },
-  formHeader: {
-    width: '100%',
-  },
-  filtersRow: {
-    display: 'flex',
-    gap: '0.8rem',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  searchBox: {
-    position: 'relative',
-    flex: 1,
-    minWidth: '160px',
-    maxWidth: '280px',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  searchIcon: {
-    position: 'absolute',
-    left: '0.75rem',
-  },
-  searchInput: {
-    width: '100%',
-    paddingLeft: '2.2rem',
-    paddingTop: '0.5rem',
-    paddingBottom: '0.5rem',
-  },
-  filterSelectWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    background: 'rgba(17, 24, 39, 0.6)',
-    border: '1px solid var(--border-light)',
-    padding: '0 0.5rem',
-    borderRadius: 'var(--radius-sm)',
-  },
-  selectInput: {
-    border: 'none',
-    background: 'none',
-    padding: '0.5rem 0.5rem',
-    fontSize: '0.85rem',
-    color: '#e5e7eb',
-    outline: 'none',
-    cursor: 'pointer',
-  },
-  btnRow: {
-    display: 'flex',
-    gap: '0.5rem',
-  },
-  actionBtn: {
-    padding: '0.5rem 1rem',
-    fontSize: '0.8rem',
+    padding: '1.25rem',
+    background: '#ffffff',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 1px 3px rgba(15,23,42,0.04)'
   },
   tableWrap: {
-    flex: 1,
-    position: 'relative',
+    marginTop: '0.5rem',
+    background: '#ffffff',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    overflow: 'hidden'
   },
   loadingBox: {
     display: 'flex',
@@ -466,46 +499,46 @@ const styles = {
   thSort: {
     cursor: 'pointer',
     userSelect: 'none',
+    padding: '10px 14px',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em'
   },
   skuCell: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
   },
-  productThumbnail: {
-    width: '28px',
-    height: '28px',
-    borderRadius: '4px',
-    objectFit: 'cover',
-    background: 'rgba(255, 255, 255, 0.02)',
-    border: '1px solid var(--border-light)',
-  },
   skuText: {
     fontFamily: 'monospace',
     fontSize: '0.8rem',
-    color: 'var(--text-primary)',
-    fontWeight: '600',
+    color: '#0f172a',
+    fontWeight: '700',
   },
   destCell: {
     display: 'flex',
     flexDirection: 'column',
   },
   cityText: {
-    fontWeight: '500',
-    color: 'var(--text-primary)',
+    fontWeight: '600',
+    color: '#0f172a',
+    fontSize: '0.82rem'
   },
   stateText: {
-    fontSize: '0.7rem',
-    color: 'var(--text-muted)',
+    fontSize: '0.72rem',
+    color: '#64748b',
     marginTop: '2px',
   },
   qtyBadge: {
     fontSize: '0.8rem',
-    fontWeight: '600',
-    color: 'var(--primary)',
-    background: 'rgba(6, 182, 212, 0.1)',
+    fontWeight: '700',
+    color: '#1d4ed8',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
     padding: '0.15rem 0.45rem',
-    borderRadius: '4px',
+    borderRadius: '6px',
   },
   pagination: {
     display: 'flex',
@@ -513,7 +546,7 @@ const styles = {
     alignItems: 'center',
     marginTop: '1rem',
     paddingTop: '1rem',
-    borderTop: '1px solid var(--border-light)',
+    borderTop: '1px solid #e2e8f0',
   },
   pagBtn: {
     padding: '0.4rem 0.8rem',
@@ -524,14 +557,17 @@ const styles = {
   },
   pageIndicator: {
     fontSize: '0.8rem',
-    color: 'var(--text-muted)',
+    color: '#64748b',
+    fontWeight: 600
   },
   error: {
-    background: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
-    borderRadius: 'var(--radius-sm)',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
     padding: '0.75rem',
-    color: '#fca5a5',
-    fontSize: '0.8rem',
+    color: '#991b1b',
+    fontSize: '0.82rem',
+    marginBottom: '0.75rem',
+    fontWeight: 600
   },
 };
