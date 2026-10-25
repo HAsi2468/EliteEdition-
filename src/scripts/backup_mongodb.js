@@ -70,14 +70,20 @@ async function performBackup() {
         try {
           const cursor = db.collection(col.name).find({});
           let isFirstDoc = true;
+          let docCount = 0;
           for await (const doc of cursor) {
             const prefix = isFirstDoc ? '      ' : ',\n      ';
             isFirstDoc = false;
             gzip.write(prefix + JSON.stringify(doc));
+            docCount++;
+            if (docCount % 50 === 0) {
+              await new Promise(r => setImmediate(r));
+            }
           }
         } catch (err) {
           logger.warn(`[Backup Script] Warning reading collection ${col.name}: ${err.message}`);
         }
+        await new Promise(r => setImmediate(r));
         gzip.write(`\n    ]${isLast ? '' : ','}\n`);
       }
       gzip.write('  }\n}\n');

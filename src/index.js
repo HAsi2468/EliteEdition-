@@ -65,13 +65,14 @@ const { syncCommunicationGroups } = require('./utils/syncCommunicationGroups');
 const { checkOverdueTasks } = require('./controllers/task.controller');
 const { startDbBackupScheduler } = require('./schedule/dbBackupScheduler');
 
-// Start automated daily database backup to Cloudflare R2
-startDbBackupScheduler();
-
-// Run overdue task check every 60 seconds
-setInterval(() => {
-  checkOverdueTasks(io).catch(err => console.error('Overdue timer check failed:', err));
-}, 60000);
+// Start automated daily database backup & overdue task timer on primary cluster instance only
+const isPrimaryInstance = !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === '0';
+if (isPrimaryInstance) {
+  startDbBackupScheduler();
+  setInterval(() => {
+    checkOverdueTasks(io).catch(err => console.error('Overdue timer check failed:', err));
+  }, 60000);
+}
 
 const port = process.env.PORT || 3001;
 const host = process.env.HOST || '127.0.0.1';

@@ -20,6 +20,16 @@ const getMemberIdString = (m) => {
 const groupsCache = new Map();
 const invalidateGroupsCache = () => { groupsCache.clear(); };
 
+// High-performance in-memory cache for group messages with 8s TTL
+const groupMessagesCache = new Map();
+const invalidateGroupMessagesCache = (groupId) => {
+  if (groupId) {
+    groupMessagesCache.delete(String(groupId));
+  } else {
+    groupMessagesCache.clear();
+  }
+};
+
 /**
  * Get all communication groups accessible to the user
  */
@@ -295,28 +305,48 @@ const getGroupMessages = async (req, res) => {
       }
     }
 
-    const [total, messages] = await Promise.all([
-      ChatMessage.countDocuments(query),
-      ChatMessage.find(query)
-        .populate({ path: 'senderId', select: 'name username email role', options: { strictPopulate: false } })
-        .populate({ path: 'mentions', select: 'name username email', options: { strictPopulate: false } })
-        .populate({ path: 'pinnedBy', select: 'name username email', options: { strictPopulate: false } })
-        .populate({ path: 'pollMeta.options.votes', select: 'name username email', options: { strictPopulate: false } })
-        .populate({
-          path: 'reactions.user',
-          select: 'name username email',
-          options: { strictPopulate: false }
-        })
-        .populate({
-          path: 'replyTo',
-          populate: { path: 'senderId', select: 'name username email', options: { strictPopulate: false } },
-          options: { strictPopulate: false }
-        })
-        .sort({ _id: -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .lean()
-    ]);
+    const isDefaultFirstPage = pageNum === 1 && !searchTerm && !before && !beforeSeq && !after && !afterSeq && !msgType;
+    const cacheKey = `${String(groupId)}_${limitNum}`;
+
+    if (isDefaultFirstPage) {
+      const cached = groupMessagesCache.get(cacheKey);
+      if (cached && (Date.now() - cached.time < 8000)) {
+        return res.json({
+          success: true,
+          data: cached.data,
+          pagination: cached.pagination,
+          cached: true
+        });
+      }
+    }
+
+    const messagesPromise = ChatMessage.find(query)
+      .populate({ path: 'senderId', select: 'name username email role', options: { strictPopulate: false } })
+      .populate({ path: 'mentions', select: 'name username email', options: { strictPopulate: false } })
+      .populate({ path: 'pinnedBy', select: 'name username email', options: { strictPopulate: false } })
+      .populate({ path: 'pollMeta.options.votes', select: 'name username email', options: { strictPopulate: false } })
+      .populate({
+        path: 'reactions.user',
+        select: 'name username email',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'name username email', options: { strictPopulate: false } },
+        options: { strictPopulate: false }
+      })
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .maxTimeMS(3000)
+      .lean();
+
+    // Avoid expensive collection-wide count on default first-page load:
+    const countPromise = isDefaultFirstPage
+      ? ChatMessage.countDocuments(query).maxTimeMS(600).catch(() => 50)
+      : ChatMessage.countDocuments(query).maxTimeMS(1200).catch(() => 100);
+
+    const [total, messages] = await Promise.all([countPromise, messagesPromise]);
 
     // Return in monotonic chronological order (ascending by timestamp and _id)
     messages.sort((a, b) => {
@@ -326,15 +356,29 @@ const getGroupMessages = async (req, res) => {
       return String(a._id).localeCompare(String(b._id));
     });
 
+    const paginationData = {
+      total: total || messages.length,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil((total || messages.length) / limitNum)
+    };
+
+    if (isDefaultFirstPage) {
+      groupMessagesCache.set(cacheKey, {
+        time: Date.now(),
+        data: messages,
+        pagination: paginationData
+      });
+      if (groupMessagesCache.size > 200) {
+        const firstKey = groupMessagesCache.keys().next().value;
+        groupMessagesCache.delete(firstKey);
+      }
+    }
+
     res.json({
       success: true,
       data: messages,
-      pagination: {
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum)
-      }
+      pagination: paginationData
     });
   } catch (error) {
     console.error('[getGroupMessages ERROR]:', error.message, error.stack);
@@ -782,6 +826,7 @@ const postGroupMessage = async (req, res) => {
     }
 
     invalidateGroupsCache();
+    invalidateGroupMessagesCache(groupId);
     res.json({ success: true, data: populatedMessage });
   } catch (error) {
     if (error.code === 11000 && clientMsgId) {
@@ -928,6 +973,7 @@ const acknowledgeMessage = async (req, res) => {
 
 let dmUsersCache = null;
 let dmUsersCacheTime = 0;
+let dmUsersInFlightPromise = null;
 
 /**
  * Get active users list for starting private 1-on-1 direct messages
@@ -936,22 +982,41 @@ const getUsersForDM = async (req, res) => {
   try {
     const rawUserId = req.user ? req.user._id : req.query.userId;
     const now = Date.now();
-    let allUsers = dmUsersCache;
 
-    if (!allUsers || now - dmUsersCacheTime > 60000) {
-      allUsers = await User.find({})
-        .select('_id name username email role department avatarUrl')
-        .maxTimeMS(2000)
-        .lean();
-      if (Array.isArray(allUsers)) {
-        allUsers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        dmUsersCache = allUsers;
-        dmUsersCacheTime = now;
-      } else {
-        allUsers = [];
+    if (!dmUsersCache || (now - dmUsersCacheTime > 120000)) {
+      if (!dmUsersInFlightPromise) {
+        dmUsersInFlightPromise = User.find({})
+          .select('_id name username email role department avatarUrl')
+          .maxTimeMS(3000)
+          .lean()
+          .then((users) => {
+            if (Array.isArray(users)) {
+              // Strip massive base64 URIs to keep payload lightweight (< 25 KB)
+              users = users.map((u) => {
+                let safeAvatar = u.avatarUrl;
+                if (safeAvatar && typeof safeAvatar === 'string' && safeAvatar.length > 2048 && safeAvatar.startsWith('data:')) {
+                  safeAvatar = '';
+                }
+                return { ...u, avatarUrl: safeAvatar };
+              });
+              users.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+              dmUsersCache = users;
+              dmUsersCacheTime = Date.now();
+            }
+            return dmUsersCache || [];
+          })
+          .catch((err) => {
+            console.error('[getUsersForDM DB error]:', err.message);
+            return dmUsersCache || [];
+          })
+          .finally(() => {
+            dmUsersInFlightPromise = null;
+          });
       }
+      await dmUsersInFlightPromise;
     }
 
+    const allUsers = dmUsersCache || [];
     const filtered = rawUserId
       ? allUsers.filter(u => String(u._id) !== String(rawUserId))
       : allUsers;
@@ -1212,6 +1277,8 @@ const toggleReaction = async (req, res) => {
       });
     }
 
+    invalidateGroupMessagesCache(message.roomId);
+
     return res.json({
       success: true,
       action,
@@ -1264,6 +1331,8 @@ const togglePinMessage = async (req, res) => {
         pinnedAt: message.pinnedAt
       });
     }
+
+    invalidateGroupMessagesCache(message.roomId);
 
     return res.json({
       success: true,
@@ -1678,6 +1747,8 @@ const deleteMessage = async (req, res) => {
       });
     }
 
+    invalidateGroupMessagesCache(message.roomId);
+
     res.json({
       success: true,
       message: 'Message deleted successfully',
@@ -1747,6 +1818,8 @@ const editMessage = async (req, res) => {
         roomId: targetRoomId
       });
     }
+
+    invalidateGroupMessagesCache(targetRoomId);
 
     res.json({
       success: true,
@@ -1841,6 +1914,7 @@ const markGroupAsRead = async (req, res) => {
     }
 
     invalidateGroupsCache();
+    invalidateGroupMessagesCache(groupId);
     return res.json({
       success: true,
       message: 'Room marked as read',
@@ -1874,6 +1948,8 @@ module.exports = {
   toggleReaction,
   togglePinMessage,
   markGroupAsRead,
+  invalidateGroupsCache,
+  invalidateGroupMessagesCache,
   purgeOrphanChatFiles,
   forceReloadAllUsers,
   clearAllData,

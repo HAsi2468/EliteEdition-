@@ -14,12 +14,17 @@ const mongoSanitize = require('express-mongo-sanitize');
 const { authLimiter, apiLimiter } = require('./middlewares/rateLimiter');
 const { createCspMiddleware } = require('./middlewares/csp');
 const routes = require('./routes/v1');
-require('./schedule/fetchFromAPISScheduler');
-require('./schedule/myntraScheduler').startMyntraScheduler();
-require('./schedule/eodExecutiveBriefingScheduler').startEodExecutiveBriefingScheduler();
-require('./schedule/infrastructureBillingScheduler').startInfrastructureBillingScheduler();
-require('./schedule/catalogImageSyncScheduler').startCatalogImageSyncScheduler();
-require('./schedule/chatOrphanCleanupScheduler').startChatOrphanCleanupScheduler();
+// In PM2 cluster mode, only execute background schedulers on the primary instance (instance 0)
+// This prevents multiple cluster workers from racing and saturating CPU/MongoDB with duplicate jobs
+const isPrimaryInstance = !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === '0';
+if (isPrimaryInstance) {
+  require('./schedule/fetchFromAPISScheduler');
+  require('./schedule/myntraScheduler').startMyntraScheduler();
+  require('./schedule/eodExecutiveBriefingScheduler').startEodExecutiveBriefingScheduler();
+  require('./schedule/infrastructureBillingScheduler').startInfrastructureBillingScheduler();
+  require('./schedule/catalogImageSyncScheduler').startCatalogImageSyncScheduler();
+  require('./schedule/chatOrphanCleanupScheduler').startChatOrphanCleanupScheduler();
+}
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const userModel = require('./db/models/user.model');

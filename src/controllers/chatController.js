@@ -512,6 +512,12 @@ async function dispatchChatMessage({
       });
     }
 
+    try {
+      const commCtrl = require('./communication.controller');
+      if (commCtrl.invalidateGroupMessagesCache) commCtrl.invalidateGroupMessagesCache(strRoomId);
+      if (commCtrl.invalidateGroupsCache) commCtrl.invalidateGroupsCache();
+    } catch (_) {}
+
     broadcast.emit('receive-message', populatedMessage);
 
     // Selective Web Push for background users
