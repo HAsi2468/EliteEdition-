@@ -1507,10 +1507,13 @@ export default function App() {
     setLoading(true);
     setError('');
     try {
+      // Only load product catalog if currently navigating to inventory/catalog screens
+      const isCatalogNeeded = activeTabRef.current === 'inventory' || activeTabRef.current === 'catalog';
+
       // Run requests in parallel with pagination limits to prevent 504 timeouts
       const [inventoryResult, catalogResult, salesResult, partiesResult, userResult] = await Promise.allSettled([
         api.getInventory(),
-        api.getProductsCatalog({ limit: 2000, forceRefresh: true }),
+        isCatalogNeeded ? api.getProductsCatalog({ limit: 500 }) : Promise.resolve([]),
         api.getSales({ limit: 50 }),
         api.getParties({ limit: 50 }),
         api.refreshCurrentUser(),
@@ -1523,8 +1526,10 @@ export default function App() {
       if (inventoryResult.status === 'fulfilled') {
         setItems(inventoryResult.value || []);
       }
-      if (catalogResult.status === 'fulfilled') {
+      if (catalogResult.status === 'fulfilled' && isCatalogNeeded) {
         setCatalogItems(catalogResult.value || []);
+      } else if (!isCatalogNeeded) {
+        // Keep existing catalog items if already loaded
       } else {
         console.warn('Failed to fetch product catalog:', catalogResult.reason);
       }

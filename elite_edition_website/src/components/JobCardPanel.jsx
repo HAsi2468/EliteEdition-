@@ -42,32 +42,42 @@ import QRCode from 'qrcode';
 import { buildTpAndWasteGrid } from '../utils/jobCardTpHelper';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 
-export function JobCardQrBadge({ card, size = 32 }) {
-  const [qrUrl, setQrUrl] = useState('');
+const qrCodeCache = new Map();
+
+export const JobCardQrBadge = React.memo(function JobCardQrBadge({ card, size = 32 }) {
+  const cleanJobNo = String(card?.jobNo || '').replace(/^JC-/i, '').replace(/^JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+  const id = cleanJobNo || card?._id || card?.id;
+  const [qrUrl, setQrUrl] = useState(() => (id ? qrCodeCache.get(id) || '' : ''));
+
   useEffect(() => {
-    let active = true;
-    const cleanJobNo = String(card?.jobNo || '').replace(/^JC-/i, '').replace(/^JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
-    const id = cleanJobNo || card?._id || card?.id;
     if (!id) return;
+    if (qrCodeCache.has(id)) {
+      setQrUrl(qrCodeCache.get(id));
+      return;
+    }
+    let active = true;
     const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://erp.eliteedition.in';
     const baseUrl = origin.includes('localhost') ? 'https://erp.eliteedition.in' : origin;
     const targetUrl = `${baseUrl}/verify/jobcard/${encodeURIComponent(id)}`;
     QRCode.toDataURL(targetUrl, { width: 120, margin: 1, errorCorrectionLevel: 'M' }).then(url => {
+      qrCodeCache.set(id, url);
       if (active) setQrUrl(url);
     }).catch(() => {});
     return () => { active = false; };
-  }, [card?.jobNo, card?._id, card?.id]);
+  }, [id]);
 
   if (!qrUrl) return <div style={{ width: size, height: size }} />;
   return (
     <img
       src={qrUrl}
       alt="Job Card QR"
+      loading="lazy"
+      decoding="async"
       style={{ width: `${size}px`, height: `${size}px`, objectFit: 'contain' }}
       title="Scan to view full Job Card"
     />
   );
-}
+});
 
 const normalizeFabricName = (val, pannaVal = '') => {
   if (!val) return '';
@@ -3456,6 +3466,413 @@ const rowStyle = {
   display:'flex', flexWrap:'wrap', gap:'0.8rem', marginBottom:'0.5rem',
 };
 
+const JobCardGridItem = React.memo(function JobCardGridItem({
+  card: c,
+  department,
+  handleSendToBilling,
+  triggerJobCardPrint,
+  openEdit,
+  setPreviewCard,
+  setHistoryModalCard,
+  handleOpenShareModal,
+  handleDelete
+}) {
+  const pStatus = (c.printStatus || '').toLowerCase();
+  const isPrintDone = pStatus.includes('done') || parseFloat(c.printMtr || 0) > 0;
+  const fStatus = (c.fusingStatus || '').toLowerCase();
+  const fusedMtr = parseFloat(c.fusingMtr || c.freshMtr || 0);
+  const isFusingDone = fStatus.includes('done');
+  const isReadyForChallan = isPrintDone && (isFusingDone || fusedMtr > 0);
+  const isGrando = c.machineName === 'GRANDO';
+
+  return (
+    <div
+      className="glass-panel job-card-item"
+      style={{
+        padding: '1.15rem 1.25rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        borderRadius: '16px',
+        background: 'var(--bg-card, #ffffff)',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+        position: 'relative'
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(15,23,42,0.08), 0 8px 10px -6px rgba(15,23,42,0.04)';
+        e.currentTarget.style.borderColor = '#bfdbfe';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.04)';
+        e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
+      }}
+    >
+      {/* Header Row 1: Job Number & Machine (Left) + Urgent & Status (Right) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+          flexWrap: 'wrap'
+        }}
+      >
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            flexShrink: 0
+          }}
+        >
+          <JobCardTooltip card={c} style={{ flexShrink: 0 }}>
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize: '0.96rem',
+                color: 'var(--primary, #2563eb)',
+                cursor: 'pointer',
+                letterSpacing: '-0.01em',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              #{c.jobNo}
+            </span>
+          </JobCardTooltip>
+
+          {c.machineName && (
+            <span
+              style={{
+                display: 'inline-block',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                background: isGrando ? '#eff6ff' : '#f5f3ff',
+                color: isGrando ? '#1d4ed8' : '#6d28d9',
+                border: `1px solid ${isGrando ? '#bfdbfe' : '#ddd6fe'}`
+              }}
+            >
+              {c.machineName}
+            </span>
+          )}
+        </div>
+
+        {/* Right: Urgent Indicator & Operational Status */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            flexShrink: 0
+          }}
+        >
+          {c.emergencyNotes && c.emergencyNotes.trim() && (
+            <span
+              style={{
+                flexShrink: 0,
+                padding: '2px 7px',
+                borderRadius: '6px',
+                fontSize: '0.64rem',
+                fontWeight: 800,
+                background: '#fef2f2',
+                color: '#dc2626',
+                border: '1px solid #fecaca',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              URGENT
+            </span>
+          )}
+
+          <StatusBadge status={c.status} />
+        </div>
+      </div>
+
+      {/* Header Row 2: Production Stage Pill & Date */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+        <WorkflowStageBadge card={c} />
+        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted, #64748b)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          📅 {formatDateDDMMYYYY(c.date)}
+        </span>
+      </div>
+
+      {/* Segmented Production Stage Progress Bar */}
+      <div style={{ margin: '4px 0 6px 0', width: '100%' }}>
+        <JobStageProgressBar
+          card={c}
+          department={department}
+        />
+      </div>
+
+      {/* Highlight Banner: Party & Design Name */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.6rem',
+          background: 'var(--bg-subtle, #f8fafc)',
+          border: '1px solid var(--border-light, #e2e8f0)',
+          borderRadius: '10px',
+          padding: '0.55rem 0.8rem'
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Party
+          </span>
+          <span
+            style={{
+              fontSize: '0.92rem',
+              fontWeight: 800,
+              color: 'var(--text-primary, #0f172a)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            title={c.party || '—'}
+          >
+            {c.party || '—'}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Design
+          </span>
+          <span
+            style={{
+              fontSize: '0.92rem',
+              fontWeight: 800,
+              color: 'var(--primary, #2563eb)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            title={c.designName || c.designNo || '—'}
+          >
+            {c.designName || c.designNo || '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Fabric Spec Row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
+        <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 700, flexShrink: 0, textTransform: 'uppercase', fontSize: '0.66rem' }}>
+          Fabric:
+        </span>
+        <span
+          style={{
+            color: 'var(--text-primary, #1e293b)',
+            fontWeight: 600,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+          title={c.fabric || '—'}
+        >
+          {c.fabric || '—'}
+        </span>
+      </div>
+
+      {/* Personnel Row: Designer & Color Matching */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.76rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: 0 }}>
+          <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, flexShrink: 0 }}>Designer:</span>
+          <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.designer || '—'}>
+            {c.designer || '—'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: 0 }}>
+          <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, flexShrink: 0 }}>C.Match:</span>
+          <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.colourMatching || '—'}>
+            {c.colourMatching || '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Key Production Metrics Strip: Total Mtr & Expected Time */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+        <div
+          style={{
+            background: 'var(--bg-subtle, #f8fafc)',
+            border: '1px solid var(--border-light, #e2e8f0)',
+            borderRadius: '8px',
+            padding: '0.4rem 0.65rem',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>
+            Total Mtr
+          </span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary, #0f172a)' }}>
+            {c.totalMtr ? `${c.totalMtr} Mtr` : '—'}
+          </span>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--bg-subtle, #f8fafc)',
+            border: '1px solid var(--border-light, #e2e8f0)',
+            borderRadius: '8px',
+            padding: '0.4rem 0.65rem',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>
+            Exp. Time
+          </span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary, #2563eb)' }}>
+            {c.expTime || '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Subtle Creator Footnote */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.72rem',
+          color: 'var(--text-muted, #94a3b8)',
+          marginTop: '-0.1rem'
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <User size={12} style={{ opacity: 0.7 }} />
+          <span>By {c.createdByName || c.createdBy || 'Staff User'}</span>
+        </span>
+        {c.lotNo && (
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted, #94a3b8)' }}>
+            Lot: {c.lotNo}
+          </span>
+        )}
+      </div>
+
+      {/* Card Actions: Primary Operations (Tier 1) + Secondary Utilities (Tier 2) */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem',
+          borderTop: '1px solid var(--border-light, #e2e8f0)',
+          paddingTop: '0.75rem',
+          marginTop: 'auto'
+        }}
+      >
+        {/* Tier 1: Primary Operation Buttons (Challan & Print) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+          <button
+            type="button"
+            onClick={() => handleSendToBilling(c)}
+            title={isReadyForChallan ? 'Create Delivery Challan' : 'Printing or Fusing in Progress'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.35rem',
+              padding: '0.44rem 0.6rem',
+              borderRadius: '8px',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              background: isReadyForChallan ? 'linear-gradient(135deg, #4f46e5, #4338ca)' : '#f1f5f9',
+              color: isReadyForChallan ? '#ffffff' : '#64748b',
+              border: isReadyForChallan ? 'none' : '1px solid #cbd5e1',
+              boxShadow: isReadyForChallan ? '0 2px 6px rgba(79,70,229,0.25)' : 'none',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <FileText size={13} />
+            <span>{isReadyForChallan ? 'Challan ✓' : 'Challan'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => triggerJobCardPrint(c)}
+            title="Print or Save PDF"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.35rem',
+              padding: '0.44rem 0.6rem',
+              borderRadius: '8px',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              background: '#ecfdf5',
+              color: '#065f46',
+              border: '1px solid #a7f3d0',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Printer size={13} />
+            <span>Print</span>
+          </button>
+        </div>
+
+        {/* Tier 2: Secondary Utilities (Edit, Preview, History, Share, Delete) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '6px',
+            paddingTop: '0.1rem'
+          }}
+        >
+          <SmartIconButton
+            icon={Edit2}
+            tooltip="Edit Job Card"
+            onClick={() => openEdit(c)}
+            variant="primary"
+            style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          />
+          <SmartIconButton
+            icon={Eye}
+            tooltip="Full Preview"
+            onClick={() => setPreviewCard(c)}
+            variant="default"
+            style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          />
+          <SmartIconButton
+            icon={Clock}
+            tooltip="Audit History & Log"
+            onClick={() => setHistoryModalCard(c)}
+            variant="warning"
+            style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          />
+          <SmartIconButton
+            icon={Send}
+            tooltip="Share Job Card"
+            onClick={() => handleOpenShareModal(c)}
+            variant="default"
+            style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          />
+          <SmartIconButton
+            icon={Trash2}
+            tooltip="Delete Job Card"
+            onClick={() => handleDelete(c._id, c.jobNo)}
+            variant="danger"
+            style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}, (prev, next) => prev.card === next.card && prev.department === next.department);
+
 // ─── MAIN PANEL ──────────────────────────────────────────────────────────────
 export default function JobCardPanel({ activeSubTab = 'jobcards', department, currentUser }) {
   const [cards, setCards] = useState([]);
@@ -4563,408 +4980,20 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department, cu
       </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))', gap:'1.25rem' }}>
-              {displayedCards.map(c => {
-                const pStatus = (c.printStatus || '').toLowerCase();
-                const isPrintDone = pStatus.includes('done') || parseFloat(c.printMtr || 0) > 0;
-                const fStatus = (c.fusingStatus || '').toLowerCase();
-                const fusedMtr = parseFloat(c.fusingMtr || c.freshMtr || 0);
-                const isFusingDone = fStatus.includes('done');
-                const isReadyForChallan = isPrintDone && (isFusingDone || fusedMtr > 0);
-
-                const isGrando = c.machineName === 'GRANDO';
-
-                return (
-                  <div
-                    key={c._id}
-                    className="glass-panel job-card-item"
-                    style={{
-                      padding: '1.15rem 1.25rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.75rem',
-                      borderRadius: '16px',
-                      background: 'var(--bg-card, #ffffff)',
-                      border: '1px solid var(--border-color, #e2e8f0)',
-                      boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
-                      transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
-                      position: 'relative'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(15,23,42,0.08), 0 8px 10px -6px rgba(15,23,42,0.04)';
-                      e.currentTarget.style.borderColor = '#bfdbfe';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = '';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.04)';
-                      e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
-                    }}
-                  >
-                    {/* Header Row 1: Job Number & Machine (Left) + Urgent & Status (Right) */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap'
-                      }}
-                    >
-                      {/* Left: Job Number & Machine Identifier (Guaranteed No Overlap) */}
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          flexShrink: 0
-                        }}
-                      >
-                        <JobCardTooltip card={c} style={{ flexShrink: 0 }}>
-                          <span
-                            style={{
-                              fontWeight: 800,
-                              fontSize: '0.96rem',
-                              color: 'var(--primary, #2563eb)',
-                              cursor: 'pointer',
-                              letterSpacing: '-0.01em',
-                              whiteSpace: 'nowrap',
-                              display: 'inline-block'
-                            }}
-                          >
-                            {c.jobNo}
-                          </span>
-                        </JobCardTooltip>
-
-                        {c.machineName && (
-                          <span
-                            style={{
-                              flexShrink: 0,
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.67rem',
-                              fontWeight: 800,
-                              letterSpacing: '0.03em',
-                              whiteSpace: 'nowrap',
-                              background: isGrando ? '#eff6ff' : '#f5f3ff',
-                              color: isGrando ? '#1d4ed8' : '#7c3aed',
-                              border: `1px solid ${isGrando ? '#bfdbfe' : '#ddd6fe'}`
-                            }}
-                          >
-                            {c.machineName}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Right: Urgent Indicator & Operational Status */}
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          flexShrink: 0
-                        }}
-                      >
-                        {c.emergencyNotes && c.emergencyNotes.trim() && (
-                          <span
-                            style={{
-                              flexShrink: 0,
-                              padding: '2px 7px',
-                              borderRadius: '6px',
-                              fontSize: '0.64rem',
-                              fontWeight: 800,
-                              background: '#fef2f2',
-                              color: '#dc2626',
-                              border: '1px solid #fecaca',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            URGENT
-                          </span>
-                        )}
-
-                        <StatusBadge status={c.status} />
-                      </div>
-                    </div>
-
-                    {/* Header Row 2: Production Stage Pill & Date */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                      <WorkflowStageBadge card={c} />
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted, #64748b)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        📅 {formatDateDDMMYYYY(c.date)}
-                      </span>
-                    </div>
-
-                    {/* Segmented Production Stage Progress Bar */}
-                    <div style={{ margin: '4px 0 6px 0', width: '100%' }}>
-                      <JobStageProgressBar
-                        card={c}
-                        department={department}
-                      />
-                    </div>
-
-                    {/* Highlight Banner: Party & Design Name */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.6rem',
-                        background: 'var(--bg-subtle, #f8fafc)',
-                        border: '1px solid var(--border-light, #e2e8f0)',
-                        borderRadius: '10px',
-                        padding: '0.55rem 0.8rem'
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                        <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Party
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '0.92rem',
-                            fontWeight: 800,
-                            color: 'var(--text-primary, #0f172a)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
-                          title={c.party || '—'}
-                        >
-                          {c.party || '—'}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0, flex: 1 }}>
-                        <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Design
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '0.92rem',
-                            fontWeight: 800,
-                            color: 'var(--primary, #2563eb)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
-                          title={c.designName || c.designNo || '—'}
-                        >
-                          {c.designName || c.designNo || '—'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Fabric Spec Row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
-                      <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 700, flexShrink: 0, textTransform: 'uppercase', fontSize: '0.66rem' }}>
-                        Fabric:
-                      </span>
-                      <span
-                        style={{
-                          color: 'var(--text-primary, #1e293b)',
-                          fontWeight: 600,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                        title={c.fabric || '—'}
-                      >
-                        {c.fabric || '—'}
-                      </span>
-                    </div>
-
-                    {/* Personnel Row: Designer & Color Matching */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.76rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: 0 }}>
-                        <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, flexShrink: 0 }}>Designer:</span>
-                        <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.designer || '—'}>
-                          {c.designer || '—'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: 0 }}>
-                        <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, flexShrink: 0 }}>C.Match:</span>
-                        <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.colourMatching || '—'}>
-                          {c.colourMatching || '—'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Key Production Metrics Strip: Total Mtr & Expected Time */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
-                      <div
-                        style={{
-                          background: 'var(--bg-subtle, #f8fafc)',
-                          border: '1px solid var(--border-light, #e2e8f0)',
-                          borderRadius: '8px',
-                          padding: '0.4rem 0.65rem',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
-                      >
-                        <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>
-                          Total Mtr
-                        </span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary, #0f172a)' }}>
-                          {c.totalMtr ? `${c.totalMtr} Mtr` : '—'}
-                        </span>
-                      </div>
-
-                      <div
-                        style={{
-                          background: 'var(--bg-subtle, #f8fafc)',
-                          border: '1px solid var(--border-light, #e2e8f0)',
-                          borderRadius: '8px',
-                          padding: '0.4rem 0.65rem',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
-                      >
-                        <span style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>
-                          Exp. Time
-                        </span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary, #2563eb)' }}>
-                          {c.expTime || '—'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Subtle Creator Footnote */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.72rem',
-                        color: 'var(--text-muted, #94a3b8)',
-                        marginTop: '-0.1rem'
-                      }}
-                    >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <User size={12} style={{ opacity: 0.7 }} />
-                        <span>By {c.createdByName || c.createdBy || 'Staff User'}</span>
-                      </span>
-                      {c.lotNo && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted, #94a3b8)' }}>
-                          Lot: {c.lotNo}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Card Actions: Primary Operations (Tier 1) + Secondary Utilities (Tier 2) */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem',
-                        borderTop: '1px solid var(--border-light, #e2e8f0)',
-                        paddingTop: '0.75rem',
-                        marginTop: 'auto'
-                      }}
-                    >
-                      {/* Tier 1: Primary Operation Buttons (Challan & Print) */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleSendToBilling(c)}
-                          title={isReadyForChallan ? 'Create Delivery Challan' : 'Printing or Fusing in Progress'}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.35rem',
-                            padding: '0.44rem 0.6rem',
-                            borderRadius: '8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            background: isReadyForChallan ? 'linear-gradient(135deg, #4f46e5, #4338ca)' : '#f1f5f9',
-                            color: isReadyForChallan ? '#ffffff' : '#64748b',
-                            border: isReadyForChallan ? 'none' : '1px solid #cbd5e1',
-                            boxShadow: isReadyForChallan ? '0 2px 6px rgba(79,70,229,0.25)' : 'none',
-                            transition: 'all 0.15s ease',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          <FileText size={13} />
-                          <span>{isReadyForChallan ? 'Challan ✓' : 'Challan'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => triggerJobCardPrint(c)}
-                          title="Print or Save PDF"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.35rem',
-                            padding: '0.44rem 0.6rem',
-                            borderRadius: '8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            background: '#ecfdf5',
-                            color: '#065f46',
-                            border: '1px solid #a7f3d0',
-                            transition: 'all 0.15s ease',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          <Printer size={13} />
-                          <span>Print</span>
-                        </button>
-                      </div>
-
-                      {/* Tier 2: Secondary Utilities (Edit, Preview, History, Share, Delete) */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '6px',
-                          paddingTop: '0.1rem'
-                        }}
-                      >
-                        <SmartIconButton
-                          icon={Edit2}
-                          tooltip="Edit Job Card"
-                          onClick={() => openEdit(c)}
-                          variant="primary"
-                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        />
-                        <SmartIconButton
-                          icon={Eye}
-                          tooltip="Full Preview"
-                          onClick={() => setPreviewCard(c)}
-                          variant="default"
-                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        />
-                        <SmartIconButton
-                          icon={Clock}
-                          tooltip="Audit History & Log"
-                          onClick={() => setHistoryModalCard(c)}
-                          variant="warning"
-                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        />
-                        <SmartIconButton
-                          icon={Send}
-                          tooltip="Share Job Card"
-                          onClick={() => handleOpenShareModal(c)}
-                          variant="default"
-                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        />
-                        <SmartIconButton
-                          icon={Trash2}
-                          tooltip="Delete Job Card"
-                          onClick={() => handleDelete(c._id, c.jobNo)}
-                          variant="danger"
-                          style={{ flex: 1, height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {displayedCards.map(c => (
+                <JobCardGridItem
+                  key={c._id}
+                  card={c}
+                  department={department}
+                  handleSendToBilling={handleSendToBilling}
+                  triggerJobCardPrint={triggerJobCardPrint}
+                  openEdit={openEdit}
+                  setPreviewCard={setPreviewCard}
+                  setHistoryModalCard={setHistoryModalCard}
+                  handleOpenShareModal={handleOpenShareModal}
+                  handleDelete={handleDelete}
+                />
+              ))}
             </div>
           )}
 

@@ -98,15 +98,21 @@ export function ScrollSpyMiniMap({
 
   useEffect(() => {
     checkValidationErrors();
-    const interval = setInterval(checkValidationErrors, 1500);
 
-    const handleFormInput = () => checkValidationErrors();
+    let debounceTimer = null;
+    const handleFormInput = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        checkValidationErrors();
+      }, 300);
+    };
+
     const root = containerRef?.current || document;
     root.addEventListener('input', handleFormInput, { passive: true });
     root.addEventListener('change', handleFormInput, { passive: true });
 
     return () => {
-      clearInterval(interval);
+      if (debounceTimer) clearTimeout(debounceTimer);
       root.removeEventListener('input', handleFormInput);
       root.removeEventListener('change', handleFormInput);
     };

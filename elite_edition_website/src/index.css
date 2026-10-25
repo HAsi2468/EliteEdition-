@@ -2484,3 +2484,9 @@ html, body {
 [role="dialog"] {
   -webkit-overflow-scrolling: touch;
 }
+
+/* 6. High-Performance Virtualized Card Layout: Skips offscreen layout/paint computations */
+.job-card-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 340px 380px;
+}

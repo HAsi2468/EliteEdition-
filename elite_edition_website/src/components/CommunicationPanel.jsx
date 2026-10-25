@@ -3681,6 +3681,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  // Memoized day groups and filtered messages — Prevents re-filtering and re-sorting hundreds of messages on every keystroke!
+  const { chatDayGroups, chatFilteredCount } = useMemo(() => {
+    let filteredList = showPinnedOnly ? messages.filter((m) => m.isPinned) : messages;
+    if (msgFilter === 'human') filteredList = filteredList.filter((m) => m.msgType !== 'system_activity');
+    if (msgFilter === 'system_activity') filteredList = filteredList.filter((m) => m.msgType === 'system_activity');
+    if (msgFilter === 'urgent') filteredList = filteredList.filter((m) => m.priority === 'urgent');
+    if (msgFilter === 'media') filteredList = filteredList.filter((m) => m.attachment);
+
+    if (inRoomQuery && inRoomQuery.trim()) {
+      const q = inRoomQuery.toLowerCase();
+      filteredList = filteredList.filter(
+        (m) =>
+          (m.content || '').toLowerCase().includes(q) ||
+          (m.senderName || m.senderId?.name || '').toLowerCase().includes(q) ||
+          (m.moduleName || '').toLowerCase().includes(q)
+      );
+    }
+
+    const sortedList = [...filteredList].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    const groups = [];
+    let curGroup = null;
+
+    sortedList.forEach((msg) => {
+      const dateHeader = formatMessageDateHeader(msg.createdAt);
+      if (!curGroup || curGroup.dateHeader !== dateHeader) {
+        curGroup = {
+          dateHeader,
+          key: `day_${dateHeader}_${msg._id}`,
+          messages: []
+        };
+        groups.push(curGroup);
+      }
+      curGroup.messages.push(msg);
+    });
+
+    return { chatDayGroups: groups, chatFilteredCount: filteredList.length };
+  }, [messages, showPinnedOnly, msgFilter, inRoomQuery]);
+
   // Clipboard Paste Handler (Supports Ctrl+V / Cmd+V for PDFs, Documents, Screenshots & Images)
   const handlePasteClipboard = async (e) => {
     let file = null;
@@ -5855,22 +5893,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                 <ErrorBoundary fallback={<div style={{ padding: '1rem', color: '#dc2626', textAlign: 'center' }}>Unable to display messages. Please refresh.</div>}>
                 {(() => {
-                  let filteredList = showPinnedOnly ? messages.filter((m) => m.isPinned) : messages;
-                  if (msgFilter === 'human') filteredList = filteredList.filter((m) => m.msgType !== 'system_activity');
-                  if (msgFilter === 'system_activity') filteredList = filteredList.filter((m) => m.msgType === 'system_activity');
-                  if (msgFilter === 'urgent') filteredList = filteredList.filter((m) => m.priority === 'urgent');
-                  if (msgFilter === 'media') filteredList = filteredList.filter((m) => m.attachment);
-
-                  if (inRoomQuery.trim()) {
-                    const q = inRoomQuery.toLowerCase();
-                    filteredList = filteredList.filter(
-                      (m) =>
-                        (m.content || '').toLowerCase().includes(q) ||
-                        (m.senderName || m.senderId?.name || '').toLowerCase().includes(q) ||
-                        (m.moduleName || '').toLowerCase().includes(q)
-                    );
-                  }
-
                   if (loadingMessages) {
                     return <ChatStreamSkeleton count={5} />;
                   }
@@ -5903,7 +5925,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     );
                   }
 
-                  if (filteredList.length === 0) {
+                  if (chatFilteredCount === 0) {
                     return (
                       <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         <MessageSquare size={32} style={{ marginBottom: '0.5rem', opacity: 0.4 }} />
@@ -5912,26 +5934,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     );
                   }
 
-                  const sortedList = [...filteredList].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
-
-                  // Group messages by day for native WhatsApp/iOS floating sticky date headers
-                  const dayGroups = [];
-                  let curGroup = null;
-
-                  sortedList.forEach((msg) => {
-                    const dateHeader = formatMessageDateHeader(msg.createdAt);
-                    if (!curGroup || curGroup.dateHeader !== dateHeader) {
-                      curGroup = {
-                        dateHeader,
-                        key: `day_${dateHeader}_${msg._id}`,
-                        messages: []
-                      };
-                      dayGroups.push(curGroup);
-                    }
-                    curGroup.messages.push(msg);
-                  });
-
-                  return dayGroups.map((group) => (
+                  return chatDayGroups.map((group) => (
                     <div
                       key={group.key}
                       className="phoenix-day-group"
