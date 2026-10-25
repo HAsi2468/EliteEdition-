@@ -606,7 +606,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
       {/* Entry Form Modal */}
       {showModal && (
         <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '1.5rem' }}>
-          <div style={{ background: 'var(--bg-modal,#161b26)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 950, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ background: 'var(--bg-modal,#ffffff)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 950, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}>
             
             {/* Header */}
             <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>

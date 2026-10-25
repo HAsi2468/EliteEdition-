@@ -1767,7 +1767,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '2rem' }}>
           <div style={{
             position: 'relative',
-            background: 'var(--bg-modal,#161b26)', border: '1px solid var(--border-light)',
+            background: 'var(--bg-modal,#ffffff)', border: '1px solid var(--border-light)',
             borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 700,
             boxShadow: 'var(--shadow-lg)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
 
@@ -2055,7 +2055,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       {bulkDetecting && (
         <div className="modal-overlay" style={{ alignItems: 'center', zIndex: 10000 }}>
           <div style={{
-            background: 'var(--bg-modal,#161b26)', border: '1px solid var(--border-light)',
+            background: 'var(--bg-modal,#ffffff)', border: '1px solid var(--border-light)',
             borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 560,
             boxShadow: 'var(--shadow-lg)', overflow: 'hidden', maxHeight: '85vh', display: 'flex', flexDirection: 'column'
           }}>

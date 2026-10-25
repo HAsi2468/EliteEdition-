@@ -1894,20 +1894,21 @@ export default function ReportsCenter({ department }) {
           backdropFilter: 'blur(4px)'
         }}>
           <div style={{
-            background: 'var(--bg-panel, #111827)',
-            border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-            borderRadius: '12px',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
             width: '100%',
             maxWidth: '480px',
             padding: '24px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
-            color: 'var(--text-primary, #f3f4f6)'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            color: '#0f172a'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Share Report to Chat</h3>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Share Report to Chat</h3>
               <button 
+                type="button"
                 onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted, #9ca3af)' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
                 <X size={20} />
               </button>
@@ -1915,7 +1916,7 @@ export default function ReportsCenter({ department }) {
 
             <form onSubmit={handleShareReport}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary, #d1d5db)' }}>Search Channel or Member</label>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>Search Channel or Member</label>
                 <input 
                   type="text" 
                   value={shareSearch} 
@@ -1923,27 +1924,30 @@ export default function ReportsCenter({ department }) {
                   placeholder="Type name to search..." 
                   style={{
                     width: '100%',
-                    padding: '10px',
+                    padding: '10px 14px',
                     borderRadius: '8px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                    backgroundColor: 'rgba(255,255,255,0.03)',
-                    color: 'var(--text-primary)',
+                    border: '1.5px solid #cbd5e1',
+                    backgroundColor: '#f8fafc',
+                    color: '#0f172a',
                     outline: 'none',
-                    fontSize: '0.9rem'
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary, #d1d5db)' }}>Select Chat Destination</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>Select Chat Destination</label>
                 <div style={{
-                  maxHeight: '200px',
+                  maxHeight: '220px',
                   overflowY: 'auto',
-                  border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
                   display: 'flex',
                   flexDirection: 'column',
-                  backgroundColor: 'rgba(255,255,255,0.01)'
+                  backgroundColor: '#f8fafc',
+                  padding: '6px',
+                  gap: '4px'
                 }}>
                   {chatRooms
                     .filter(r => {
@@ -1965,28 +1969,43 @@ export default function ReportsCenter({ department }) {
                           key={r._id} 
                           onClick={() => setSelectedRoomId(r._id)}
                           style={{
-                            padding: '10px 14px',
+                            padding: '9px 12px',
+                            borderRadius: '8px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '10px',
                             cursor: 'pointer',
-                            backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                            borderBottom: '1px solid rgba(255,255,255,0.04)',
-                            transition: 'background-color 0.2s',
+                            backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                            transition: 'all 0.15s ease',
                           }}
                         >
                           <div style={{
-                            width: '8px',
-                            height: '8px',
+                            width: '9px',
+                            height: '9px',
                             borderRadius: '50%',
-                            backgroundColor: isDirect ? 'var(--success, #10b981)' : 'var(--primary, #3b82f6)'
+                            flexShrink: 0,
+                            backgroundColor: isDirect ? '#10b981' : '#2563eb'
                           }} />
-                          <span style={{ fontSize: '0.9rem', fontWeight: isSelected ? '600' : 'normal', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{displayName}</span>
+                          <span style={{
+                            fontSize: '0.88rem',
+                            fontWeight: isSelected ? 700 : 500,
+                            color: isSelected ? '#1d4ed8' : '#0f172a',
+                            flex: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {displayName}
+                          </span>
+                          {isSelected && (
+                            <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 800 }}>✓</span>
+                          )}
                         </div>
                       );
                     })}
                   {chatRooms.length === 0 && (
-                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
                       No active channels or messages found.
                     </div>
                   )}
@@ -1998,13 +2017,14 @@ export default function ReportsCenter({ department }) {
                   type="button" 
                   onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
                   style={{
-                    padding: '10px 18px',
+                    padding: '9px 18px',
                     borderRadius: '8px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                    backgroundColor: 'transparent',
-                    color: 'var(--text-primary)',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#f1f5f9',
+                    color: '#475569',
                     cursor: 'pointer',
-                    fontSize: '0.85rem'
+                    fontSize: '0.85rem',
+                    fontWeight: 600
                   }}
                 >
                   Cancel
@@ -2013,17 +2033,18 @@ export default function ReportsCenter({ department }) {
                   type="submit" 
                   disabled={sharingReport || !selectedRoomId}
                   style={{
-                    padding: '10px 20px',
+                    padding: '9px 20px',
                     borderRadius: '8px',
                     border: 'none',
-                    backgroundColor: selectedRoomId ? 'var(--primary, #3b82f6)' : 'var(--border-light, #374151)',
-                    color: '#000',
+                    background: selectedRoomId ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : '#cbd5e1',
+                    color: '#ffffff',
                     cursor: selectedRoomId ? 'pointer' : 'not-allowed',
-                    fontWeight: 'bold',
+                    fontWeight: 700,
                     fontSize: '0.85rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    gap: '6px',
+                    boxShadow: selectedRoomId ? '0 4px 12px rgba(37,99,235,0.25)' : 'none'
                   }}
                 >
                   {sharingReport ? 'Sharing...' : 'Confirm Share'}

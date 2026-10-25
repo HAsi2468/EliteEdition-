@@ -204,7 +204,7 @@ export default function GarmentJobCardForm({ card, onSave, onClose }) {
   return (
     <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '1rem' }}>
       <div style={{
-        background: 'var(--bg-modal, #111827)',
+        background: 'var(--bg-modal, #ffffff)',
         border: '1px solid var(--border-light)',
         borderRadius: 'var(--radius-lg)',
         width: '100%',

@@ -2826,7 +2826,7 @@ function JobCardForm({ card, onSave, onClose, department, currentUser }) {
   return (
     <div className="modal-overlay" style={{ alignItems:'flex-start', paddingTop:'1rem' }}>
         {/* Header */}
-        <form onSubmit={handleSubmit} style={{ background:'var(--bg-modal,#111827)', border:'1px solid var(--border-light)',
+        <form onSubmit={handleSubmit} style={{ background:'var(--bg-modal,#ffffff)', border:'1px solid var(--border-light)',
           borderRadius:'var(--radius-lg)', width:'100%', maxWidth:900,
           boxShadow:'var(--shadow-lg)', overflow:'hidden', maxHeight:'96vh', display:'flex', flexDirection:'column' }}>
 

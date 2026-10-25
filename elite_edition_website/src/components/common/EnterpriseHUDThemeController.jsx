@@ -302,6 +302,24 @@ export function EnterpriseHUDThemeController({
   const isTaskActive = activeTab === 'task_management';
   const isReconcileActive = activeTab === 'reconciliation' || activeTab === 'ledger-reconciliation';
 
+  // Completely suppress the floating dock on mobile screens and inside the communication / chat workspace
+  const [isMobileScreen, setIsMobileScreen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 768;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileScreen(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  if (isMobileScreen || isCommActive) {
+    return null;
+  }
+
   const effectiveCollapsed = isDocked ? false : isCollapsed;
 
   return (
