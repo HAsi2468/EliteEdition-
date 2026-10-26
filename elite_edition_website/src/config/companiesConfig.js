@@ -108,6 +108,21 @@ export const COMPANIES = [
     gradient: 'linear-gradient(135deg, #ec4899, #be185d)',
     description: 'Company workspace for Ethno wear finance, invoices & billing.',
     aliases: ['ethno_wear', 'ew', 'ethno wear', 'ethnowear', 'ethno']
+  },
+  {
+    id: 'yamunaji',
+    code: 'YJ',
+    name: 'Yamunaji',
+    fullName: 'Yamunaji',
+    shortName: 'Yamunaji',
+    type: 'Textile & Corporate Sales Entity',
+    iconName: 'Building',
+    defaultTab: 'yj_invoices',
+    badgeColor: '#0ea5e9',
+    iconColor: '#0ea5e9',
+    gradient: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+    description: 'Company workspace for Yamunaji finance, invoices & billing.',
+    aliases: ['yamunaji', 'yj', 'yamuna ji', 'yamuna']
   }
 ];
 

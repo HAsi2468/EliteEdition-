@@ -46,6 +46,20 @@ export const AVAILABLE_SCREENS = [
   { id: 'so_complaints', label: 'Sobise: Complaints Module', category: 'Sobise' },
   { id: 'so_settings', label: 'Sobise: Company Settings', category: 'Sobise' },
 
+  // Ethno wear (Company)
+  { id: 'ew_dashboard', label: 'Ethno wear: Dashboard Overview', category: 'Ethno wear' },
+  { id: 'ew_invoices', label: 'Ethno wear: Invoices & GST Billing', category: 'Ethno wear' },
+  { id: 'ew_expenses', label: 'Ethno wear: Expense Ledger', category: 'Ethno wear' },
+  { id: 'ew_complaints', label: 'Ethno wear: Complaints Module', category: 'Ethno wear' },
+  { id: 'ew_settings', label: 'Ethno wear: Company Settings', category: 'Ethno wear' },
+
+  // Yamunaji (Company)
+  { id: 'yj_dashboard', label: 'Yamunaji: Dashboard Overview', category: 'Yamunaji' },
+  { id: 'yj_invoices', label: 'Yamunaji: Invoices & GST Billing', category: 'Yamunaji' },
+  { id: 'yj_expenses', label: 'Yamunaji: Expense Ledger', category: 'Yamunaji' },
+  { id: 'yj_complaints', label: 'Yamunaji: Complaints Module', category: 'Yamunaji' },
+  { id: 'yj_settings', label: 'Yamunaji: Company Settings', category: 'Yamunaji' },
+
   // Elite Digital Print
   { id: 'jobcards', label: 'Elite Prints: Dashboard & Reports', category: 'Elite Digital Print' },
   { id: 'jobcards_status_dashboard', label: 'Elite Prints: Pending Status Overview', category: 'Elite Digital Print' },

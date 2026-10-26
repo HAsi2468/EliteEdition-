@@ -12,6 +12,7 @@ const normalizeBusinessUnit = (bu) => {
   if (u === 'SO' || u === 'SOBISE') return 'Sobise';
   if (u === 'EON' || u === 'ELITE ONLINE') return 'Elite Online';
   if (u === 'EW' || u === 'ETHNO WEAR' || u === 'ETHNO_WEAR' || u === 'ETHNOWEAR') return 'Ethno wear';
+  if (u === 'YJ' || u === 'YAMUNAJI' || u === 'YAMUNA JI' || u === 'YAMUNA') return 'Yamunaji';
   return bu;
 };
 
@@ -24,6 +25,7 @@ const getBusinessUnitCode = (bu) => {
   if (norm === 'Sobise') return 'SO';
   if (norm === 'Elite Online') return 'EON';
   if (norm === 'Ethno wear') return 'EW';
+  if (norm === 'Yamunaji') return 'YJ';
   return 'EDP';
 };
 
@@ -46,6 +48,9 @@ const buildExpenseCompFilter = (companyEntity) => {
   }
   if (norm === 'Ethno wear') {
     return { companyEntity: 'Ethno wear' };
+  }
+  if (norm === 'Yamunaji') {
+    return { companyEntity: 'Yamunaji' };
   }
   return {
     $or: [
@@ -561,6 +566,7 @@ async function generateUniqueVoucherNo(companyEntity = 'Elite Digital Print') {
     'Elite Stitching': 'ES-EXP-',
     'Elite Online': 'EO-EXP-',
     'Ethno wear': 'EW-EXP-',
+    'Yamunaji': 'YJ-EXP-',
     'Elite Digital Print': 'EDP-EXP-'
   };
   const prefix = prefixMap[normEntity] || prefixMap[companyEntity] || 'EDP-EXP-';

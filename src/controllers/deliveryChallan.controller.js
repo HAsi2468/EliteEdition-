@@ -10,6 +10,7 @@ const PDFDocument = require('pdfkit');
 const getCompanyPrefix = (entity = 'Sobise') => {
   const norm = String(entity || '').trim().toLowerCase();
   if (norm.includes('ethno') || norm === 'ew') return 'EWC-';
+  if (norm.includes('yamunaji') || norm === 'yj') return 'YJ-';
   if (norm.includes('sobise')) return 'SO-';
   if (norm.includes('fabtex')) return 'EF-';
   if (norm.includes('edition')) return 'EE-';

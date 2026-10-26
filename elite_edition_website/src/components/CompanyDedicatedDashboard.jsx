@@ -136,6 +136,7 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
     if (entity === 'Sobise') return 'so_invoices';
     if (entity === 'Elite Fabtex') return 'ef_invoices';
     if (entity === 'Ethno wear' || entity === 'ethno_wear' || entity === 'EW') return 'ew_invoices';
+    if (entity === 'Yamunaji' || entity === 'yamunaji' || entity === 'YJ') return 'yj_invoices';
     return 'ee_invoices';
   };
 

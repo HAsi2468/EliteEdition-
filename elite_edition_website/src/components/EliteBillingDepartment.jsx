@@ -194,6 +194,7 @@ export const normalizeCompanyEntity = (raw) => {
   if (/^sobise/i.test(s) || /^so$/i.test(s)) return 'Sobise';
   if (/^elite\s*online/i.test(s) || /^eon$/i.test(s) || s === 'elite_online') return 'Elite Online';
   if (/^ethno\s*wear/i.test(s) || /^ew$/i.test(s) || s === 'ethno_wear') return 'Ethno wear';
+  if (/^yamunaji/i.test(s) || /^yj$/i.test(s) || s === 'yamunaji') return 'Yamunaji';
   return s;
 };
 
@@ -205,6 +206,7 @@ export const getDefaultInvoicePrefix = (comp) => {
   if (c === 'Elite Stitching') return 'ES-2627-0001';
   if (c === 'Elite Online') return 'EO-2627-0001';
   if (c === 'Ethno wear') return 'EW-2627-0001';
+  if (c === 'Yamunaji') return 'YJ-2627-0001';
   return 'EDP/26-27/1001';
 };
 
@@ -216,9 +218,9 @@ export default function EliteBillingDepartment({
 }) {
   const companyEntity = normalizeCompanyEntity(
     propCompanyEntity || 
-    (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : department === 'ethno_wear' ? 'Ethno wear' : 'Elite Digital Prints')
+    (department === 'stitching' ? 'Elite Stitching' : department === 'elite_fabtex' ? 'Elite Fabtex' : department === 'sobise' ? 'Sobise' : department === 'elite_edition' ? 'Elite Edition' : department === 'elite_online' ? 'Elite Online' : department === 'ethno_wear' ? 'Ethno wear' : department === 'yamunaji' ? 'Yamunaji' : 'Elite Digital Prints')
   );
-  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear'].includes(companyEntity);
+  const isCorporateEntity = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear', 'Yamunaji'].includes(companyEntity);
   const isStitchingEntity = department === 'stitching' || companyEntity === 'Elite Stitching';
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -2932,7 +2934,7 @@ export default function EliteBillingDepartment({
     terms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.'
   }));
 
-  const isCorporateInvoice = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear'].includes(invoiceForm.issuingCompany || companyEntity);
+  const isCorporateInvoice = ['Sobise', 'Elite Edition', 'Elite Fabtex', 'Elite Online', 'Ethno wear', 'Yamunaji'].includes(invoiceForm.issuingCompany || companyEntity);
 
   // Synchronize invoice issuingCompany & next invoice number whenever active companyEntity changes
   useEffect(() => {
@@ -4577,6 +4579,7 @@ export default function EliteBillingDepartment({
                 <option value="Elite Stitching">🏢 Elite Stitching</option>
                 <option value="Elite Online">🏢 Elite Online</option>
                 <option value="Ethno wear">🏢 Ethno wear</option>
+                <option value="Yamunaji">🏢 Yamunaji</option>
               </select>
             </div>
             <div>

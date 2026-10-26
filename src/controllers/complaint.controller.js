@@ -177,6 +177,7 @@ const getNextNumber = async (req, res) => {
     let prefix = 'COMP-';
     if (norm.includes('edition') || norm === 'ee') prefix = 'EE-COMP-';
     else if (norm.includes('ethno') || norm === 'ew') prefix = 'EW-COMP-';
+    else if (norm.includes('yamunaji') || norm === 'yj') prefix = 'YJ-COMP-';
     else if (norm.includes('fabtex') || norm === 'ef') prefix = 'EF-COMP-';
     else if (norm.includes('sobise') || norm === 'so') prefix = 'SO-COMP-';
     else if (norm.includes('stitching') || norm === 'es') prefix = 'ES-COMP-';

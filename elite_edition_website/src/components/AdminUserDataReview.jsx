@@ -180,6 +180,9 @@ export default function AdminUserDataReview() {
     { value: 'Elite Stitching', label: '🏢 Elite Stitching' },
     { value: 'Elite Fabtex', label: '🏢 Elite Fabtex' },
     { value: 'Elite Edition', label: '🏢 Elite Edition' },
+    { value: 'Sobise', label: '🏢 Sobise' },
+    { value: 'Ethno wear', label: '🏢 Ethno wear' },
+    { value: 'Yamunaji', label: '🏢 Yamunaji' },
   ];
 
   const departmentOptions = [

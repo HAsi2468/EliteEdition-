@@ -53,6 +53,13 @@ const COMPANIES = [
     type: 'Ethnic Wear & Apparel Brand',
     aliases: ['ethno_wear', 'ew', 'ethno wear', 'ethnowear', 'ethno'],
   },
+  {
+    id: 'yamunaji',
+    code: 'YJ',
+    name: 'Yamunaji',
+    type: 'Textile & Corporate Sales Entity',
+    aliases: ['yamunaji', 'yj', 'yamuna ji', 'yamuna'],
+  },
 ];
 
 const COMPANY_IDS = COMPANIES.map((c) => c.id);

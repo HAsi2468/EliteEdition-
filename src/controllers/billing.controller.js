@@ -84,6 +84,13 @@ function buildCompanyFilter(companyEntity) {
         { invoiceNo: { $regex: '^EW', $options: 'i' } }
       ]
     };
+  } else if (ce === 'Yamunaji' || ce === 'yamunaji' || ce === 'YJ') {
+    return {
+      $or: [
+        { companyEntity: 'Yamunaji' },
+        { invoiceNo: { $regex: '^YJ', $options: 'i' } }
+      ]
+    };
   } else if (
     ce === 'Elite Digital Print' ||
     ce === 'Elite Digital Prints' ||
@@ -152,6 +159,13 @@ function buildPurchaseCompanyFilter(companyEntity) {
       $or: [
         { companyEntity: 'Ethno wear' },
         { purchaseNo: { $regex: '^EW', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Yamunaji' || ce === 'yamunaji' || ce === 'YJ') {
+    return {
+      $or: [
+        { companyEntity: 'Yamunaji' },
+        { purchaseNo: { $regex: '^YJ', $options: 'i' } }
       ]
     };
   } else if (ce === 'edp' || ce === 'Elite Digital Prints' || ce === 'Elite Digital Print') {
@@ -451,6 +465,9 @@ const getNextInvoiceNo = async (req, res) => {
       defaultStartSeq = 1;
     } else if (companyEntity === 'Ethno wear' || companyEntity === 'ethno_wear') {
       defaultPrefix = 'EW-2627-';
+      defaultStartSeq = 1;
+    } else if (companyEntity === 'Yamunaji' || companyEntity === 'yamunaji') {
+      defaultPrefix = 'YJ-2627-';
       defaultStartSeq = 1;
     }
 
@@ -3350,6 +3367,10 @@ const getCompanySettings = async (req, res) => {
         prefix = 'SO-2627-';
       } else if (companyEntity === 'Elite Fabtex') {
         prefix = 'EF-2627-';
+      } else if (companyEntity === 'Ethno wear') {
+        prefix = 'EW-2627-';
+      } else if (companyEntity === 'Yamunaji') {
+        prefix = 'YJ-2627-';
       } else if (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') {
         prefix = 'EDP/26-27/';
         startNo = 223;
@@ -3477,6 +3498,7 @@ const getPurchases = async (req, res) => {
 const getPurchasePrefix = (entity = 'Elite Digital Prints') => {
   const norm = String(entity || '').trim().toLowerCase();
   if (norm.includes('ethno') || norm === 'ew') return 'EWP-';
+  if (norm.includes('yamunaji') || norm === 'yj') return 'YJP-';
   if (norm.includes('edition') || norm === 'ee') return 'EEP-';
   if (norm.includes('fabtex') || norm === 'ef') return 'EFP-';
   if (norm.includes('sobise') || norm === 'so') return 'SOP-';
