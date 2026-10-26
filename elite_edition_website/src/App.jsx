@@ -151,6 +151,11 @@ export const ROUTE_ALIASES = {
   'ethno_wear': { tab: 'ew_invoices', dept: 'ethno_wear' },
   'yj_invoices': { tab: 'yj_invoices', dept: 'yamunaji' },
   'yamunaji': { tab: 'yj_invoices', dept: 'yamunaji' },
+  'yj': { tab: 'yj_invoices', dept: 'yamunaji' },
+  'yj_dashboard': { tab: 'yj_dashboard', dept: 'yamunaji' },
+  'yj_settings': { tab: 'yj_settings', dept: 'yamunaji' },
+  'yj_complaints': { tab: 'yj_complaints', dept: 'yamunaji' },
+  'yj_expenses': { tab: 'yj_expenses', dept: 'yamunaji' },
   'jobcards': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcard': { tab: 'jobcards_list', dept: 'digital_print' },
   'jobcards_list': { tab: 'jobcards_list', dept: 'digital_print' },
@@ -1077,6 +1082,7 @@ export default function App() {
       'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses', 'ef_raw_materials',
       'so_dashboard', 'so_invoices', 'so_settings', 'so_complaints', 'so_expenses', 'so_raw_materials',
       'ew_dashboard', 'ew_invoices', 'ew_settings', 'ew_complaints', 'ew_expenses', 'ew_raw_materials',
+      'yj_dashboard', 'yj_invoices', 'yj_settings', 'yj_complaints', 'yj_expenses', 'yj_raw_materials',
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'es_raw_materials', 'eo_scan_pack', 'eo_complaints', 'eo_expenses', 'eo_settings', 'eo_raw_materials', 'raw_materials',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
@@ -1087,7 +1093,7 @@ export default function App() {
 
     if (isSuperOrAdmin) {
       // Admins and Super Admins have access to all system tabs
-      if (!ALL_SYSTEM_TABS.includes(activeTab)) {
+      if (!ALL_SYSTEM_TABS.includes(activeTab) && !activeTab.startsWith('yj_') && !activeTab.startsWith('ew_') && !activeTab.startsWith('so_') && !activeTab.startsWith('ef_') && !activeTab.startsWith('ee_') && !activeTab.startsWith('es_') && !activeTab.startsWith('eo_') && !activeTab.startsWith('jobcards')) {
         setActiveTab('dashboard');
       }
       return;
@@ -3137,19 +3143,19 @@ export default function App() {
               if (activeDepartment === 'yamunaji' && hasYamunajiAccess) {
                 return (
                   <>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_dashboard')) &&
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_dashboard')) &&
                       renderNavItem('yj_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_raw_materials')) &&
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_raw_materials')) &&
                       renderNavItem('yj_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_invoices')) &&
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_invoices')) &&
                       renderNavItem('yj_invoices', 'Finance', Receipt, null, 'Finance')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_complaints')) &&
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_complaints')) &&
                       renderNavItem('yj_complaints', 'Complaints', AlertTriangle, null, 'Complaints')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_settings')) &&
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_settings')) &&
                       renderNavItem('yj_settings', 'Settings', Settings, null, 'Settings')
                     }
                   </>
