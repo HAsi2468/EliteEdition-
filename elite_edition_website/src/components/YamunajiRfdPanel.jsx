@@ -828,7 +828,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             }}
             title="Configure Weaver Names, Fabric Qualities, Panna Widths & Mills"
           >
-            <Settings size={15} color="#0284c7" /> Settings (માસ્ટર સેટિંગ્સ)
+            <Settings size={15} color="#0284c7" /> Settings
           </button>
 
           {/* Primary Screen Mode Switcher: Gray Fabric vs. RFD Fabric */}
@@ -863,7 +863,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 transition: 'all 0.15s ease'
               }}
             >
-              <Boxes size={15} /> Gray Fabric (ગ્રે કાપડ)
+              <Boxes size={15} /> Gray Fabric
             </button>
 
             <button
@@ -885,7 +885,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 transition: 'all 0.15s ease'
               }}
             >
-              <Layers size={15} /> RFD Fabric (તૈયાર RFD)
+              <Layers size={15} /> RFD Fabric
             </button>
           </div>
         </div>
@@ -916,7 +916,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 {grayStats.inStockMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
               </div>
               <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
-                <span style={{ fontWeight: 700, color: '#0284c7' }}>{grayStats.inStockTps} TPs / Taka</span> ready in warehouse
+                <span style={{ fontWeight: 700, color: '#0284c7' }}>{grayStats.inStockTps} TPs</span> ready in warehouse
               </div>
             </div>
 
@@ -1122,7 +1122,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                             {lot.panna}
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
-                            {lot.totalTps} Taka
+                            {lot.totalTps} TPs
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: 800 }}>
                             {lot.totalMeters.toFixed(1)} Mtr
@@ -1231,7 +1231,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                           {ch.vehicleNo}
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
-                          {ch.totalTps} Taka
+                          {ch.totalTps} TPs
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0f172a' }}>
                           {ch.totalMeters.toFixed(1)} Mtr
@@ -1452,7 +1452,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                    Yamunaji Master Configuration Settings (માસ્ટર સેટિંગ્સ)
+                    Yamunaji Master Configuration Settings
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                     Configure dropdown values for Weaver Names, Fabric Qualities, Panna Widths, Processing Mills & Process Types.
@@ -1727,7 +1727,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                    + Inward Gray Fabric from Weaver (વિવર આવક)
+                    + Inward Gray Fabric from Weaver
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                     Select weaver & quality from masters. Enter individual TP Numbers & TP Meters. Press Enter to add next row.
@@ -1895,7 +1895,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Hash size={15} color="#0284c7" />
                     <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                      TP (Taka / Piece) Breakdown Entries
+                      TP (Piece) Breakdown Entries
                     </span>
                   </div>
 
@@ -2059,7 +2059,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                    + Create Delivery Challan for Mill (મિલ જાવક ચલણ)
+                    + Create Delivery Challan for Mill
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                     Select Gray Fabric TPs from stock to dispatch to the processing mill for RFD.
@@ -2252,7 +2252,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 {/* Selection Footer */}
                 <div style={{ background: '#f0fdf4', padding: '8px 12px', borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 700 }}>
-                    Selected: {selectedMillTps.length} TPs / Taka
+                    Selected: {selectedMillTps.length} TPs
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#15803d' }}>
                     Challan Total: {millSelectedTotalMtrs.toFixed(1)} Mtr
@@ -2483,7 +2483,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   TEXTILE GRAY & RFD PROCESSING DIVISION — SURAT, GUJARAT
                 </p>
                 <div style={{ marginTop: 6, display: 'inline-block', border: '1px solid #0f172a', padding: '2px 12px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                  DELIVERY CHALLAN FOR PROCESSING MILL (ગ્રે જાવક ચલણ)
+                  DELIVERY CHALLAN FOR PROCESSING MILL
                 </div>
               </div>
 
@@ -2527,7 +2527,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   <tfoot>
                     <tr style={{ background: '#f8fafc', borderTop: '2px solid #0f172a', fontWeight: 900 }}>
                       <td colSpan={2} style={{ padding: '8px', borderRight: '1px solid #0f172a' }}>
-                        TOTAL TAKA / TP: {showPrintChallanModal.totalTps}
+                        TOTAL TPs: {showPrintChallanModal.totalTps}
                       </td>
                       <td colSpan={2} style={{ padding: '8px', textAlign: 'right', fontSize: '0.95rem' }}>
                         GRAND TOTAL METERS: {showPrintChallanModal.totalMeters.toFixed(1)} Mtr
