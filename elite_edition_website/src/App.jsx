@@ -24,6 +24,7 @@ const CompanySettingsPanel = lazy(() => import('./components/CompanySettingsPane
 const DocumentDesignStudio = lazy(() => import('./components/DesignStudio/DocumentDesignStudio'));
 const EliteBillingDepartment = lazy(() => import('./components/EliteBillingDepartment'));
 const RawMaterialsPanel = lazy(() => import('./components/RawMaterialsPanel'));
+const YamunajiRfdPanel = lazy(() => import('./components/YamunajiRfdPanel'));
 const CompanyDevelopmentWorkspace = lazy(() => import('./components/CompanyDevelopmentWorkspace'));
 const DigitalPrintComplainModule = lazy(() => import('./components/DigitalPrintComplainModule'));
 const DigitalPrintExpenseModule = lazy(() => import('./components/DigitalPrintExpenseModule'));
@@ -152,6 +153,9 @@ export const ROUTE_ALIASES = {
   'yj_invoices': { tab: 'yj_invoices', dept: 'yamunaji' },
   'yamunaji': { tab: 'yj_invoices', dept: 'yamunaji' },
   'yj': { tab: 'yj_invoices', dept: 'yamunaji' },
+  'yj_rfd': { tab: 'yj_rfd', dept: 'yamunaji' },
+  'rfd': { tab: 'yj_rfd', dept: 'yamunaji' },
+  'yamunaji_rfd': { tab: 'yj_rfd', dept: 'yamunaji' },
   'yj_dashboard': { tab: 'yj_dashboard', dept: 'yamunaji' },
   'yj_settings': { tab: 'yj_settings', dept: 'yamunaji' },
   'yj_complaints': { tab: 'yj_complaints', dept: 'yamunaji' },
@@ -762,7 +766,7 @@ export default function App() {
   const ELITE_FABTEX_PERMISSIONS = ['ef_dashboard', 'ef_invoices', 'ef_complaints', 'ef_settings', 'ef_expenses', 'ef_raw_materials'];
   const SOBISE_PERMISSIONS = ['so_dashboard', 'so_invoices', 'so_complaints', 'so_settings', 'so_expenses', 'so_raw_materials'];
   const ETHNO_WEAR_PERMISSIONS = ['ew_invoices', 'ew_dashboard', 'ew_complaints', 'ew_settings', 'ew_expenses', 'ew_raw_materials'];
-  const YAMUNAJI_PERMISSIONS = ['yj_invoices', 'yj_dashboard', 'yj_complaints', 'yj_settings', 'yj_expenses', 'yj_raw_materials'];
+  const YAMUNAJI_PERMISSIONS = ['yj_rfd', 'yj_invoices', 'yj_dashboard', 'yj_complaints', 'yj_settings', 'yj_expenses', 'yj_raw_materials'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_sample', 'jobcards_master', 'designer_screen', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'crm_profiles', 'crm_leads', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'es_dashboard', 'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
@@ -2119,7 +2123,19 @@ export default function App() {
           })()}
 
           {/* Master Consolidated Business Unit Selector for Desktop */}
-          <div className="dept-switcher-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            className="dept-switcher-header"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: '#f1f5f9',
+              borderRadius: '10px',
+              padding: '3px 6px',
+              border: '1px solid #e2e8f0',
+              gap: '3px',
+              flexShrink: 0
+            }}
+          >
             {(() => {
               const visibleCompanies = COMPANIES.filter(company => {
                 if (!isCompanyAllowed(company.id) && !isCompanyAllowed(company.name)) return false;
@@ -2142,10 +2158,8 @@ export default function App() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    background: '#f1f5f9',
-                    borderRadius: '8px',
-                    padding: '2px',
-                    border: '1px solid #e2e8f0'
+                    gap: '3px',
+                    flexShrink: 0
                   }}
                   title="Switch Business Unit"
                 >
@@ -2172,8 +2186,9 @@ export default function App() {
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 8px',
+                          justifyContent: 'center',
+                          padding: '4px 9px',
+                          height: '28px',
                           borderRadius: '6px',
                           border: 'none',
                           background: isActive ? '#ffffff' : 'transparent',
@@ -2181,8 +2196,10 @@ export default function App() {
                           fontWeight: isActive ? 800 : 600,
                           fontSize: '0.74rem',
                           cursor: 'pointer',
-                          boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                          transition: 'all 0.12s ease'
+                          boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.15s ease',
+                          flexShrink: 0,
+                          whiteSpace: 'nowrap'
                         }}
                       >
                         <span>{company.code || company.name}</span>
@@ -2193,8 +2210,13 @@ export default function App() {
               );
             })()}
 
-            {(hasCommunicationAccess || hasTaskAccess || true) && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', borderLeft: '1px solid #e2e8f0', paddingLeft: '8px' }}>
+            {/* Vertical Divider */}
+            {(hasCommunicationAccess || hasTaskAccess) && (
+              <div style={{ width: '1px', height: '18px', background: '#cbd5e1', margin: '0 3px', flexShrink: 0 }} />
+            )}
+
+            {(hasCommunicationAccess || hasTaskAccess) && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
                 {hasCommunicationAccess && (
                   <button
                     onClick={() => {
@@ -2204,10 +2226,27 @@ export default function App() {
                         window.dispatchEvent(new CustomEvent('elite-open-chat-list'));
                       }
                     }}
-                    className={`dept-switcher-btn comm-btn ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
+                    className={`company-segment-pill ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
                     title="Inter-Department Communication & Workforce Chat"
                     type="button"
-                    style={{ minHeight: '30px', height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 9px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: (activeTab === 'communication' || activeTab === 'workspace') ? '#ffffff' : 'transparent',
+                      color: (activeTab === 'communication' || activeTab === 'workspace') ? '#1d4ed8' : '#64748b',
+                      fontWeight: (activeTab === 'communication' || activeTab === 'workspace') ? 800 : 600,
+                      fontSize: '0.74rem',
+                      cursor: 'pointer',
+                      boxShadow: (activeTab === 'communication' || activeTab === 'workspace') ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                      position: 'relative'
+                    }}
                   >
                     <MessageSquare size={13} style={{ flexShrink: 0 }} />
                     <span className="hidden sm:inline">Chat</span>
@@ -2225,10 +2264,26 @@ export default function App() {
                       setActiveTab('task_management');
                       setMobileMenuOpen(false);
                     }}
-                    className={`dept-switcher-btn comm-btn ${activeTab === 'task_management' ? 'active' : ''}`}
+                    className={`company-segment-pill ${activeTab === 'task_management' ? 'active' : ''}`}
                     title="Task Management & Staff Workloads"
                     type="button"
-                    style={{ minHeight: '30px', height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 9px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: activeTab === 'task_management' ? '#ffffff' : 'transparent',
+                      color: activeTab === 'task_management' ? '#1d4ed8' : '#64748b',
+                      fontWeight: activeTab === 'task_management' ? 800 : 600,
+                      fontSize: '0.74rem',
+                      cursor: 'pointer',
+                      boxShadow: activeTab === 'task_management' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0
+                    }}
                   >
                     <CheckSquare size={13} style={{ flexShrink: 0 }} />
                     <span className="hidden sm:inline">Tasks</span>
@@ -2841,9 +2896,14 @@ export default function App() {
                       </button>
                     )}
                     {activeDepartment === 'yamunaji' && (
-                      <button onClick={() => { setActiveTab('yj_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_raw_materials' ? 'active' : ''}`}>
-                        Raw Materials
-                      </button>
+                      <>
+                        <button onClick={() => { setActiveTab('yj_rfd'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_rfd' ? 'active' : ''}`}>
+                          RFD Fabric
+                        </button>
+                        <button onClick={() => { setActiveTab('yj_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'yj_raw_materials' ? 'active' : ''}`}>
+                          Raw Materials
+                        </button>
+                      </>
                     )}
                     {activeDepartment === 'elite_edition' && (
                       <button onClick={() => { setActiveTab('ee_raw_materials'); setMobileMenuOpen(false); }} className={`mobile-drawer-item ${activeTab === 'ee_raw_materials' ? 'active' : ''}`}>
@@ -3151,8 +3211,11 @@ export default function App() {
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_dashboard')) &&
                       renderNavItem('yj_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')
                     }
+                    {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_rfd')) &&
+                      renderNavItem('yj_rfd', 'RFD', Layers, null, 'RFD')
+                    }
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_raw_materials')) &&
-                      renderNavItem('yj_raw_materials', 'Raw Materials', Layers, null, 'Raw Materials')
+                      renderNavItem('yj_raw_materials', 'Raw Materials', PackageCheck, null, 'Raw Materials')
                     }
                     {(!currentUser || isSuperOrAdmin || currentUser.role === 'admin' || currentUser.permissions?.includes('yj_invoices')) &&
                       renderNavItem('yj_invoices', 'Finance', Receipt, null, 'Finance')
@@ -3567,6 +3630,8 @@ export default function App() {
             <EliteBillingDepartment companyEntity="Ethno wear" department="ethno_wear" />
           ) : activeTab === 'yj_dashboard' ? (
             <CompanyDedicatedDashboard companyEntity="Yamunaji" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'yj_rfd' ? (
+            <YamunajiRfdPanel companyEntity="Yamunaji" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'yj_settings' ? (
             <CompanySettingsPanel companyEntity="Yamunaji" />
           ) : activeTab === 'yj_complaints' ? (

@@ -16,7 +16,8 @@ import {
   FileText,
   ChevronRight,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  Layers
 } from 'lucide-react';
 import JobCardStatusDashboard from './JobCardStatusDashboard';
 
@@ -164,6 +165,15 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {(companyEntity === 'Yamunaji' || companyEntity === 'yamunaji' || companyEntity === 'YJ') && (
+            <button
+              onClick={() => onNavigate && onNavigate('yj_rfd')}
+              className="btn-secondary"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              <Layers size={15} color="#0ea5e9" /> RFD Fabric Hub
+            </button>
+          )}
           <button
             onClick={() => onNavigate && onNavigate(getInvoicesTab(companyEntity))}
             className="btn-primary"
