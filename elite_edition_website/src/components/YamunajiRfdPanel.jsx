@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Layers,
   PlusCircle,
   Search,
-  Filter,
   CheckCircle2,
   AlertTriangle,
   Clock,
@@ -14,588 +13,614 @@ import {
   Download,
   Trash2,
   Eye,
-  Sliders,
-  Sparkles,
-  PackageCheck,
-  Building,
-  Check,
-  X,
-  FileSpreadsheet,
-  QrCode,
-  Tag,
   Scissors,
   Printer,
   ChevronRight,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Truck,
+  Plus,
+  X,
+  FileSpreadsheet,
+  PackageCheck,
+  Building,
+  Check,
+  ChevronDown,
+  Hash,
+  Sparkles,
+  Calendar,
+  ClipboardList,
+  Boxes
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
 
-const STORAGE_KEY = 'yamunaji_rfd_lots_data';
-const LEDGER_STORAGE_KEY = 'yamunaji_rfd_ledger_data';
+const STORAGE_GRAY_KEY = 'yamunaji_gray_lots_data';
+const STORAGE_MILL_CHALLAN_KEY = 'yamunaji_mill_challans_data';
+const STORAGE_RFD_KEY = 'yamunaji_rfd_lots_data';
+const STORAGE_LEDGER_KEY = 'yamunaji_rfd_ledger_data';
 
-// Initial Seed Data for Yamunaji RFD Lots
-const SEED_LOTS = [
+// ==========================================
+// SEED DATA FOR GRAY FABRIC
+// ==========================================
+const SEED_GRAY_LOTS = [
   {
-    id: 'YJ-RFD-2026-001',
-    lotNumber: 'YJ-RFD-2026-001',
-    inwardDate: '2026-10-22',
-    millParty: 'Shree Radhe Bleaching & Dyeing',
-    challanNo: 'CH-SR-8842',
+    id: 'GRAY-LOT-2026-001',
+    lotNumber: 'GRAY-2026-001',
+    inwardDate: '2026-10-24',
+    weaverParty: 'Maruti Weaving Works',
+    weaverChallanNo: 'MWW-8921',
     fabricQuality: 'Pure Viscose Rayon 14kg',
     panna: '44"',
-    gsm: 140,
-    totalRolls: 24,
-    totalMeters: 2400,
-    issuedMeters: 1200,
-    ratePerMeter: 68.5,
-    qualityGrade: 'A Grade',
-    status: 'Partially Issued', // In Stock, Partially Issued, Depleted
-    rackLocation: 'Rack YJ-A1',
-    remarks: 'Ready for digital sublimation discharge. 0% shrinkage verified.',
-    rolls: [
-      { rollNo: 'R-01', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
-      { rollNo: 'R-02', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
-      { rollNo: 'R-03', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
-      { rollNo: 'R-04', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
-      { rollNo: 'R-05', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1108' },
-      { rollNo: 'R-06', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1108' },
-      { rollNo: 'R-07', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1108' },
-      { rollNo: 'R-08', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1108' },
-      { rollNo: 'R-09', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1114' },
-      { rollNo: 'R-10', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1114' },
-      { rollNo: 'R-11', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1114' },
-      { rollNo: 'R-12', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1114' },
-      { rollNo: 'R-13', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-14', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-15', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-16', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-17', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-18', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-19', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-20', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-21', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-22', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-23', meters: 100, status: 'In Stock', issueTo: null },
-      { rollNo: 'R-24', meters: 100, status: 'In Stock', issueTo: null }
+    totalTps: 10,
+    totalMeters: 1024.5,
+    sentToMillMeters: 512.0,
+    ratePerMeter: 46.0,
+    status: 'Partially at Mill', // In Stock, Partially at Mill, Fully at Mill
+    rackLocation: 'Gray Rack G-01',
+    remarks: 'Dense 14kg warp-weft weave. Zero weaving defect.',
+    tps: [
+      { srNo: 1, tpNo: '101', tpMtr: 102.5, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
+      { srNo: 2, tpNo: '102', tpMtr: 101.0, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
+      { srNo: 3, tpNo: '103', tpMtr: 104.2, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
+      { srNo: 4, tpNo: '104', tpMtr: 103.0, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
+      { srNo: 5, tpNo: '105', tpMtr: 101.3, status: 'Sent to Mill', millChallanNo: 'MILL-CH-101' },
+      { srNo: 6, tpNo: '106', tpMtr: 102.0, status: 'In Stock', millChallanNo: null },
+      { srNo: 7, tpNo: '107', tpMtr: 103.5, status: 'In Stock', millChallanNo: null },
+      { srNo: 8, tpNo: '108', tpMtr: 101.8, status: 'In Stock', millChallanNo: null },
+      { srNo: 9, tpNo: '109', tpMtr: 102.7, status: 'In Stock', millChallanNo: null },
+      { srNo: 10, tpNo: '110', tpMtr: 102.5, status: 'In Stock', millChallanNo: null }
     ]
   },
   {
-    id: 'YJ-RFD-2026-002',
-    lotNumber: 'YJ-RFD-2026-002',
-    inwardDate: '2026-10-24',
-    millParty: 'Vrundavan Mills Pvt Ltd',
-    challanNo: 'VRUN-CH-4410',
+    id: 'GRAY-LOT-2026-002',
+    lotNumber: 'GRAY-2026-002',
+    inwardDate: '2026-10-25',
+    weaverParty: 'Harikrishna Textiles',
+    weaverChallanNo: 'HKT-4450',
     fabricQuality: 'Pure Modal Satin 60s',
     panna: '44"',
-    gsm: 125,
-    totalRolls: 30,
-    totalMeters: 3000,
-    issuedMeters: 800,
-    ratePerMeter: 124.0,
-    qualityGrade: 'A Grade',
-    status: 'Partially Issued',
-    rackLocation: 'Rack YJ-B2',
-    remarks: 'Premium satin gloss finish. High tensile strength, zero defect certified.',
-    rolls: Array.from({ length: 30 }, (_, i) => ({
-      rollNo: `R-${String(i + 1).padStart(2, '0')}`,
-      meters: 100,
-      status: i < 8 ? 'Issued' : 'In Stock',
-      issueTo: i < 8 ? 'Digital Print Job Card #1120' : null
-    }))
+    totalTps: 8,
+    totalMeters: 818.0,
+    sentToMillMeters: 0,
+    ratePerMeter: 82.0,
+    status: 'In Stock',
+    rackLocation: 'Gray Rack G-02',
+    remarks: 'High twist modal gray fabric received from Katargam looms.',
+    tps: [
+      { srNo: 1, tpNo: '201', tpMtr: 102.0, status: 'In Stock', millChallanNo: null },
+      { srNo: 2, tpNo: '202', tpMtr: 101.5, status: 'In Stock', millChallanNo: null },
+      { srNo: 3, tpNo: '203', tpMtr: 103.0, status: 'In Stock', millChallanNo: null },
+      { srNo: 4, tpNo: '204', tpMtr: 102.5, status: 'In Stock', millChallanNo: null },
+      { srNo: 5, tpNo: '205', tpMtr: 101.0, status: 'In Stock', millChallanNo: null },
+      { srNo: 6, tpNo: '206', tpMtr: 103.5, status: 'In Stock', millChallanNo: null },
+      { srNo: 7, tpNo: '207', tpMtr: 102.0, status: 'In Stock', millChallanNo: null },
+      { srNo: 8, tpNo: '208', tpMtr: 102.5, status: 'In Stock', millChallanNo: null }
+    ]
   },
   {
-    id: 'YJ-RFD-2026-003',
-    lotNumber: 'YJ-RFD-2026-003',
-    inwardDate: '2026-10-25',
-    millParty: 'Ganesh Textile Processors',
-    challanNo: 'GTP-9921',
+    id: 'GRAY-LOT-2026-003',
+    lotNumber: 'GRAY-2026-003',
+    inwardDate: '2026-10-26',
+    weaverParty: 'Shivam Loom Industries',
+    weaverChallanNo: 'SLI-1029',
     fabricQuality: 'Cotton 60x60 Cambric',
     panna: '58"',
-    gsm: 90,
-    totalRolls: 40,
-    totalMeters: 4000,
-    issuedMeters: 0,
-    ratePerMeter: 54.0,
-    qualityGrade: 'A Grade',
+    totalTps: 12,
+    totalMeters: 1248.0,
+    sentToMillMeters: 0,
+    ratePerMeter: 38.5,
     status: 'In Stock',
-    rackLocation: 'Rack YJ-A3',
-    remarks: 'High absorbency RFD cambric for reactive printing. 58-inch wide panna.',
-    rolls: Array.from({ length: 40 }, (_, i) => ({
-      rollNo: `R-${String(i + 1).padStart(2, '0')}`,
-      meters: 100,
+    rackLocation: 'Gray Rack G-03',
+    remarks: '58" wide cambric fresh inward from weaver.',
+    tps: Array.from({ length: 12 }, (_, i) => ({
+      srNo: i + 1,
+      tpNo: `30${i + 1}`,
+      tpMtr: 104.0,
       status: 'In Stock',
-      issueTo: null
-    }))
-  },
-  {
-    id: 'YJ-RFD-2026-004',
-    lotNumber: 'YJ-RFD-2026-004',
-    inwardDate: '2026-10-26',
-    millParty: 'Shree Ambika Processing Mill',
-    challanNo: 'AMB-1029',
-    fabricQuality: 'Organza Viscose Gold Weave',
-    panna: '44"',
-    gsm: 65,
-    totalRolls: 20,
-    totalMeters: 2000,
-    issuedMeters: 0,
-    ratePerMeter: 92.0,
-    qualityGrade: 'A Grade',
-    status: 'In Stock',
-    rackLocation: 'Rack YJ-C1',
-    remarks: 'Fresh inward today. Inspected on rolling machine.',
-    rolls: Array.from({ length: 20 }, (_, i) => ({
-      rollNo: `R-${String(i + 1).padStart(2, '0')}`,
-      meters: 100,
-      status: 'In Stock',
-      issueTo: null
-    }))
-  },
-  {
-    id: 'YJ-RFD-2026-005',
-    lotNumber: 'YJ-RFD-2026-005',
-    inwardDate: '2026-10-18',
-    millParty: 'Bhagwati Textile Mills',
-    challanNo: 'BGW-4512',
-    fabricQuality: 'Chanderi Silk 50gm',
-    panna: '44"',
-    gsm: 75,
-    totalRolls: 15,
-    totalMeters: 1500,
-    issuedMeters: 1500,
-    ratePerMeter: 86.0,
-    qualityGrade: 'A Grade',
-    status: 'Depleted',
-    rackLocation: 'Rack YJ-C2',
-    remarks: 'All 15 rolls fully issued to EDP printing lines.',
-    rolls: Array.from({ length: 15 }, (_, i) => ({
-      rollNo: `R-${String(i + 1).padStart(2, '0')}`,
-      meters: 100,
-      status: 'Issued',
-      issueTo: 'Job Card #1098'
+      millChallanNo: null
     }))
   }
 ];
 
-const SEED_LEDGER = [
+// Seed Mill Outward Challans
+const SEED_MILL_CHALLANS = [
   {
-    id: 'TX-01',
-    date: '2026-10-26 11:30 AM',
-    lotNumber: 'YJ-RFD-2026-004',
-    type: 'INWARD',
-    fabricQuality: 'Organza Viscose Gold Weave',
-    meters: 2000,
-    rolls: 20,
-    party: 'Shree Ambika Processing Mill',
-    reference: 'Challan #AMB-1029',
-    user: 'Harshit Sidapara',
-    notes: 'Inward gate inspection passed 100%'
-  },
-  {
-    id: 'TX-02',
-    date: '2026-10-25 04:15 PM',
-    lotNumber: 'YJ-RFD-2026-002',
-    type: 'ISSUED',
-    fabricQuality: 'Pure Modal Satin 60s',
-    meters: 800,
-    rolls: 8,
-    party: 'Digital Print Floor (EDP)',
-    reference: 'Job Card #1120',
-    user: 'Store Manager',
-    notes: 'Issued 8 rolls for designer kurti printing run'
-  },
-  {
-    id: 'TX-03',
-    date: '2026-10-25 10:00 AM',
-    lotNumber: 'YJ-RFD-2026-003',
-    type: 'INWARD',
-    fabricQuality: 'Cotton 60x60 Cambric',
-    meters: 4000,
-    rolls: 40,
-    party: 'Ganesh Textile Processors',
-    reference: 'Challan #GTP-9921',
-    user: 'Store Manager',
-    notes: 'Bulk RFD lot received for summer collection'
-  },
-  {
-    id: 'TX-04',
-    date: '2026-10-23 03:00 PM',
-    lotNumber: 'YJ-RFD-2026-001',
-    type: 'ISSUED',
+    id: 'MILL-CH-101',
+    challanNo: 'MILL-CH-101',
+    challanDate: '2026-10-25',
+    millParty: 'Shree Radhe Bleaching & Dyeing Processors',
+    vehicleNo: 'GJ-05-BT-4412',
+    driverName: 'Ramesh Patel',
+    processRequired: 'RFD Bleaching, Scouring & Heat Setting',
     fabricQuality: 'Pure Viscose Rayon 14kg',
-    meters: 1200,
-    rolls: 12,
-    party: 'Digital Print Floor (EDP)',
-    reference: 'Job Cards #1102, #1108, #1114',
-    user: 'Harshit Sidapara',
-    notes: 'Issued 12 rolls for saree print order'
+    totalTps: 5,
+    totalMeters: 512.0,
+    status: 'At Mill', // At Mill, Received as RFD
+    tps: [
+      { srNo: 1, lotNumber: 'GRAY-2026-001', tpNo: '101', tpMtr: 102.5 },
+      { srNo: 2, lotNumber: 'GRAY-2026-001', tpNo: '102', tpMtr: 101.0 },
+      { srNo: 3, lotNumber: 'GRAY-2026-001', tpNo: '103', tpMtr: 104.2 },
+      { srNo: 4, lotNumber: 'GRAY-2026-001', tpNo: '104', tpMtr: 103.0 },
+      { srNo: 5, lotNumber: 'GRAY-2026-001', tpNo: '105', tpMtr: 101.3 }
+    ],
+    notes: 'Urgent RFD required for digital discharge printing batch #1102.'
+  }
+];
+
+// Seed Processed RFD Lots
+const SEED_RFD_LOTS = [
+  {
+    id: 'YJ-RFD-2026-001',
+    lotNumber: 'YJ-RFD-2026-001',
+    inwardDate: '2026-10-26',
+    millParty: 'Shree Radhe Bleaching & Dyeing Processors',
+    millChallanNo: 'RADHE-RFD-7721',
+    originMillChallan: 'MILL-CH-101',
+    fabricQuality: 'Pure Viscose Rayon 14kg',
+    panna: '44"',
+    gsm: 140,
+    graySentMeters: 512.0,
+    receivedRfdMeters: 498.0,
+    shrinkageLossMeters: 14.0,
+    shrinkagePercent: 2.73,
+    totalRolls: 5,
+    issuedMeters: 200.0,
+    ratePerMeter: 68.5,
+    qualityGrade: 'A Grade',
+    status: 'Partially Issued',
+    rackLocation: 'RFD Rack YJ-A1',
+    remarks: 'Ready for digital sublimation discharge. 0% residue verified.',
+    rolls: [
+      { rollNo: 'R-01', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
+      { rollNo: 'R-02', meters: 100, status: 'Issued', issueTo: 'EDP Job Card #1102' },
+      { rollNo: 'R-03', meters: 100, status: 'In Stock', issueTo: null },
+      { rollNo: 'R-04', meters: 99, status: 'In Stock', issueTo: null },
+      { rollNo: 'R-05', meters: 99, status: 'In Stock', issueTo: null }
+    ]
   }
 ];
 
 export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigate }) {
-  // State
-  const [activeTab, setActiveTab] = useState('inventory'); // inventory, inward, issuance, inspection, ledger
-  const [lots, setLots] = useState(() => {
+  // Master Screen Mode: 'gray' (Gray Fabric) or 'rfd' (RFD Fabric)
+  const [screenMode, setScreenMode] = useState('gray');
+
+  // Sub-tabs for Gray: 'weaver_inward' (Weaver Inward & Gray Stock) or 'mill_outward' (Outward Challans to Mill)
+  const [graySubTab, setGraySubTab] = useState('weaver_inward');
+
+  // Sub-tabs for RFD: 'rfd_inventory' or 'rfd_inward'
+  const [rfdSubTab, setRfdSubTab] = useState('rfd_inventory');
+
+  // Data States
+  const [grayLots, setGrayLots] = useState(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_GRAY_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const p = JSON.parse(saved);
+        if (Array.isArray(p) && p.length > 0) return p;
       }
-    } catch (e) {
-      console.warn('Failed reading RFD lots from storage:', e);
-    }
-    return SEED_LOTS;
+    } catch (e) {}
+    return SEED_GRAY_LOTS;
   });
 
-  const [ledger, setLedger] = useState(() => {
+  const [millChallans, setMillChallans] = useState(() => {
     try {
-      const saved = localStorage.getItem(LEDGER_STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_MILL_CHALLAN_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const p = JSON.parse(saved);
+        if (Array.isArray(p) && p.length > 0) return p;
       }
-    } catch (e) {
-      console.warn('Failed reading RFD ledger from storage:', e);
-    }
-    return SEED_LEDGER;
+    } catch (e) {}
+    return SEED_MILL_CHALLANS;
   });
 
-  // Filters & Search
+  const [rfdLots, setRfdLots] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_RFD_KEY);
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (Array.isArray(p) && p.length > 0) return p;
+      }
+    } catch (e) {}
+    return SEED_RFD_LOTS;
+  });
+
+  // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
-  const [qualityFilter, setQualityFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Modals
-  const [showInwardModal, setShowInwardModal] = useState(false);
-  const [showIssueModal, setShowIssueModal] = useState(false);
-  const [selectedLotForRolls, setSelectedLotForRolls] = useState(null);
-  const [selectedLotForIssue, setSelectedLotForIssue] = useState(null);
+  const [showWeaverInwardModal, setShowWeaverInwardModal] = useState(false);
+  const [showMillChallanModal, setShowMillChallanModal] = useState(false);
+  const [showPrintChallanModal, setShowPrintChallanModal] = useState(null);
+  const [selectedGrayLotForView, setSelectedGrayLotForView] = useState(null);
 
-  // Form State for Inward
-  const [inwardForm, setInwardForm] = useState({
+  // Form State for Weaver Inward with TP details
+  const [weaverForm, setWeaverForm] = useState({
     lotNumber: '',
     inwardDate: new Date().toISOString().split('T')[0],
-    millParty: '',
-    challanNo: '',
+    weaverParty: '',
+    weaverChallanNo: '',
     fabricQuality: 'Pure Viscose Rayon 14kg',
     panna: '44"',
-    gsm: 140,
-    totalRolls: 20,
-    totalMeters: 2000,
-    ratePerMeter: 65,
-    qualityGrade: 'A Grade',
-    rackLocation: 'Rack YJ-A1',
-    remarks: ''
+    ratePerMeter: 45,
+    rackLocation: 'Gray Rack G-01',
+    remarks: '',
+    tps: [
+      { srNo: 1, tpNo: '1', tpMtr: '' },
+      { srNo: 2, tpNo: '2', tpMtr: '' },
+      { srNo: 3, tpNo: '3', tpMtr: '' },
+      { srNo: 4, tpNo: '4', tpMtr: '' },
+      { srNo: 5, tpNo: '5', tpMtr: '' }
+    ]
   });
 
-  // Form State for Issuance
-  const [issueForm, setIssueForm] = useState({
-    lotId: '',
-    issuedMeters: 200,
-    issuedRolls: 2,
-    issueTo: 'EDP Digital Print Job Card',
-    referenceDoc: '',
-    operatorName: 'Store Operator',
+  // Form State for Mill Outward Challan
+  const [millChallanForm, setMillChallanForm] = useState({
+    challanNo: '',
+    challanDate: new Date().toISOString().split('T')[0],
+    millParty: 'Shree Radhe Bleaching & Dyeing Processors',
+    vehicleNo: '',
+    driverName: '',
+    processRequired: 'RFD Bleaching, Scouring & Heat Setting',
+    selectedTpKeys: {}, // key: "lotId__tpIndex" -> boolean
     notes: ''
   });
 
-  // Sync to localStorage
+  // Sync to LocalStorage
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(lots));
-    } catch (e) {
-      console.error('Error saving lots to localStorage:', e);
-    }
-  }, [lots]);
+    try { localStorage.setItem(STORAGE_GRAY_KEY, JSON.stringify(grayLots)); } catch (e) {}
+  }, [grayLots]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(ledger));
-    } catch (e) {
-      console.error('Error saving ledger to localStorage:', e);
-    }
-  }, [ledger]);
+    try { localStorage.setItem(STORAGE_MILL_CHALLAN_KEY, JSON.stringify(millChallans)); } catch (e) {}
+  }, [millChallans]);
 
-  // Aggregate Stats
-  const stats = useMemo(() => {
-    let totalInStockMeters = 0;
-    let totalInStockRolls = 0;
-    let totalIssuedMeters = 0;
-    let totalValuation = 0;
-    let activeLotsCount = 0;
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_RFD_KEY, JSON.stringify(rfdLots)); } catch (e) {}
+  }, [rfdLots]);
 
-    lots.forEach(lot => {
-      const balance = Math.max(0, (lot.totalMeters || 0) - (lot.issuedMeters || 0));
-      totalInStockMeters += balance;
-      totalIssuedMeters += (lot.issuedMeters || 0);
-      totalValuation += balance * (lot.ratePerMeter || 0);
+  // Aggregate Metrics
+  const grayStats = useMemo(() => {
+    let inStockMtrs = 0;
+    let inStockTps = 0;
+    let atMillMtrs = 0;
+    let totalGrayValuation = 0;
 
-      const inStockRolls = (lot.rolls || []).filter(r => r.status === 'In Stock').length;
-      totalInStockRolls += inStockRolls > 0 ? inStockRolls : Math.round(balance / 100);
-
-      if (lot.status !== 'Depleted') activeLotsCount++;
+    grayLots.forEach(lot => {
+      const availableTps = (lot.tps || []).filter(t => t.status === 'In Stock');
+      const inStockMtr = availableTps.reduce((sum, t) => sum + (Number(t.tpMtr) || 0), 0);
+      inStockMtrs += inStockMtr;
+      inStockTps += availableTps.length;
+      atMillMtrs += (lot.sentToMillMeters || 0);
+      totalGrayValuation += inStockMtr * (lot.ratePerMeter || 0);
     });
 
     return {
-      totalInStockMeters,
-      totalInStockRolls,
-      totalIssuedMeters,
-      totalValuation,
-      activeLotsCount,
-      totalLots: lots.length
+      inStockMtrs,
+      inStockTps,
+      atMillMtrs,
+      totalGrayValuation,
+      totalLots: grayLots.length
     };
-  }, [lots]);
+  }, [grayLots]);
 
-  // Filtered Lots
-  const filteredLots = useMemo(() => {
-    return lots.filter(lot => {
-      if (qualityFilter !== 'ALL' && lot.fabricQuality !== qualityFilter) return false;
-      if (statusFilter !== 'ALL' && lot.status !== statusFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchLot = (lot.lotNumber || '').toLowerCase().includes(q);
-        const matchMill = (lot.millParty || '').toLowerCase().includes(q);
-        const matchChallan = (lot.challanNo || '').toLowerCase().includes(q);
-        const matchQuality = (lot.fabricQuality || '').toLowerCase().includes(q);
-        const matchRack = (lot.rackLocation || '').toLowerCase().includes(q);
-        return matchLot || matchMill || matchChallan || matchQuality || matchRack;
-      }
-      return true;
+  const rfdStats = useMemo(() => {
+    let inStockRfdMtrs = 0;
+    let inStockRolls = 0;
+    rfdLots.forEach(lot => {
+      const bal = Math.max(0, (lot.receivedRfdMeters || 0) - (lot.issuedMeters || 0));
+      inStockRfdMtrs += bal;
+      inStockRolls += (lot.rolls || []).filter(r => r.status === 'In Stock').length;
     });
-  }, [lots, qualityFilter, statusFilter, searchQuery]);
+    return { inStockRfdMtrs, inStockRolls, totalRfdLots: rfdLots.length };
+  }, [rfdLots]);
 
-  // Unique Qualities for Filter
-  const availableQualities = useMemo(() => {
-    const set = new Set();
-    lots.forEach(l => { if (l.fabricQuality) set.add(l.fabricQuality); });
-    return Array.from(set);
-  }, [lots]);
+  // ==========================================
+  // WEAVER INWARD FORM TP ROW HELPERS
+  // ==========================================
+  const handleTpChange = (index, field, value) => {
+    setWeaverForm(prev => {
+      const updated = [...prev.tps];
+      if (field === 'tpMtr') {
+        // Sanitize decimal input
+        const clean = value.replace(/[^0-9.]/g, '');
+        const parts = clean.split('.');
+        const validVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean;
+        updated[index] = { ...updated[index], [field]: validVal };
+      } else {
+        updated[index] = { ...updated[index], [field]: value };
+      }
+      return { ...prev, tps: updated };
+    });
+  };
 
-  // Handle Inward Submission
-  const handleCreateInwardLot = (e) => {
+  const handleAddTpRow = () => {
+    setWeaverForm(prev => {
+      const nextSr = prev.tps.length + 1;
+      const lastTpNo = prev.tps.length > 0 ? Number(prev.tps[prev.tps.length - 1].tpNo) : 0;
+      const nextTpNo = !isNaN(lastTpNo) && lastTpNo > 0 ? String(lastTpNo + 1) : String(nextSr);
+      return {
+        ...prev,
+        tps: [...prev.tps, { srNo: nextSr, tpNo: nextTpNo, tpMtr: '' }]
+      };
+    });
+  };
+
+  const handleAddMultipleTpRows = (count = 5) => {
+    setWeaverForm(prev => {
+      const updated = [...prev.tps];
+      for (let i = 0; i < count; i++) {
+        const nextSr = updated.length + 1;
+        const lastTpNo = updated.length > 0 ? Number(updated[updated.length - 1].tpNo) : 0;
+        const nextTpNo = !isNaN(lastTpNo) && lastTpNo > 0 ? String(lastTpNo + 1) : String(nextSr);
+        updated.push({ srNo: nextSr, tpNo: nextTpNo, tpMtr: '' });
+      }
+      return { ...prev, tps: updated };
+    });
+  };
+
+  const handleRemoveTpRow = (index) => {
+    setWeaverForm(prev => {
+      const filtered = prev.tps.filter((_, idx) => idx !== index);
+      // Re-index Sr. No
+      const reIndexed = filtered.map((item, idx) => ({ ...item, srNo: idx + 1 }));
+      return { ...prev, tps: reIndexed };
+    });
+  };
+
+  // Keyboard navigation: pressing Enter on a TP Meter input adds or focuses next row
+  const handleTpKeyDown = (e, index) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (index === weaverForm.tps.length - 1) {
+        handleAddTpRow();
+      }
+      setTimeout(() => {
+        const nextInput = document.getElementById(`tp-mtr-input-${index + 1}`);
+        if (nextInput) nextInput.focus();
+      }, 50);
+    }
+  };
+
+  // Computed Totals for Weaver Form
+  const weaverFormSummary = useMemo(() => {
+    let totalMtrs = 0;
+    let filledTps = 0;
+    weaverForm.tps.forEach(tp => {
+      const m = parseFloat(tp.tpMtr);
+      if (!isNaN(m) && m > 0) {
+        totalMtrs += m;
+        filledTps++;
+      }
+    });
+    return {
+      totalMtrs: parseFloat(totalMtrs.toFixed(2)),
+      totalTps: filledTps,
+      avgMtr: filledTps > 0 ? (totalMtrs / filledTps).toFixed(2) : 0
+    };
+  }, [weaverForm.tps]);
+
+  // Submit Weaver Inward
+  const handleSaveWeaverInward = (e) => {
     e.preventDefault();
-    if (!inwardForm.millParty.trim()) {
-      triggerEliteAlert('Please enter the Mill / Processing Party name.', 'Missing Party');
+    if (!weaverForm.weaverParty.trim()) {
+      triggerEliteAlert('Please enter Weaver / Loom Owner Party Name.', 'Missing Weaver');
       return;
     }
-    const totalMeters = Number(inwardForm.totalMeters) || 0;
-    const totalRolls = Number(inwardForm.totalRolls) || 1;
-    if (totalMeters <= 0) {
-      triggerEliteAlert('Total meters must be greater than zero.', 'Invalid Meters');
+    const validTps = weaverForm.tps.filter(t => {
+      const m = parseFloat(t.tpMtr);
+      return !isNaN(m) && m > 0;
+    });
+
+    if (validTps.length === 0) {
+      triggerEliteAlert('Please enter meters for at least one TP.', 'No TP Meters');
       return;
     }
 
-    const nextId = `YJ-RFD-2026-${String(lots.length + 1).padStart(3, '0')}`;
-    const lotNumber = inwardForm.lotNumber.trim() || nextId;
+    const nextId = `GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`;
+    const lotNumber = weaverForm.lotNumber.trim() || nextId;
+    const totalMeters = validTps.reduce((sum, t) => sum + parseFloat(t.tpMtr), 0);
 
-    // Generate individual rolls
-    const avgRollMeters = Math.round(totalMeters / totalRolls);
-    const rollsList = Array.from({ length: totalRolls }, (_, i) => ({
-      rollNo: `R-${String(i + 1).padStart(2, '0')}`,
-      meters: avgRollMeters,
-      status: 'In Stock',
-      issueTo: null
-    }));
-
-    const newLot = {
+    const newGrayLot = {
       id: nextId,
       lotNumber,
-      inwardDate: inwardForm.inwardDate,
-      millParty: inwardForm.millParty.trim(),
-      challanNo: inwardForm.challanNo.trim() || 'Direct Inward',
-      fabricQuality: inwardForm.fabricQuality,
-      panna: inwardForm.panna,
-      gsm: Number(inwardForm.gsm) || 120,
-      totalRolls,
-      totalMeters,
-      issuedMeters: 0,
-      ratePerMeter: Number(inwardForm.ratePerMeter) || 0,
-      qualityGrade: inwardForm.qualityGrade,
+      inwardDate: weaverForm.inwardDate,
+      weaverParty: weaverForm.weaverParty.trim(),
+      weaverChallanNo: weaverForm.weaverChallanNo.trim() || 'Direct Inward',
+      fabricQuality: weaverForm.fabricQuality,
+      panna: weaverForm.panna,
+      totalTps: validTps.length,
+      totalMeters: parseFloat(totalMeters.toFixed(2)),
+      sentToMillMeters: 0,
+      ratePerMeter: parseFloat(weaverForm.ratePerMeter) || 0,
       status: 'In Stock',
-      rackLocation: inwardForm.rackLocation.trim() || 'Floor Bay YJ',
-      remarks: inwardForm.remarks.trim(),
-      rolls: rollsList
+      rackLocation: weaverForm.rackLocation.trim() || 'Gray Rack',
+      remarks: weaverForm.remarks.trim(),
+      tps: validTps.map((t, idx) => ({
+        srNo: idx + 1,
+        tpNo: t.tpNo || String(idx + 1),
+        tpMtr: parseFloat(t.tpMtr),
+        status: 'In Stock',
+        millChallanNo: null
+      }))
     };
 
-    const newLedgerEntry = {
-      id: `TX-${Date.now()}`,
-      date: new Date().toLocaleDateString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      lotNumber,
-      type: 'INWARD',
-      fabricQuality: newLot.fabricQuality,
-      meters: totalMeters,
-      rolls: totalRolls,
-      party: newLot.millParty,
-      reference: `Challan #${newLot.challanNo}`,
-      user: 'Yamunaji Operations',
-      notes: newLot.remarks || 'Standard RFD Batch Inward'
-    };
-
-    setLots(prev => [newLot, ...prev]);
-    setLedger(prev => [newLedgerEntry, ...prev]);
-    setShowInwardModal(false);
+    setGrayLots(prev => [newGrayLot, ...prev]);
+    setShowWeaverInwardModal(false);
 
     // Reset Form
-    setInwardForm({
+    setWeaverForm({
       lotNumber: '',
       inwardDate: new Date().toISOString().split('T')[0],
-      millParty: '',
-      challanNo: '',
+      weaverParty: '',
+      weaverChallanNo: '',
       fabricQuality: 'Pure Viscose Rayon 14kg',
       panna: '44"',
-      gsm: 140,
-      totalRolls: 20,
-      totalMeters: 2000,
-      ratePerMeter: 65,
-      qualityGrade: 'A Grade',
-      rackLocation: 'Rack YJ-A1',
-      remarks: ''
+      ratePerMeter: 45,
+      rackLocation: 'Gray Rack G-01',
+      remarks: '',
+      tps: [
+        { srNo: 1, tpNo: '1', tpMtr: '' },
+        { srNo: 2, tpNo: '2', tpMtr: '' },
+        { srNo: 3, tpNo: '3', tpMtr: '' },
+        { srNo: 4, tpNo: '4', tpMtr: '' },
+        { srNo: 5, tpNo: '5', tpMtr: '' }
+      ]
     });
 
-    triggerEliteAlert(`RFD Lot ${lotNumber} (${totalMeters} Meters) successfully added to Yamunaji Stock!`, 'Inward Successful');
+    triggerEliteAlert(`Gray Fabric Lot ${lotNumber} (${validTps.length} TPs, ${totalMeters.toFixed(2)} Mtr) successfully inwarded!`, 'Inward Successful');
   };
 
-  // Open Issue Modal for a Lot
-  const handleOpenIssueModal = (lot) => {
-    setSelectedLotForIssue(lot);
-    const balanceMtrs = Math.max(0, lot.totalMeters - lot.issuedMeters);
-    setIssueForm({
-      lotId: lot.id,
-      issuedMeters: Math.min(200, balanceMtrs),
-      issuedRolls: Math.max(1, Math.min(2, Math.round(balanceMtrs / 100))),
-      issueTo: 'EDP Digital Print Job Card',
-      referenceDoc: `JC-${Date.now().toString().slice(-4)}`,
-      operatorName: 'Store Operator',
-      notes: `Issued from ${lot.lotNumber} for digital printing`
+  // ==========================================
+  // MILL OUTWARD CHALLAN HELPERS
+  // ==========================================
+  // List of all Available Gray TPs across lots that are currently 'In Stock'
+  const availableGrayTps = useMemo(() => {
+    const list = [];
+    grayLots.forEach(lot => {
+      (lot.tps || []).forEach((tp, tpIdx) => {
+        if (tp.status === 'In Stock') {
+          list.push({
+            lotId: lot.id,
+            lotNumber: lot.lotNumber,
+            weaverParty: lot.weaverParty,
+            fabricQuality: lot.fabricQuality,
+            panna: lot.panna,
+            tpIndex: tpIdx,
+            srNo: tp.srNo,
+            tpNo: tp.tpNo,
+            tpMtr: tp.tpMtr
+          });
+        }
+      });
     });
-    setShowIssueModal(true);
+    return list;
+  }, [grayLots]);
+
+  // Selected TPs in Mill Challan form
+  const selectedMillTps = useMemo(() => {
+    return availableGrayTps.filter(t => {
+      const key = `${t.lotId}__${t.tpIndex}`;
+      return Boolean(millChallanForm.selectedTpKeys[key]);
+    });
+  }, [availableGrayTps, millChallanForm.selectedTpKeys]);
+
+  const millSelectedTotalMtrs = useMemo(() => {
+    return selectedMillTps.reduce((sum, t) => sum + (Number(t.tpMtr) || 0), 0);
+  }, [selectedMillTps]);
+
+  const handleToggleTpSelection = (lotId, tpIndex) => {
+    const key = `${lotId}__${tpIndex}`;
+    setMillChallanForm(prev => ({
+      ...prev,
+      selectedTpKeys: {
+        ...prev.selectedTpKeys,
+        [key]: !prev.selectedTpKeys[key]
+      }
+    }));
   };
 
-  // Handle Fabric Issuance
-  const handleConfirmIssuance = (e) => {
+  const handleSelectAllTpsForLot = (lotId) => {
+    setMillChallanForm(prev => {
+      const updated = { ...prev.selectedTpKeys };
+      const lotTps = availableGrayTps.filter(t => t.lotId === lotId);
+      const allSelected = lotTps.every(t => updated[`${lotId}__${t.tpIndex}`]);
+      lotTps.forEach(t => {
+        updated[`${lotId}__${t.tpIndex}`] = !allSelected;
+      });
+      return { ...prev, selectedTpKeys: updated };
+    });
+  };
+
+  // Submit Mill Outward Challan
+  const handleCreateMillChallan = (e) => {
     e.preventDefault();
-    if (!selectedLotForIssue) return;
-
-    const metersToIssue = Number(issueForm.issuedMeters) || 0;
-    const rollsToIssue = Number(issueForm.issuedRolls) || 0;
-    const currentBalance = Math.max(0, selectedLotForIssue.totalMeters - selectedLotForIssue.issuedMeters);
-
-    if (metersToIssue <= 0) {
-      triggerEliteAlert('Please enter a valid meter count to issue.', 'Invalid Quantity');
+    if (!millChallanForm.millParty.trim()) {
+      triggerEliteAlert('Please select or enter the Processing Mill name.', 'Missing Mill');
+      return;
+    }
+    if (selectedMillTps.length === 0) {
+      triggerEliteAlert('Please select at least one Gray Fabric TP to send to the mill.', 'No TPs Selected');
       return;
     }
 
-    if (metersToIssue > currentBalance) {
-      triggerEliteAlert(`Cannot issue ${metersToIssue} Mtr! Available balance is only ${currentBalance} Mtr.`, 'Insufficient Stock');
-      return;
-    }
+    const challanNo = millChallanForm.challanNo.trim() || `MILL-CH-${String(millChallans.length + 101)}`;
+    const totalMtrs = parseFloat(millSelectedTotalMtrs.toFixed(2));
+    const primaryQuality = selectedMillTps[0]?.fabricQuality || 'Gray Fabric';
 
-    // Update lot state
-    setLots(prev => prev.map(lot => {
-      if (lot.id === selectedLotForIssue.id) {
-        const newIssued = (lot.issuedMeters || 0) + metersToIssue;
-        const newStatus = newIssued >= lot.totalMeters ? 'Depleted' : 'Partially Issued';
+    const newChallan = {
+      id: challanNo,
+      challanNo,
+      challanDate: millChallanForm.challanDate,
+      millParty: millChallanForm.millParty.trim(),
+      vehicleNo: millChallanForm.vehicleNo.trim() || 'By Hand / Tempo',
+      driverName: millChallanForm.driverName.trim() || 'Driver',
+      processRequired: millChallanForm.processRequired,
+      fabricQuality: primaryQuality,
+      totalTps: selectedMillTps.length,
+      totalMeters: totalMtrs,
+      status: 'At Mill',
+      tps: selectedMillTps.map((t, idx) => ({
+        srNo: idx + 1,
+        lotNumber: t.lotNumber,
+        tpNo: t.tpNo,
+        tpMtr: t.tpMtr
+      })),
+      notes: millChallanForm.notes.trim()
+    };
 
-        // Update rolls status
-        let rollsPendingToMark = rollsToIssue;
-        const updatedRolls = (lot.rolls || []).map(r => {
-          if (r.status === 'In Stock' && rollsPendingToMark > 0) {
-            rollsPendingToMark--;
-            return {
-              ...r,
-              status: 'Issued',
-              issueTo: issueForm.issueTo + (issueForm.referenceDoc ? ` (${issueForm.referenceDoc})` : '')
-            };
-          }
-          return r;
-        });
+    // Update Gray Lots state to mark TPs as "Sent to Mill"
+    setGrayLots(prev => prev.map(lot => {
+      let lotHasSent = false;
+      let additionalSentMtrs = 0;
 
+      const updatedTps = (lot.tps || []).map((tp, tpIdx) => {
+        const key = `${lot.id}__${tpIdx}`;
+        if (millChallanForm.selectedTpKeys[key]) {
+          lotHasSent = true;
+          additionalSentMtrs += Number(tp.tpMtr) || 0;
+          return {
+            ...tp,
+            status: 'Sent to Mill',
+            millChallanNo: challanNo
+          };
+        }
+        return tp;
+      });
+
+      if (lotHasSent) {
+        const newSentMtr = (lot.sentToMillMeters || 0) + additionalSentMtrs;
+        const allSent = updatedTps.every(t => t.status === 'Sent to Mill');
         return {
           ...lot,
-          issuedMeters: newIssued,
-          status: newStatus,
-          rolls: updatedRolls
+          sentToMillMeters: parseFloat(newSentMtr.toFixed(2)),
+          status: allSent ? 'Fully at Mill' : 'Partially at Mill',
+          tps: updatedTps
         };
       }
       return lot;
     }));
 
-    // Add to ledger
-    const newLedgerEntry = {
-      id: `TX-${Date.now()}`,
-      date: new Date().toLocaleDateString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      lotNumber: selectedLotForIssue.lotNumber,
-      type: 'ISSUED',
-      fabricQuality: selectedLotForIssue.fabricQuality,
-      meters: metersToIssue,
-      rolls: rollsToIssue,
-      party: issueForm.issueTo,
-      reference: issueForm.referenceDoc || 'Production Issue',
-      user: issueForm.operatorName || 'Yamunaji Operations',
-      notes: issueForm.notes
-    };
+    setMillChallans(prev => [newChallan, ...prev]);
+    setShowMillChallanModal(false);
 
-    setLedger(prev => [newLedgerEntry, ...prev]);
-    setShowIssueModal(false);
-    setSelectedLotForIssue(null);
+    // Reset Form
+    setMillChallanForm({
+      challanNo: '',
+      challanDate: new Date().toISOString().split('T')[0],
+      millParty: 'Shree Radhe Bleaching & Dyeing Processors',
+      vehicleNo: '',
+      driverName: '',
+      processRequired: 'RFD Bleaching, Scouring & Heat Setting',
+      selectedTpKeys: {},
+      notes: ''
+    });
 
-    triggerEliteAlert(`Successfully issued ${metersToIssue} Mtr from Lot ${selectedLotForIssue.lotNumber} to ${issueForm.issueTo}.`, 'Issuance Completed');
-  };
-
-  // Delete Lot
-  const handleDeleteLot = (lot) => {
-    triggerEliteConfirm(
-      `Are you sure you want to delete Lot ${lot.lotNumber}? This will remove ${lot.totalMeters} Mtr from records.`,
-      () => {
-        setLots(prev => prev.filter(l => l.id !== lot.id));
-        triggerEliteAlert(`Lot ${lot.lotNumber} removed.`, 'Lot Deleted');
-      },
-      null,
-      'Delete RFD Lot',
-      'Delete Lot',
-      'Cancel'
-    );
-  };
-
-  // Export CSV
-  const handleExportCSV = () => {
-    if (lots.length === 0) {
-      triggerEliteAlert('No lot data available to export.', 'Export');
-      return;
-    }
-    const headers = ['Lot Number', 'Inward Date', 'Mill / Party', 'Challan No', 'Fabric Quality', 'Panna', 'GSM', 'Total Rolls', 'Total Meters', 'Issued Meters', 'Balance Meters', 'Rate/Mtr', 'Status', 'Rack'];
-    const rows = lots.map(l => [
-      l.lotNumber,
-      l.inwardDate,
-      `"${l.millParty}"`,
-      l.challanNo,
-      `"${l.fabricQuality}"`,
-      l.panna,
-      l.gsm,
-      l.totalRolls,
-      l.totalMeters,
-      l.issuedMeters,
-      Math.max(0, l.totalMeters - l.issuedMeters),
-      l.ratePerMeter,
-      l.status,
-      l.rackLocation
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Yamunaji_RFD_Stock_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerEliteAlert(`Mill Outward Challan ${challanNo} created for ${selectedMillTps.length} TPs (${totalMtrs} Mtr)!`, 'Challan Created');
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2.5rem' }}>
-      {/* 🌟 Top Header Banner */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '3rem' }}>
+      {/* 🌟 Master Header Banner */}
       <div
         className="glass-panel"
         style={{
@@ -606,14 +631,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '1rem',
-          background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.04) 0%, rgba(2, 132, 199, 0.08) 100%)'
+          background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.05) 0%, rgba(2, 132, 199, 0.08) 100%)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div
             style={{
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               borderRadius: 12,
               background: '#0ea5e920',
               display: 'flex',
@@ -623,12 +648,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)'
             }}
           >
-            <Layers size={24} color="#0ea5e9" />
+            <Layers size={26} color="#0ea5e9" />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
-                Yamunaji (YJ) — RFD Fabric Operations
+                Yamunaji (YJ) — Fabric Operations & Challans
               </h2>
               <span
                 style={{
@@ -638,554 +663,601 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   borderRadius: '6px',
                   background: '#0ea5e91a',
                   color: '#0284c7',
-                  border: '1px solid #0ea5e933',
-                  textTransform: 'uppercase'
+                  border: '1px solid #0ea5e933'
                 }}
               >
-                Ready For Dyeing / Discharge
+                WEAVER TO MILL TO RFD
               </span>
             </div>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>
-              Raw fabric lot inward, panna & GSM quality testing, roll inventory tracking, and direct issuance to digital printing.
+              Weaver Gray Fabric inward with TP Details (Sr No, TP No, TP Mtr) & Mill Delivery Outward Challans.
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Primary Screen Mode Switcher: Gray Fabric vs. RFD Fabric */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            background: '#ffffff',
+            borderRadius: '10px',
+            padding: '4px',
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+            gap: '4px'
+          }}
+        >
           <button
-            onClick={handleExportCSV}
-            className="btn-secondary"
-            style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
-            title="Download CSV Spreadsheet"
-          >
-            <FileSpreadsheet size={15} /> Export Stock
-          </button>
-          <button
-            onClick={() => setShowInwardModal(true)}
-            className="btn-primary"
+            onClick={() => setScreenMode('gray')}
+            type="button"
             style={{
-              padding: '0.45rem 1rem',
-              fontSize: '0.82rem',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+              padding: '6px 14px',
+              borderRadius: '7px',
               border: 'none',
-              boxShadow: '0 2px 6px rgba(14, 165, 233, 0.3)'
+              background: screenMode === 'gray' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
+              color: screenMode === 'gray' ? '#ffffff' : '#475569',
+              fontWeight: screenMode === 'gray' ? 800 : 600,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              boxShadow: screenMode === 'gray' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
+              transition: 'all 0.15s ease'
             }}
           >
-            <PlusCircle size={16} /> + New RFD Inward Batch
+            <Boxes size={15} /> Gray Fabric (ગ્રે કાપડ)
+          </button>
+
+          <button
+            onClick={() => setScreenMode('rfd')}
+            type="button"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '7px',
+              border: 'none',
+              background: screenMode === 'rfd' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
+              color: screenMode === 'rfd' ? '#ffffff' : '#475569',
+              fontWeight: screenMode === 'rfd' ? 800 : 600,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              boxShadow: screenMode === 'rfd' ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Layers size={15} /> RFD Fabric (તૈયાર RFD)
           </button>
         </div>
       </div>
 
-      {/* 📊 Executive Quick Metrics HUD */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: '1rem'
-        }}
-      >
-        {/* Card 1: Total RFD Balance */}
-        <div className="glass-panel" style={{ padding: '1.1rem', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              In-Stock RFD Fabric
-            </span>
-            <span style={{ width: 30, height: 30, borderRadius: 8, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Layers size={16} color="#0284c7" />
-            </span>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0284c7' }}>
-            {stats.totalInStockMeters.toLocaleString('en-IN')} <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Mtr</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            <span style={{ fontWeight: 700, color: '#0ea5e9' }}>{stats.totalInStockRolls} Rolls</span> across warehouse racks
-          </div>
-        </div>
-
-        {/* Card 2: Active Lots */}
-        <div className="glass-panel" style={{ padding: '1.1rem', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Active Batches / Lots
-            </span>
-            <span style={{ width: 30, height: 30, borderRadius: 8, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PackageCheck size={16} color="#15803d" />
-            </span>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#16a34a' }}>
-            {stats.activeLotsCount} <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Lots</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            <span style={{ fontWeight: 700, color: '#16a34a' }}>100% Inspected</span> & Ready for printing
-          </div>
-        </div>
-
-        {/* Card 3: Total Issued */}
-        <div className="glass-panel" style={{ padding: '1.1rem', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Issued to Production
-            </span>
-            <span style={{ width: 30, height: 30, borderRadius: 8, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowUpRight size={16} color="#7c3aed" />
-            </span>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#7c3aed' }}>
-            {stats.totalIssuedMeters.toLocaleString('en-IN')} <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Mtr</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            Allocated to Digital Printing & Job Cards
-          </div>
-        </div>
-
-        {/* Card 4: Inventory Valuation */}
-        <div className="glass-panel" style={{ padding: '1.1rem', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Stock Valuation (YJ)
-            </span>
-            <span style={{ width: 30, height: 30, borderRadius: 8, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUp size={16} color="#b45309" />
-            </span>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#d97706' }}>
-            ₹ {stats.totalValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            Based on supplier inward purchase rate
-          </div>
-        </div>
-      </div>
-
-      {/* 🧭 Secondary Nav Pills */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-        <button
-          onClick={() => setActiveTab('inventory')}
-          className="tab-pill"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 14px',
-            borderRadius: '8px',
-            fontSize: '0.8rem',
-            fontWeight: activeTab === 'inventory' ? 800 : 600,
-            background: activeTab === 'inventory' ? '#0ea5e9' : 'transparent',
-            color: activeTab === 'inventory' ? '#ffffff' : '#64748b',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <Layers size={14} /> RFD Lot Inventory ({lots.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('ledger')}
-          className="tab-pill"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 14px',
-            borderRadius: '8px',
-            fontSize: '0.8rem',
-            fontWeight: activeTab === 'ledger' ? 800 : 600,
-            background: activeTab === 'ledger' ? '#0ea5e9' : 'transparent',
-            color: activeTab === 'ledger' ? '#ffffff' : '#64748b',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <Clock size={14} /> Stock Movement Ledger ({ledger.length})
-        </button>
-      </div>
-
       {/* ======================================================== */}
-      {/* 📦 TAB 1: RFD LOT INVENTORY TABLE                         */}
+      {/* 🧶 SCREEN MODE 1: GRAY FABRIC (WEAVER TO MILL)            */}
       {/* ======================================================== */}
-      {activeTab === 'inventory' && (
-        <div className="glass-panel" style={{ padding: '1.25rem' }}>
-          {/* Filter Bar */}
+      {screenMode === 'gray' && (
+        <>
+          {/* Quick Stats HUD for Gray Fabric */}
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.75rem',
-              marginBottom: '1.25rem'
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+              gap: '1rem'
             }}
           >
-            {/* Search Input */}
-            <div style={{ position: 'relative', minWidth: 260, flex: 1, maxWidth: 360 }}>
-              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input
-                type="text"
-                placeholder="Search Lot #, Mill / Party, Quality, Rack..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input-field"
-                style={{ paddingLeft: '32px', height: '36px', fontSize: '0.82rem', width: '100%' }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-                >
-                  <X size={14} />
-                </button>
-              )}
+            {/* Stat 1: In-Stock Gray Meters */}
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #0284c7' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  In-Stock Gray Fabric
+                </span>
+                <Boxes size={16} color="#0284c7" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0284c7' }}>
+                {grayStats.inStockMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                <span style={{ fontWeight: 700, color: '#0284c7' }}>{grayStats.inStockTps} TPs / Taka</span> ready in warehouse
+              </div>
             </div>
 
-            {/* Filter Dropdowns */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {/* Quality Filter */}
-              <select
-                value={qualityFilter}
-                onChange={(e) => setQualityFilter(e.target.value)}
-                className="input-field"
-                style={{ height: '36px', fontSize: '0.8rem', minWidth: 150 }}
-              >
-                <option value="ALL">All Fabric Qualities</option>
-                {availableQualities.map(q => (
-                  <option key={q} value={q}>{q}</option>
-                ))}
-              </select>
+            {/* Stat 2: Sent to Mill for RFD */}
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Sent to Mill (Outward)
+                </span>
+                <Truck size={16} color="#f59e0b" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#d97706' }}>
+                {grayStats.atMillMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                Currently in processing at dye houses
+              </div>
+            </div>
 
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="input-field"
-                style={{ height: '36px', fontSize: '0.8rem', minWidth: 130 }}
+            {/* Stat 3: Outward Challans Created */}
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #10b981' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Mill Delivery Challans
+                </span>
+                <ClipboardList size={16} color="#10b981" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669' }}>
+                {millChallans.length} <span style={{ fontSize: '0.85rem' }}>Challans</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                Outward to Shree Radhe, Vrundavan, etc.
+              </div>
+            </div>
+
+            {/* Stat 4: Gray Stock Valuation */}
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Gray Inventory Value
+                </span>
+                <TrendingUp size={16} color="#8b5cf6" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#7c3aed' }}>
+                ₹ {grayStats.totalGrayValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                Purchase rate from weavers
+              </div>
+            </div>
+          </div>
+
+          {/* Sub Navigation Bar for Gray Fabric */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                onClick={() => setGraySubTab('weaver_inward')}
+                className="tab-pill"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: graySubTab === 'weaver_inward' ? 800 : 600,
+                  background: graySubTab === 'weaver_inward' ? '#0ea5e9' : 'transparent',
+                  color: graySubTab === 'weaver_inward' ? '#ffffff' : '#64748b',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
               >
-                <option value="ALL">All Statuses</option>
-                <option value="In Stock">In Stock</option>
-                <option value="Partially Issued">Partially Issued</option>
-                <option value="Depleted">Depleted</option>
-              </select>
+                <Boxes size={14} /> Weaver Inward & Gray Stock ({grayLots.length} Lots)
+              </button>
 
               <button
-                onClick={() => { setSearchQuery(''); setQualityFilter('ALL'); setStatusFilter('ALL'); }}
-                className="btn-secondary"
-                style={{ height: '36px', padding: '0 10px', fontSize: '0.78rem' }}
-                title="Reset Filters"
+                onClick={() => setGraySubTab('mill_outward')}
+                className="tab-pill"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: graySubTab === 'mill_outward' ? 800 : 600,
+                  background: graySubTab === 'mill_outward' ? '#0ea5e9' : 'transparent',
+                  color: graySubTab === 'mill_outward' ? '#ffffff' : '#64748b',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
               >
-                <RefreshCw size={13} /> Reset
+                <Truck size={14} /> Mill Outward Challans ({millChallans.length})
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <button
+                onClick={() => setShowWeaverInwardModal(true)}
+                className="btn-primary"
+                style={{
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                  border: 'none'
+                }}
+              >
+                <PlusCircle size={16} /> + New Weaver Gray Inward
+              </button>
+
+              <button
+                onClick={() => setShowMillChallanModal(true)}
+                className="btn-primary"
+                style={{
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #059669, #10b981)',
+                  border: 'none'
+                }}
+              >
+                <Truck size={16} /> + Create Challan for Mill
               </button>
             </div>
           </div>
 
-          {/* Table Container */}
-          <div className="table-container" style={{ overflowX: 'auto' }}>
-            {filteredLots.length === 0 ? (
-              <div style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <Layers size={36} style={{ color: '#94a3b8', margin: '0 auto 0.75rem', display: 'block' }} />
-                <h4 style={{ margin: '0 0 4px', color: 'var(--text-primary)', fontSize: '1rem', fontWeight: 700 }}>
-                  No RFD lots matching filter criteria
-                </h4>
-                <p style={{ margin: 0, fontSize: '0.82rem' }}>
-                  Try adjusting your search terms or add a new inward batch.
+          {/* ======================================================== */}
+          {/* 📋 SUB-TAB 1: WEAVER INWARD & GRAY FABRIC LOTS           */}
+          {/* ======================================================== */}
+          {graySubTab === 'weaver_inward' && (
+            <div className="glass-panel" style={{ padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Gray Fabric Inward Lots (Received from Weavers)
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    Each lot contains full TP breakdown (Sr No, TP No, TP Mtr). Click "View TPs" to inspect all pieces.
+                  </p>
+                </div>
+
+                <div style={{ position: 'relative', width: 260 }}>
+                  <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    placeholder="Search Lot, Weaver, Challan..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="input-field"
+                    style={{ paddingLeft: '32px', height: '34px', fontSize: '0.8rem', width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div className="table-container" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '10px 12px' }}>Lot Number</th>
+                      <th style={{ padding: '10px 12px' }}>Inward Date</th>
+                      <th style={{ padding: '10px 12px' }}>Weaver / Loom Owner</th>
+                      <th style={{ padding: '10px 12px' }}>Weaver Challan #</th>
+                      <th style={{ padding: '10px 12px' }}>Quality</th>
+                      <th style={{ padding: '10px 12px' }}>Panna</th>
+                      <th style={{ padding: '10px 12px' }}>Total TPs</th>
+                      <th style={{ padding: '10px 12px' }}>Total Gray Mtr</th>
+                      <th style={{ padding: '10px 12px' }}>At Mill Mtr</th>
+                      <th style={{ padding: '10px 12px' }}>In Warehouse</th>
+                      <th style={{ padding: '10px 12px' }}>Status</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grayLots.map(lot => {
+                      const availableTps = (lot.tps || []).filter(t => t.status === 'In Stock');
+                      const inWarehouseMtr = availableTps.reduce((sum, t) => sum + (Number(t.tpMtr) || 0), 0);
+
+                      return (
+                        <tr key={lot.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
+                          <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0284c7' }}>
+                            {lot.lotNumber}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
+                            {lot.inwardDate}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {lot.weaverParty}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                            {lot.weaverChallanNo}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 600 }}>
+                            <span style={{ background: '#f8fafc', padding: '3px 8px', borderRadius: '5px', border: '1px solid #e2e8f0' }}>
+                              {lot.fabricQuality}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 700 }}>
+                            {lot.panna}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
+                            {lot.totalTps} Taka
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 800 }}>
+                            {lot.totalMeters.toFixed(1)} Mtr
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#d97706', fontWeight: 700 }}>
+                            {(lot.sentToMillMeters || 0).toFixed(1)} Mtr
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#16a34a', fontWeight: 800 }}>
+                            {inWarehouseMtr.toFixed(1)} Mtr
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                padding: '3px 8px',
+                                borderRadius: '5px',
+                                background: lot.status === 'In Stock' ? '#dcfce7' : lot.status === 'Fully at Mill' ? '#f1f5f9' : '#fef3c7',
+                                color: lot.status === 'In Stock' ? '#15803d' : lot.status === 'Fully at Mill' ? '#64748b' : '#b45309'
+                              }}
+                            >
+                              {lot.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => setSelectedGrayLotForView(lot)}
+                              className="btn-secondary"
+                              style={{ padding: '3px 8px', fontSize: '0.74rem', height: '28px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <Eye size={13} /> View TPs ({lot.tps?.length || 0})
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* 🚚 SUB-TAB 2: MILL OUTWARD CHALLANS                      */}
+          {/* ======================================================== */}
+          {graySubTab === 'mill_outward' && (
+            <div className="glass-panel" style={{ padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    Outward Delivery Challans to Processing Mills
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    Delivery challans sent with vehicle/tempo to dyeing mills for processing gray fabric into RFD.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setShowMillChallanModal(true)}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.45rem 1rem',
+                    fontSize: '0.82rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #059669, #10b981)',
+                    border: 'none'
+                  }}
+                >
+                  <PlusCircle size={15} /> + Create Outward Challan
+                </button>
+              </div>
+
+              <div className="table-container" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '10px 12px' }}>Challan No</th>
+                      <th style={{ padding: '10px 12px' }}>Date</th>
+                      <th style={{ padding: '10px 12px' }}>Processing Mill Name</th>
+                      <th style={{ padding: '10px 12px' }}>Process Required</th>
+                      <th style={{ padding: '10px 12px' }}>Vehicle / Transport</th>
+                      <th style={{ padding: '10px 12px' }}>Total TPs</th>
+                      <th style={{ padding: '10px 12px' }}>Total Meters</th>
+                      <th style={{ padding: '10px 12px' }}>Status</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center' }}>Print & Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {millChallans.map(ch => (
+                      <tr key={ch.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
+                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#059669' }}>
+                          {ch.challanNo}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
+                          {ch.challanDate}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {ch.millParty}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                          {ch.processRequired}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>
+                          {ch.vehicleNo}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
+                          {ch.totalTps} Taka
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0f172a' }}>
+                          {ch.totalMeters.toFixed(1)} Mtr
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: '5px',
+                              background: '#fef3c7',
+                              color: '#b45309',
+                              border: '1px solid #fde68a'
+                            }}
+                          >
+                            {ch.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => setShowPrintChallanModal(ch)}
+                            className="btn-primary"
+                            style={{
+                              padding: '3px 10px',
+                              fontSize: '0.74rem',
+                              height: '28px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: '#0ea5e9'
+                            }}
+                          >
+                            <Printer size={13} /> Print Mill Challan
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ======================================================== */}
+      {/* 🥻 SCREEN MODE 2: RFD FABRIC (PROCESSED LOTS)             */}
+      {/* ======================================================== */}
+      {screenMode === 'rfd' && (
+        <>
+          {/* RFD Quick HUD */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+              gap: '1rem'
+            }}
+          >
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #0284c7' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  In-Stock RFD Fabric
+                </span>
+                <Layers size={16} color="#0284c7" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0284c7' }}>
+                {rfdStats.inStockRfdMtrs.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.85rem' }}>Mtr</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                {rfdStats.inStockRolls} Rolls Ready for Digital Printing
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #10b981' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Active RFD Lots
+                </span>
+                <PackageCheck size={16} color="#10b981" />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669' }}>
+                {rfdStats.totalRfdLots} <span style={{ fontSize: '0.85rem' }}>Lots</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                Received from processing mills
+              </div>
+            </div>
+          </div>
+
+          {/* RFD Inventory Table */}
+          <div className="glass-panel" style={{ padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Processed RFD Fabric Inventory (Ready For Dyeing / Discharge)
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  Received back from processing mills. Directly available for EDP Digital Printing job cards.
                 </p>
               </div>
-            ) : (
+            </div>
+
+            <div className="table-container" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase' }}>
                     <th style={{ padding: '10px 12px' }}>Lot Number</th>
-                    <th style={{ padding: '10px 12px' }}>Date</th>
-                    <th style={{ padding: '10px 12px' }}>Mill / Processing Party</th>
+                    <th style={{ padding: '10px 12px' }}>Inward Date</th>
+                    <th style={{ padding: '10px 12px' }}>Processing Mill</th>
+                    <th style={{ padding: '10px 12px' }}>Mill Challan #</th>
                     <th style={{ padding: '10px 12px' }}>Fabric Quality</th>
-                    <th style={{ padding: '10px 12px' }}>Panna / Width</th>
-                    <th style={{ padding: '10px 12px' }}>GSM</th>
-                    <th style={{ padding: '10px 12px' }}>Rolls</th>
-                    <th style={{ padding: '10px 12px' }}>Total Inward</th>
+                    <th style={{ padding: '10px 12px' }}>Panna</th>
+                    <th style={{ padding: '10px 12px' }}>Gray Sent</th>
+                    <th style={{ padding: '10px 12px' }}>RFD Received</th>
+                    <th style={{ padding: '10px 12px' }}>Shrinkage / Loss</th>
                     <th style={{ padding: '10px 12px' }}>Available Balance</th>
-                    <th style={{ padding: '10px 12px' }}>Rack</th>
                     <th style={{ padding: '10px 12px' }}>Status</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLots.map((lot) => {
-                    const balance = Math.max(0, lot.totalMeters - lot.issuedMeters);
-                    const percentage = Math.round((balance / (lot.totalMeters || 1)) * 100);
-                    const isDepleted = lot.status === 'Depleted' || balance === 0;
-                    const inStockRolls = (lot.rolls || []).filter(r => r.status === 'In Stock').length;
-
+                  {rfdLots.map(lot => {
+                    const balance = Math.max(0, lot.receivedRfdMeters - (lot.issuedMeters || 0));
                     return (
-                      <tr
-                        key={lot.id}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          transition: 'background 0.12s ease'
-                        }}
-                        className="hover-row"
-                      >
-                        {/* Lot Number */}
+                      <tr key={lot.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
                         <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0284c7' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>{lot.lotNumber}</span>
-                            <span
-                              style={{
-                                fontSize: '0.65rem',
-                                fontWeight: 700,
-                                padding: '1px 5px',
-                                borderRadius: '4px',
-                                background: '#f0fdf4',
-                                color: '#16a34a',
-                                border: '1px solid #bbf7d0'
-                              }}
-                            >
-                              {lot.qualityGrade || 'A Grade'}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                            Challan: {lot.challanNo}
-                          </div>
+                          {lot.lotNumber}
                         </td>
-
-                        {/* Date */}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
-                          {lot.inwardDate ? new Date(lot.inwardDate).toLocaleDateString('en-IN') : '--'}
+                        <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
+                          {lot.inwardDate}
                         </td>
-
-                        {/* Mill Party */}
                         <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {lot.millParty}
                         </td>
-
-                        {/* Quality */}
-                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                          <span style={{ background: '#f8fafc', padding: '3px 8px', borderRadius: '5px', border: '1px solid #e2e8f0' }}>
-                            {lot.fabricQuality}
-                          </span>
+                        <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                          {lot.millChallanNo}
                         </td>
-
-                        {/* Panna */}
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>
+                          {lot.fabricQuality}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700 }}>
                           {lot.panna}
                         </td>
-
-                        {/* GSM */}
                         <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
-                          {lot.gsm ? `${lot.gsm} GSM` : '--'}
+                          {lot.graySentMeters} Mtr
                         </td>
-
-                        {/* Rolls */}
-                        <td style={{ padding: '10px 12px', fontWeight: 700 }}>
-                          <span style={{ color: '#0284c7' }}>{inStockRolls}</span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}> / {lot.totalRolls}</span>
+                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0f172a' }}>
+                          {lot.receivedRfdMeters} Mtr
                         </td>
-
-                        {/* Total Inward */}
-                        <td style={{ padding: '10px 12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                          {lot.totalMeters.toLocaleString('en-IN')} Mtr
+                        <td style={{ padding: '10px 12px', color: '#ef4444', fontWeight: 700 }}>
+                          {lot.shrinkageLossMeters} Mtr ({lot.shrinkagePercent}%)
                         </td>
-
-                        {/* Available Balance */}
-                        <td style={{ padding: '10px 12px', minWidth: 140 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                            <span style={{ fontWeight: 800, color: isDepleted ? '#94a3b8' : '#0f172a' }}>
-                              {balance.toLocaleString('en-IN')} Mtr
-                            </span>
-                            <span style={{ fontSize: '0.7rem', color: isDepleted ? '#94a3b8' : '#0284c7', fontWeight: 700 }}>
-                              {percentage}%
-                            </span>
-                          </div>
-                          {/* Mini Progress Bar */}
-                          <div style={{ height: '5px', width: '100%', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                            <div
-                              style={{
-                                height: '100%',
-                                width: `${percentage}%`,
-                                background: isDepleted ? '#94a3b8' : percentage > 50 ? '#0ea5e9' : '#f59e0b',
-                                transition: 'width 0.3s ease'
-                              }}
-                            />
-                          </div>
+                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#16a34a' }}>
+                          {balance.toFixed(1)} Mtr
                         </td>
-
-                        {/* Rack Location */}
                         <td style={{ padding: '10px 12px' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 700, background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>
-                            📍 {lot.rackLocation || 'Bay YJ'}
-                          </span>
-                        </td>
-
-                        {/* Status Badge */}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                           <span
                             style={{
-                              fontSize: '0.7rem',
+                              fontSize: '0.68rem',
                               fontWeight: 800,
                               padding: '3px 8px',
-                              borderRadius: '6px',
-                              background: isDepleted ? '#f1f5f9' : lot.status === 'Partially Issued' ? '#fef3c7' : '#e0f2fe',
-                              color: isDepleted ? '#64748b' : lot.status === 'Partially Issued' ? '#b45309' : '#0369a1',
-                              border: `1px solid ${isDepleted ? '#e2e8f0' : lot.status === 'Partially Issued' ? '#fde68a' : '#bae6fd'}`
+                              borderRadius: '5px',
+                              background: '#e0f2fe',
+                              color: '#0369a1'
                             }}
                           >
                             {lot.status}
                           </span>
-                        </td>
-
-                        {/* Action Buttons */}
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <button
-                              onClick={() => setSelectedLotForRolls(lot)}
-                              className="btn-secondary"
-                              style={{ padding: '4px 7px', fontSize: '0.72rem', height: '28px' }}
-                              title="View Individual Rolls Breakdown"
-                            >
-                              <Eye size={13} /> Rolls
-                            </button>
-
-                            {!isDepleted && (
-                              <button
-                                onClick={() => handleOpenIssueModal(lot)}
-                                className="btn-primary"
-                                style={{
-                                  padding: '4px 8px',
-                                  fontSize: '0.72rem',
-                                  height: '28px',
-                                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                                  border: 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '3px'
-                                }}
-                                title="Issue meters to Digital Print / Production"
-                              >
-                                <ArrowUpRight size={13} /> Issue
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => handleDeleteLot(lot)}
-                              style={{
-                                padding: '4px 6px',
-                                fontSize: '0.72rem',
-                                height: '28px',
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#ef4444',
-                                cursor: 'pointer',
-                                borderRadius: '4px'
-                              }}
-                              title="Delete Lot"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* 📜 TAB 2: AUDIT LEDGER                                    */}
-      {/* ======================================================== */}
-      {activeTab === 'ledger' && (
-        <div className="glass-panel" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                Yamunaji RFD Stock Movement Ledger
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                Complete chronologic history of all fabric inward batches and issuance dispatches.
-              </p>
             </div>
           </div>
-
-          <div className="table-container">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '10px 12px' }}>Timestamp</th>
-                  <th style={{ padding: '10px 12px' }}>Type</th>
-                  <th style={{ padding: '10px 12px' }}>Lot Number</th>
-                  <th style={{ padding: '10px 12px' }}>Fabric Quality</th>
-                  <th style={{ padding: '10px 12px' }}>Meters</th>
-                  <th style={{ padding: '10px 12px' }}>Rolls</th>
-                  <th style={{ padding: '10px 12px' }}>Source / Destination</th>
-                  <th style={{ padding: '10px 12px' }}>Reference</th>
-                  <th style={{ padding: '10px 12px' }}>Operator</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ledger.map((item) => {
-                  const isInward = item.type === 'INWARD';
-                  return (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                        {item.date}
-                      </td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <span
-                          style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            padding: '3px 8px',
-                            borderRadius: '5px',
-                            background: isInward ? '#dcfce7' : '#ede9fe',
-                            color: isInward ? '#15803d' : '#6d28d9',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px'
-                          }}
-                        >
-                          {isInward ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}
-                          {item.type}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0284c7' }}>
-                        {item.lotNumber}
-                      </td>
-                      <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                        {item.fabricQuality}
-                      </td>
-                      <td style={{ padding: '10px 12px', fontWeight: 800, color: isInward ? '#16a34a' : '#7c3aed' }}>
-                        {isInward ? `+${item.meters}` : `-${item.meters}`} Mtr
-                      </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
-                        {item.rolls} Rolls
-                      </td>
-                      <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {item.party}
-                      </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
-                        {item.reference}
-                      </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                        👤 {item.user}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </>
       )}
 
       {/* ======================================================== */}
-      {/* ➕ MODAL: NEW INWARD RFD LOT                              */}
+      {/* ➕ MODAL 1: WEAVER GRAY INWARD WITH TP DETAILS TABLE     */}
       {/* ======================================================== */}
-      {showInwardModal && (
+      {showWeaverInwardModal && (
         <div
           style={{
             position: 'fixed',
@@ -1203,35 +1275,35 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: 620,
-              maxHeight: '90vh',
+              maxWidth: 720,
+              maxHeight: '92vh',
               overflowY: 'auto',
               background: '#ffffff',
               borderRadius: 14,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
               padding: '1.5rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1.25rem'
+              gap: '1rem'
             }}
           >
             {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <PlusCircle size={20} color="#0284c7" />
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Boxes size={22} color="#0284c7" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                    + New RFD Fabric Inward Batch
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                    + Inward Gray Fabric from Weaver (વિવર આવક)
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Record receiving of Ready For Dyeing / Discharge lot at Yamunaji
+                    Enter weaver details and add individual TP Numbers & TP Meters. Press Enter to add next row.
                   </span>
                 </div>
               </div>
               <button
-                onClick={() => setShowInwardModal(false)}
+                onClick={() => setShowWeaverInwardModal(false)}
                 style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
               >
                 <X size={20} />
@@ -1239,78 +1311,79 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             </div>
 
             {/* Inward Form */}
-            <form onSubmit={handleCreateInwardLot} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleSaveWeaverInward} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Header Fields */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Lot Number (Optional, auto-generated if blank)
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Lot Number (Optional)
                   </label>
                   <input
                     type="text"
-                    placeholder={`YJ-RFD-2026-${String(lots.length + 1).padStart(3, '0')}`}
-                    value={inwardForm.lotNumber}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, lotNumber: e.target.value }))}
+                    placeholder={`GRAY-2026-${String(grayLots.length + 1).padStart(3, '0')}`}
+                    value={weaverForm.lotNumber}
+                    onChange={(e) => setWeaverForm(prev => ({ ...prev, lotNumber: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
                     Inward Date *
                   </label>
                   <input
                     type="date"
                     required
-                    value={inwardForm.inwardDate}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, inwardDate: e.target.value }))}
+                    value={weaverForm.inwardDate}
+                    onChange={(e) => setWeaverForm(prev => ({ ...prev, inwardDate: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Mill / Processing Party Name *
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Weaver / Loom Owner Name *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Shree Radhe Textiles / Vrundavan Mills"
-                    value={inwardForm.millParty}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, millParty: e.target.value }))}
+                    placeholder="e.g. Maruti Weaving, Harikrishna Textiles"
+                    value={weaverForm.weaverParty}
+                    onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverParty: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Mill Challan / LR Number
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Weaver Gray Challan No
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. CH-9981"
-                    value={inwardForm.challanNo}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, challanNo: e.target.value }))}
+                    placeholder="e.g. CH-8901"
+                    value={weaverForm.weaverChallanNo}
+                    onChange={(e) => setWeaverForm(prev => ({ ...prev, weaverChallanNo: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
                     Fabric Quality *
                   </label>
                   <select
-                    value={inwardForm.fabricQuality}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, fabricQuality: e.target.value }))}
+                    value={weaverForm.fabricQuality}
+                    onChange={(e) => setWeaverForm(prev => ({ ...prev, fabricQuality: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   >
                     <option value="Pure Viscose Rayon 14kg">Pure Viscose Rayon 14kg</option>
                     <option value="Pure Modal Satin 60s">Pure Modal Satin 60s</option>
@@ -1319,144 +1392,146 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     <option value="Chanderi Silk 50gm">Chanderi Silk 50gm</option>
                     <option value="Pure Linen Slub 60s">Pure Linen Slub 60s</option>
                     <option value="Viscose Crepe 80gm">Viscose Crepe 80gm</option>
-                    <option value="Georgette 60gm Pure">Georgette 60gm Pure</option>
-                    <option value="Heavy Cotton Twill 200 GSM">Heavy Cotton Twill 200 GSM</option>
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
                     Panna / Width *
                   </label>
                   <select
-                    value={inwardForm.panna}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, panna: e.target.value }))}
+                    value={weaverForm.panna}
+                    onChange={(e) => setWeaverForm(prev => ({ ...prev, panna: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   >
                     <option value='44"'>44 inches</option>
                     <option value='48"'>48 inches</option>
                     <option value='54"'>54 inches</option>
                     <option value='58"'>58 inches</option>
-                    <option value='60"'>60 inches</option>
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Fabric GSM
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="140"
-                    value={inwardForm.gsm}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, gsm: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Total Rolls / Thaan *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={inwardForm.totalRolls}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, totalRolls: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Total Meters *
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="1"
-                    required
-                    value={inwardForm.totalMeters}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, totalMeters: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
                     Rate / Mtr (₹)
                   </label>
                   <input
                     type="number"
                     step="any"
-                    value={inwardForm.ratePerMeter}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
+                    value={weaverForm.ratePerMeter}
+                    onChange={(e) => setWeaverForm(prev => ({ ...prev, ratePerMeter: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Quality Grade
-                  </label>
-                  <select
-                    value={inwardForm.qualityGrade}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, qualityGrade: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                  >
-                    <option value="A Grade">A Grade (Export Quality)</option>
-                    <option value="B Grade">B Grade (Commercial Grade)</option>
-                    <option value="Inspection Pending">Inspection Pending</option>
-                  </select>
+              {/* 📊 TP ENTRY TABLE (SR NO AUTO, TP NO, TP MTR) */}
+              <div style={{ marginTop: '0.5rem', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ background: '#f8fafc', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Hash size={15} color="#0284c7" />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                      TP (Taka / Piece) Breakdown Entries
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleAddMultipleTpRows(5)}
+                      className="btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
+                    >
+                      + Add 5 Rows
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddTpRow}
+                      className="btn-primary"
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px', background: '#0ea5e9', border: 'none' }}
+                    >
+                      + Add Row
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Warehouse Rack / Shelf Location
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Rack YJ-A1, Floor Bay 2"
-                    value={inwardForm.rackLocation}
-                    onChange={(e) => setInwardForm(prev => ({ ...prev, rackLocation: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                  />
+                {/* TP Rows Scrollable Area */}
+                <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '6px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
+                        <th style={{ padding: '6px 8px', width: 70 }}>Sr. No</th>
+                        <th style={{ padding: '6px 8px' }}>TP No.</th>
+                        <th style={{ padding: '6px 8px' }}>TP Meter (Mtr) *</th>
+                        <th style={{ padding: '6px 8px', width: 40, textAlign: 'center' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weaverForm.tps.map((tp, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #f8fafc' }}>
+                          <td style={{ padding: '5px 8px', fontWeight: 800, color: '#64748b' }}>
+                            {tp.srNo}
+                          </td>
+                          <td style={{ padding: '5px 8px' }}>
+                            <input
+                              type="text"
+                              value={tp.tpNo}
+                              onChange={(e) => handleTpChange(idx, 'tpNo', e.target.value)}
+                              placeholder={`TP-${idx + 1}`}
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                            />
+                          </td>
+                          <td style={{ padding: '5px 8px' }}>
+                            <input
+                              id={`tp-mtr-input-${idx}`}
+                              type="text"
+                              inputMode="decimal"
+                              value={tp.tpMtr}
+                              onChange={(e) => handleTpChange(idx, 'tpMtr', e.target.value)}
+                              onKeyDown={(e) => handleTpKeyDown(e, idx)}
+                              placeholder="e.g. 102.5"
+                              className="input-field"
+                              style={{ height: '30px', fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', width: '100%' }}
+                            />
+                          </td>
+                          <td style={{ padding: '5px 8px', textAlign: 'center' }}>
+                            {weaverForm.tps.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTpRow(idx)}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                  Inspection Notes & Remarks
-                </label>
-                <textarea
-                  placeholder="Specify weave quality, shrinkage %, visual defect notes..."
-                  value={inwardForm.remarks}
-                  onChange={(e) => setInwardForm(prev => ({ ...prev, remarks: e.target.value }))}
-                  className="input-field"
-                  rows={2}
-                  style={{ fontSize: '0.82rem', width: '100%', resize: 'vertical' }}
-                />
+                {/* TP Summary Footer */}
+                <div style={{ background: '#f1f5f9', padding: '8px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '0.76rem', color: '#475569' }}>
+                    Total TPs Entered: <strong style={{ color: '#0284c7' }}>{weaverFormSummary.totalTps}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                    Grand Total: <span style={{ color: '#0284c7', fontSize: '1rem' }}>{weaverFormSummary.totalMtrs}</span> Mtr
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
                 <button
                   type="button"
-                  onClick={() => setShowInwardModal(false)}
+                  onClick={() => setShowWeaverInwardModal(false)}
                   className="btn-secondary"
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.82rem' }}
+                  style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
                 >
                   Cancel
                 </button>
@@ -1464,7 +1539,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   type="submit"
                   className="btn-primary"
                   style={{
-                    padding: '0.5rem 1.25rem',
+                    padding: '0.45rem 1.25rem',
                     fontSize: '0.82rem',
                     background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
                     border: 'none',
@@ -1473,7 +1548,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     gap: '6px'
                   }}
                 >
-                  <Check size={16} /> Save Inward RFD Lot
+                  <Check size={16} /> Save Gray Fabric Inward
                 </button>
               </div>
             </form>
@@ -1482,9 +1557,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       )}
 
       {/* ======================================================== */}
-      {/* 🚀 MODAL: ISSUE RFD FABRIC TO PRODUCTION                 */}
+      {/* 🚚 MODAL 2: CREATE OUTWARD CHALLAN FOR PROCESSING MILL   */}
       {/* ======================================================== */}
-      {showIssueModal && selectedLotForIssue && (
+      {showMillChallanModal && (
         <div
           style={{
             position: 'fixed',
@@ -1502,10 +1577,12 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: 520,
+              maxWidth: 780,
+              maxHeight: '92vh',
+              overflowY: 'auto',
               background: '#ffffff',
               borderRadius: 14,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
               padding: '1.5rem',
               display: 'flex',
               flexDirection: 'column',
@@ -1515,122 +1592,183 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <ArrowUpRight size={20} color="#7c3aed" />
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Truck size={22} color="#15803d" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                    Issue RFD Fabric to Production
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                    + Create Delivery Challan for Mill (મિલ જાવક ચલણ)
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    From Lot {selectedLotForIssue.lotNumber} ({selectedLotForIssue.fabricQuality})
+                    Select Gray Fabric TPs from stock to dispatch to the processing mill for RFD.
                   </span>
                 </div>
               </div>
               <button
-                onClick={() => { setShowIssueModal(false); setSelectedLotForIssue(null); }}
+                onClick={() => setShowMillChallanModal(false)}
                 style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Current Stock Banner */}
-            <div style={{ background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Current Balance</span>
-                <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0ea5e9' }}>
-                  {Math.max(0, selectedLotForIssue.totalMeters - selectedLotForIssue.issuedMeters).toLocaleString('en-IN')} Mtr
-                </span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Panna / Width</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
-                  {selectedLotForIssue.panna} ({selectedLotForIssue.gsm} GSM)
-                </span>
-              </div>
-            </div>
-
             {/* Form */}
-            <form onSubmit={handleConfirmIssuance} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <form onSubmit={handleCreateMillChallan} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Meters to Issue *
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Challan No (Auto if blank)
                   </label>
                   <input
-                    type="number"
-                    step="any"
-                    required
-                    min="1"
-                    max={Math.max(0, selectedLotForIssue.totalMeters - selectedLotForIssue.issuedMeters)}
-                    value={issueForm.issuedMeters}
-                    onChange={(e) => setIssueForm(prev => ({ ...prev, issuedMeters: e.target.value }))}
+                    type="text"
+                    placeholder={`MILL-CH-${String(millChallans.length + 101)}`}
+                    value={millChallanForm.challanNo}
+                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, challanNo: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Rolls to Issue *
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Challan Date *
                   </label>
                   <input
-                    type="number"
-                    min="1"
+                    type="date"
                     required
-                    value={issueForm.issuedRolls}
-                    onChange={(e) => setIssueForm(prev => ({ ...prev, issuedRolls: e.target.value }))}
+                    value={millChallanForm.challanDate}
+                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, challanDate: e.target.value }))}
                     className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Processing / Dyeing Mill Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Shree Radhe Bleaching & Dyeing, Vrundavan Mills"
+                    value={millChallanForm.millParty}
+                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, millParty: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Vehicle / Tempo No
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. GJ-05-XX-1234"
+                    value={millChallanForm.vehicleNo}
+                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, vehicleNo: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                  Destination Department / Client *
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                  Process Instructions for Mill
                 </label>
-                <select
-                  value={issueForm.issueTo}
-                  onChange={(e) => setIssueForm(prev => ({ ...prev, issueTo: e.target.value }))}
+                <input
+                  type="text"
+                  placeholder="e.g. RFD Bleaching, Scouring, Mercerizing & Heat Setting"
+                  value={millChallanForm.processRequired}
+                  onChange={(e) => setMillChallanForm(prev => ({ ...prev, processRequired: e.target.value }))}
                   className="input-field"
-                  style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                >
-                  <option value="EDP Digital Print Job Card">EDP Digital Print Job Card</option>
-                  <option value="Sampling & Design Studio">Sampling & Design Studio</option>
-                  <option value="Outside Job Work Dyeing">Outside Job Work Dyeing</option>
-                  <option value="Direct Client Delivery">Direct Client Delivery</option>
-                  <option value="Stitching Unit (ES)">Stitching Unit (ES)</option>
-                </select>
+                  style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Job Card / Voucher Ref #
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. JC-1142"
-                    value={issueForm.referenceDoc}
-                    onChange={(e) => setIssueForm(prev => ({ ...prev, referenceDoc: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                  />
+              {/* 📦 SELECT TP PIECES TO SEND TO MILL */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ background: '#f8fafc', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                    Select In-Stock Gray TPs to Send to Mill
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Available: <strong style={{ color: '#0284c7' }}>{availableGrayTps.length} TPs</strong>
+                  </span>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Operator / Issued By
-                  </label>
-                  <input
-                    type="text"
-                    value={issueForm.operatorName}
-                    onChange={(e) => setIssueForm(prev => ({ ...prev, operatorName: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '36px', fontSize: '0.82rem', width: '100%' }}
-                  />
+                <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '6px' }}>
+                  {availableGrayTps.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                      No gray TPs currently available in stock. Inward gray fabric from weaver first.
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ padding: '6px 8px', width: 40 }}>Select</th>
+                          <th style={{ padding: '6px 8px' }}>Lot #</th>
+                          <th style={{ padding: '6px 8px' }}>Weaver</th>
+                          <th style={{ padding: '6px 8px' }}>Quality</th>
+                          <th style={{ padding: '6px 8px' }}>TP No</th>
+                          <th style={{ padding: '6px 8px' }}>TP Meter</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {availableGrayTps.map((tp, idx) => {
+                          const key = `${tp.lotId}__${tp.tpIndex}`;
+                          const isSelected = Boolean(millChallanForm.selectedTpKeys[key]);
+                          return (
+                            <tr
+                              key={idx}
+                              onClick={() => handleToggleTpSelection(tp.lotId, tp.tpIndex)}
+                              style={{
+                                cursor: 'pointer',
+                                background: isSelected ? '#f0fdf4' : 'transparent',
+                                borderBottom: '1px solid #f1f5f9'
+                              }}
+                            >
+                              <td style={{ padding: '6px 8px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}} // handled by row click
+                                />
+                              </td>
+                              <td style={{ padding: '6px 8px', fontWeight: 700, color: '#0284c7' }}>
+                                {tp.lotNumber}
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                {tp.weaverParty}
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                {tp.fabricQuality}
+                              </td>
+                              <td style={{ padding: '6px 8px', fontWeight: 800 }}>
+                                {tp.tpNo}
+                              </td>
+                              <td style={{ padding: '6px 8px', fontWeight: 800, color: '#0f172a' }}>
+                                {tp.tpMtr} Mtr
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Selection Footer */}
+                <div style={{ background: '#f0fdf4', padding: '8px 12px', borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 700 }}>
+                    Selected: {selectedMillTps.length} TPs / Taka
+                  </div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#15803d' }}>
+                    Challan Total: {millSelectedTotalMtrs.toFixed(1)} Mtr
+                  </div>
                 </div>
               </div>
 
@@ -1638,26 +1776,27 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
                 <button
                   type="button"
-                  onClick={() => { setShowIssueModal(false); setSelectedLotForIssue(null); }}
+                  onClick={() => setShowMillChallanModal(false)}
                   className="btn-secondary"
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.82rem' }}
+                  style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={selectedMillTps.length === 0}
                   className="btn-primary"
                   style={{
-                    padding: '0.5rem 1.25rem',
+                    padding: '0.45rem 1.25rem',
                     fontSize: '0.82rem',
-                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                    background: selectedMillTps.length > 0 ? 'linear-gradient(135deg, #059669, #10b981)' : '#94a3b8',
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px'
                   }}
                 >
-                  <ArrowUpRight size={16} /> Confirm Fabric Issuance
+                  <Check size={16} /> Confirm & Generate Mill Challan
                 </button>
               </div>
             </form>
@@ -1666,9 +1805,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       )}
 
       {/* ======================================================== */}
-      {/* 🔍 MODAL: INDIVIDUAL ROLLS BREAKDOWN                     */}
+      {/* 🔍 MODAL 3: VIEW INDIVIDUAL TPS IN A GRAY LOT            */}
       {/* ======================================================== */}
-      {selectedLotForRolls && (
+      {selectedGrayLotForView && (
         <div
           style={{
             position: 'fixed',
@@ -1686,83 +1825,80 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: 680,
+              maxWidth: 640,
               maxHeight: '90vh',
               overflowY: 'auto',
               background: '#ffffff',
               borderRadius: 14,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
               padding: '1.5rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1.25rem'
+              gap: '1rem'
             }}
           >
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                    Rolls Breakdown: {selectedLotForRolls.lotNumber}
-                  </h3>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>
-                    {selectedLotForRolls.fabricQuality}
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                  Supplier: {selectedLotForRolls.millParty} | Panna: {selectedLotForRolls.panna} | Rack: {selectedLotForRolls.rackLocation}
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  TP Breakdown: {selectedGrayLotForView.lotNumber}
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  Weaver: {selectedGrayLotForView.weaverParty} | Quality: {selectedGrayLotForView.fabricQuality}
                 </span>
               </div>
               <button
-                onClick={() => setSelectedLotForRolls(null)}
+                onClick={() => setSelectedGrayLotForView(null)}
                 style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Rolls Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.65rem' }}>
-              {(selectedLotForRolls.rolls || []).map((roll, idx) => {
-                const isIssued = roll.status === 'Issued';
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.6rem' }}>
+              {(selectedGrayLotForView.tps || []).map((tp, idx) => {
+                const isSent = tp.status === 'Sent to Mill';
                 return (
                   <div
                     key={idx}
                     style={{
                       padding: '0.75rem',
                       borderRadius: 8,
-                      border: `1px solid ${isIssued ? '#e2e8f0' : '#bbf7d0'}`,
-                      background: isIssued ? '#f8fafc' : '#f0fdf4',
+                      border: `1px solid ${isSent ? '#fde68a' : '#bbf7d0'}`,
+                      background: isSent ? '#fefce8' : '#f0fdf4',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '4px'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: isIssued ? '#94a3b8' : '#15803d' }}>
-                        {roll.rollNo}
+                      <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
+                        Sr #{tp.srNo}
                       </span>
                       <span
                         style={{
                           fontSize: '0.62rem',
-                          fontWeight: 700,
+                          fontWeight: 800,
                           padding: '1px 5px',
                           borderRadius: '4px',
-                          background: isIssued ? '#e2e8f0' : '#dcfce7',
-                          color: isIssued ? '#64748b' : '#15803d'
+                          background: isSent ? '#fef3c7' : '#dcfce7',
+                          color: isSent ? '#b45309' : '#15803d'
                         }}
                       >
-                        {roll.status}
+                        {tp.status}
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: isIssued ? '#94a3b8' : '#0f172a' }}>
-                      {roll.meters} Mtr
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                      TP: {tp.tpNo}
                     </div>
 
-                    {isIssued && roll.issueTo && (
-                      <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>
-                        Issued to: {roll.issueTo}
+                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
+                      {tp.tpMtr} Mtr
+                    </div>
+
+                    {isSent && tp.millChallanNo && (
+                      <div style={{ fontSize: '0.65rem', color: '#b45309', fontWeight: 700 }}>
+                        Challan: {tp.millChallanNo}
                       </div>
                     )}
                   </div>
@@ -1770,15 +1906,171 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               })}
             </div>
 
-            {/* Modal Footer */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
               <button
-                onClick={() => setSelectedLotForRolls(null)}
+                onClick={() => setSelectedGrayLotForView(null)}
                 className="btn-primary"
                 style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 🖨️ MODAL 4: PROFESSIONAL MILL DELIVERY CHALLAN (PRINT)   */}
+      {/* ======================================================== */}
+      {showPrintChallanModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              width: '100%',
+              maxWidth: 720,
+              maxHeight: '94vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: 12,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              padding: '2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem'
+            }}
+          >
+            {/* Top Toolbar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                Print Preview: Delivery Challan to Processing Mill
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => window.print()}
+                  className="btn-primary"
+                  style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Printer size={14} /> Print Now
+                </button>
+                <button
+                  onClick={() => setShowPrintChallanModal(null)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Document Sheet */}
+            <div
+              id="printable-mill-challan"
+              style={{
+                border: '2px solid #0f172a',
+                padding: '1.5rem',
+                borderRadius: 4,
+                background: '#ffffff',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                color: '#0f172a'
+              }}
+            >
+              {/* Company Header */}
+              <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, letterSpacing: '0.05em' }}>
+                  YAMUNAJI (YJ)
+                </h1>
+                <p style={{ margin: '3px 0 0', fontSize: '0.8rem', fontWeight: 600 }}>
+                  TEXTILE GRAY & RFD PROCESSING DIVISION — SURAT, GUJARAT
+                </p>
+                <div style={{ marginTop: 6, display: 'inline-block', border: '1px solid #0f172a', padding: '2px 12px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                  DELIVERY CHALLAN FOR PROCESSING MILL (ગ્રે જાવક ચલણ)
+                </div>
+              </div>
+
+              {/* Meta Info Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', borderBottom: '1px solid #0f172a', paddingBottom: '0.75rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>TO (PROCESSING MILL):</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, marginTop: 2 }}>{showPrintChallanModal.millParty}</div>
+                  <div style={{ marginTop: 4 }}><strong>Process Required:</strong> {showPrintChallanModal.processRequired}</div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div><strong>Challan No:</strong> <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>{showPrintChallanModal.challanNo}</span></div>
+                  <div><strong>Date:</strong> {showPrintChallanModal.challanDate}</div>
+                  <div><strong>Vehicle No:</strong> {showPrintChallanModal.vehicleNo}</div>
+                  <div><strong>Quality:</strong> {showPrintChallanModal.fabricQuality}</div>
+                </div>
+              </div>
+
+              {/* TP Breakdown Table */}
+              <div style={{ marginBottom: '1rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #0f172a' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #0f172a', textAlign: 'center', fontWeight: 800 }}>
+                      <th style={{ padding: '6px', borderRight: '1px solid #0f172a', width: 60 }}>Sr. No</th>
+                      <th style={{ padding: '6px', borderRight: '1px solid #0f172a' }}>Lot Number</th>
+                      <th style={{ padding: '6px', borderRight: '1px solid #0f172a' }}>TP No.</th>
+                      <th style={{ padding: '6px' }}>TP Meter (Mtr)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(showPrintChallanModal.tps || []).map((tp, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
+                        <td style={{ padding: '5px', borderRight: '1px solid #0f172a', fontWeight: 700 }}>{tp.srNo}</td>
+                        <td style={{ padding: '5px', borderRight: '1px solid #0f172a' }}>{tp.lotNumber}</td>
+                        <td style={{ padding: '5px', borderRight: '1px solid #0f172a', fontWeight: 800 }}>{tp.tpNo}</td>
+                        <td style={{ padding: '5px', fontWeight: 800 }}>{Number(tp.tpMtr).toFixed(1)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f8fafc', borderTop: '2px solid #0f172a', fontWeight: 900 }}>
+                      <td colSpan={2} style={{ padding: '8px', borderRight: '1px solid #0f172a' }}>
+                        TOTAL TAKA / TP: {showPrintChallanModal.totalTps}
+                      </td>
+                      <td colSpan={2} style={{ padding: '8px', textAlign: 'right', fontSize: '0.95rem' }}>
+                        GRAND TOTAL METERS: {showPrintChallanModal.totalMeters.toFixed(1)} Mtr
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Remarks & Signatures */}
+              {showPrintChallanModal.notes && (
+                <div style={{ fontSize: '0.75rem', marginBottom: '1.5rem', background: '#f8fafc', padding: '6px 10px', border: '1px solid #e2e8f0' }}>
+                  <strong>Notes:</strong> {showPrintChallanModal.notes}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', fontSize: '0.78rem' }}>
+                <div>
+                  <div style={{ height: '35px' }}></div>
+                  <div style={{ borderTop: '1px solid #0f172a', width: '180px', fontWeight: 700 }}>
+                    Receiver's Signature (Mill)
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ height: '35px' }}></div>
+                  <div style={{ borderTop: '1px solid #0f172a', width: '180px', marginLeft: 'auto', fontWeight: 700 }}>
+                    For YAMUNAJI (Authorized)
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
