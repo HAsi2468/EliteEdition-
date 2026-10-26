@@ -23,7 +23,8 @@ module.exports = {
       shutdown_with_message: true, // Enables IPC message shutdown sequence
 
       // Memory Leak & Crash Safeguards
-      max_memory_restart: '500M',  // Auto-cycles worker if memory reaches 500MB (prevents OOM freezes)
+      node_args: '--max-old-space-size=256', // Keeps V8 heap constrained to prevent 1GB RAM exhaustion
+      max_memory_restart: '300M',  // Auto-cycles worker if memory reaches 300MB (prevents OOM freezes on 1GB instances)
       exp_backoff_restart_delay: 200, // Exponential backoff prevents CPU pegging on crash loops
       max_restarts: 15,            // Guards against infinite restart loops
       min_uptime: '10s',           // Deems app healthy if it runs uninterrupted for 10s
