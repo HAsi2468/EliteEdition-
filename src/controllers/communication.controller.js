@@ -1212,7 +1212,7 @@ const searchMessages = async (req, res) => {
       .populate('senderId', 'name username email avatarUrl role')
       .populate('roomId', 'name title type')
       .populate('mentions', 'name username email')
-      .populate('pinnedBy', 'name username email')
+      .populate({ path: 'pinnedBy', select: 'name username email', options: { strictPopulate: false } })
       .populate({
         path: 'reactions.user',
         select: 'name username email'
@@ -1343,7 +1343,7 @@ const togglePinMessage = async (req, res) => {
 
     const populatedMsg = await ChatMessage.findById(message._id)
       .populate('senderId', 'name username email role')
-      .populate('pinnedBy', 'name username email')
+      .populate({ path: 'pinnedBy', select: 'name username email', options: { strictPopulate: false } })
       .lean();
 
     const io = req.app.get('io') || req.app.get('socketio') || global.io;
