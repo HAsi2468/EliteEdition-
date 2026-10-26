@@ -12,8 +12,8 @@ module.exports = {
       script: 'src/index.js',
       cwd: process.env.PM2_CWD || '/home/ubuntu/EliteEditionMongo',
 
-      // Cluster scaling: runs 2 dedicated worker instances (or 'max' for all CPU cores)
-      instances: process.env.PM2_INSTANCES ? parseInt(process.env.PM2_INSTANCES, 10) : 2,
+      // Scaling: Runs 1 dedicated worker to fit within 1GB RAM on t3.micro
+      instances: process.env.PM2_INSTANCES ? parseInt(process.env.PM2_INSTANCES, 10) : 1,
       exec_mode: 'cluster',
 
       // Zero-Downtime Reload & Handshake Controls
@@ -23,8 +23,8 @@ module.exports = {
       shutdown_with_message: true, // Enables IPC message shutdown sequence
 
       // Memory Leak & Crash Safeguards
-      node_args: '--max-old-space-size=256', // Keeps V8 heap constrained to prevent 1GB RAM exhaustion
-      max_memory_restart: '300M',  // Auto-cycles worker if memory reaches 300MB (prevents OOM freezes on 1GB instances)
+      node_args: '--max-old-space-size=350', // Constrains V8 heap safely below 1GB limit
+      max_memory_restart: '380M',  // Auto-cycles worker if memory reaches 380MB
       exp_backoff_restart_delay: 200, // Exponential backoff prevents CPU pegging on crash loops
       max_restarts: 15,            // Guards against infinite restart loops
       min_uptime: '10s',           // Deems app healthy if it runs uninterrupted for 10s
