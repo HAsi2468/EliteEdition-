@@ -38,7 +38,8 @@ import {
   MapPin,
   Phone,
   User,
-  Briefcase
+  Briefcase,
+  Lock
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
 
@@ -528,10 +529,16 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     ]
   });
 
+  // Filters for Mill Outward Challans List
+  const [millQualityFilter, setMillQualityFilter] = useState('all');
+  const [millSearchQuery, setMillSearchQuery] = useState('');
+
   // Form State for Mill Outward Challan
   const [millChallanForm, setMillChallanForm] = useState({
     challanNo: '',
     challanDate: new Date().toISOString().split('T')[0],
+    fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
+    selectedLotId: 'all',
     millParty: getPartyName(configs.mills[0]) || 'Shree Radhe Bleaching & Dyeing Processors',
     vehicleNo: '',
     driverName: '',
@@ -893,40 +900,102 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // ==========================================
   // MILL OUTWARD CHALLAN HELPERS
   // ==========================================
-  const availableGrayTps = useMemo(() => {
-    const list = [];
+  // All unique fabric qualities with live stock counters
+  const grayStockQualities = useMemo(() => {
+    const map = new Map();
+    // Pre-populate with master configs
+    (configs.qualities || []).forEach(q => {
+      map.set(q, { inStockTps: 0, totalTps: 0, inStockMtr: 0 });
+    });
+    // Tally from actual gray lots
     grayLots.forEach(lot => {
-      (lot.tps || []).forEach((tp, tpIdx) => {
+      const q = lot.fabricQuality || 'Gray Fabric';
+      if (!map.has(q)) {
+        map.set(q, { inStockTps: 0, totalTps: 0, inStockMtr: 0 });
+      }
+      const data = map.get(q);
+      (lot.tps || []).forEach(tp => {
+        data.totalTps += 1;
         if (tp.status === 'In Stock') {
-          list.push({
-            lotId: lot.id,
-            lotNumber: lot.lotNumber,
-            weaverParty: lot.weaverParty,
-            fabricQuality: lot.fabricQuality,
-            panna: lot.panna,
-            tpIndex: tpIdx,
-            srNo: tp.srNo,
-            tpNo: tp.tpNo,
-            tpMtr: tp.tpMtr
-          });
+          data.inStockTps += 1;
+          data.inStockMtr += Number(tp.tpMtr) || 0;
         }
       });
     });
-    return list;
-  }, [grayLots]);
 
+    return Array.from(map.entries()).map(([quality, stats]) => ({
+      quality,
+      ...stats
+    }));
+  }, [grayLots, configs.qualities]);
+
+  // Inward Challans/Lots matching the selected Fabric Quality
+  const lotsMatchingQuality = useMemo(() => {
+    const selectedQ = millChallanForm.fabricQuality;
+    if (!selectedQ) return grayLots;
+    return grayLots.filter(lot => lot.fabricQuality === selectedQ);
+  }, [grayLots, millChallanForm.fabricQuality]);
+
+  // Inward lots filtered by selected inward challan/lot
+  const lotsForOutwardSelection = useMemo(() => {
+    if (!millChallanForm.selectedLotId || millChallanForm.selectedLotId === 'all') {
+      return lotsMatchingQuality;
+    }
+    return lotsMatchingQuality.filter(lot => String(lot.id) === String(millChallanForm.selectedLotId));
+  }, [lotsMatchingQuality, millChallanForm.selectedLotId]);
+
+  // All TPs in the filtered lots for outward dispatch display:
+  // Shows BOTH In Stock (selectable) and Already Outwarded (disabled, non-selectable)
+  const displayedTpsForOutward = useMemo(() => {
+    const list = [];
+    lotsForOutwardSelection.forEach(lot => {
+      (lot.tps || []).forEach((tp, tpIdx) => {
+        const isOutwarded = tp.status === 'Sent to Mill';
+        const isInStock = tp.status === 'In Stock';
+        list.push({
+          lotId: lot.id,
+          lotNumber: lot.lotNumber,
+          weaverParty: lot.weaverParty,
+          weaverChallanNo: lot.weaverChallanNo || lot.lotNumber,
+          fabricQuality: lot.fabricQuality,
+          panna: lot.panna,
+          tpIndex: tpIdx,
+          srNo: tp.srNo,
+          tpNo: tp.tpNo,
+          tpMtr: tp.tpMtr,
+          status: tp.status,
+          millChallanNo: tp.millChallanNo,
+          isOutwarded,
+          isInStock
+        });
+      });
+    });
+    return list;
+  }, [lotsForOutwardSelection]);
+
+  const availableInStockTpsCount = useMemo(() => {
+    return displayedTpsForOutward.filter(t => t.isInStock).length;
+  }, [displayedTpsForOutward]);
+
+  const outwardedTpsCount = useMemo(() => {
+    return displayedTpsForOutward.filter(t => t.isOutwarded).length;
+  }, [displayedTpsForOutward]);
+
+  // Only In-Stock TPs that are checked
   const selectedMillTps = useMemo(() => {
-    return availableGrayTps.filter(t => {
+    return displayedTpsForOutward.filter(t => {
+      if (!t.isInStock) return false;
       const key = `${t.lotId}__${t.tpIndex}`;
       return Boolean(millChallanForm.selectedTpKeys[key]);
     });
-  }, [availableGrayTps, millChallanForm.selectedTpKeys]);
+  }, [displayedTpsForOutward, millChallanForm.selectedTpKeys]);
 
   const millSelectedTotalMtrs = useMemo(() => {
     return selectedMillTps.reduce((sum, t) => sum + (Number(t.tpMtr) || 0), 0);
   }, [selectedMillTps]);
 
-  const handleToggleTpSelection = (lotId, tpIndex) => {
+  const handleToggleTpSelection = (lotId, tpIndex, isInStock) => {
+    if (!isInStock) return; // Cannot select already outwarded TP
     const key = `${lotId}__${tpIndex}`;
     setMillChallanForm(prev => ({
       ...prev,
@@ -936,6 +1005,65 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       }
     }));
   };
+
+  const handleSelectAllInStock = () => {
+    const updated = { ...millChallanForm.selectedTpKeys };
+    displayedTpsForOutward.forEach(t => {
+      if (t.isInStock) {
+        const key = `${t.lotId}__${t.tpIndex}`;
+        updated[key] = true;
+      }
+    });
+    setMillChallanForm(prev => ({ ...prev, selectedTpKeys: updated }));
+  };
+
+  const handleDeselectAllInStock = () => {
+    setMillChallanForm(prev => ({ ...prev, selectedTpKeys: {} }));
+  };
+
+  const handleQualityChangeForOutward = (quality) => {
+    setMillChallanForm(prev => ({
+      ...prev,
+      fabricQuality: quality,
+      selectedLotId: 'all',
+      selectedTpKeys: {} // clear selection when switching quality
+    }));
+  };
+
+  const openMillChallanModal = (preselectedQuality) => {
+    let qual = preselectedQuality || millChallanForm.fabricQuality;
+    if (!qual) {
+      for (const lot of grayLots) {
+        if ((lot.tps || []).some(t => t.status === 'In Stock')) {
+          qual = lot.fabricQuality;
+          break;
+        }
+      }
+      if (!qual) qual = configs.qualities[0] || 'Pure Viscose Rayon 14kg';
+    }
+    setMillChallanForm(prev => ({
+      ...prev,
+      fabricQuality: qual,
+      selectedLotId: 'all',
+      selectedTpKeys: {}
+    }));
+    setShowMillChallanModal(true);
+  };
+
+  // Filtered Mill Outward Challans for table list
+  const filteredMillChallans = useMemo(() => {
+    return millChallans.filter(ch => {
+      const matchQuality = millQualityFilter === 'all' || ch.fabricQuality === millQualityFilter;
+      const q = millSearchQuery.trim().toLowerCase();
+      const matchSearch = !q ||
+        (ch.challanNo && ch.challanNo.toLowerCase().includes(q)) ||
+        (ch.millParty && ch.millParty.toLowerCase().includes(q)) ||
+        (ch.processRequired && ch.processRequired.toLowerCase().includes(q)) ||
+        (ch.vehicleNo && ch.vehicleNo.toLowerCase().includes(q)) ||
+        (ch.fabricQuality && ch.fabricQuality.toLowerCase().includes(q));
+      return matchQuality && matchSearch;
+    });
+  }, [millChallans, millQualityFilter, millSearchQuery]);
 
   const handleCreateMillChallan = (e) => {
     e.preventDefault();
@@ -950,7 +1078,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
     const challanNo = millChallanForm.challanNo.trim() || `MILL-CH-${String(millChallans.length + 101)}`;
     const totalMtrs = parseFloat(millSelectedTotalMtrs.toFixed(2));
-    const primaryQuality = selectedMillTps[0]?.fabricQuality || 'Gray Fabric';
+    const primaryQuality = millChallanForm.fabricQuality || selectedMillTps[0]?.fabricQuality || 'Gray Fabric';
     const matchedMill = selectedMillDetails;
 
     const newChallan = {
@@ -1016,6 +1144,8 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setMillChallanForm({
       challanNo: '',
       challanDate: new Date().toISOString().split('T')[0],
+      fabricQuality: configs.qualities[0] || 'Pure Viscose Rayon 14kg',
+      selectedLotId: 'all',
       millParty: getPartyName(configs.mills[0]) || 'Shree Radhe Bleaching & Dyeing Processors',
       vehicleNo: '',
       driverName: '',
@@ -1024,7 +1154,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       notes: ''
     });
 
-    triggerEliteAlert(`Mill Outward Challan ${challanNo} created for ${selectedMillTps.length} TPs (${totalMtrs} Mtr)!`, 'Challan Created');
+    triggerEliteAlert(`Mill Outward Challan ${challanNo} (${primaryQuality}) created for ${selectedMillTps.length} TPs (${totalMtrs} Mtr)!`, 'Challan Created');
   };
 
   return (
@@ -1309,7 +1439,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </button>
 
               <button
-                onClick={() => setShowMillChallanModal(true)}
+                onClick={() => openMillChallanModal()}
                 className="btn-primary"
                 style={{
                   padding: '0.45rem 1rem',
@@ -1448,7 +1578,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
           {/* ======================================================== */}
           {graySubTab === 'mill_outward' && (
             <div className="glass-panel" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                     Outward Delivery Challans to Processing Mills
@@ -1458,21 +1588,54 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setShowMillChallanModal(true)}
-                  className="btn-primary"
-                  style={{
-                    padding: '0.45rem 1rem',
-                    fontSize: '0.82rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: 'linear-gradient(135deg, #059669, #10b981)',
-                    border: 'none'
-                  }}
-                >
-                  <PlusCircle size={15} /> + Create Outward Challan
-                </button>
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Quality Filter */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
+                      Quality:
+                    </label>
+                    <select
+                      value={millQualityFilter}
+                      onChange={(e) => setMillQualityFilter(e.target.value)}
+                      className="input-field"
+                      style={{ height: '34px', fontSize: '0.78rem', padding: '0 8px', fontWeight: 600 }}
+                    >
+                      <option value="all">All Fabric Qualities</option>
+                      {(configs.qualities || []).map(q => (
+                        <option key={q} value={q}>{q}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Search Input */}
+                  <div style={{ position: 'relative', width: 220 }}>
+                    <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      type="text"
+                      placeholder="Search Challan, Mill, Vehicle..."
+                      value={millSearchQuery}
+                      onChange={(e) => setMillSearchQuery(e.target.value)}
+                      className="input-field"
+                      style={{ paddingLeft: '30px', height: '34px', fontSize: '0.78rem', width: '100%' }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => openMillChallanModal()}
+                    className="btn-primary"
+                    style={{
+                      padding: '0.45rem 1rem',
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'linear-gradient(135deg, #059669, #10b981)',
+                      border: 'none'
+                    }}
+                  >
+                    <PlusCircle size={15} /> + Create Outward Challan
+                  </button>
+                </div>
               </div>
 
               <div className="table-container" style={{ overflowX: 'auto' }}>
@@ -1482,6 +1645,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       <th style={{ padding: '10px 12px' }}>Challan No</th>
                       <th style={{ padding: '10px 12px' }}>Date</th>
                       <th style={{ padding: '10px 12px' }}>Processing Mill Name</th>
+                      <th style={{ padding: '10px 12px' }}>Fabric Quality</th>
                       <th style={{ padding: '10px 12px' }}>Process Required</th>
                       <th style={{ padding: '10px 12px' }}>Vehicle / Transport</th>
                       <th style={{ padding: '10px 12px' }}>Total TPs</th>
@@ -1491,7 +1655,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                     </tr>
                   </thead>
                   <tbody>
-                    {millChallans.map(ch => (
+                    {filteredMillChallans.map(ch => (
                       <tr key={ch.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover-row">
                         <td style={{ padding: '10px 12px', fontWeight: 800, color: '#059669' }}>
                           {ch.challanNo}
@@ -1501,6 +1665,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {ch.millParty}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284c7' }}>
+                          {ch.fabricQuality || 'Gray Fabric'}
                         </td>
                         <td style={{ padding: '10px 12px', color: '#64748b' }}>
                           {ch.processRequired}
@@ -1548,6 +1715,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                         </td>
                       </tr>
                     ))}
+                    {filteredMillChallans.length === 0 && (
+                      <tr>
+                        <td colSpan={10} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>
+                            No Mill Outward Challans Found
+                          </div>
+                          <div style={{ fontSize: '0.78rem' }}>
+                            {millQualityFilter !== 'all' || millSearchQuery
+                              ? 'Try clearing the quality filter or search query.'
+                              : 'Create your first delivery challan to send gray fabric pieces to the processing mill.'}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -2927,69 +3108,229 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 </datalist>
               </div>
 
-              {/* 📦 SELECT TP PIECES TO SEND TO MILL */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{ background: '#f8fafc', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                    Select In-Stock Gray TPs to Send to Mill
+              {/* 🧵 1. SELECT FABRIC QUALITY & INWARD CHALLAN */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <Layers size={15} color="#0284c7" />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                    1. Select Fabric Quality & Inward Challan
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Available: <strong style={{ color: '#0284c7' }}>{availableGrayTps.length} TPs</strong>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: 'auto' }}>
+                    (Only inward challans & TPs of selected quality are shown)
                   </span>
                 </div>
 
-                <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '6px' }}>
-                  {availableGrayTps.length === 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
+                  {/* Fabric Quality Selector */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                      Fabric Quality *
+                    </label>
+                    <select
+                      value={millChallanForm.fabricQuality}
+                      onChange={(e) => handleQualityChangeForOutward(e.target.value)}
+                      className="input-field"
+                      style={{ height: '34px', fontSize: '0.8rem', width: '100%', fontWeight: 700 }}
+                    >
+                      {grayStockQualities.map(item => (
+                        <option key={item.quality} value={item.quality}>
+                          {item.quality} {item.inStockTps > 0 ? `(${item.inStockTps} In Stock, ${item.inStockMtr.toFixed(0)} Mtr)` : `(0 In Stock)`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Inward Challan / Lot Selector */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                      Filter by Weaver Challan / Lot
+                    </label>
+                    <select
+                      value={millChallanForm.selectedLotId}
+                      onChange={(e) => setMillChallanForm(prev => ({ ...prev, selectedLotId: e.target.value }))}
+                      className="input-field"
+                      style={{ height: '34px', fontSize: '0.8rem', width: '100%' }}
+                    >
+                      <option value="all">
+                        All Inward Challans ({lotsMatchingQuality.length} Lots Available)
+                      </option>
+                      {lotsMatchingQuality.map(lot => {
+                        const inStockCount = (lot.tps || []).filter(t => t.status === 'In Stock').length;
+                        return (
+                          <option key={lot.id} value={lot.id}>
+                            Lot #{lot.lotNumber} | Weaver: {lot.weaverParty} | Ch: {lot.weaverChallanNo || lot.lotNumber} ({inStockCount} in stock)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* 📦 2. SELECT TP PIECES TO SEND TO MILL */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ background: '#f8fafc', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                      2. Select TP Pieces for Outward Challan
+                    </span>
+                    <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b' }}>
+                      Quality: <strong style={{ color: '#0284c7' }}>{millChallanForm.fabricQuality}</strong> • Available to Send: <strong style={{ color: '#16a34a' }}>{availableInStockTpsCount} TPs</strong>
+                      {outwardedTpsCount > 0 && ` • Already Outwarded: ${outwardedTpsCount} TPs (Locked)`}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      disabled={availableInStockTpsCount === 0}
+                      onClick={handleSelectAllInStock}
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: 4,
+                        border: '1px solid #bbf7d0',
+                        background: '#f0fdf4',
+                        color: '#166534',
+                        cursor: availableInStockTpsCount > 0 ? 'pointer' : 'not-allowed',
+                        opacity: availableInStockTpsCount > 0 ? 1 : 0.6
+                      }}
+                    >
+                      Select All Available ({availableInStockTpsCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllInStock}
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: 4,
+                        border: '1px solid #e2e8f0',
+                        background: '#ffffff',
+                        color: '#64748b',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '240px', overflowY: 'auto', padding: '4px' }}>
+                  {displayedTpsForOutward.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
-                      No gray TPs currently available in stock. Inward gray fabric from weaver first.
+                      No gray fabric pieces found for <strong>{millChallanForm.fabricQuality}</strong>. Please inward gray fabric from weaver first or select another quality.
                     </div>
                   ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
                         <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
-                          <th style={{ padding: '6px 8px', width: 40 }}>Select</th>
+                          <th style={{ padding: '6px 8px', width: 40, textAlign: 'center' }}>Select</th>
                           <th style={{ padding: '6px 8px' }}>Lot #</th>
-                          <th style={{ padding: '6px 8px' }}>Weaver</th>
+                          <th style={{ padding: '6px 8px' }}>Weaver Challan / Party</th>
                           <th style={{ padding: '6px 8px' }}>Quality</th>
                           <th style={{ padding: '6px 8px' }}>TP No</th>
                           <th style={{ padding: '6px 8px' }}>TP Meter</th>
+                          <th style={{ padding: '6px 8px' }}>Status / Outward Info</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {availableGrayTps.map((tp, idx) => {
+                        {displayedTpsForOutward.map((tp, idx) => {
                           const key = `${tp.lotId}__${tp.tpIndex}`;
                           const isSelected = Boolean(millChallanForm.selectedTpKeys[key]);
                           return (
                             <tr
                               key={idx}
-                              onClick={() => handleToggleTpSelection(tp.lotId, tp.tpIndex)}
+                              onClick={() => {
+                                if (tp.isInStock) {
+                                  handleToggleTpSelection(tp.lotId, tp.tpIndex, true);
+                                }
+                              }}
                               style={{
-                                cursor: 'pointer',
-                                background: isSelected ? '#f0fdf4' : 'transparent',
-                                borderBottom: '1px solid #f1f5f9'
+                                cursor: tp.isInStock ? 'pointer' : 'not-allowed',
+                                background: tp.isOutwarded
+                                  ? '#f8fafc'
+                                  : isSelected
+                                    ? '#ecfdf5'
+                                    : '#ffffff',
+                                borderBottom: '1px solid #f1f5f9',
+                                opacity: tp.isOutwarded ? 0.72 : 1,
+                                transition: 'background 0.15s ease'
                               }}
                             >
-                              <td style={{ padding: '6px 8px' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}}
-                                />
+                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                {tp.isOutwarded ? (
+                                  <input
+                                    type="checkbox"
+                                    disabled
+                                    checked={false}
+                                    title="Already outwarded to mill"
+                                    style={{ cursor: 'not-allowed' }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => handleToggleTpSelection(tp.lotId, tp.tpIndex, true)}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                )}
                               </td>
-                              <td style={{ padding: '6px 8px', fontWeight: 700, color: '#0284c7' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 700, color: tp.isOutwarded ? '#64748b' : '#0284c7' }}>
                                 {tp.lotNumber}
                               </td>
-                              <td style={{ padding: '6px 8px' }}>
-                                {tp.weaverParty}
+                              <td style={{ padding: '6px 8px', color: tp.isOutwarded ? '#94a3b8' : '#334155' }}>
+                                <div style={{ fontWeight: 600 }}>{tp.weaverParty}</div>
+                                <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Ch: {tp.weaverChallanNo}</div>
                               </td>
-                              <td style={{ padding: '6px 8px' }}>
+                              <td style={{ padding: '6px 8px', color: tp.isOutwarded ? '#94a3b8' : '#334155' }}>
                                 {tp.fabricQuality}
                               </td>
-                              <td style={{ padding: '6px 8px', fontWeight: 800 }}>
-                                {tp.tpNo}
+                              <td style={{ padding: '6px 8px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#0f172a' }}>
+                                TP-{tp.tpNo}
                               </td>
-                              <td style={{ padding: '6px 8px', fontWeight: 800, color: '#0f172a' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 800, color: tp.isOutwarded ? '#94a3b8' : '#059669' }}>
                                 {tp.tpMtr} Mtr
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                {tp.isOutwarded ? (
+                                  <span
+                                    style={{
+                                      fontSize: '0.68rem',
+                                      fontWeight: 800,
+                                      padding: '2px 8px',
+                                      borderRadius: 4,
+                                      background: '#f1f5f9',
+                                      color: '#64748b',
+                                      border: '1px solid #cbd5e1',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 3
+                                    }}
+                                  >
+                                    <Lock size={10} color="#64748b" /> Already Outwarded ({tp.millChallanNo || 'At Mill'})
+                                  </span>
+                                ) : (
+                                  <span
+                                    style={{
+                                      fontSize: '0.68rem',
+                                      fontWeight: 800,
+                                      padding: '2px 8px',
+                                      borderRadius: 4,
+                                      background: '#dcfce7',
+                                      color: '#15803d',
+                                      border: '1px solid #bbf7d0',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 3
+                                    }}
+                                  >
+                                    <CheckCircle2 size={10} color="#16a34a" /> In Stock (Available)
+                                  </span>
+                                )}
                               </td>
                             </tr>
                           );
@@ -3002,7 +3343,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 {/* Selection Footer */}
                 <div style={{ background: '#f0fdf4', padding: '8px 12px', borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 700 }}>
-                    Selected: {selectedMillTps.length} TPs
+                    Selected for Mill: <strong>{selectedMillTps.length} TPs</strong>
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#15803d' }}>
                     Challan Total: {millSelectedTotalMtrs.toFixed(1)} Mtr
