@@ -34,7 +34,11 @@ import {
   Settings,
   Edit2,
   Sliders,
-  RotateCcw
+  RotateCcw,
+  MapPin,
+  Phone,
+  User,
+  Briefcase
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from '../services/dialogService';
 
@@ -46,16 +50,88 @@ const STORAGE_CONFIGS_KEY = 'yamunaji_master_configurations';
 // ==========================================
 // DEFAULT MASTER CONFIGURATIONS (SURAT TEXTILES)
 // ==========================================
-const DEFAULT_CONFIGS = {
+export const DEFAULT_CONFIGS = {
   weavers: [
-    'Maruti Weaving Works',
-    'Harikrishna Textiles',
-    'Shivam Loom Industries',
-    'Radha Krishna Weaving',
-    'Shreeji Textiles',
-    'Gopi Loom Mills',
-    'Omkar Weavers',
-    'Pooja Textiles (Katargam)'
+    {
+      name: 'Maruti Weaving Works',
+      gst: '24AABCM1234F1Z8',
+      address: 'Plot No. 42-45, Phase-2, GIDC Pandesara',
+      city: 'Surat, Gujarat - 394221',
+      phone: '+91 98251 12345',
+      contactPerson: 'Hareshbhai Patel',
+      broker: 'Ramesh Dalal (Textile Agent)',
+      notes: 'Specialist in 14kg Viscose & Modal Satin weaving'
+    },
+    {
+      name: 'Harikrishna Textiles',
+      gst: '24AAACH9876K1Z3',
+      address: 'Shed No. 12, Bamroli Road, Khatodara GIDC',
+      city: 'Surat, Gujarat - 395002',
+      phone: '+91 98240 54321',
+      contactPerson: 'Mukeshbhai Radadiya',
+      broker: 'Kishorebhai (Direct)',
+      notes: 'Premium 60s Cambric & Pure Linen specialist'
+    },
+    {
+      name: 'Shivam Loom Industries',
+      gst: '24AAKFS4412L1Z9',
+      address: 'Survey 108/B, Anjana Farm, Ring Road',
+      city: 'Surat, Gujarat - 395003',
+      phone: '+91 98980 11223',
+      contactPerson: 'Pravinbhai Savani',
+      broker: 'Shyam Agency',
+      notes: 'High-speed airjet looms, prompt delivery'
+    },
+    {
+      name: 'Radha Krishna Weaving',
+      gst: '24AAGFR7721M1Z4',
+      address: 'Plot 78, Road No. 6, Sachin GIDC',
+      city: 'Surat, Gujarat - 394230',
+      phone: '+91 97234 88990',
+      contactPerson: 'Ghanshyambhai Vaghasiya',
+      broker: 'Direct Weaver',
+      notes: 'Viscose Crepe & Georgette weaving'
+    },
+    {
+      name: 'Shreeji Textiles',
+      gst: '24AALPS3344P1Z2',
+      address: 'Plot 15, Ved Road Industrial Area, Katargam',
+      city: 'Surat, Gujarat - 395004',
+      phone: '+91 98790 66778',
+      contactPerson: 'Dineshbhai Patel',
+      broker: 'Jalaram Brokerage',
+      notes: 'Organza & Gold Weave specialist'
+    },
+    {
+      name: 'Gopi Loom Mills',
+      gst: '24AAJFG5566Q1Z6',
+      address: 'Block 201, Palsana Industrial Park, NH-48',
+      city: 'Surat, Gujarat - 394315',
+      phone: '+91 98255 33445',
+      contactPerson: 'Bharatbhai Dobariya',
+      broker: 'Ramesh Dalal',
+      notes: 'Heavy Cotton Twill & Dola Silk'
+    },
+    {
+      name: 'Omkar Weavers',
+      gst: '24AAUPO9988R1Z1',
+      address: 'Plot 89, Pipodara GIDC, Surat',
+      city: 'Surat, Gujarat - 394110',
+      phone: '+91 99090 44556',
+      contactPerson: 'Ashokbhai Sutariya',
+      broker: 'Direct',
+      notes: 'Chanderi Silk & Viscose Weaves'
+    },
+    {
+      name: 'Pooja Textiles (Katargam)',
+      gst: '24AABCP1122S1Z7',
+      address: 'Near Gajera Circle, Laxmi Enclave, Katargam',
+      city: 'Surat, Gujarat - 395004',
+      phone: '+91 98253 77889',
+      contactPerson: 'Sanjaybhai Gondaliya',
+      broker: 'Bhavna Textiles Agency',
+      notes: 'Prompt delivery, high-grade quality inspection'
+    }
   ],
   qualities: [
     'Pure Viscose Rayon 14kg',
@@ -79,12 +155,66 @@ const DEFAULT_CONFIGS = {
     '60"'
   ],
   mills: [
-    'Shree Radhe Bleaching & Dyeing Processors',
-    'Vrundavan Mills Pvt Ltd',
-    'Ganesh Textile Processors',
-    'Shree Ambika Processing Mill',
-    'Bhagwati Dyeing House',
-    'Navkar Processing Mills'
+    {
+      name: 'Shree Radhe Bleaching & Dyeing Processors',
+      gst: '24AAACR1234A1Z5',
+      address: 'Plot 112-116, Road No. 12, Sachin GIDC',
+      city: 'Surat, Gujarat - 394230',
+      phone: '+91 98250 11999',
+      contactPerson: 'Maheshbhai (Mill Manager)',
+      processTypes: 'RFD Bleaching, Scouring & Heat Setting',
+      notes: 'Turnaround: 2-3 Days. Loss/Shrinkage avg 2.5-3%'
+    },
+    {
+      name: 'Vrundavan Mills Pvt Ltd',
+      gst: '24AABCV5678B1Z0',
+      address: 'Block 402, GIDC Pandesara, Opp. Water Tank',
+      city: 'Surat, Gujarat - 394221',
+      phone: '+91 98241 88776',
+      contactPerson: 'Kishorebhai Desai',
+      processTypes: 'Mercerizing & RFD Bleaching, Bio Wash',
+      notes: 'Specialist for 60s Cambric & Pure Modal'
+    },
+    {
+      name: 'Ganesh Textile Processors',
+      gst: '24AAACG9012C1Z8',
+      address: 'Plot 55, Kadodara Road, Palsana GIDC',
+      city: 'Surat, Gujarat - 394317',
+      phone: '+91 99798 22334',
+      contactPerson: 'Rajubhai Kothari',
+      processTypes: 'Soft Finish & Wash RFD, Stenter Finishing',
+      notes: 'Fast delivery for urgent job card requirements'
+    },
+    {
+      name: 'Shree Ambika Processing Mill',
+      gst: '24AAACA3456D1Z3',
+      address: 'Survey 245, Bhestan-Jiaav Road, Surat',
+      city: 'Surat, Gujarat - 395023',
+      phone: '+91 98256 66554',
+      contactPerson: 'Chandreshbhai Shah',
+      processTypes: 'High Tensile Heat Setting, Scouring',
+      notes: 'Zero shrinkage calibration on viscose rayon'
+    },
+    {
+      name: 'Bhagwati Dyeing House',
+      gst: '24AAACB7890E1Z1',
+      address: 'Plot 18, Road No. 3, Hojiwala Industrial Estate',
+      city: 'Surat, Gujarat - 394230',
+      phone: '+91 98795 44332',
+      contactPerson: 'Girishbhai Parmar',
+      processTypes: 'Bio Wash & Zero Shrinkage Finish',
+      notes: 'Continuous bleaching range (CBR)'
+    },
+    {
+      name: 'Navkar Processing Mills',
+      gst: '24AAACN2345F1Z6',
+      address: 'Plot 72, Sachin-Magdalla Road, Surat',
+      city: 'Surat, Gujarat - 394230',
+      phone: '+91 98258 99001',
+      contactPerson: 'Anandbhai Mehta',
+      processTypes: 'Viscose Crepe & Chanderi RFD processing',
+      notes: 'High consistency white whiteness index'
+    }
   ],
   processes: [
     'RFD Bleaching, Scouring & Heat Setting',
@@ -94,6 +224,45 @@ const DEFAULT_CONFIGS = {
     'Bio Wash & Zero Shrinkage Finish'
   ]
 };
+
+// ==========================================
+// PARTY NORMALIZATION & HELPER UTILITIES
+// ==========================================
+export const normalizeParty = (item, defaultCity = 'Surat, Gujarat') => {
+  if (!item) return { name: '', gst: '', address: '', city: defaultCity, phone: '', contactPerson: '', broker: '', processTypes: '', notes: '' };
+  if (typeof item === 'string') {
+    const defaultMatch = (DEFAULT_CONFIGS.weavers || []).concat(DEFAULT_CONFIGS.mills || []).find(
+      d => typeof d === 'object' && d.name.toLowerCase() === item.toLowerCase()
+    );
+    if (defaultMatch) {
+      return { ...defaultMatch };
+    }
+    return {
+      name: item,
+      gst: '',
+      address: '',
+      city: defaultCity,
+      phone: '',
+      contactPerson: '',
+      broker: '',
+      processTypes: '',
+      notes: ''
+    };
+  }
+  return {
+    name: item.name || '',
+    gst: item.gst || '',
+    address: item.address || '',
+    city: item.city || defaultCity,
+    phone: item.phone || '',
+    contactPerson: item.contactPerson || '',
+    broker: item.broker || '',
+    processTypes: item.processTypes || '',
+    notes: item.notes || ''
+  };
+};
+
+export const getPartyName = (p) => (typeof p === 'string' ? p : p?.name || '');
 
 // ==========================================
 // SEED DATA FOR GRAY FABRIC
@@ -251,10 +420,14 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
         const p = JSON.parse(saved);
         if (p && typeof p === 'object') {
           return {
-            weavers: Array.isArray(p.weavers) && p.weavers.length > 0 ? p.weavers : DEFAULT_CONFIGS.weavers,
+            weavers: Array.isArray(p.weavers) && p.weavers.length > 0 
+              ? p.weavers.map(w => normalizeParty(w)) 
+              : DEFAULT_CONFIGS.weavers,
             qualities: Array.isArray(p.qualities) && p.qualities.length > 0 ? p.qualities : DEFAULT_CONFIGS.qualities,
             pannas: Array.isArray(p.pannas) && p.pannas.length > 0 ? p.pannas : DEFAULT_CONFIGS.pannas,
-            mills: Array.isArray(p.mills) && p.mills.length > 0 ? p.mills : DEFAULT_CONFIGS.mills,
+            mills: Array.isArray(p.mills) && p.mills.length > 0 
+              ? p.mills.map(m => normalizeParty(m)) 
+              : DEFAULT_CONFIGS.mills,
             processes: Array.isArray(p.processes) && p.processes.length > 0 ? p.processes : DEFAULT_CONFIGS.processes
           };
         }
@@ -312,6 +485,24 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [editingItemIndex, setEditingItemIndex] = useState(null);
   const [editingItemValue, setEditingItemValue] = useState('');
 
+  // Party Detail Modal State (for Weavers and Processing Mills)
+  const [showPartyModal, setShowPartyModal] = useState(false);
+  const [partyModalMode, setPartyModalMode] = useState('add'); // 'add' | 'edit'
+  const [partyModalType, setPartyModalType] = useState('weavers'); // 'weavers' | 'mills'
+  const [partyModalIndex, setPartyModalIndex] = useState(null);
+  const [partySearchTerm, setPartySearchTerm] = useState('');
+  const [partyModalForm, setPartyModalForm] = useState({
+    name: '',
+    gst: '',
+    address: '',
+    city: 'Surat, Gujarat',
+    phone: '',
+    contactPerson: '',
+    broker: '',
+    processTypes: '',
+    notes: ''
+  });
+
   const [showWeaverInwardModal, setShowWeaverInwardModal] = useState(false);
   const [showMillChallanModal, setShowMillChallanModal] = useState(false);
   const [showPrintChallanModal, setShowPrintChallanModal] = useState(null);
@@ -341,7 +532,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   const [millChallanForm, setMillChallanForm] = useState({
     challanNo: '',
     challanDate: new Date().toISOString().split('T')[0],
-    millParty: configs.mills[0] || 'Shree Radhe Bleaching & Dyeing Processors',
+    millParty: getPartyName(configs.mills[0]) || 'Shree Radhe Bleaching & Dyeing Processors',
     vehicleNo: '',
     driverName: '',
     processRequired: configs.processes[0] || 'RFD Bleaching, Scouring & Heat Setting',
@@ -401,12 +592,74 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   // ==========================================
   // MASTER CONFIGURATION HANDLERS
   // ==========================================
+  const handleOpenAddParty = (type) => {
+    setPartyModalType(type);
+    setPartyModalMode('add');
+    setPartyModalIndex(null);
+    setPartyModalForm({
+      name: '',
+      gst: '',
+      address: '',
+      city: 'Surat, Gujarat',
+      phone: '',
+      contactPerson: '',
+      broker: '',
+      processTypes: type === 'mills' ? (configs.processes[0] || 'RFD Bleaching, Scouring & Heat Setting') : '',
+      notes: ''
+    });
+    setShowPartyModal(true);
+  };
+
+  const handleOpenEditParty = (type, index, item) => {
+    const party = normalizeParty(item);
+    setPartyModalType(type);
+    setPartyModalMode('edit');
+    setPartyModalIndex(index);
+    setPartyModalForm({ ...party });
+    setShowPartyModal(true);
+  };
+
+  const handleSaveParty = (e) => {
+    e.preventDefault();
+    if (!partyModalForm.name.trim()) {
+      triggerEliteAlert('Please enter Party / Firm Name.', 'Missing Name');
+      return;
+    }
+    const cleanParty = {
+      name: partyModalForm.name.trim(),
+      gst: partyModalForm.gst.trim().toUpperCase(),
+      address: partyModalForm.address.trim(),
+      city: partyModalForm.city.trim() || 'Surat, Gujarat',
+      phone: partyModalForm.phone.trim(),
+      contactPerson: partyModalForm.contactPerson.trim(),
+      broker: partyModalForm.broker.trim(),
+      processTypes: partyModalForm.processTypes.trim(),
+      notes: partyModalForm.notes.trim()
+    };
+
+    setConfigs(prev => {
+      const list = [...(prev[partyModalType] || [])];
+      if (partyModalMode === 'add') {
+        list.push(cleanParty);
+      } else if (partyModalIndex !== null) {
+        list[partyModalIndex] = cleanParty;
+      }
+      return { ...prev, [partyModalType]: list };
+    });
+
+    setShowPartyModal(false);
+    triggerEliteAlert(
+      `${partyModalType === 'weavers' ? 'Weaver' : 'Processing Mill'} "${cleanParty.name}" details saved!`,
+      'Party Saved'
+    );
+  };
+
   const handleAddMasterSetting = (e) => {
     e.preventDefault();
     const val = newSettingInput.trim();
     if (!val) return;
     const currentList = configs[settingsActiveTab] || [];
-    if (currentList.some(item => item.toLowerCase() === val.toLowerCase())) {
+    if (currentList.some(item => (typeof item === 'string' ? item : item.name).toLowerCase() === val.toLowerCase())) {
       triggerEliteAlert(`"${val}" is already present in ${settingsActiveTab}!`, 'Duplicate Item');
       return;
     }
@@ -419,7 +672,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
   const handleStartEditMasterSetting = (index, value) => {
     setEditingItemIndex(index);
-    setEditingItemValue(value);
+    setEditingItemValue(typeof value === 'object' ? value.name : value);
   };
 
   const handleSaveEditMasterSetting = (index) => {
@@ -427,7 +680,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     if (!val) return;
     setConfigs(prev => {
       const updated = [...prev[settingsActiveTab]];
-      updated[index] = val;
+      if (typeof updated[index] === 'object') {
+        updated[index] = { ...updated[index], name: val };
+      } else {
+        updated[index] = val;
+      }
       return { ...prev, [settingsActiveTab]: updated };
     });
     setEditingItemIndex(null);
@@ -435,8 +692,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
   };
 
   const handleDeleteMasterSetting = (index, item) => {
+    const itemName = typeof item === 'object' ? item.name : item;
     triggerEliteConfirm(
-      `Are you sure you want to remove "${item}" from master list?`,
+      `Are you sure you want to remove "${itemName}" from master list?`,
       () => {
         setConfigs(prev => ({
           ...prev,
@@ -547,6 +805,20 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
       avgMtr: filledTps > 0 ? (totalMtrs / filledTps).toFixed(2) : 0
     };
   }, [weaverForm.tps]);
+
+  const selectedWeaverDetails = useMemo(() => {
+    const name = (weaverForm.weaverParty || '').trim().toLowerCase();
+    if (!name) return null;
+    const found = (configs.weavers || []).find(w => getPartyName(w).toLowerCase() === name);
+    return found ? normalizeParty(found) : null;
+  }, [weaverForm.weaverParty, configs.weavers]);
+
+  const selectedMillDetails = useMemo(() => {
+    const name = (millChallanForm.millParty || '').trim().toLowerCase();
+    if (!name) return null;
+    const found = (configs.mills || []).find(m => getPartyName(m).toLowerCase() === name);
+    return found ? normalizeParty(found) : null;
+  }, [millChallanForm.millParty, configs.mills]);
 
   const handleSaveWeaverInward = (e) => {
     e.preventDefault();
@@ -679,12 +951,18 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     const challanNo = millChallanForm.challanNo.trim() || `MILL-CH-${String(millChallans.length + 101)}`;
     const totalMtrs = parseFloat(millSelectedTotalMtrs.toFixed(2));
     const primaryQuality = selectedMillTps[0]?.fabricQuality || 'Gray Fabric';
+    const matchedMill = selectedMillDetails;
 
     const newChallan = {
       id: challanNo,
       challanNo,
       challanDate: millChallanForm.challanDate,
       millParty: millChallanForm.millParty.trim(),
+      millGst: matchedMill?.gst || '',
+      millAddress: matchedMill?.address || '',
+      millCity: matchedMill?.city || 'Surat, Gujarat',
+      millPhone: matchedMill?.phone || '',
+      millContact: matchedMill?.contactPerson || '',
       vehicleNo: millChallanForm.vehicleNo.trim() || 'By Hand / Tempo',
       driverName: millChallanForm.driverName.trim() || 'Driver',
       processRequired: millChallanForm.processRequired,
@@ -738,7 +1016,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
     setMillChallanForm({
       challanNo: '',
       challanDate: new Date().toISOString().split('T')[0],
-      millParty: configs.mills[0] || 'Shree Radhe Bleaching & Dyeing Processors',
+      millParty: getPartyName(configs.mills[0]) || 'Shree Radhe Bleaching & Dyeing Processors',
       vehicleNo: '',
       driverName: '',
       processRequired: configs.processes[0] || 'RFD Bleaching, Scouring & Heat Setting',
@@ -1432,7 +1710,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             className="glass-panel"
             style={{
               width: '100%',
-              maxWidth: 680,
+              maxWidth: 780,
               maxHeight: '92vh',
               overflowY: 'auto',
               background: '#ffffff',
@@ -1471,11 +1749,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
-                onClick={() => { setSettingsActiveTab('weavers'); setEditingItemIndex(null); setNewSettingInput(''); }}
+                onClick={() => { setSettingsActiveTab('weavers'); setEditingItemIndex(null); setNewSettingInput(''); setPartySearchTerm(''); }}
                 style={{
-                  padding: '5px 12px',
+                  padding: '6px 14px',
                   borderRadius: '6px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.8rem',
                   fontWeight: settingsActiveTab === 'weavers' ? 800 : 600,
                   background: settingsActiveTab === 'weavers' ? '#0ea5e9' : 'transparent',
                   color: settingsActiveTab === 'weavers' ? '#ffffff' : '#64748b',
@@ -1490,9 +1768,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 type="button"
                 onClick={() => { setSettingsActiveTab('qualities'); setEditingItemIndex(null); setNewSettingInput(''); }}
                 style={{
-                  padding: '5px 12px',
+                  padding: '6px 14px',
                   borderRadius: '6px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.8rem',
                   fontWeight: settingsActiveTab === 'qualities' ? 800 : 600,
                   background: settingsActiveTab === 'qualities' ? '#0ea5e9' : 'transparent',
                   color: settingsActiveTab === 'qualities' ? '#ffffff' : '#64748b',
@@ -1507,9 +1785,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 type="button"
                 onClick={() => { setSettingsActiveTab('pannas'); setEditingItemIndex(null); setNewSettingInput(''); }}
                 style={{
-                  padding: '5px 12px',
+                  padding: '6px 14px',
                   borderRadius: '6px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.8rem',
                   fontWeight: settingsActiveTab === 'pannas' ? 800 : 600,
                   background: settingsActiveTab === 'pannas' ? '#0ea5e9' : 'transparent',
                   color: settingsActiveTab === 'pannas' ? '#ffffff' : '#64748b',
@@ -1522,11 +1800,11 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
 
               <button
                 type="button"
-                onClick={() => { setSettingsActiveTab('mills'); setEditingItemIndex(null); setNewSettingInput(''); }}
+                onClick={() => { setSettingsActiveTab('mills'); setEditingItemIndex(null); setNewSettingInput(''); setPartySearchTerm(''); }}
                 style={{
-                  padding: '5px 12px',
+                  padding: '6px 14px',
                   borderRadius: '6px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.8rem',
                   fontWeight: settingsActiveTab === 'mills' ? 800 : 600,
                   background: settingsActiveTab === 'mills' ? '#0ea5e9' : 'transparent',
                   color: settingsActiveTab === 'mills' ? '#ffffff' : '#64748b',
@@ -1541,9 +1819,9 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 type="button"
                 onClick={() => { setSettingsActiveTab('processes'); setEditingItemIndex(null); setNewSettingInput(''); }}
                 style={{
-                  padding: '5px 12px',
+                  padding: '6px 14px',
                   borderRadius: '6px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.8rem',
                   fontWeight: settingsActiveTab === 'processes' ? 800 : 600,
                   background: settingsActiveTab === 'processes' ? '#0ea5e9' : 'transparent',
                   color: settingsActiveTab === 'processes' ? '#ffffff' : '#64748b',
@@ -1555,112 +1833,304 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
               </button>
             </div>
 
-            {/* Quick Add Bar */}
-            <form onSubmit={handleAddMasterSetting} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input
-                type="text"
-                required
-                placeholder={
-                  settingsActiveTab === 'weavers' ? 'Enter Weaver / Loom Owner name (e.g. Balaji Weaving)...' :
-                  settingsActiveTab === 'qualities' ? 'Enter Fabric Quality (e.g. Cotton 60x60, Modal Satin)...' :
-                  settingsActiveTab === 'pannas' ? 'Enter Panna / Width (e.g. 52", 64")...' :
-                  settingsActiveTab === 'mills' ? 'Enter Processing Mill name...' :
-                  'Enter Process Type (e.g. RFD Bleaching)...'
-                }
-                value={newSettingInput}
-                onChange={(e) => setNewSettingInput(e.target.value)}
-                className="input-field"
-                style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
-              />
-              <button
-                type="submit"
-                className="btn-primary"
-                style={{ height: '36px', padding: '0 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', border: 'none' }}
-              >
-                <Plus size={15} /> Add to Master
-              </button>
-            </form>
+            {/* TAB CONTENT: PARTY TABS (WEAVERS & MILLS) */}
+            {(settingsActiveTab === 'weavers' || settingsActiveTab === 'mills') ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {/* Search & Add Bar */}
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                  <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                    <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      placeholder={`Search ${settingsActiveTab === 'weavers' ? 'weavers' : 'mills'} by name, GSTIN, address, phone...`}
+                      value={partySearchTerm}
+                      onChange={(e) => setPartySearchTerm(e.target.value)}
+                      className="input-field"
+                      style={{ paddingLeft: '32px', height: '36px', fontSize: '0.82rem', width: '100%' }}
+                    />
+                  </div>
 
-            {/* Items List */}
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.5rem', maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {(configs[settingsActiveTab] || []).length === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
-                  No items configured for {settingsActiveTab}. Add a new value above.
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddParty(settingsActiveTab)}
+                    className="btn-primary"
+                    style={{
+                      height: '36px',
+                      padding: '0 16px',
+                      fontSize: '0.82rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 5px rgba(2, 132, 199, 0.25)'
+                    }}
+                  >
+                    <Plus size={16} /> + Add New {settingsActiveTab === 'weavers' ? 'Weaver' : 'Processing Mill'}
+                  </button>
                 </div>
-              ) : (
-                (configs[settingsActiveTab] || []).map((item, idx) => {
-                  const isEditing = editingItemIndex === idx;
-                  return (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '7px 12px',
-                        borderRadius: 6,
-                        background: '#f8fafc',
-                        border: '1px solid #f1f5f9'
-                      }}
-                    >
-                      {isEditing ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, marginRight: '10px' }}>
-                          <input
-                            type="text"
-                            value={editingItemValue}
-                            onChange={(e) => setEditingItemValue(e.target.value)}
-                            className="input-field"
-                            style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEditMasterSetting(idx)}
-                            className="btn-primary"
-                            style={{ height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingItemIndex(null)}
-                            className="btn-secondary"
-                            style={{ height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
-                          {item}
-                        </span>
-                      )}
 
-                      {!isEditing && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleStartEditMasterSetting(idx, item)}
-                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 3 }}
-                            title="Edit / Rename"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMasterSetting(idx, item)}
-                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 3 }}
-                            title="Delete"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                {/* Party Cards List */}
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.65rem', maxHeight: '380px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc' }}>
+                  {(() => {
+                    const rawList = configs[settingsActiveTab] || [];
+                    const filtered = rawList.filter(item => {
+                      if (!partySearchTerm.trim()) return true;
+                      const p = normalizeParty(item);
+                      const term = partySearchTerm.toLowerCase();
+                      return (
+                        p.name.toLowerCase().includes(term) ||
+                        p.gst.toLowerCase().includes(term) ||
+                        p.address.toLowerCase().includes(term) ||
+                        p.city.toLowerCase().includes(term) ||
+                        p.phone.toLowerCase().includes(term) ||
+                        p.contactPerson.toLowerCase().includes(term) ||
+                        p.broker.toLowerCase().includes(term)
+                      );
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                          No {settingsActiveTab} found matching your search. Click "+ Add New" above to register details.
                         </div>
-                      )}
+                      );
+                    }
+
+                    return filtered.map((item, idx) => {
+                      const party = normalizeParty(item);
+                      const originalIndex = rawList.indexOf(item);
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            padding: '11px 14px',
+                            borderRadius: 8,
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                                {party.name}
+                              </span>
+                              {party.gst ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: '1px 8px', borderRadius: 4, letterSpacing: '0.04em' }}>
+                                  GSTIN: {party.gst}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>
+                                  No GST Listed
+                                </span>
+                              )}
+                              {party.broker && (
+                                <span style={{ fontSize: '0.72rem', background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', padding: '1px 8px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <Briefcase size={11} color="#64748b" /> Agent: {party.broker}
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditParty(settingsActiveTab, originalIndex >= 0 ? originalIndex : idx, item)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 10px',
+                                  borderRadius: 6,
+                                  background: '#f8fafc',
+                                  border: '1px solid #cbd5e1',
+                                  color: '#334155',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                                title="Edit Party Details"
+                              >
+                                <Edit2 size={12} color="#0284c7" /> Edit Details
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMasterSetting(originalIndex >= 0 ? originalIndex : idx, item)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  background: '#fef2f2',
+                                  border: '1px solid #fecaca',
+                                  color: '#ef4444',
+                                  cursor: 'pointer'
+                                }}
+                                title="Delete Party"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Address, Phone, Contact Grid */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px', fontSize: '0.78rem', color: '#475569', marginTop: 2 }}>
+                            {(party.address || party.city) && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <MapPin size={13} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {party.address ? `${party.address}, ${party.city}` : party.city}
+                                </span>
+                              </div>
+                            )}
+                            {party.phone && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <Phone size={13} color="#16a34a" style={{ flexShrink: 0 }} />
+                                <span>{party.phone}</span>
+                              </div>
+                            )}
+                            {party.contactPerson && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <User size={13} color="#6366f1" style={{ flexShrink: 0 }} />
+                                <span>Contact: <strong>{party.contactPerson}</strong></span>
+                              </div>
+                            )}
+                            {party.processTypes && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <Sliders size={13} color="#d97706" style={{ flexShrink: 0 }} />
+                                <span>Processes: {party.processTypes}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {party.notes && (
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', background: '#f8fafc', padding: '3px 8px', borderRadius: 4, marginTop: 2 }}>
+                              📝 {party.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            ) : (
+              /* TAB CONTENT: QUALITIES, PANNAS, PROCESSES */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {/* Quick Add Bar */}
+                <form onSubmit={handleAddMasterSetting} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    required
+                    placeholder={
+                      settingsActiveTab === 'qualities' ? 'Enter Fabric Quality (e.g. Cotton 60x60 Cambric)...' :
+                      settingsActiveTab === 'pannas' ? 'Enter Panna / Width (e.g. 52", 64")...' :
+                      'Enter Process Type (e.g. RFD Bleaching)...'
+                    }
+                    value={newSettingInput}
+                    onChange={(e) => setNewSettingInput(e.target.value)}
+                    className="input-field"
+                    style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+                  />
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={{ height: '36px', padding: '0 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', border: 'none' }}
+                  >
+                    <Plus size={15} /> Add to Master
+                  </button>
+                </form>
+
+                {/* Items List */}
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.5rem', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {(configs[settingsActiveTab] || []).length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                      No items configured for {settingsActiveTab}. Add a new value above.
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  ) : (
+                    (configs[settingsActiveTab] || []).map((item, idx) => {
+                      const isEditing = editingItemIndex === idx;
+                      const textVal = typeof item === 'object' ? item.name : item;
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '7px 12px',
+                            borderRadius: 6,
+                            background: '#f8fafc',
+                            border: '1px solid #f1f5f9'
+                          }}
+                        >
+                          {isEditing ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, marginRight: '10px' }}>
+                              <input
+                                type="text"
+                                value={editingItemValue}
+                                onChange={(e) => setEditingItemValue(e.target.value)}
+                                className="input-field"
+                                style={{ height: '30px', fontSize: '0.8rem', width: '100%' }}
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditMasterSetting(idx)}
+                                className="btn-primary"
+                                style={{ height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingItemIndex(null)}
+                                className="btn-secondary"
+                                style={{ height: '30px', padding: '0 8px', fontSize: '0.74rem' }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
+                              {textVal}
+                            </span>
+                          )}
+
+                          {!isEditing && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditMasterSetting(idx, item)}
+                                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 3 }}
+                                title="Edit / Rename"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMasterSetting(idx, item)}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 3 }}
+                                title="Delete"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Modal Footer with Reset Defaults */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
@@ -1682,6 +2152,221 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                 Done / Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 🏛️ SUB-MODAL: ADD / EDIT PARTY DETAILS (GST, ADDRESS, ETC)*/}
+      {/* ======================================================== */}
+      {showPartyModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 10001,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              width: '100%',
+              maxWidth: 580,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.15rem'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Building size={22} color="#0284c7" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                    {partyModalMode === 'add' ? '+ Add New' : 'Edit'} {partyModalType === 'weavers' ? 'Weaver Party' : 'Processing Mill'} Details
+                  </h3>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Enter party GSTIN, complete address, phone, contact person and brokerage details.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPartyModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveParty} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                  Party / Firm Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={partyModalType === 'weavers' ? 'e.g. Maruti Weaving Works' : 'e.g. Shree Radhe Bleaching & Dyeing Processors'}
+                  value={partyModalForm.name}
+                  onChange={(e) => setPartyModalForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="input-field"
+                  style={{ height: '36px', fontSize: '0.85rem', width: '100%', fontWeight: 700 }}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    GSTIN (GST Number)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={15}
+                    placeholder="e.g. 24AABCM1234F1Z8"
+                    value={partyModalForm.gst}
+                    onChange={(e) => setPartyModalForm(prev => ({ ...prev, gst: e.target.value.toUpperCase() }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%', letterSpacing: '0.04em', fontFamily: 'monospace' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Phone / Mobile
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. +91 98251 12345"
+                    value={partyModalForm.phone}
+                    onChange={(e) => setPartyModalForm(prev => ({ ...prev, phone: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                  Factory / Office Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Plot No. 42-45, Phase-2, GIDC Pandesara"
+                  value={partyModalForm.address}
+                  onChange={(e) => setPartyModalForm(prev => ({ ...prev, address: e.target.value }))}
+                  className="input-field"
+                  style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    City & State
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Surat, Gujarat - 394221"
+                    value={partyModalForm.city}
+                    onChange={(e) => setPartyModalForm(prev => ({ ...prev, city: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Contact Person Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Hareshbhai Patel"
+                    value={partyModalForm.contactPerson}
+                    onChange={(e) => setPartyModalForm(prev => ({ ...prev, contactPerson: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              {partyModalType === 'weavers' ? (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Broker / Textile Agent
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ramesh Dalal or Direct"
+                    value={partyModalForm.broker}
+                    onChange={(e) => setPartyModalForm(prev => ({ ...prev, broker: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                    Process Specializations / Services
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. RFD Bleaching, Scouring, Mercerizing, Bio Wash"
+                    value={partyModalForm.processTypes}
+                    onChange={(e) => setPartyModalForm(prev => ({ ...prev, processTypes: e.target.value }))}
+                    className="input-field"
+                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: 3 }}>
+                  Notes / Payment Terms
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. 30 Days Credit. Fast turnaround on 14kg rayon."
+                  value={partyModalForm.notes}
+                  onChange={(e) => setPartyModalForm(prev => ({ ...prev, notes: e.target.value }))}
+                  className="input-field"
+                  style={{ fontSize: '0.82rem', width: '100%', resize: 'none', padding: '6px 8px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowPartyModal(false)}
+                  className="btn-secondary"
+                  style={{ height: '36px', padding: '0 16px', fontSize: '0.82rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ height: '36px', padding: '0 18px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', border: 'none', fontWeight: 700 }}
+                >
+                  Save Party Details
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1790,7 +2475,7 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       ⚙️ Manage Weavers
                     </button>
                   </div>
-                  <div style={{ display: 'flex', gap: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <input
                       type="text"
                       required
@@ -1802,8 +2487,42 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
                     />
                     <datalist id="weavers-master-datalist">
-                      {(configs.weavers || []).map(w => <option key={w} value={w} />)}
+                      {(configs.weavers || []).map((w, idx) => {
+                        const party = normalizeParty(w);
+                        return (
+                          <option
+                            key={idx}
+                            value={party.name}
+                            label={party.gst ? `GST: ${party.gst} | ${party.address || party.city}` : ''}
+                          />
+                        );
+                      })}
                     </datalist>
+
+                    {selectedWeaverDetails && (
+                      <div style={{ fontSize: '0.72rem', background: '#f8fafc', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', color: '#475569', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {selectedWeaverDetails.gst && (
+                          <span style={{ fontWeight: 800, color: '#16a34a' }}>
+                            GSTIN: {selectedWeaverDetails.gst}
+                          </span>
+                        )}
+                        {selectedWeaverDetails.address && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <MapPin size={11} color="#0284c7" /> {selectedWeaverDetails.address}, {selectedWeaverDetails.city}
+                          </span>
+                        )}
+                        {selectedWeaverDetails.phone && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <Phone size={11} color="#16a34a" /> {selectedWeaverDetails.phone}
+                          </span>
+                        )}
+                        {selectedWeaverDetails.broker && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <Briefcase size={11} color="#64748b" /> Agent: {selectedWeaverDetails.broker}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2120,19 +2839,50 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
                       ⚙️ Manage Mills
                     </button>
                   </div>
-                  <input
-                    type="text"
-                    required
-                    list="mills-master-datalist"
-                    placeholder="Select or enter processing mill name..."
-                    value={millChallanForm.millParty}
-                    onChange={(e) => setMillChallanForm(prev => ({ ...prev, millParty: e.target.value }))}
-                    className="input-field"
-                    style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
-                  />
-                  <datalist id="mills-master-datalist">
-                    {(configs.mills || []).map(m => <option key={m} value={m} />)}
-                  </datalist>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <input
+                      type="text"
+                      required
+                      list="mills-master-datalist"
+                      placeholder="Select or enter processing mill name..."
+                      value={millChallanForm.millParty}
+                      onChange={(e) => setMillChallanForm(prev => ({ ...prev, millParty: e.target.value }))}
+                      className="input-field"
+                      style={{ height: '34px', fontSize: '0.82rem', width: '100%' }}
+                    />
+                    <datalist id="mills-master-datalist">
+                      {(configs.mills || []).map((m, idx) => {
+                        const party = normalizeParty(m);
+                        return (
+                          <option
+                            key={idx}
+                            value={party.name}
+                            label={party.gst ? `GST: ${party.gst} | ${party.address || party.city}` : ''}
+                          />
+                        );
+                      })}
+                    </datalist>
+
+                    {selectedMillDetails && (
+                      <div style={{ fontSize: '0.72rem', background: '#f0fdf4', padding: '4px 8px', borderRadius: 6, border: '1px solid #bbf7d0', color: '#166534', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {selectedMillDetails.gst && (
+                          <span style={{ fontWeight: 800 }}>
+                            GSTIN: {selectedMillDetails.gst}
+                          </span>
+                        )}
+                        {selectedMillDetails.address && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <MapPin size={11} color="#16a34a" /> {selectedMillDetails.address}, {selectedMillDetails.city}
+                          </span>
+                        )}
+                        {selectedMillDetails.phone && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <Phone size={11} color="#16a34a" /> {selectedMillDetails.phone}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -2476,22 +3226,40 @@ export default function YamunajiRfdPanel({ companyEntity = 'Yamunaji', onNavigat
             >
               {/* Company Header */}
               <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-                <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, letterSpacing: '0.05em' }}>
+                <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, letterSpacing: '0.05em' }}>
                   YAMUNAJI (YJ)
                 </h1>
-                <p style={{ margin: '3px 0 0', fontSize: '0.8rem', fontWeight: 600 }}>
+                <p style={{ margin: '3px 0 0', fontSize: '0.82rem', fontWeight: 700 }}>
                   TEXTILE GRAY & RFD PROCESSING DIVISION — SURAT, GUJARAT
                 </p>
-                <div style={{ marginTop: 6, display: 'inline-block', border: '1px solid #0f172a', padding: '2px 12px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: '#334155' }}>
+                  GSTIN: <strong>24AAGFY0182C1ZP</strong> | Ring Road Textile Market, Surat - 395002 | Phone: +91 98250 12345
+                </p>
+                <div style={{ marginTop: 6, display: 'inline-block', border: '1.5px solid #0f172a', padding: '3px 14px', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   DELIVERY CHALLAN FOR PROCESSING MILL
                 </div>
               </div>
 
               {/* Meta Info Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', borderBottom: '1px solid #0f172a', paddingBottom: '0.75rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '1rem', borderBottom: '1px solid #0f172a', paddingBottom: '0.75rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>TO (PROCESSING MILL):</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 900, marginTop: 2 }}>{showPrintChallanModal.millParty}</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, marginTop: 2, color: '#0f172a' }}>{showPrintChallanModal.millParty}</div>
+                  {showPrintChallanModal.millGst && (
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0369a1', marginTop: 2 }}>
+                      GSTIN: {showPrintChallanModal.millGst}
+                    </div>
+                  )}
+                  {(showPrintChallanModal.millAddress || showPrintChallanModal.millCity) && (
+                    <div style={{ fontSize: '0.78rem', color: '#334155', marginTop: 2 }}>
+                      {showPrintChallanModal.millAddress ? `${showPrintChallanModal.millAddress}, ` : ''}{showPrintChallanModal.millCity || ''}
+                    </div>
+                  )}
+                  {showPrintChallanModal.millPhone && (
+                    <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: 1 }}>
+                      Phone: {showPrintChallanModal.millPhone} {showPrintChallanModal.millContact ? `(${showPrintChallanModal.millContact})` : ''}
+                    </div>
+                  )}
                   <div style={{ marginTop: 4 }}><strong>Process Required:</strong> {showPrintChallanModal.processRequired}</div>
                 </div>
 
