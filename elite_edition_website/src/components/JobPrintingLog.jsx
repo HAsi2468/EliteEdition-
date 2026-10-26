@@ -246,6 +246,28 @@ export default function JobPrintingLog() {
     setOutwardPaperEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: val } : e));
   };
 
+  // Safe decimal and numeric input handlers for Raw Material inputs (prevents React HTML5 type="number" decimal swallow bugs)
+  const handleRawDecimalChange = (setter) => (e) => {
+    let val = e.target.value.replace(/,/g, '.');
+    if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+      setter(val);
+    }
+  };
+
+  const handleRawPaperFieldChange = (id, field, isDecimal = false, isInward = true) => (e) => {
+    let val = e.target.value.replace(/,/g, '.');
+    if (isDecimal) {
+      if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+        if (isInward) handleInwardPaperEntryChange(id, field, val);
+        else handleOutwardPaperEntryChange(id, field, val);
+      }
+    } else {
+      val = val.replace(/[^0-9]/g, '');
+      if (isInward) handleInwardPaperEntryChange(id, field, val);
+      else handleOutwardPaperEntryChange(id, field, val);
+    }
+  };
+
   // Raw Material Summary State for Displaying on Screen
   const [rawMaterialSummary, setRawMaterialSummary] = useState({
     inward: { grando: { C: 0, M: 0, Y: 0, K: 0 }, printdot: { C: 0, M: 0, Y: 0, K: 0 }, paper: [] },
@@ -4748,7 +4770,7 @@ export default function JobPrintingLog() {
                 <div>
                   <label style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>OPERATOR</label>
                   <input
-                    type="text" list="print-operators-list" placeholder="Operator name..." value={rawOperator} onChange={e => setRawOperator(e.target.value)}
+                    type="text" list="print-operators-list" placeholder="Operator name..." value={rawOperator} onFocus={e => e.target.select()} onChange={e => setRawOperator(e.target.value)}
                     style={{ width: '100%', padding: '0.28rem 0.45rem', fontSize: '0.76rem', height: '30px', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }}
                   />
                 </div>
@@ -4781,9 +4803,16 @@ export default function JobPrintingLog() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C', '#0284c7', grandoInC, setGrandoInC], ['M', '#db2777', grandoInM, setGrandoInM], ['Y', '#ca8a04', grandoInY, setGrandoInY], ['K', '#334155', grandoInK, setGrandoInK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
-                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
-                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', transition: 'box-shadow 0.15s' }} />
+                            <label style={{ fontSize: '0.62rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={val}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawDecimalChange(set)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.8rem', height: '28px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+                            />
                           </div>
                         ))}
                       </div>
@@ -4795,9 +4824,16 @@ export default function JobPrintingLog() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C', '#0284c7', printdotInC, setPrintdotInC], ['M', '#db2777', printdotInM, setPrintdotInM], ['Y', '#ca8a04', printdotInY, setPrintdotInY], ['K', '#334155', printdotInK, setPrintdotInK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
-                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
-                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', transition: 'box-shadow 0.15s' }} />
+                            <label style={{ fontSize: '0.62rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={val}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawDecimalChange(set)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.8rem', height: '28px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+                            />
                           </div>
                         ))}
                       </div>
@@ -4858,11 +4894,29 @@ export default function JobPrintingLog() {
                               })()}
                             </select>
                           </div>
-                          <div style={{ width: '54px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Rolls Quantity" />
+                          <div style={{ width: '64px', flexShrink: 0 }}>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="Rolls"
+                              value={entry.paperRollsQty}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawPaperFieldChange(entry.id, 'paperRollsQty', false, true)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.76rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }}
+                              title="Rolls Quantity"
+                            />
                           </div>
-                          <div style={{ width: '54px' }}>
-                            <input type="number" step="0.1" placeholder="Mtr" value={entry.paperMtrQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperMtrQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Meters Quantity" />
+                          <div style={{ width: '64px', flexShrink: 0 }}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="Mtr"
+                              value={entry.paperMtrQty}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawPaperFieldChange(entry.id, 'paperMtrQty', true, true)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.76rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }}
+                              title="Meters Quantity"
+                            />
                           </div>
                           {inwardPaperEntries.length > 1 && (
                             <button type="button" onClick={() => handleRemoveInwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
@@ -4898,9 +4952,16 @@ export default function JobPrintingLog() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C', '#0284c7', grandoOutC, setGrandoOutC], ['M', '#db2777', grandoOutM, setGrandoOutM], ['Y', '#ca8a04', grandoOutY, setGrandoOutY], ['K', '#334155', grandoOutK, setGrandoOutK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
-                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
-                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                            <label style={{ fontSize: '0.62rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={val}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawDecimalChange(set)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.8rem', height: '28px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+                            />
                           </div>
                         ))}
                       </div>
@@ -4912,9 +4973,16 @@ export default function JobPrintingLog() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C', '#0284c7', printdotOutC, setPrintdotOutC], ['M', '#db2777', printdotOutM, setPrintdotOutM], ['Y', '#ca8a04', printdotOutY, setPrintdotOutY], ['K', '#334155', printdotOutK, setPrintdotOutK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
-                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
-                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                            <label style={{ fontSize: '0.62rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={val}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawDecimalChange(set)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.8rem', height: '28px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+                            />
                           </div>
                         ))}
                       </div>
@@ -4975,11 +5043,29 @@ export default function JobPrintingLog() {
                               })()}
                             </select>
                           </div>
-                          <div style={{ width: '54px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Rolls Quantity" />
+                          <div style={{ width: '64px', flexShrink: 0 }}>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="Rolls"
+                              value={entry.paperRollsQty}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawPaperFieldChange(entry.id, 'paperRollsQty', false, false)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.76rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }}
+                              title="Rolls Quantity"
+                            />
                           </div>
-                          <div style={{ width: '54px' }}>
-                            <input type="number" step="0.1" placeholder="Mtr" value={entry.paperMtrQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperMtrQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Meters Quantity" />
+                          <div style={{ width: '64px', flexShrink: 0 }}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="Mtr"
+                              value={entry.paperMtrQty}
+                              onFocus={e => e.target.select()}
+                              onChange={handleRawPaperFieldChange(entry.id, 'paperMtrQty', true, false)}
+                              style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.76rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }}
+                              title="Meters Quantity"
+                            />
                           </div>
                           {outwardPaperEntries.length > 1 && (
                             <button type="button" onClick={() => handleRemoveOutwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
@@ -5002,6 +5088,7 @@ export default function JobPrintingLog() {
                   type="text"
                   placeholder="Remarks / Optional notes..."
                   value={rawNotes}
+                  onFocus={e => e.target.select()}
                   onChange={e => setRawNotes(e.target.value)}
                   style={{
                     flex: 1, padding: '0.42rem 0.7rem', fontSize: '0.8rem', height: '34px',
